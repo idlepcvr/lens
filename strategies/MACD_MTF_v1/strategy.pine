@@ -43,12 +43,10 @@ longCross  = ta.crossover(macdLine,  sigLine)
 shortCross = ta.crossunder(macdLine, sigLine)
 
 // ─── HTF MACD bias (no lookahead — request prior bar value) ─────────────────
-htfMacdLine = request.security(syminfo.tickerid, htfRes,
-                  ta.macd(close, fastLen, slowLen, sigLen)[0],
-                  lookahead=barmerge.lookahead_off)
-htfSigLine  = request.security(syminfo.tickerid, htfRes,
-                  ta.macd(close, fastLen, slowLen, sigLen)[1],
-                  lookahead=barmerge.lookahead_off)
+[htfMacdLine, htfSigLine, htfHist] = request.security(
+     syminfo.tickerid, htfRes,
+     ta.macd(close, fastLen, slowLen, sigLen),
+     lookahead=barmerge.lookahead_off)
 htfBullish = htfMacdLine > htfSigLine
 htfBearish = htfMacdLine < htfSigLine
 htfBiasStr = htfBullish ? "bullish" : htfBearish ? "bearish" : "neutral"
