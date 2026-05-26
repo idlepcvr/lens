@@ -1,9 +1,16 @@
 //@version=6
 // ─────────────────────────────────────────────────────────────────────────────
-// LENS / MACD_MTF_v1
-// Entry-TF MACD cross, confirmed by HTF MACD bias. ATR-based stop, R:R target.
-// Emits a LENS-schema JSON in alert() — see /home/mini/lens/app/models.py SignalIngest.
-// Built for BTCUSDT.P 15m per LENS_PLAN.md Week 2.
+// LENS / MACD_MTF_v1   ⚠ DEPRECATED — DO NOT TRADE
+// ─────────────────────────────────────────────────────────────────────────────
+// Baseline run 2026-05-26 (BYBIT BTCUSD.P, 9-month sample):
+//   1151 trades, 14.9% WR, PF 0.11, -€946 on €1000, 94.7% max DD,
+//   44-trade losing streak. No edge — kept as a negative-baseline reference.
+// Entry-TF MACD cross + HTF MACD alignment failed because:
+//   - 15m BTC is mostly chop; MACD whipsaws constantly
+//   - ATR(14)×1.5 stops are noise-level on 15m
+//   - 3R target unreachable from chop entries
+//   - No regime / volatility filter
+// Replacement strategy will be reverse-engineered from PRISM v0.1 fill history.
 // ─────────────────────────────────────────────────────────────────────────────
 strategy("LENS / MACD_MTF_v1", overlay=true,
      initial_capital=1000, default_qty_type=strategy.percent_of_equity,
