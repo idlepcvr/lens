@@ -1,0 +1,163 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / MACD_MTF_v1
+// Entry-TF MACD cross, confirmed by HTF MACD bias. ATR-based stop, R:R target.
+// Emits a LENS-schema JSON in alert() — see /home/mini/lens/app/models.py SignalIngest.
+// Built for BTCUSDT.P 15m per LENS_PLAN.md Week 2.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("LENS / MACD_MTF_v1", overlay=true,
+     initial_capital=1000, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10, commission_type=strategy.commission.percent,
+     commission_value=0.05, slippage=2,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+// ─── Strategy identity (must match LENS schema) ─────────────────────────────
+strategyName    = "MACD_MTF_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+grpMACD  = "MACD"
+fastLen  = input.int(12,  "MACD Fast",   group=grpMACD)
+slowLen  = input.int(26,  "MACD Slow",   group=grpMACD)
+sigLen   = input.int(9,   "MACD Signal", group=grpMACD)
+htfRes   = input.timeframe("60", "HTF resolution (bias)", group=grpMACD,
+                            tooltip="MACD direction on this TF must agree with entry side")
+
+grpRisk  = "Risk / target"
+atrLen   = input.int(14,  "ATR length",          group=grpRisk)
+atrMult  = input.float(1.5,"ATR multiplier (SL)",group=grpRisk, step=0.1)
+rrTarget = input.float(3.0,"R:R target",         group=grpRisk, step=0.5)
+
+grpCtx   = "Context"
+venueIn  = input.string("kraken", "Venue tag", options=["kraken","bybit"], group=grpCtx)
+useSess  = input.bool(false, "Tag session_utc (asia/london/ny/off-hours)", group=grpCtx)
+
+grpAlert = "Alert"
+emitJson = input.bool(true, "Emit LENS JSON in alert message", group=grpAlert,
+                       tooltip="Disable to alert without payload (signal only)")
+
+// ─── MACD on entry TF ────────────────────────────────────────────────────────
+[macdLine, sigLine, hist] = ta.macd(close, fastLen, slowLen, sigLen)
+longCross  = ta.crossover(macdLine,  sigLine)
+shortCross = ta.crossunder(macdLine, sigLine)
+
+// ─── HTF MACD bias (no lookahead — request prior bar value) ─────────────────
+htfMacdLine = request.security(syminfo.tickerid, htfRes,
+                  ta.macd(close, fastLen, slowLen, sigLen)[0],
+                  lookahead=barmerge.lookahead_off)
+htfSigLine  = request.security(syminfo.tickerid, htfRes,
+                  ta.macd(close, fastLen, slowLen, sigLen)[1],
+                  lookahead=barmerge.lookahead_off)
+htfBullish = htfMacdLine > htfSigLine
+htfBearish = htfMacdLine < htfSigLine
+htfBiasStr = htfBullish ? "bullish" : htfBearish ? "bearish" : "neutral"
+
+// ─── Multi-TF confluence — count agreeing checks ────────────────────────────
+hist1Above  = hist > 0
+htfRising   = htfMacdLine > htfMacdLine[1]
+priceAbove50 = close > ta.sma(close, 50)
+priceBelow50 = close < ta.sma(close, 50)
+
+confLong  = (htfBullish ? 1 : 0) + (hist1Above ? 1 : 0)
+          + (htfRising  ? 1 : 0) + (priceAbove50 ? 1 : 0)
+confShort = (htfBearish ? 1 : 0) + (not hist1Above ? 1 : 0)
+          + (not htfRising ? 1 : 0) + (priceBelow50 ? 1 : 0)
+
+// ─── ATR-based SL / TP ──────────────────────────────────────────────────────
+atrVal      = ta.atr(atrLen)
+atr14dPct   = (request.security(syminfo.tickerid, "D",
+                  ta.atr(14), lookahead=barmerge.lookahead_off) / close) * 100
+
+longStop    = close - atrVal * atrMult
+longTarget  = close + atrVal * atrMult * rrTarget
+shortStop   = close + atrVal * atrMult
+shortTarget = close - atrVal * atrMult * rrTarget
+
+// ─── Entry conditions ──────────────────────────────────────────────────────
+longSig  = longCross  and htfBullish
+shortSig = shortCross and htfBearish
+
+// ─── Daily BTC trend tag (context, not gate) ────────────────────────────────
+btc1dClose = request.security("BTCUSDT", "D", close, lookahead=barmerge.lookahead_off)
+btc1dSma   = request.security("BTCUSDT", "D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
+btc1dTrend = btc1dClose > btc1dSma * 1.02 ? "up" : btc1dClose < btc1dSma * 0.98 ? "down" : "range"
+
+btc1wClose = request.security("BTCUSDT", "W", close, lookahead=barmerge.lookahead_off)
+btc1wSma   = request.security("BTCUSDT", "W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
+btc1wTrend = btc1wClose > btc1wSma * 1.02 ? "up" : btc1wClose < btc1wSma * 0.98 ? "down" : "range"
+
+// ─── Session tag (UTC) ─────────────────────────────────────────────────────
+sessionStr = ""
+if useSess
+    h = hour(time, "UTC")
+    sessionStr := h >= 0 and h < 8  ? "asia"
+              : h >= 8 and h < 13 ? "london"
+              : h >= 13 and h < 21 ? "ny" : "off-hours"
+
+// ─── Strategy execution (for Strategy Tester baseline) ─────────────────────
+if longSig
+    strategy.entry("long", strategy.long)
+    strategy.exit("long-x", "long", stop=longStop, limit=longTarget)
+if shortSig
+    strategy.entry("short", strategy.short)
+    strategy.exit("short-x", "short", stop=shortStop, limit=shortTarget)
+
+plot(longStop,   "Long SL",  color=color.new(color.red,   60), style=plot.style_linebr)
+plot(longTarget, "Long TP",  color=color.new(color.green, 60), style=plot.style_linebr)
+
+// ─── JSON payload (matches SignalIngest in app/models.py) ──────────────────
+// Pine has no JSON serializer — build the string manually. Use f-string-y concat.
+// signal_id format: <strategy>_<symbol>_<timestamp_ms>_<dir> (stable per bar)
+f_jsonStr(k, v) => '"' + k + '":"' + v + '"'
+f_jsonNum(k, v) => '"' + k + '":' + str.tostring(v)
+f_jsonNull(k)   => '"' + k + '":null'
+
+buildPayload(dir, entryPx, stopPx, tgtPx, conf, rrExpect) =>
+    sigId = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    triggerType = dir == "long" ? "macd_cross_long" : "macd_cross_short"
+    mtf = '['
+    mtf += htfBullish or htfBearish ? '"htf_macd_align"' : ''
+    mtf += hist1Above != (dir == "short") ? (str.length(mtf) > 1 ? ',"hist_align"' : '"hist_align"') : ''
+    mtf += htfRising  != (dir == "short") ? (str.length(mtf) > 1 ? ',"htf_rising"'  : '"htf_rising"')  : ''
+    mtf += (dir == "long" ? priceAbove50 : priceBelow50) ? (str.length(mtf) > 1 ? ',"sma50"' : '"sma50"') : ''
+    mtf += ']'
+
+    s  = '{'
+    s += f_jsonStr("signal_id",        sigId)               + ','
+    s += f_jsonStr("strategy_name",    strategyName)        + ','
+    s += f_jsonStr("strategy_version", strategyVersion)     + ','
+    s += f_jsonStr("symbol",           syminfo.ticker)      + ','
+    s += f_jsonStr("venue",            venueIn)             + ','
+    s += (useSess  ? f_jsonStr("session_utc",  sessionStr)  : f_jsonNull("session_utc"))  + ','
+    s += f_jsonStr("btc_1d_trend",     btc1dTrend)          + ','
+    s += f_jsonStr("btc_1w_trend",     btc1wTrend)          + ','
+    s += f_jsonNum("atr_14d_pct",      math.round(atr14dPct * 1000) / 1000) + ','
+    s += f_jsonStr("trigger_type",     triggerType)         + ','
+    s += f_jsonStr("htf_bias",         htfBiasStr)          + ','
+    s += '"mtf_confluence":' + mtf                          + ','
+    s += f_jsonNum("confluence_count", conf)                + ','
+    s += f_jsonStr("direction",        dir)                 + ','
+    s += f_jsonNum("entry_price",      math.round(entryPx * 100) / 100) + ','
+    s += f_jsonNum("stop_price",       math.round(stopPx  * 100) / 100) + ','
+    s += f_jsonNum("target_price",     math.round(tgtPx   * 100) / 100) + ','
+    s += f_jsonNum("expected_rr",      rrExpect)
+    s += '}'
+    s
+
+// ─── Alerts (fire on confirmed close) ──────────────────────────────────────
+alertcondition(longSig,  title="LENS Long",  message="long signal")
+alertcondition(shortSig, title="LENS Short", message="short signal")
+
+if longSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("long", close, longStop, longTarget, confLong, rrTarget) : "long"
+    alert(payload, alert.freq_once_per_bar_close)
+
+if shortSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("short", close, shortStop, shortTarget, confShort, rrTarget) : "short"
+    alert(payload, alert.freq_once_per_bar_close)
+
+// ─── Visual markers ────────────────────────────────────────────────────────
+plotshape(longSig,  title="Long",  location=location.belowbar,
+     style=shape.triangleup,   color=color.new(color.green, 0), size=size.small)
+plotshape(shortSig, title="Short", location=location.abovebar,
+     style=shape.triangledown, color=color.new(color.red,   0), size=size.small)

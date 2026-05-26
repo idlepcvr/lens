@@ -1,0 +1,35 @@
+# Environment & secrets
+.env
+*.env
+
+# Database
+lens.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+lens.log
+
+# Node
+node_modules/
+
+# Screenshots (Week 6 deliverable)
+data/screenshots/

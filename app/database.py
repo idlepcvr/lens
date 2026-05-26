@@ -1,0 +1,613 @@
+"""
+SQLite CRUD layer for LENS.
+
+Tables (LENS v1 scope, per LENS_PLAN.md):
+  trades, transfers, daily_snapshots, signals
+
+Signal feature schema is locked — see LENS_PLAN.md `Feature Schema`.
+"""
+
+import json
+import sqlite3
+from datetime import datetime, timedelta
+from typing import Optional
+
+from .models import TradeCreate, TradeUpdate, TradeResponse
+
+DB_PATH = "lens.db"
+
+
+# ─── Connection / schema ──────────────────────────────────────────────────────
+
+def _conn():
+    c = sqlite3.connect(DB_PATH)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys = ON")
+    return c
+
+
+def init_db():
+    c = _conn()
+    c.executescript("""
+        CREATE TABLE IF NOT EXISTS trades (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol            TEXT    NOT NULL DEFAULT 'BTC/USD:USD',
+            direction         TEXT    NOT NULL,
+            entry             REAL    NOT NULL,
+            size              REAL    NOT NULL,
+            leverage          REAL    NOT NULL,
+            tp                REAL,
+            sl                REAL,
+            exit              REAL,
+            pnl               REAL,
+            fees              REAL,
+            notes             TEXT,
+            opened_at         TEXT    NOT NULL,
+            closed_at         TEXT,
+            followed_plan     INTEGER,
+            followed_strategy INTEGER,
+            balance_after     REAL,
+            kraken_order_id   TEXT    UNIQUE,
+            venue             TEXT    DEFAULT 'manual',
+            contract          TEXT,
+            market_type       TEXT,
+            fill_type         TEXT,
+            order_type        TEXT,
+            funding_cost      REAL,
+            fill_uuid         TEXT,
+            fill_count        INTEGER,
+            linked_signal_id  TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_trades_opened_at      ON trades(opened_at);
+        CREATE INDEX IF NOT EXISTS idx_trades_closed_at      ON trades(closed_at);
+        CREATE INDEX IF NOT EXISTS idx_trades_venue          ON trades(venue);
+        CREATE INDEX IF NOT EXISTS idx_trades_linked_signal  ON trades(linked_signal_id);
+
+        CREATE TABLE IF NOT EXISTS transfers (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            kraken_id     TEXT    UNIQUE,
+            transfer_type TEXT,
+            asset         TEXT,
+            amount        REAL,
+            balance_after REAL,
+            ts            TEXT,
+            venue         TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_transfers_ts ON transfers(ts);
+
+        CREATE TABLE IF NOT EXISTS daily_snapshots (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_date    TEXT UNIQUE,
+            eur_balance      REAL,
+            btc_balance      REAL,
+            btc_price_usd    REAL,
+            portfolio_usd    REAL,
+            unrealized_pnl   REAL,
+            margin_used      REAL,
+            available_margin REAL
+        );
+
+        -- Signals: locked schema per LENS_PLAN.md ─────────────────────────────
+        CREATE TABLE IF NOT EXISTS signals (
+            -- Identity
+            signal_id         TEXT PRIMARY KEY,           -- UUID
+            strategy_name     TEXT NOT NULL,
+            strategy_version  TEXT NOT NULL,
+            received_at       TEXT NOT NULL,
+
+            -- Context
+            symbol            TEXT NOT NULL,
+            venue             TEXT,
+            session_utc       TEXT,                       -- asia|london|ny|off-hours
+            btc_1d_trend      TEXT,
+            btc_1w_trend      TEXT,
+            atr_14d_pct       REAL,
+
+            -- Setup
+            trigger_type      TEXT,
+            htf_bias          TEXT,
+            mtf_confluence    TEXT,                       -- JSON array
+            confluence_count  INTEGER,
+
+            -- Trade plan
+            direction          TEXT,
+            entry_price        REAL,
+            stop_price         REAL,
+            target_price       REAL,
+            suggested_size_pct REAL,
+            suggested_leverage REAL,
+            expected_rr        REAL,
+
+            -- Decision (filled at approve/reject)
+            status            TEXT NOT NULL DEFAULT 'pending',  -- pending|approved|rejected|expired
+            your_conviction   INTEGER,                          -- 1-5
+            rejection_reason  TEXT,
+            decided_at        TEXT,
+
+            -- Execution linkage (filled by sync, week 5)
+            linked_trade_id   INTEGER,
+
+            -- Outcome (filled when trade closes, week 5)
+            outcome           TEXT,                              -- win|loss|breakeven|open
+            r_realized        REAL,
+            pnl_eur           REAL,
+            hold_duration_min INTEGER,
+
+            -- Optional enrichment (week 6)
+            screenshot_path   TEXT,
+            notes             TEXT,
+
+            FOREIGN KEY (linked_trade_id) REFERENCES trades(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_signals_status        ON signals(status);
+        CREATE INDEX IF NOT EXISTS idx_signals_strategy      ON signals(strategy_name);
+        CREATE INDEX IF NOT EXISTS idx_signals_received_at   ON signals(received_at);
+        CREATE INDEX IF NOT EXISTS idx_signals_symbol        ON signals(symbol);
+
+        -- Single-row config (id=1) — drives goal/position calculator defaults
+        CREATE TABLE IF NOT EXISTS lens_config (
+            id                      INTEGER PRIMARY KEY,
+            start_balance           REAL,
+            target_balance          REAL,
+            target_date             TEXT,
+            trades_per_week         REAL,
+            win_rate                REAL,
+            rr_ratio                REAL,
+            leverage                REAL,
+            max_drawdown_allowed    REAL,
+            losses_allowed          INTEGER,
+            fractional_kelly        REAL,
+            execution_fill_factor   REAL,
+            risk_per_trade          REAL,
+            min_underlying_stop_pct REAL,
+            btc_price_eur           REAL,
+            btc_growth_monthly      REAL,
+            updated_at              TEXT
+        );
+    """)
+
+    # Seed default config row on first init
+    row = c.execute("SELECT id FROM lens_config WHERE id = 1").fetchone()
+    if not row:
+        c.execute(
+            """INSERT INTO lens_config (
+                id, start_balance, target_balance, target_date,
+                trades_per_week, win_rate, rr_ratio, leverage,
+                max_drawdown_allowed, losses_allowed, fractional_kelly,
+                execution_fill_factor, btc_growth_monthly, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (1000.0, 250000.0, "2028-12-31",
+             14.0, 0.55, 3.0, 10.0,
+             0.50, 20, 1.0 / 6.0,
+             1.0, 0.04, datetime.utcnow().isoformat()),
+        )
+
+    c.commit()
+    c.close()
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _iso(v):
+    if v is None:
+        return None
+    if hasattr(v, "isoformat"):
+        return v.isoformat()
+    return str(v)
+
+
+def _parse_dt(v):
+    if v is None or not isinstance(v, str):
+        return v
+    try:
+        return datetime.fromisoformat(v.replace("Z", "+00:00"))
+    except Exception:
+        return v
+
+
+def _row_to_response(row: sqlite3.Row) -> TradeResponse:
+    d = dict(row)
+    d["is_open"] = d.get("exit") is None
+    d["opened_at"] = _parse_dt(d["opened_at"])
+    if d.get("closed_at"):
+        d["closed_at"] = _parse_dt(d["closed_at"])
+    for col in ("followed_plan", "followed_strategy"):
+        if d.get(col) is not None:
+            d[col] = bool(d[col])
+    return TradeResponse(**{k: v for k, v in d.items() if k in TradeResponse.model_fields})
+
+
+def _row_to_dict(row: sqlite3.Row, json_cols: tuple = ()) -> dict:
+    d = dict(row)
+    for col in json_cols:
+        if col in d and isinstance(d[col], str):
+            try:
+                d[col] = json.loads(d[col])
+            except Exception:
+                pass
+    return d
+
+
+# ─── Trades ───────────────────────────────────────────────────────────────────
+
+def create_trade(trade: TradeCreate) -> TradeResponse:
+    now = trade.opened_at or datetime.utcnow()
+    fp = int(trade.followed_plan)     if trade.followed_plan     is not None else None
+    fs = int(trade.followed_strategy) if trade.followed_strategy is not None else None
+    c = _conn()
+    cur = c.execute("""
+        INSERT INTO trades (symbol, direction, entry, size, leverage, tp, sl,
+                            exit, pnl, fees, notes, opened_at, closed_at,
+                            followed_plan, followed_strategy, balance_after,
+                            linked_signal_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        trade.symbol, trade.direction, trade.entry, trade.size, trade.leverage,
+        trade.tp, trade.sl, trade.exit, trade.pnl, trade.fees, trade.notes,
+        _iso(now), _iso(trade.closed_at), fp, fs, trade.balance_after,
+        trade.linked_signal_id,
+    ))
+    c.commit()
+    row = c.execute("SELECT * FROM trades WHERE id = ?", (cur.lastrowid,)).fetchone()
+    c.close()
+    return _row_to_response(row)
+
+
+def get_trades(
+    limit: int = 100,
+    offset: int = 0,
+    venue: Optional[str] = None,
+    direction: Optional[str] = None,
+    result: Optional[str] = None,
+    period: Optional[int] = None,
+) -> list[TradeResponse]:
+    where = []
+    params: list = []
+    if venue:
+        where.append("venue = ?"); params.append(venue)
+    if direction:
+        where.append("direction = ?"); params.append(direction)
+    if result == "win":
+        where.append("pnl > 0")
+    elif result == "loss":
+        where.append("pnl < 0")
+    if period:
+        cutoff = (datetime.utcnow() - timedelta(days=int(period))).strftime("%Y-%m-%d")
+        where.append("(closed_at >= ? OR closed_at IS NULL)")
+        params.append(cutoff)
+    sql = "SELECT * FROM trades"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY opened_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    c = _conn()
+    rows = c.execute(sql, params).fetchall()
+    c.close()
+    return [_row_to_response(r) for r in rows]
+
+
+def get_trade(trade_id: int) -> Optional[TradeResponse]:
+    c = _conn()
+    row = c.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
+    c.close()
+    return _row_to_response(row) if row else None
+
+
+def update_trade(trade_id: int, data: TradeUpdate) -> Optional[TradeResponse]:
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not updates:
+        return get_trade(trade_id)
+    for ts_col in ("opened_at", "closed_at"):
+        if ts_col in updates:
+            updates[ts_col] = _iso(updates[ts_col])
+    for col in ("followed_plan", "followed_strategy"):
+        if col in updates and isinstance(updates[col], bool):
+            updates[col] = int(updates[col])
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [trade_id]
+    c = _conn()
+    c.execute(f"UPDATE trades SET {set_clause} WHERE id = ?", values)
+    c.commit()
+    row = c.execute("SELECT * FROM trades WHERE id = ?", (trade_id,)).fetchone()
+    c.close()
+    return _row_to_response(row) if row else None
+
+
+def delete_trade(trade_id: int) -> bool:
+    c = _conn()
+    cur = c.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
+    c.commit()
+    c.close()
+    return cur.rowcount > 0
+
+
+def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
+    """Used by kraken_sync + bybit_sync — dedups on kraken_order_id column
+    (reused as a generic exchange_order_id for both venues)."""
+    order_id = trade_dict.get("kraken_order_id")
+    c = _conn()
+    if order_id:
+        existing = c.execute(
+            "SELECT id FROM trades WHERE kraken_order_id = ?", (order_id,)
+        ).fetchone()
+        if existing:
+            c.close()
+            return None
+
+    cur = c.execute("""
+        INSERT INTO trades (symbol, direction, entry, size, leverage, tp, sl,
+                            exit, pnl, fees, notes, opened_at, closed_at,
+                            kraken_order_id, balance_after,
+                            venue, contract, market_type, fill_type, order_type,
+                            funding_cost, fill_uuid, fill_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        trade_dict.get("symbol", "BTC/USD"),
+        trade_dict["direction"],
+        trade_dict["entry"],
+        trade_dict["size"],
+        trade_dict.get("leverage", 1.0),
+        trade_dict.get("tp"),
+        trade_dict.get("sl"),
+        trade_dict.get("exit"),
+        trade_dict.get("pnl"),
+        trade_dict.get("fees"),
+        trade_dict.get("notes"),
+        _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat(),
+        _iso(trade_dict.get("closed_at")),
+        order_id,
+        trade_dict.get("balance_after"),
+        trade_dict.get("venue", "kraken_futures"),
+        trade_dict.get("contract"),
+        trade_dict.get("market_type"),
+        trade_dict.get("fill_type"),
+        trade_dict.get("order_type"),
+        trade_dict.get("funding_cost"),
+        trade_dict.get("fill_uuid"),
+        trade_dict.get("fill_count"),
+    ))
+    c.commit()
+    row = c.execute("SELECT * FROM trades WHERE id = ?", (cur.lastrowid,)).fetchone()
+    c.close()
+    return _row_to_response(row)
+
+
+# ─── Transfers ────────────────────────────────────────────────────────────────
+
+def get_transfers(limit: int = 200) -> list[dict]:
+    c = _conn()
+    rows = c.execute(
+        "SELECT * FROM transfers ORDER BY ts DESC LIMIT ?", (limit,)
+    ).fetchall()
+    c.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def upsert_transfer(transfer_dict: dict) -> bool:
+    kid = transfer_dict.get("kraken_id")
+    c = _conn()
+    if kid:
+        existing = c.execute(
+            "SELECT id FROM transfers WHERE kraken_id = ?", (kid,)
+        ).fetchone()
+        if existing:
+            c.close()
+            return False
+
+    ts = _iso(transfer_dict.get("ts"))
+    c.execute("""
+        INSERT INTO transfers (kraken_id, transfer_type, asset, amount, balance_after, ts, venue)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        transfer_dict.get("kraken_id", str(ts)),
+        transfer_dict.get("transfer_type", "unknown"),
+        transfer_dict.get("asset", "eur"),
+        float(transfer_dict.get("amount", 0)),
+        transfer_dict.get("balance_after"),
+        ts,
+        transfer_dict.get("venue", "kraken_spot"),
+    ))
+    c.commit()
+    c.close()
+    return True
+
+
+# ─── Daily snapshots ──────────────────────────────────────────────────────────
+
+_DSNAP_COLS = ("snapshot_date", "eur_balance", "btc_balance", "btc_price_usd",
+               "portfolio_usd", "unrealized_pnl", "margin_used", "available_margin")
+
+
+def upsert_daily_snapshot(snapshot: dict) -> dict:
+    payload = {k: snapshot.get(k) for k in _DSNAP_COLS}
+    if not payload.get("snapshot_date"):
+        raise ValueError("snapshot_date is required")
+    c = _conn()
+    existing = c.execute(
+        "SELECT id FROM daily_snapshots WHERE snapshot_date = ?",
+        (payload["snapshot_date"],),
+    ).fetchone()
+    if existing:
+        set_clause = ", ".join(f"{k} = ?" for k in _DSNAP_COLS if k != "snapshot_date")
+        c.execute(
+            f"UPDATE daily_snapshots SET {set_clause} WHERE snapshot_date = ?",
+            [payload[k] for k in _DSNAP_COLS if k != "snapshot_date"]
+            + [payload["snapshot_date"]],
+        )
+    else:
+        cols = list(_DSNAP_COLS)
+        placeholders = ", ".join("?" for _ in cols)
+        c.execute(
+            f"INSERT INTO daily_snapshots ({', '.join(cols)}) VALUES ({placeholders})",
+            [payload[k] for k in cols],
+        )
+    c.commit()
+    row = c.execute(
+        "SELECT * FROM daily_snapshots WHERE snapshot_date = ?",
+        (payload["snapshot_date"],),
+    ).fetchone()
+    c.close()
+    return _row_to_dict(row)
+
+
+def get_daily_snapshots(limit: int = 90) -> list[dict]:
+    c = _conn()
+    rows = c.execute(
+        "SELECT * FROM daily_snapshots ORDER BY snapshot_date DESC LIMIT ?", (limit,)
+    ).fetchall()
+    c.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+# ─── Signals ──────────────────────────────────────────────────────────────────
+
+_SIGNAL_COLS = (
+    "signal_id", "strategy_name", "strategy_version", "received_at",
+    "symbol", "venue", "session_utc", "btc_1d_trend", "btc_1w_trend", "atr_14d_pct",
+    "trigger_type", "htf_bias", "mtf_confluence", "confluence_count",
+    "direction", "entry_price", "stop_price", "target_price",
+    "suggested_size_pct", "suggested_leverage", "expected_rr",
+)
+
+
+def insert_signal(signal: dict) -> dict:
+    """Insert a new signal (status='pending'). signal_id must be supplied."""
+    if not signal.get("signal_id"):
+        raise ValueError("signal_id is required")
+
+    payload = {k: signal.get(k) for k in _SIGNAL_COLS}
+    payload["received_at"] = _iso(payload.get("received_at")) or datetime.utcnow().isoformat()
+
+    # Serialize mtf_confluence JSON array if list/dict was passed
+    mtf = payload.get("mtf_confluence")
+    if mtf is not None and not isinstance(mtf, str):
+        payload["mtf_confluence"] = json.dumps(mtf)
+
+    cols = list(_SIGNAL_COLS)
+    placeholders = ", ".join("?" for _ in cols)
+    c = _conn()
+    try:
+        c.execute(
+            f"INSERT INTO signals ({', '.join(cols)}) VALUES ({placeholders})",
+            [payload[k] for k in cols],
+        )
+        c.commit()
+    except sqlite3.IntegrityError as e:
+        c.close()
+        raise ValueError(f"Duplicate signal_id: {payload['signal_id']}") from e
+    row = c.execute("SELECT * FROM signals WHERE signal_id = ?",
+                    (payload["signal_id"],)).fetchone()
+    c.close()
+    return _row_to_dict(row, json_cols=("mtf_confluence",))
+
+
+def get_signals(
+    status: Optional[str] = None,
+    strategy: Optional[str] = None,
+    limit: int = 200,
+) -> list[dict]:
+    where = []
+    params: list = []
+    if status:
+        where.append("status = ?"); params.append(status)
+    if strategy:
+        where.append("strategy_name = ?"); params.append(strategy)
+    sql = "SELECT * FROM signals"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY received_at DESC LIMIT ?"
+    params.append(limit)
+    c = _conn()
+    rows = c.execute(sql, params).fetchall()
+    c.close()
+    return [_row_to_dict(r, json_cols=("mtf_confluence",)) for r in rows]
+
+
+def get_signal(signal_id: str) -> Optional[dict]:
+    c = _conn()
+    row = c.execute("SELECT * FROM signals WHERE signal_id = ?", (signal_id,)).fetchone()
+    c.close()
+    return _row_to_dict(row, json_cols=("mtf_confluence",)) if row else None
+
+
+def decide_signal(
+    signal_id: str,
+    status: str,                       # approved | rejected
+    your_conviction: Optional[int] = None,
+    rejection_reason: Optional[str] = None,
+) -> Optional[dict]:
+    if status not in ("approved", "rejected"):
+        raise ValueError("status must be 'approved' or 'rejected'")
+    if status == "approved" and not your_conviction:
+        raise ValueError("your_conviction (1-5) required to approve")
+    if status == "rejected" and not rejection_reason:
+        raise ValueError("rejection_reason required to reject")
+
+    c = _conn()
+    c.execute(
+        """UPDATE signals
+           SET status = ?, your_conviction = ?, rejection_reason = ?, decided_at = ?
+           WHERE signal_id = ? AND status = 'pending'""",
+        (status, your_conviction, rejection_reason,
+         datetime.utcnow().isoformat(), signal_id),
+    )
+    c.commit()
+    row = c.execute("SELECT * FROM signals WHERE signal_id = ?", (signal_id,)).fetchone()
+    c.close()
+    return _row_to_dict(row, json_cols=("mtf_confluence",)) if row else None
+
+
+_CFG_COLS = (
+    "start_balance", "target_balance", "target_date",
+    "trades_per_week", "win_rate", "rr_ratio", "leverage",
+    "max_drawdown_allowed", "losses_allowed", "fractional_kelly",
+    "execution_fill_factor", "risk_per_trade", "min_underlying_stop_pct",
+    "btc_price_eur", "btc_growth_monthly",
+)
+
+
+def get_lens_config() -> dict:
+    c = _conn()
+    row = c.execute("SELECT * FROM lens_config WHERE id = 1").fetchone()
+    c.close()
+    return _row_to_dict(row) if row else {}
+
+
+def upsert_lens_config(updates: dict) -> dict:
+    """Partial update — keeps existing values for keys not in `updates`."""
+    payload = {k: v for k, v in updates.items() if k in _CFG_COLS}
+    payload["updated_at"] = datetime.utcnow().isoformat()
+    c = _conn()
+    existing = c.execute("SELECT id FROM lens_config WHERE id = 1").fetchone()
+    if existing:
+        set_clause = ", ".join(f"{k} = ?" for k in payload)
+        c.execute(
+            f"UPDATE lens_config SET {set_clause} WHERE id = 1",
+            list(payload.values()),
+        )
+    else:
+        cols = ["id"] + list(payload.keys())
+        vals = [1] + list(payload.values())
+        placeholders = ", ".join("?" for _ in cols)
+        c.execute(
+            f"INSERT INTO lens_config ({', '.join(cols)}) VALUES ({placeholders})",
+            vals,
+        )
+    c.commit()
+    row = c.execute("SELECT * FROM lens_config WHERE id = 1").fetchone()
+    c.close()
+    return _row_to_dict(row)
+
+
+def expire_stale_signals(older_than_minutes: int = 30) -> int:
+    """Mark pending signals older than N minutes as 'expired'. Returns count updated."""
+    cutoff = (datetime.utcnow() - timedelta(minutes=older_than_minutes)).isoformat()
+    c = _conn()
+    cur = c.execute(
+        "UPDATE signals SET status = 'expired' WHERE status = 'pending' AND received_at < ?",
+        (cutoff,),
+    )
+    c.commit()
+    n = cur.rowcount
+    c.close()
+    return n

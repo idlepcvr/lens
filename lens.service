@@ -1,0 +1,17 @@
+[Unit]
+Description=LENS Trading Server (FastAPI + Uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mini/lens
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8765
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/mini/lens/lens.log
+StandardError=append:/home/mini/lens/lens.log
+EnvironmentFile=/home/mini/lens/.env
+
+[Install]
+WantedBy=default.target
