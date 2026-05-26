@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 // ─────────────────────────────────────────────────────────────────────────────
 // LENS / MACD_MTF_v1
 // Entry-TF MACD cross, confirmed by HTF MACD bias. ATR-based stop, R:R target.
@@ -9,6 +9,7 @@ strategy("LENS / MACD_MTF_v1", overlay=true,
      initial_capital=1000, default_qty_type=strategy.percent_of_equity,
      default_qty_value=10, commission_type=strategy.commission.percent,
      commission_value=0.05, slippage=2,
+     margin_long=10, margin_short=10,
      process_orders_on_close=true, calc_on_every_tick=false)
 
 // ─── Strategy identity (must match LENS schema) ─────────────────────────────
@@ -65,7 +66,7 @@ confShort = (htfBearish ? 1 : 0) + (not hist1Above ? 1 : 0)
 
 // ─── ATR-based SL / TP ──────────────────────────────────────────────────────
 atrVal      = ta.atr(atrLen)
-atr14dPct   = (request.security(syminfo.tickerid, "D",
+atr14dPct   = (request.security(syminfo.tickerid, "1D",
                   ta.atr(14), lookahead=barmerge.lookahead_off) / close) * 100
 
 longStop    = close - atrVal * atrMult
@@ -78,12 +79,12 @@ longSig  = longCross  and htfBullish
 shortSig = shortCross and htfBearish
 
 // ─── Daily BTC trend tag (context, not gate) ────────────────────────────────
-btc1dClose = request.security("BTCUSDT", "D", close, lookahead=barmerge.lookahead_off)
-btc1dSma   = request.security("BTCUSDT", "D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
+btc1dClose = request.security("BTCUSDT", "1D", close, lookahead=barmerge.lookahead_off)
+btc1dSma   = request.security("BTCUSDT", "1D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
 btc1dTrend = btc1dClose > btc1dSma * 1.02 ? "up" : btc1dClose < btc1dSma * 0.98 ? "down" : "range"
 
-btc1wClose = request.security("BTCUSDT", "W", close, lookahead=barmerge.lookahead_off)
-btc1wSma   = request.security("BTCUSDT", "W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
+btc1wClose = request.security("BTCUSDT", "1W", close, lookahead=barmerge.lookahead_off)
+btc1wSma   = request.security("BTCUSDT", "1W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
 btc1wTrend = btc1wClose > btc1wSma * 1.02 ? "up" : btc1wClose < btc1wSma * 0.98 ? "down" : "range"
 
 // ─── Session tag (UTC) ─────────────────────────────────────────────────────
