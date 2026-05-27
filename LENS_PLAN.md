@@ -28,6 +28,8 @@ The mechanism: every trade decision in LENS originates from a Pine Script strate
 - Per-strategy stats view (n, win rate, avg R, expectancy)
 - Chart screenshot capture on approve
 - Single-page dashboard on miniPC, accessed via LAN or tunnel
+- **Persisted goal config + interactive goal dashboard at `/`** *(pulled forward from Wk 4 sizing dependency; added Wk 1)*
+- **Server-side discipline filters in `/api/signals`** auto-reject Saturday / sub-5min cooldown / bleed hours / wrong venue *(added Wk 1 after PRISM fingerprint research showed bulk discretionary trading is break-even; selection discipline is the bottleneck)*
 
 ### Out of v1 (defer to v2+)
 - ML prediction model — earn in at month 6 once dataset exists
@@ -150,26 +152,31 @@ This schema is the contract between Pine Script (producer) and LENS (consumer). 
 **Deliverables:**
 - [ ] New repo `lens` initialized, README with one-paragraph mission
 - [ ] SQLite schema migrated: `trades`, `signals`, `daily_snapshots`, `transfers`
-- [ ] Kraken sync ported, runs on cron, writes to LENS DB
-- [ ] Bybit sync ported, runs on cron, writes to LENS DB
-- [ ] FastAPI scaffold, `/health` and `/api/trades` working
-- [ ] systemd user unit installed, runs on boot
+- [x] Kraken sync ported, writes to LENS DB *(cron deferred — manual `/api/sync/kraken` works; timer to be added when needed)*
+- [x] Bybit sync ported, writes to LENS DB
+- [x] FastAPI scaffold, `/health` and `/api/trades` working
+- [x] systemd user unit installed, runs on boot
+- [x] **(bonus)** Interactive goal dashboard at `/` with persisted `lens_config`
+- [x] **(bonus)** Server-side discipline filters auto-reject bad signals
+- [x] **(bonus)** PRISM trade-history fingerprint analysis → `strategies/_research/prism_fingerprint.md`
 
-**Definition of done:** running `curl localhost:8000/api/trades` returns synced trades from both exchanges.
+**Definition of done:** ✅ `curl localhost:8765/api/trades` works; LENS persistent across reboots.
 
 ---
 
-### Week 2: Pine Script v1 (Jun 2 – Jun 8)
+### Week 2: Pine Script v1 (Jun 2 – Jun 8)  *(started early)*
 **Objective:** First strategy emitting locked schema, baseline backtest captured.
 
 **Deliverables:**
-- [ ] `MACD_MTF_v1` Pine v5 strategy file
-- [ ] `alert()` message emits full JSON matching Setup + Trade plan schema fields
-- [ ] Strategy Tester run on 6 months BTCUSDT.P 15m: WR, PF, max DD, Sharpe captured
-- [ ] Document baseline in `strategies/MACD_MTF_v1/BASELINE.md`
-- [ ] Manual webhook test: paste alert JSON into `curl` against future endpoint stub, verify schema parses
+- [x] `MACD_MTF_v1` Pine v6 strategy file *(now DEPRECATED — baseline PF 0.11, no edge)*
+- [x] `alert()` message emits full JSON matching Setup + Trade plan schema fields
+- [x] Strategy Tester run on 9 months BYBIT BTCUSD.P 15m → see `MACD_MTF_v1/BASELINE.md` (failed)
+- [x] Document baseline (failure documented as negative reference)
+- [x] Manual webhook test: JSON shape validated against `/api/signals` → 201 round-trip works
+- [ ] **`MOM_BREAK_v1` Pine v6 strategy** — consolidation-break scalp built from PRISM fingerprint, ready to backtest
+- [ ] Strategy Tester run on `MOM_BREAK_v1` → fill `MOM_BREAK_v1/BASELINE.md`
 
-**Definition of done:** alert fires in TradingView paper-fire mode, JSON validates against schema.
+**Definition of done:** `MOM_BREAK_v1` Strategy Tester baseline shows PF ≥ 1.4 and WR ≥ 45% over 6 months. If not, iterate or pivot entry premise.
 
 ---
 

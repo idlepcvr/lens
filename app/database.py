@@ -470,26 +470,36 @@ _SIGNAL_COLS = (
 )
 
 
-def insert_signal(signal: dict) -> dict:
-    """Insert a new signal (status='pending'). signal_id must be supplied."""
+def insert_signal(signal: dict, auto_rejection_reason: Optional[str] = None) -> dict:
+    """Insert a new signal. signal_id must be supplied.
+
+    If `auto_rejection_reason` is provided (from discipline filters), the row is
+    stored with status='rejected' and rejection_reason set, instead of 'pending'.
+    """
     if not signal.get("signal_id"):
         raise ValueError("signal_id is required")
 
     payload = {k: signal.get(k) for k in _SIGNAL_COLS}
     payload["received_at"] = _iso(payload.get("received_at")) or datetime.utcnow().isoformat()
 
-    # Serialize mtf_confluence JSON array if list/dict was passed
     mtf = payload.get("mtf_confluence")
     if mtf is not None and not isinstance(mtf, str):
         payload["mtf_confluence"] = json.dumps(mtf)
 
     cols = list(_SIGNAL_COLS)
-    placeholders = ", ".join("?" for _ in cols)
+    extra_cols: list[str] = []
+    extra_vals: list = []
+    if auto_rejection_reason:
+        extra_cols = ["status", "rejection_reason", "decided_at"]
+        extra_vals = ["rejected", auto_rejection_reason, datetime.utcnow().isoformat()]
+
+    all_cols = cols + extra_cols
+    placeholders = ", ".join("?" for _ in all_cols)
     c = _conn()
     try:
         c.execute(
-            f"INSERT INTO signals ({', '.join(cols)}) VALUES ({placeholders})",
-            [payload[k] for k in cols],
+            f"INSERT INTO signals ({', '.join(all_cols)}) VALUES ({placeholders})",
+            [payload[k] for k in cols] + extra_vals,
         )
         c.commit()
     except sqlite3.IntegrityError as e:
@@ -499,6 +509,19 @@ def insert_signal(signal: dict) -> dict:
                     (payload["signal_id"],)).fetchone()
     c.close()
     return _row_to_dict(row, json_cols=("mtf_confluence",))
+
+
+def get_last_non_rejected_signal_for_symbol(symbol: str) -> Optional[dict]:
+    """Most-recent pending|approved signal for cooldown checks."""
+    c = _conn()
+    row = c.execute(
+        """SELECT * FROM signals
+           WHERE symbol = ? AND status IN ('pending', 'approved')
+           ORDER BY received_at DESC LIMIT 1""",
+        (symbol,),
+    ).fetchone()
+    c.close()
+    return _row_to_dict(row, json_cols=("mtf_confluence",)) if row else None
 
 
 def get_signals(

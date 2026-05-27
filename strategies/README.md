@@ -34,5 +34,10 @@ A `201 Created` with the full signal row means schema parses. A `422` means a fi
 
 | Name | Status | Baseline | Notes |
 |---|---|---|---|
-| `MACD_MTF_v1` | scaffold | TBD | Week 2 build, first live strategy |
+| `MACD_MTF_v1` | ⚠ DEPRECATED | PF 0.11, WR 14.9% | Kept as negative-baseline reference |
+| `MOM_BREAK_v1` | ready to test | TBD | Consolidation-break scalp, built from PRISM fingerprint |
 | `MACD_MTF_BOS_v1` | not started | — | Week 8 — adds Break-of-Structure confirmation |
+
+## Research artifacts
+
+- `_research/prism_fingerprint.md` — Statistical fingerprint of 2,315 PRISM v0.1 trades. Source for the discipline filters in `app/discipline.py` and the design of `MOM_BREAK_v1`.

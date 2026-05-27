@@ -36,8 +36,10 @@ from .database import (
     get_transfers, upsert_transfer,
     get_daily_snapshots,
     insert_signal, get_signals, get_signal, decide_signal, expire_stale_signals,
+    get_last_non_rejected_signal_for_symbol,
     get_lens_config, upsert_lens_config,
 )
+from . import discipline
 from .models import (
     GoalRequest, GoalResponse,
     PositionRequest, PositionResponse,
@@ -610,14 +612,26 @@ def patch_config(data: ConfigUpdate):
 
 @app.post("/api/signals", response_model=SignalResponse, status_code=201)
 def ingest_signal(payload: SignalIngest):
-    """Accept a Pine Script alert payload, persist as `pending`.
+    """Accept a Pine Script alert payload, run discipline filters, persist.
 
-    Schema-validated by SignalIngest. Pine emits this via webhook (week 3).
+    Signals that violate discipline (Saturday, sub-5min cooldown, bleed hour,
+    bad venue) are still stored — with status='rejected' and rejection_reason
+    set — so the dataset stays complete. Live signals land as status='pending'
+    for manual approve/reject in the decision view.
     """
+    data = payload.model_dump()
+    last = get_last_non_rejected_signal_for_symbol(data["symbol"])
+    reason = discipline.evaluate(data, last)
     try:
-        return insert_signal(payload.model_dump())
+        return insert_signal(data, auto_rejection_reason=reason)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.get("/api/discipline")
+def get_discipline_settings():
+    """Current server-side discipline filter settings."""
+    return discipline.settings()
 
 
 @app.get("/api/signals")

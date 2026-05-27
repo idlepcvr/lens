@@ -1,0 +1,215 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / MOM_BREAK_v1
+// Consolidation-break scalp with volume confirmation, HTF trend alignment,
+// ATR-tight stop, 1.5R target. Built-in session/day filter matching the
+// LENS server-side discipline filters (see app/discipline.py).
+//
+// Designed against findings in strategies/_research/prism_fingerprint.md:
+//   • Conviction-sized fast trades work (PRISM <5min + 5x bal: PF 3.16)
+//   • 5-15 min holds are dead zone — target is ≤5min OR ≥1h, not in between
+//   • Saturday + bleed hours (02/11 UTC) auto-rejected
+//   • Cooldown ≥5min between signals (no revenge trading)
+//
+// Defaults tuned for BTCUSDT.P on 5m or 15m. Run Strategy Tester for baseline.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("LENS / MOM_BREAK_v1", overlay=true,
+     initial_capital=1000, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10, commission_type=strategy.commission.percent,
+     commission_value=0.05, slippage=2,
+     margin_long=10, margin_short=10,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+strategyName    = "MOM_BREAK_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+grpBreak  = "Range break"
+rangeBars = input.int(15,  "Consolidation lookback (bars)", group=grpBreak, minval=5, maxval=50)
+volMult   = input.float(1.5, "Volume spike × 20-bar SMA",    group=grpBreak, minval=1.0, step=0.1)
+
+grpHtf    = "Higher-TF bias"
+htfRes    = input.timeframe("60", "HTF EMA resolution", group=grpHtf)
+htfEmaLen = input.int(200, "HTF EMA length",           group=grpHtf, minval=20)
+requireBias = input.bool(true, "Require HTF trend alignment", group=grpHtf)
+
+grpRisk  = "Risk / target"
+atrLen   = input.int(14,  "ATR length",          group=grpRisk)
+atrSl    = input.float(1.0,"Stop = ATR ×",       group=grpRisk, minval=0.5, step=0.1)
+rrTarget = input.float(1.5,"R:R target",         group=grpRisk, minval=1.0, step=0.1)
+
+grpDisc  = "Discipline (mirrors server)"
+skipSat  = input.bool(true, "Skip Saturday",            group=grpDisc)
+skipBad  = input.bool(true, "Skip bleed hours (02,11 UTC)", group=grpDisc)
+cooldownMin = input.int(5,  "Cooldown after signal (min)", group=grpDisc, minval=0)
+sessOnly = input.bool(true, "Only fire 07:00-21:00 UTC (active sessions)", group=grpDisc)
+
+grpCtx   = "Context tags (for LENS payload)"
+venueIn  = input.string("kraken", "Venue tag", options=["kraken","bybit"], group=grpCtx)
+
+grpAlert = "Alert"
+emitJson = input.bool(true, "Emit LENS JSON in alert message", group=grpAlert)
+
+// ─── Range break detection ──────────────────────────────────────────────────
+// Use [1] so the lookback excludes the current bar — break-out is real
+prevHigh = ta.highest(high[1], rangeBars)
+prevLow  = ta.lowest(low[1],   rangeBars)
+rangeWidthPct = (prevHigh - prevLow) / close * 100
+
+volSma    = ta.sma(volume, 20)
+volSpike  = volume > volSma * volMult
+
+longBreak  = close > prevHigh
+shortBreak = close < prevLow
+
+// ─── HTF EMA bias ────────────────────────────────────────────────────────────
+htfEma = request.security(syminfo.tickerid, htfRes,
+              ta.ema(close, htfEmaLen),
+              lookahead=barmerge.lookahead_off)
+htfBullish = close > htfEma
+htfBearish = close < htfEma
+htfBiasStr = htfBullish ? "bullish" : htfBearish ? "bearish" : "neutral"
+
+biasLongOK  = not requireBias or htfBullish
+biasShortOK = not requireBias or htfBearish
+
+// ─── ATR-based SL / TP ──────────────────────────────────────────────────────
+atrVal     = ta.atr(atrLen)
+atr14dPct  = (request.security(syminfo.tickerid, "1D",
+                  ta.atr(14), lookahead=barmerge.lookahead_off) / close) * 100
+
+longStop   = close - atrVal * atrSl
+longTarget = close + atrVal * atrSl * rrTarget
+shortStop  = close + atrVal * atrSl
+shortTarget= close - atrVal * atrSl * rrTarget
+
+// ─── Discipline filters (mirror server-side rules) ──────────────────────────
+hourUtc = hour(time, "UTC")
+dow     = dayofweek(time, "UTC")
+
+passDay   = not skipSat or dow != dayofweek.saturday
+passHour  = not skipBad or (hourUtc != 2 and hourUtc != 11)
+passSess  = not sessOnly or (hourUtc >= 7 and hourUtc < 21)
+
+// Cooldown — track last fire time, reject if too recent
+var int lastSignalTime = na
+cooldownMs = cooldownMin * 60 * 1000
+passCool  = na(lastSignalTime) or (time - lastSignalTime) >= cooldownMs
+
+allowFire = passDay and passHour and passSess and passCool
+
+// ─── BTC daily/weekly trend tag (context) ───────────────────────────────────
+btc1dClose = request.security("BTCUSDT", "1D", close, lookahead=barmerge.lookahead_off)
+btc1dSma   = request.security("BTCUSDT", "1D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
+btc1dTrend = btc1dClose > btc1dSma * 1.02 ? "up" : btc1dClose < btc1dSma * 0.98 ? "down" : "range"
+
+btc1wClose = request.security("BTCUSDT", "1W", close, lookahead=barmerge.lookahead_off)
+btc1wSma   = request.security("BTCUSDT", "1W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
+btc1wTrend = btc1wClose > btc1wSma * 1.02 ? "up" : btc1wClose < btc1wSma * 0.98 ? "down" : "range"
+
+// ─── Session tag (UTC) for the JSON ─────────────────────────────────────────
+sessionStr = hourUtc >= 0 and hourUtc < 8  ? "asia"
+           : hourUtc >= 8 and hourUtc < 13 ? "london"
+           : hourUtc >= 13 and hourUtc < 21 ? "ny" : "off-hours"
+
+// ─── Confluence count — higher = bigger suggested size ──────────────────────
+//   Always 1: the break itself
+//   +1 if volume spike
+//   +1 if HTF bias aligns (regardless of requireBias)
+//   +1 if session is active (NY or London)
+//   +1 if range width was meaningful (>0.5%)
+sigConfBase(side) =>
+    c = 1                                              // base break
+    c += volSpike ? 1 : 0
+    c += (side == "long" ? htfBullish : htfBearish) ? 1 : 0
+    c += (sessionStr == "ny" or sessionStr == "london") ? 1 : 0
+    c += rangeWidthPct > 0.5 ? 1 : 0
+    c
+
+// ─── Entry conditions ──────────────────────────────────────────────────────
+longSig  = longBreak  and volSpike and biasLongOK  and allowFire
+shortSig = shortBreak and volSpike and biasShortOK and allowFire
+
+// Track last fire time
+if longSig or shortSig
+    lastSignalTime := time
+
+// ─── Strategy execution (Strategy Tester baseline) ─────────────────────────
+if longSig
+    strategy.entry("long", strategy.long)
+    strategy.exit("long-x", "long", stop=longStop, limit=longTarget)
+if shortSig
+    strategy.entry("short", strategy.short)
+    strategy.exit("short-x", "short", stop=shortStop, limit=shortTarget)
+
+plot(longStop,   "Long SL",  color=color.new(color.red,   60), style=plot.style_linebr)
+plot(longTarget, "Long TP",  color=color.new(color.green, 60), style=plot.style_linebr)
+plot(prevHigh,   "Range Hi", color=color.new(color.blue, 70))
+plot(prevLow,    "Range Lo", color=color.new(color.blue, 70))
+
+// ─── JSON payload (matches SignalIngest in app/models.py) ──────────────────
+f_jsonStr(k, v) => '"' + k + '":"' + v + '"'
+f_jsonNum(k, v) => '"' + k + '":' + str.tostring(v)
+f_jsonNull(k)   => '"' + k + '":null'
+
+buildPayload(dir, entryPx, stopPx, tgtPx, conf, rrExpect) =>
+    sigId = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    triggerType = dir == "long" ? "range_break_long" : "range_break_short"
+
+    // Suggested size escalates with confluence (PRISM data: conviction wins)
+    suggestedLev = conf >= 4 ? 10.0 : conf >= 3 ? 5.0 : 3.0
+    suggestedSizePct = conf >= 4 ? 4.0 : conf >= 3 ? 2.5 : 1.5
+
+    // mtf_confluence array
+    mtf = '['
+    parts = ''
+    parts := volSpike ? '"vol_spike"' : ''
+    if (dir == "long" ? htfBullish : htfBearish)
+        parts := str.length(parts) > 0 ? parts + ',"htf_aligned"' : '"htf_aligned"'
+    if sessionStr == "ny" or sessionStr == "london"
+        parts := str.length(parts) > 0 ? parts + ',"active_session"' : '"active_session"'
+    if rangeWidthPct > 0.5
+        parts := str.length(parts) > 0 ? parts + ',"wide_range"' : '"wide_range"'
+    mtf := mtf + parts + ']'
+
+    s  = '{'
+    s += f_jsonStr("signal_id",        sigId)             + ','
+    s += f_jsonStr("strategy_name",    strategyName)      + ','
+    s += f_jsonStr("strategy_version", strategyVersion)   + ','
+    s += f_jsonStr("symbol",           syminfo.ticker)    + ','
+    s += f_jsonStr("venue",            venueIn)           + ','
+    s += f_jsonStr("session_utc",      sessionStr)        + ','
+    s += f_jsonStr("btc_1d_trend",     btc1dTrend)        + ','
+    s += f_jsonStr("btc_1w_trend",     btc1wTrend)        + ','
+    s += f_jsonNum("atr_14d_pct",      math.round(atr14dPct * 1000) / 1000) + ','
+    s += f_jsonStr("trigger_type",     triggerType)       + ','
+    s += f_jsonStr("htf_bias",         htfBiasStr)        + ','
+    s += '"mtf_confluence":' + mtf                        + ','
+    s += f_jsonNum("confluence_count", conf)              + ','
+    s += f_jsonStr("direction",        dir)               + ','
+    s += f_jsonNum("entry_price",      math.round(entryPx * 100) / 100) + ','
+    s += f_jsonNum("stop_price",       math.round(stopPx  * 100) / 100) + ','
+    s += f_jsonNum("target_price",     math.round(tgtPx   * 100) / 100) + ','
+    s += f_jsonNum("suggested_size_pct", suggestedSizePct) + ','
+    s += f_jsonNum("suggested_leverage", suggestedLev)    + ','
+    s += f_jsonNum("expected_rr",      rrExpect)
+    s += '}'
+    s
+
+// ─── Alerts (fire on confirmed close only) ──────────────────────────────────
+alertcondition(longSig,  title="LENS MOM_BREAK Long",  message="long signal")
+alertcondition(shortSig, title="LENS MOM_BREAK Short", message="short signal")
+
+if longSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("long", close, longStop, longTarget, sigConfBase("long"), rrTarget) : "long"
+    alert(payload, alert.freq_once_per_bar_close)
+
+if shortSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("short", close, shortStop, shortTarget, sigConfBase("short"), rrTarget) : "short"
+    alert(payload, alert.freq_once_per_bar_close)
+
+// ─── Visual markers ────────────────────────────────────────────────────────
+plotshape(longSig,  title="Long",  location=location.belowbar,
+     style=shape.triangleup,   color=color.new(color.green, 0), size=size.small)
+plotshape(shortSig, title="Short", location=location.abovebar,
+     style=shape.triangledown, color=color.new(color.red,   0), size=size.small)
