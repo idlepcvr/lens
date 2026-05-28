@@ -1,0 +1,223 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / DAILY_BREAK_v1
+// Previous-day high/low breakout — built for multi-day swing holds.
+//
+// PRISM fingerprint rationale:
+//   • >24hr holds:  WR 56%, PF 1.62 — the strongest edge bucket in 2,315 trades
+//   • Monday: WR 48%, PF 1.21 — best day; daily breakouts often form Mon/Tue
+//   • Saturdays: DO NOT TRADE (PF 0.38, cost €2,606)
+//   • Conviction sizing (10-25× notional): WR 53%, PF 1.78
+//
+// How it works:
+//   Yesterday's high/low acts as a key structural level. When today's price
+//   breaks cleanly through that level on volume, it often initiates a multi-day
+//   leg. Stop is ATR-based (below/above the breakout level). Target: 3R.
+//
+// Recommended TF: 1h (detects break promptly) or 4h
+// Run Strategy Tester on both before going live.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("LENS / DAILY_BREAK_v1", overlay=true,
+     initial_capital=1000, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10, commission_type=strategy.commission.percent,
+     commission_value=0.05, slippage=2,
+     margin_long=10, margin_short=10,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+strategyName    = "DAILY_BREAK_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+grpBreak  = "Breakout"
+dayLook   = input.int(1,   "Previous day offset (1 = yesterday)",    group=grpBreak, minval=1, maxval=3)
+volMult   = input.float(1.4, "Volume spike × 20-bar SMA",            group=grpBreak, minval=1.0, step=0.05)
+minRangePct = input.float(0.4, "Min prev-day range (% of price)",    group=grpBreak, minval=0.1, step=0.05)
+// Minimum range filter: avoids entering on a tight inside-day break that
+// has little directional meaning. 0.4% at $100k BTC = $400 range minimum.
+
+grpHtf    = "Trend bias"
+htfEmaLen = input.int(200, "Daily EMA length (trend gate)",           group=grpHtf, minval=50)
+reqBias   = input.bool(true, "Require daily 200 EMA bias alignment",  group=grpHtf)
+reqWeekly = input.bool(true, "Require weekly trend alignment",        group=grpHtf)
+
+grpRisk   = "Risk / Target"
+atrLen    = input.int(14,   "ATR length",                             group=grpRisk)
+atrSl     = input.float(1.5, "Stop loss = ATR ×",                    group=grpRisk, minval=0.5, step=0.1)
+rrTarget  = input.float(3.0, "R:R target",                           group=grpRisk, minval=1.5, step=0.25)
+// 3R: at 1h TF this typically takes 12-48 hours to hit — exactly the >24hr
+// hold zone where PRISM data shows the edge. Do NOT use 1.5R on this strategy.
+
+grpDisc   = "Discipline (mirrors server app/discipline.py)"
+skipSat   = input.bool(true, "Skip Saturday",                         group=grpDisc)
+skipBad   = input.bool(true, "Skip bleed hours 02 + 11 UTC",          group=grpDisc)
+coolMin   = input.int(60,   "Cooldown after signal (min)",            group=grpDisc, minval=0)
+// 60-min cooldown (vs 5-min in MOM_BREAK): daily break = one trade per level per day
+sessOnly  = input.bool(true, "Only fire 07:00–21:00 UTC",             group=grpDisc)
+
+grpCtx    = "Context (LENS payload)"
+venueIn   = input.string("kraken", "Venue tag",                      group=grpCtx, options=["kraken","bybit"])
+
+// ─── Previous day levels ──────────────────────────────────────────────────────
+prevDHigh = request.security(syminfo.tickerid, "1D", high[dayLook],  lookahead=barmerge.lookahead_off)
+prevDLow  = request.security(syminfo.tickerid, "1D", low[dayLook],   lookahead=barmerge.lookahead_off)
+prevDRange    = prevDHigh - prevDLow
+prevDRangePct = prevDRange / close * 100
+rangeOk       = prevDRangePct >= minRangePct
+
+// ─── Daily 200 EMA bias ───────────────────────────────────────────────────────
+htfEma     = request.security(syminfo.tickerid, "1D",
+                 ta.ema(close, htfEmaLen), lookahead=barmerge.lookahead_off)
+htfBullish = close > htfEma
+htfBearish = close < htfEma
+htfBiasStr = htfBullish ? "bullish" : htfBearish ? "bearish" : "neutral"
+
+// ─── BTC weekly + daily trend context ────────────────────────────────────────
+btc1wClose = request.security("BTCUSDT", "1W", close,             lookahead=barmerge.lookahead_off)
+btc1wSma   = request.security("BTCUSDT", "1W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
+btc1wTrend = btc1wClose > btc1wSma * 1.02 ? "up"
+           : btc1wClose < btc1wSma * 0.98 ? "down" : "range"
+
+btc1dClose = request.security("BTCUSDT", "1D", close,             lookahead=barmerge.lookahead_off)
+btc1dSma   = request.security("BTCUSDT", "1D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
+btc1dTrend = btc1dClose > btc1dSma * 1.02 ? "up"
+           : btc1dClose < btc1dSma * 0.98 ? "down" : "range"
+
+// ─── Breakout detection ───────────────────────────────────────────────────────
+// Detects the FIRST bar close above/below the previous day's level.
+// [1] guard prevents re-triggering if price stays above/below for multiple bars.
+longBreak  = close > prevDHigh and close[1] <= prevDHigh and rangeOk
+shortBreak = close < prevDLow  and close[1] >= prevDLow  and rangeOk
+
+// ─── Volume confirmation ──────────────────────────────────────────────────────
+volSma   = ta.sma(volume, 20)
+volSpike = volume > volSma * volMult
+
+// ─── ATR stops / targets ──────────────────────────────────────────────────────
+atrVal    = ta.atr(atrLen)
+atr14dPct = (request.security(syminfo.tickerid, "1D",
+                 ta.atr(14), lookahead=barmerge.lookahead_off) / close) * 100
+
+// Stop: ATR-based so it's consistent regardless of the breakout bar's size.
+// For longs: below the breakout, placing SL inside the previous range
+// is equivalent to "if price falls back into the box, we're wrong" — and
+// 1.5 ATR achieves that without being too tight.
+longSl  = close - atrVal * atrSl
+longTp  = close + atrVal * atrSl * rrTarget
+shortSl = close + atrVal * atrSl
+shortTp = close - atrVal * atrSl * rrTarget
+
+// ─── Discipline filters ───────────────────────────────────────────────────────
+hourUtc   = hour(time, "UTC")
+dow       = dayofweek(time, "UTC")
+passDay   = not skipSat  or dow != dayofweek.saturday
+passHour  = not skipBad  or (hourUtc != 2 and hourUtc != 11)
+passSess  = not sessOnly or (hourUtc >= 7 and hourUtc < 21)
+
+var int lastSigTime = na
+coolMs    = coolMin * 60 * 1000
+passCool  = na(lastSigTime) or (time - lastSigTime) >= coolMs
+allowFire = passDay and passHour and passSess and passCool
+
+sessionStr = hourUtc >= 0  and hourUtc < 8  ? "asia"
+           : hourUtc >= 8  and hourUtc < 13 ? "london"
+           : hourUtc >= 13 and hourUtc < 21 ? "ny" : "off-hours"
+
+// ─── Bias gates ───────────────────────────────────────────────────────────────
+biasLongOk  = (not reqBias   or htfBullish)
+              and (not reqWeekly or btc1wTrend == "up")
+biasShortOk = (not reqBias   or htfBearish)
+              and (not reqWeekly or btc1wTrend == "down")
+
+// ─── Entry conditions ─────────────────────────────────────────────────────────
+longSig  = longBreak  and volSpike and allowFire and biasLongOk
+shortSig = shortBreak and volSpike and allowFire and biasShortOk
+
+if longSig or shortSig
+    lastSigTime := time
+
+// ─── Strategy execution ───────────────────────────────────────────────────────
+if longSig
+    strategy.entry("long",   strategy.long)
+    strategy.exit("long-x",  "long",  stop=longSl,  limit=longTp)
+if shortSig
+    strategy.entry("short",  strategy.short)
+    strategy.exit("short-x", "short", stop=shortSl, limit=shortTp)
+
+// ─── Plots ───────────────────────────────────────────────────────────────────
+plot(prevDHigh, "Prev Day High", color=color.new(color.teal, 40),   style=plot.style_stepline, linewidth=1)
+plot(prevDLow,  "Prev Day Low",  color=color.new(color.orange, 40), style=plot.style_stepline, linewidth=1)
+plot(htfEma,    "D200 EMA",      color=color.new(color.blue, 70),   linewidth=1)
+plot(longSig    ? longSl  : na,  "Long SL",  color=color.new(color.red,   55), style=plot.style_linebr)
+plot(longSig    ? longTp  : na,  "Long TP",  color=color.new(color.green, 55), style=plot.style_linebr)
+plot(shortSig   ? shortSl : na,  "Shrt SL",  color=color.new(color.red,   55), style=plot.style_linebr)
+plot(shortSig   ? shortTp : na,  "Shrt TP",  color=color.new(color.green, 55), style=plot.style_linebr)
+
+plotshape(longSig,  title="Long",  location=location.belowbar,
+     style=shape.triangleup,   color=color.new(color.green, 0), size=size.normal)
+plotshape(shortSig, title="Short", location=location.abovebar,
+     style=shape.triangledown, color=color.new(color.red, 0),   size=size.normal)
+
+// ─── Confluence scoring ───────────────────────────────────────────────────────
+// Sizing: conviction-scale from PRISM (10-25× notional/balance is peak bucket)
+//   ≥4 confluence → 10× lev / 5% — max conviction, daily level break
+//    3 confluence → 7×  lev / 3%
+//   ≤2 confluence → 5×  lev / 2% — minimum viable signal
+confScore(dir) =>
+    c = 1   // base: the level break itself
+    c += volSpike ? 1 : 0
+    c += (dir == "long" ? htfBullish : htfBearish) ? 1 : 0
+    c += (dir == "long" ? btc1wTrend == "up" : btc1wTrend == "down") ? 1 : 0
+    c += (sessionStr == "ny" or sessionStr == "london") ? 1 : 0
+    c
+
+// ─── JSON payload ─────────────────────────────────────────────────────────────
+buildPayload(dir, entryPx, stopPx, tgtPx, conf) =>
+    sigId       = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    triggerType = dir == "long" ? "prev_day_high_break" : "prev_day_low_break"
+    sugLev      = conf >= 4 ? 10.0 : conf >= 3 ? 7.0 : 5.0
+    sugSize     = conf >= 4 ? 5.0  : conf >= 3 ? 3.0 : 2.0
+
+    mtf = ''
+    mtf := volSpike ? '"vol_spike"' : ''
+    if (dir == "long" ? htfBullish : htfBearish)
+        mtf := str.length(mtf) > 0 ? mtf + ',"htf_aligned"'    : '"htf_aligned"'
+    if (dir == "long" ? btc1wTrend == "up" : btc1wTrend == "down")
+        mtf := str.length(mtf) > 0 ? mtf + ',"weekly_trend"'   : '"weekly_trend"'
+    if sessionStr == "ny" or sessionStr == "london"
+        mtf := str.length(mtf) > 0 ? mtf + ',"active_session"' : '"active_session"'
+    if rangeOk and prevDRangePct > 0.6
+        mtf := str.length(mtf) > 0 ? mtf + ',"wide_prev_day"'  : '"wide_prev_day"'
+    mtfArr = '[' + mtf + ']'
+
+    s  = '{'
+    s += '"signal_id":"'         + sigId                                              + '",'
+    s += '"strategy_name":"'     + strategyName                                       + '",'
+    s += '"strategy_version":"'  + strategyVersion                                    + '",'
+    s += '"symbol":"'            + syminfo.ticker                                     + '",'
+    s += '"venue":"'             + venueIn                                            + '",'
+    s += '"session_utc":"'       + sessionStr                                         + '",'
+    s += '"btc_1d_trend":"'      + btc1dTrend                                        + '",'
+    s += '"btc_1w_trend":"'      + btc1wTrend                                        + '",'
+    s += '"atr_14d_pct":'        + str.tostring(math.round(atr14dPct * 1000) / 1000) + ','
+    s += '"trigger_type":"'      + triggerType                                        + '",'
+    s += '"htf_bias":"'          + htfBiasStr                                         + '",'
+    s += '"mtf_confluence":'     + mtfArr                                             + ','
+    s += '"confluence_count":'   + str.tostring(conf)                                 + ','
+    s += '"direction":"'         + dir                                                + '",'
+    s += '"entry_price":'        + str.tostring(math.round(entryPx * 100) / 100)     + ','
+    s += '"stop_price":'         + str.tostring(math.round(stopPx  * 100) / 100)     + ','
+    s += '"target_price":'       + str.tostring(math.round(tgtPx   * 100) / 100)     + ','
+    s += '"suggested_size_pct":' + str.tostring(sugSize)                              + ','
+    s += '"suggested_leverage":' + str.tostring(sugLev)                              + ','
+    s += '"expected_rr":'        + str.tostring(rrTarget)
+    s += '}'
+    s
+
+// ─── Alert conditions + alerts ───────────────────────────────────────────────
+alertcondition(longSig,  title="LENS DAILY_BREAK Long",  message="long signal")
+alertcondition(shortSig, title="LENS DAILY_BREAK Short", message="short signal")
+
+if longSig and barstate.isconfirmed
+    alert(buildPayload("long",  close, longSl,  longTp,  confScore("long")),  alert.freq_once_per_bar_close)
+if shortSig and barstate.isconfirmed
+    alert(buildPayload("short", close, shortSl, shortTp, confScore("short")), alert.freq_once_per_bar_close)

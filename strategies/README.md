@@ -1,6 +1,6 @@
 # Strategies
 
-Pine v5 strategies that emit LENS-schema JSON via `alert()`. Every strategy must:
+Pine v6 strategies that emit LENS-schema JSON via `alert()`. Every strategy must:
 
 1. **Emit every Setup + Trade-plan field** in the JSON payload (see `app/models.py::SignalIngest`).
 2. **Bump `strategyVersion`** on any logic change.
@@ -32,11 +32,20 @@ A `201 Created` with the full signal row means schema parses. A `422` means a fi
 
 ## Current strategies
 
-| Name | Status | Baseline | Notes |
-|---|---|---|---|
-| `MACD_MTF_v1` | ⚠ DEPRECATED | PF 0.11, WR 14.9% | Kept as negative-baseline reference |
-| `MOM_BREAK_v1` | ready to test | TBD | Consolidation-break scalp, built from PRISM fingerprint |
-| `MACD_MTF_BOS_v1` | not started | — | Week 8 — adds Break-of-Structure confirmation |
+| Name | Status | Baseline | TF | Notes |
+|---|---|---|---|---|
+| `MACD_MTF_v1` | ⚠ DEPRECATED | PF 0.11, WR 14.9% | 15m | Kept as negative-baseline reference only |
+| `MOM_BREAK_v1` | ready to test | TBD | 5m/15m | Consolidation-break scalp — ⚠ note scalps bleed in PRISM; test before committing |
+| `SWING_PULL_v1` | **ready to test** | TBD | **4h** | EMA pullback in daily trend — targets >24hr holds (the real edge bucket) |
+| `DAILY_BREAK_v1` | **ready to test** | TBD | **1h/4h** | Prev-day high/low breakout — multi-day swing, 3R target |
+| `MACD_MTF_BOS_v1` | not started | — | — | Week 8 — MACD + Break-of-Structure (defer until baselines done) |
+
+### Priority testing order
+
+Run `SWING_PULL_v1` first, then `DAILY_BREAK_v1`. Both are built for the
+>24hr hold edge that PRISM data shows is real. `MOM_BREAK_v1` (scalp) is the
+*least* aligned with the fingerprint — test it last and only keep it if baseline
+shows PF ≥ 1.5.
 
 ## Research artifacts
 
