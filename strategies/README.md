@@ -34,9 +34,16 @@ A `201 Created` with the full signal row means schema parses. A `422` means a fi
 
 | Name | Status | Baseline | Notes |
 |---|---|---|---|
+| `TREND_4R_v1` | **ready to test** | TBD | **Current focus.** 4H with-trend, fixed 1% stop / 4% TP (4R). Built to the locked thesis (see repo-root `PRISM-SYSTEM-SPEC (1).md`). Tests whether 4R is reachable at a 1% stop. |
+| `MOM_BREAK_v1` | ⏸ on hold | TBD | 5m/15m scalp. **Superseded for live use** by the 2026-06-02 conclusion that scalping doesn't fit the account-risk math — kept for reference only. |
 | `MACD_MTF_v1` | ⚠ DEPRECATED | PF 0.11, WR 14.9% | Kept as negative-baseline reference |
-| `MOM_BREAK_v1` | ready to test | TBD | Consolidation-break scalp, built from PRISM fingerprint |
 | `MACD_MTF_BOS_v1` | not started | — | Week 8 — adds Break-of-Structure confirmation |
+
+The locked trading thesis driving `TREND_4R_v1`: **R-multiple is the lever, not win
+rate.** 44% WR is accepted as fine; the edge is holding winners to 4R instead of
+closing early. 4H timeframe, 10x (≡5x @ 2% stop), 1% stop = 10% account risk, 4% TP
+= 40% gain. The crux — *does a 4H signal actually reach 4R behind a 1% stop?* — is
+unproven and is exactly what `TREND_4R_v1`'s backtest is meant to settle.
 
 ## Research artifacts
 

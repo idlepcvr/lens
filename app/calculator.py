@@ -388,6 +388,121 @@ def compute_goal(
     }
 
 
+# ─── Forward Projection (PARAMETER-FIRST — the "new method") ───────────────────
+
+def compute_projection(
+    start_balance:    float,
+    stop_pct:         float,   # SL price move, as fraction (0.01 = 1%)
+    tp_pct:           float,   # TP price move, as fraction (0.04 = 4%)
+    leverage:         float,   # exchange leverage (10x)
+    win_rate:         float,   # 0–1
+    trades_per_week:  float,
+    weeks:            float,   # horizon
+    btc_price_eur:    float = None,
+    max_drawdown:     float = 0.50,
+) -> dict:
+    """
+    The inverse of compute_goal. Here the trade PARAMETERS are LOCKED inputs
+    (1% stop, 4% TP, 10x, fixed risk) and the equity curve is PROJECTED forward
+    at a given win rate. Answers "where do I land?" rather than "what do I need?".
+
+    Win rate is NOT optimized — it's a dial you turn to see sensitivity. The
+    edge here is R (tp_pct / stop_pct), driven by holding to target.
+    """
+    if start_balance <= 0:
+        raise CalcError("start_balance must be positive")
+    if stop_pct <= 0 or tp_pct <= 0:
+        raise CalcError("stop_pct and tp_pct must be positive")
+    if leverage <= 0:
+        raise CalcError("leverage must be positive")
+    if not (0 < win_rate < 1):
+        raise CalcError("win_rate must be between 0 and 1 (exclusive)")
+    if trades_per_week <= 0 or weeks <= 0:
+        raise CalcError("trades_per_week and weeks must be positive")
+
+    loss_rate = 1.0 - win_rate
+
+    # ── Per-trade account impact (fee drag baked in, like compute_goal) ──────
+    acct_gain_win  = (tp_pct   - FEE_ROUNDTRIP) * leverage   # +40% gross at 10x/4%
+    acct_loss_loss = (stop_pct + FEE_ROUNDTRIP) * leverage   # -11.5% at 10x/1%
+    if acct_loss_loss >= 1.0:
+        raise CalcError("Per-trade loss ≥ 100% of account — reduce leverage or stop.")
+    if acct_gain_win <= 0:
+        raise CalcError("Take-profit too small to clear fees at this leverage.")
+
+    nominal_r = tp_pct / stop_pct
+    actual_r  = acct_gain_win / acct_loss_loss
+
+    per_trade_ev = win_rate * acct_gain_win - loss_rate * acct_loss_loss
+    breakeven_wr = acct_loss_loss / (acct_gain_win + acct_loss_loss)
+
+    # ── Log-return moments → geometric growth ────────────────────────────────
+    a       = log(1 + acct_gain_win)
+    b       = log(1 - acct_loss_loss)
+    mu_log  = win_rate * a + loss_rate * b
+    var_log = win_rate * a**2 + loss_rate * b**2 - mu_log**2
+    sigma   = sqrt(var_log) if var_log > 0 else 1e-9
+    geometric_drift = exp(mu_log) - 1
+
+    trades_to_double = (log(2) / mu_log) if mu_log > 0 else None
+    weeks_to_double  = (trades_to_double / trades_per_week) if trades_to_double else None
+
+    # ── Risk of ruin over the whole horizon (to max_drawdown) ────────────────
+    N_total = max(1, round(trades_per_week * weeks))
+    B = -log(1 - max_drawdown)
+    if sigma > 0:
+        z1 = -(B + mu_log * N_total) / (sigma * sqrt(N_total))
+        z2 =  (B + mu_log * N_total) / (sigma * sqrt(N_total))
+        ror = norm.cdf(z1) + (exp(-2 * mu_log * B / var_log) * norm.cdf(z2) if var_log > 0 else 0)
+        risk_of_ruin = min(1.0, max(0.0, ror))
+    else:
+        risk_of_ruin = 1.0 if mu_log <= 0 else 0.0
+
+    # ── Week-by-week percentile bands (the "multicolour projection") ─────────
+    def _band(N, z):
+        return start_balance * exp(N * mu_log + z * sigma * sqrt(N))
+
+    milestone_weeks = sorted({w for w in [1, 2, 3, 4, 6, 8, 10, 12, 16, 20, 26, round(weeks)]
+                              if 0 < w <= weeks})
+    curve = []
+    for w in milestone_weeks:
+        N = trades_per_week * w
+        p50 = _band(N, 0.0)
+        row = {
+            "week":   w,
+            "trades": round(N),
+            "p05":    round(_band(N, -1.645), 2),
+            "p25":    round(_band(N, -0.674), 2),
+            "p50":    round(p50, 2),
+            "p75":    round(_band(N,  0.674), 2),
+            "p95":    round(_band(N,  1.645), 2),
+            "btc_p50": round(p50 / btc_price_eur, 4) if btc_price_eur else None,
+        }
+        curve.append(row)
+
+    return {
+        "inputs": {
+            "start_balance": start_balance, "stop_pct": round(stop_pct * 100, 4),
+            "tp_pct": round(tp_pct * 100, 4), "leverage": leverage,
+            "win_rate": round(win_rate * 100, 2), "trades_per_week": trades_per_week,
+            "weeks": weeks, "btc_price_eur": btc_price_eur,
+        },
+        "nominal_r":        round(nominal_r, 2),
+        "actual_r":         round(actual_r, 2),
+        "acct_gain_win":    round(acct_gain_win * 100, 2),
+        "acct_loss_loss":   round(acct_loss_loss * 100, 2),
+        "per_trade_ev":     round(per_trade_ev * 100, 3),
+        "breakeven_wr":     round(breakeven_wr * 100, 2),
+        "geometric_drift":  round(geometric_drift * 100, 3),
+        "weeks_to_double":  round(weeks_to_double, 1) if weeks_to_double else None,
+        "trades_to_double": round(trades_to_double, 1) if trades_to_double else None,
+        "risk_of_ruin":     round(risk_of_ruin * 100, 2),
+        "max_drawdown":     round(max_drawdown * 100, 0),
+        "is_positive_ev":   per_trade_ev > 0,
+        "curve":            curve,
+    }
+
+
 # ─── Position Calculator ──────────────────────────────────────────────────────
 
 def compute_position(

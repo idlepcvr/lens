@@ -28,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from .calculator import CalcError, compute_goal, compute_position
+from .calculator import CalcError, compute_goal, compute_position, compute_projection
 from .database import (
     init_db,
     create_trade, get_trades, get_trade, update_trade, delete_trade,
@@ -62,6 +62,202 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+# ─── Projection (parameter-first "new method") ────────────────────────────────
+
+@app.get("/projection", response_class=HTMLResponse)
+def projection_page(
+    start: float = Query(360,   description="Start balance €"),
+    stop:  float = Query(1.0,   description="Stop — % price move"),
+    tp:    float = Query(4.0,   description="Take profit — % price move"),
+    lev:   float = Query(10.0,  description="Leverage"),
+    wr:    float = Query(44.0,  description="Win rate %"),
+    tpw:   float = Query(5.0,   description="Trades / week"),
+    weeks: float = Query(26.0,  description="Horizon (weeks)"),
+    btc:   float = Query(60000, description="BTC price € (for BTC equivalent)"),
+):
+    def fmt_eur(v):
+        if v is None:
+            return "—"
+        if abs(v) >= 1_000_000:
+            return f"€{v/1_000_000:.2f}M"
+        if abs(v) >= 10_000:
+            return f"€{v/1000:.1f}k"
+        return f"€{v:,.0f}"
+
+    try:
+        p = compute_projection(
+            start_balance=start, stop_pct=stop/100, tp_pct=tp/100, leverage=lev,
+            win_rate=wr/100, trades_per_week=tpw, weeks=weeks, btc_price_eur=btc,
+        )
+        err_html = ""
+    except CalcError as e:
+        p = None
+        err_html = f"<div class='err'>{e}</div>"
+
+    # ── Curve rows (the multicolour bands) ──────────────────────────────────
+    curve_rows = ""
+    if p:
+        for r in p["curve"]:
+            btc_cell = f"<td class='btc'>{r['btc_p50']:.4f}</td>" if r["btc_p50"] is not None else "<td>—</td>"
+            curve_rows += (
+                f"<tr><td>{r['week']}</td><td class='dim'>{r['trades']}</td>"
+                f"<td class='p05'>{fmt_eur(r['p05'])}</td>"
+                f"<td class='p25'>{fmt_eur(r['p25'])}</td>"
+                f"<td class='p50'>{fmt_eur(r['p50'])}</td>"
+                f"<td class='p75'>{fmt_eur(r['p75'])}</td>"
+                f"<td class='p95'>{fmt_eur(r['p95'])}</td>"
+                f"{btc_cell}</tr>"
+            )
+
+    # ── Win-rate sensitivity (proves WR is NOT the lever) ───────────────────
+    wr_rows = ""
+    for w in [30, 40, 44, 54, 60]:
+        try:
+            s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp/100,
+                                   leverage=lev, win_rate=w/100, trades_per_week=tpw,
+                                   weeks=weeks, btc_price_eur=btc)
+            dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
+            cls = "pos" if s["is_positive_ev"] else "neg"
+            here = " ←" if abs(w - wr) < 0.5 else ""
+            final = s["curve"][-1]["p50"]
+            wr_rows += (f"<tr><td>{w}%{here}</td><td class='{cls}'>{s['per_trade_ev']:+.2f}%</td>"
+                        f"<td>{dbl}</td><td>{fmt_eur(final)}</td><td>{s['risk_of_ruin']}%</td></tr>")
+        except CalcError:
+            wr_rows += f"<tr><td>{w}%</td><td colspan=4 class='dim'>invalid</td></tr>"
+
+    # ── R sensitivity (proves R IS the lever — vary TP, stop fixed) ─────────
+    r_rows = ""
+    for tp_v in [2.0, 3.0, 4.0, 5.0]:
+        try:
+            s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp_v/100,
+                                   leverage=lev, win_rate=wr/100, trades_per_week=tpw,
+                                   weeks=weeks, btc_price_eur=btc)
+            dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
+            cls = "pos" if s["is_positive_ev"] else "neg"
+            here = " ←" if abs(tp_v - tp) < 0.01 else ""
+            final = s["curve"][-1]["p50"]
+            r_rows += (f"<tr><td>{s['nominal_r']:.0f}R{here}</td><td class='{cls}'>{s['per_trade_ev']:+.2f}%</td>"
+                       f"<td>{dbl}</td><td>{fmt_eur(final)}</td><td>{s['risk_of_ruin']}%</td></tr>")
+        except CalcError:
+            r_rows += f"<tr><td>{tp_v:.0f}%</td><td colspan=4 class='dim'>invalid</td></tr>"
+
+    # ── Headline metrics ────────────────────────────────────────────────────
+    if p:
+        ev_cls = "pos" if p["is_positive_ev"] else "neg"
+        ror_cls = "pos" if p["risk_of_ruin"] <= 5 else ("warn" if p["risk_of_ruin"] <= 20 else "neg")
+        metrics = f"""
+        <div class="card"><div class="n {ev_cls}">{p['per_trade_ev']:+.2f}%</div><div class="l">EV / trade</div></div>
+        <div class="card"><div class="n">{p['actual_r']}R</div><div class="l">Actual R (after fees)</div></div>
+        <div class="card"><div class="n">{p['weeks_to_double'] or '∞'}</div><div class="l">Weeks to double</div></div>
+        <div class="card"><div class="n {ror_cls}">{p['risk_of_ruin']}%</div><div class="l">Ruin risk (−{int(p['max_drawdown'])}%)</div></div>
+        <div class="card"><div class="n {('neg' if wr < p['breakeven_wr'] else 'pos')}">{p['breakeven_wr']}%</div><div class="l">Breakeven WR</div></div>
+        <div class="card"><div class="n pos">{p['acct_gain_win']:+.0f}%</div><div class="l">Account / win</div></div>
+        <div class="card"><div class="n neg">−{p['acct_loss_loss']:.0f}%</div><div class="l">Account / loss</div></div>
+        <div class="card"><div class="n">{p['geometric_drift']:+.2f}%</div><div class="l">Geo growth / trade</div></div>
+        """
+    else:
+        metrics = ""
+
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>LENS — projection</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  *{{box-sizing:border-box}}
+  body{{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0c0c0d;color:#d4d4d4;margin:0;padding:24px;max-width:1100px;margin:0 auto}}
+  h1{{font-size:26px;letter-spacing:.08em;margin:0 0 2px;color:#fff;font-weight:600}}
+  h1 .v{{font-size:11px;opacity:.4;margin-left:10px}}
+  a{{color:#7aa2f7;text-decoration:none}} a:hover{{text-decoration:underline}}
+  h2{{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#888;border-bottom:1px solid #272729;padding-bottom:6px;margin:26px 0 12px}}
+  .strat{{background:#111112;border:1px solid #232325;border-left:3px solid #7aa2f7;border-radius:6px;padding:14px 18px;margin:14px 0 8px;font-size:12.5px;color:#bbb}}
+  .strat b{{color:#fff}} .strat .one{{color:#a6c1ff;font-style:italic;display:block;margin-bottom:8px}}
+  .strat ul{{margin:6px 0 0;padding-left:18px}} .strat li{{margin:3px 0}}
+  form{{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#111112;border:1px solid #232325;border-radius:6px;padding:12px 16px;margin:8px 0}}
+  form .f{{display:flex;flex-direction:column;gap:3px}}
+  form label{{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#888}}
+  form input{{background:#0c0c0d;border:1px solid #2a2a2c;color:#fff;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px;width:80px}}
+  form input:focus{{outline:none;border-color:#7aa2f7}}
+  button{{background:#293551;color:#a6c1ff;border:1px solid #3a4a72;padding:7px 16px;border-radius:4px;cursor:pointer;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.1em}}
+  button:hover{{background:#324063;color:#fff}}
+  .status{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0}}
+  @media(max-width:760px){{.status{{grid-template-columns:repeat(2,1fr)}}}}
+  .card{{background:#161617;border:1px solid #272729;border-radius:6px;padding:12px 14px}}
+  .card .n{{font-size:20px;color:#fff;font-weight:600;line-height:1}}
+  .card .l{{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:#777;margin-top:6px}}
+  table{{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}}
+  th{{text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#777;padding:6px 8px;border-bottom:1px solid #272729}}
+  th:first-child,td:first-child{{text-align:left}}
+  td{{text-align:right;padding:5px 8px;border-bottom:1px solid #1a1a1a}}
+  td.dim,.dim{{color:#666}}
+  .p05{{color:#f7768e}} .p25{{color:#e0af68}} .p50{{color:#fff;font-weight:600}} .p75{{color:#9ad68a}} .p95{{color:#9ece6a}}
+  td.btc{{color:#f0a000}}
+  .pos{{color:#9ece6a}} .neg{{color:#f7768e}} .warn{{color:#e0af68}}
+  .two{{display:grid;grid-template-columns:1fr 1fr;gap:16px}} @media(max-width:760px){{.two{{grid-template-columns:1fr}}}}
+  .note{{color:#777;font-size:11px;margin:6px 0}}
+  .err{{background:#3b1d20;border:1px solid #6c3439;color:#f7768e;padding:10px 14px;border-radius:6px;margin:8px 0}}
+</style></head><body>
+
+<h1>LENS · PROJECTION<span class="v">parameter-first · <a href="/">← dashboard (goal-first)</a></span></h1>
+
+<div class="strat">
+  <span class="one">"I trade BTC perps on Kraken — with-trend, on the 4H chart — risking a fixed 10% of my account to make 40% (a 4R trade). My entire edge is holding winners to the full 4R instead of bailing early."</span>
+  <b>The locked rules:</b>
+  <ul>
+    <li><b>Market / TF:</b> BTC perpetual futures, Kraken. 4-hour chart. Holds 1–3 days. Not scalping, not daily swing.</li>
+    <li><b>Direction:</b> long or short — <b>only with the trend.</b> Never counter-trend.</li>
+    <li><b>Risk (fixed):</b> 1% price stop = <b>10% of account</b> at 10x. Same 10% on every trade.</li>
+    <li><b>Exit (this IS the edge):</b> take profit at +4% price = <b>+40% account = 4R.</b> Hands-off — set SL/TP, walk away. No closing early.</li>
+    <li><b>Frequency:</b> ~1 trade/day max; 2–3 good setups a week. Most of the time, no trade.</li>
+    <li><b>Not optimizing win rate.</b> 44% is fine. <b>R is the lever</b> — see the two tables below.</li>
+  </ul>
+</div>
+
+<form method="get" action="/projection">
+  <div class="f"><label>Start €</label><input name="start" type="number" step="any" value="{start:g}"></div>
+  <div class="f"><label>Stop %</label><input name="stop" type="number" step="any" value="{stop:g}"></div>
+  <div class="f"><label>TP %</label><input name="tp" type="number" step="any" value="{tp:g}"></div>
+  <div class="f"><label>Leverage</label><input name="lev" type="number" step="any" value="{lev:g}"></div>
+  <div class="f"><label>Win rate %</label><input name="wr" type="number" step="any" value="{wr:g}"></div>
+  <div class="f"><label>Trades/wk</label><input name="tpw" type="number" step="any" value="{tpw:g}"></div>
+  <div class="f"><label>Weeks</label><input name="weeks" type="number" step="any" value="{weeks:g}"></div>
+  <div class="f"><label>BTC € </label><input name="btc" type="number" step="any" value="{btc:g}"></div>
+  <button type="submit">Project →</button>
+</form>
+{err_html}
+
+<div class="status">{metrics}</div>
+
+<h2>Projected equity — percentile bands</h2>
+<p class="note">Median (P50) is the expected path. P05 = unlucky (worst 5%), P95 = lucky. Spread = variance, not a forecast. BTC column converts the median at €{btc:,.0f}/BTC.</p>
+<table>
+  <tr><th>Week</th><th>Trades</th><th class="p05">P05</th><th class="p25">P25</th><th class="p50">Median</th><th class="p75">P75</th><th class="p95">P95</th><th>BTC (P50)</th></tr>
+  {curve_rows}
+</table>
+
+<div class="two">
+  <div>
+    <h2>Win-rate sensitivity <span class="dim">(R held at {p['nominal_r'] if p else tp/stop:g}R)</span></h2>
+    <p class="note">Win rate compounds hard too — but it's a <b>byproduct of entry quality</b>: slow to move, and below the breakeven WR you die. You don't chase it; you let better setups raise it over time.</p>
+    <table>
+      <tr><th>WR</th><th>EV/trade</th><th>Double</th><th>Final (P50)</th><th>Ruin</th></tr>
+      {wr_rows}
+    </table>
+  </div>
+  <div>
+    <h2>R sensitivity <span class="dim">(WR held at {wr:g}%)</span></h2>
+    <p class="note">Same horizon, WR fixed, only R moves. Just as explosive — and <b>R is the one you control</b>: it's an exit choice (hold to target vs. close early), fixable today. That's why it's "the lever".</p>
+    <table>
+      <tr><th>R</th><th>EV/trade</th><th>Double</th><th>Final (P50)</th><th>Ruin</th></tr>
+      {r_rows}
+    </table>
+  </div>
+</div>
+
+<p class="note" style="margin-top:18px">⚠ <b>Read the shape, not the raw totals.</b> Over many trades, compounding produces absurd numbers (millions, hundreds of BTC) — those are arithmetic, not realistic outcomes: liquidity, position size, and your own psychology cap the real path. What's trustworthy here is the <b>early weeks, the EV/trade, the breakeven WR, and the ruin %</b>. It also assumes the win rate holds at a <b>1% stop</b> (unproven — history used wider stops) and ignores funding on multi-day holds. A model, not a promise. Validate via the <code>TREND_4R_v1</code> backtest first.</p>
+
+</body></html>"""
 
 
 # ─── Landing + health ─────────────────────────────────────────────────────────
@@ -144,7 +340,7 @@ def landing():
   .ep .d{{color:#666;font-size:11px}}
 </style></head><body>
 
-<h1>LENS<span class="v">v1.0.0-dev · :8765</span></h1>
+<h1>LENS<span class="v">v1.0.0-dev · :8765 · <a href="/projection">projection →</a></span></h1>
 <p class="mission">Build the dataset that makes month-6 predictive scoring possible. Every Pine signal — taken or skipped — captured with locked schema, linked to exchange fills, outcome-attached.</p>
 
 <div class="status">
