@@ -76,6 +76,7 @@ def projection_page(
     tpw:   float = Query(5.0,   description="Trades / week"),
     weeks: float = Query(26.0,  description="Horizon (weeks)"),
     btc:   float = Query(60000, description="BTC price € (for BTC equivalent)"),
+    fee:   float = Query(0.30,  description="Fee % round trip (0.15%/side)"),
 ):
     def fmt_eur(v):
         if v is None:
@@ -90,6 +91,7 @@ def projection_page(
         p = compute_projection(
             start_balance=start, stop_pct=stop/100, tp_pct=tp/100, leverage=lev,
             win_rate=wr/100, trades_per_week=tpw, weeks=weeks, btc_price_eur=btc,
+            fee_roundtrip=fee/100,
         )
         err_html = ""
     except CalcError as e:
@@ -117,7 +119,7 @@ def projection_page(
         try:
             s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp/100,
                                    leverage=lev, win_rate=w/100, trades_per_week=tpw,
-                                   weeks=weeks, btc_price_eur=btc)
+                                   weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee/100)
             dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
             cls = "pos" if s["is_positive_ev"] else "neg"
             here = " ←" if abs(w - wr) < 0.5 else ""
@@ -133,7 +135,7 @@ def projection_page(
         try:
             s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp_v/100,
                                    leverage=lev, win_rate=wr/100, trades_per_week=tpw,
-                                   weeks=weeks, btc_price_eur=btc)
+                                   weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee/100)
             dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
             cls = "pos" if s["is_positive_ev"] else "neg"
             here = " ←" if abs(tp_v - tp) < 0.01 else ""
@@ -223,6 +225,7 @@ def projection_page(
   <div class="f"><label>Trades/wk</label><input name="tpw" type="number" step="any" value="{tpw:g}"></div>
   <div class="f"><label>Weeks</label><input name="weeks" type="number" step="any" value="{weeks:g}"></div>
   <div class="f"><label>BTC € </label><input name="btc" type="number" step="any" value="{btc:g}"></div>
+  <div class="f"><label>Fee % RT</label><input name="fee" type="number" step="any" value="{fee:g}"></div>
   <button type="submit">Project →</button>
 </form>
 {err_html}

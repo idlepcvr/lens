@@ -400,6 +400,7 @@ def compute_projection(
     weeks:            float,   # horizon
     btc_price_eur:    float = None,
     max_drawdown:     float = 0.50,
+    fee_roundtrip:    float = 0.003,   # 0.30% round trip = 0.15%/side (real Kraken taker)
 ) -> dict:
     """
     The inverse of compute_goal. Here the trade PARAMETERS are LOCKED inputs
@@ -423,8 +424,9 @@ def compute_projection(
     loss_rate = 1.0 - win_rate
 
     # ── Per-trade account impact (fee drag baked in, like compute_goal) ──────
-    acct_gain_win  = (tp_pct   - FEE_ROUNDTRIP) * leverage   # +40% gross at 10x/4%
-    acct_loss_loss = (stop_pct + FEE_ROUNDTRIP) * leverage   # -11.5% at 10x/1%
+    # At 10x/4%/1% with 0.30% round trip: win = +37% account, loss = -13% → ~2.85R
+    acct_gain_win  = (tp_pct   - fee_roundtrip) * leverage
+    acct_loss_loss = (stop_pct + fee_roundtrip) * leverage
     if acct_loss_loss >= 1.0:
         raise CalcError("Per-trade loss ≥ 100% of account — reduce leverage or stop.")
     if acct_gain_win <= 0:
