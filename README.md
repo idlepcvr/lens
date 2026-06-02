@@ -137,6 +137,40 @@ Health check: `curl localhost:8765/health` · API docs: http://localhost:8765/do
 
 ---
 
+## Working across machines (laptop ↔ miniPC)
+
+Active work lives on the branch **`lens-4r-projection`** (direct pushes to `master`
+are blocked by a review guard).
+
+**To pick up where you left off on another machine:**
+
+```bash
+git fetch origin
+git checkout lens-4r-projection     # first time
+# or, if already on the branch:
+git pull
+```
+
+**To save and sync your work back up:**
+
+```bash
+git add -A
+git commit -m "what changed"
+git push origin HEAD:lens-4r-projection
+```
+
+**When the branch is solid and you want it as your main line:**
+
+```bash
+git checkout master
+git merge lens-4r-projection
+```
+
+Current progress snapshot is always in **`STATUS.md`** — read that first to remember
+where things stand and what the next step is.
+
+---
+
 ## Status / honesty
 
 - ✅ Goal calculator, projection page, exchange sync, signal ingestion, discipline filters.
