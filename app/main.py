@@ -70,7 +70,7 @@ def startup():
 def projection_page(
     start: float = Query(360,   description="Start balance €"),
     stop:  float = Query(1.0,   description="Stop — % price move"),
-    tp:    float = Query(4.0,   description="Take profit — % price move"),
+    tp:    float = Query(5.5,   description="Take profit — % price move (5.5% → actual 4R after 0.30% fee)"),
     lev:   float = Query(10.0,  description="Leverage"),
     wr:    float = Query(44.0,  description="Win rate %"),
     tpw:   float = Query(5.0,   description="Trades / week"),
@@ -78,15 +78,16 @@ def projection_page(
     btc:   float = Query(60000, description="BTC price € (for BTC equivalent)"),
     fee:   float = Query(0.30,  description="Fee % round trip (0.15%/side)"),
 ):
+    import math
+
+    # ── helpers ──────────────────────────────────────────────────────────────────
     def fmt_eur(v):
-        if v is None:
-            return "—"
-        if abs(v) >= 1_000_000:
-            return f"€{v/1_000_000:.2f}M"
-        if abs(v) >= 10_000:
-            return f"€{v/1000:.1f}k"
+        if v is None: return "—"
+        if abs(v) >= 1_000_000: return f"€{v/1_000_000:.2f}M"
+        if abs(v) >= 10_000: return f"€{v/1000:.1f}k"
         return f"€{v:,.0f}"
 
+    # ── compute ──────────────────────────────────────────────────────────────────
     try:
         p = compute_projection(
             start_balance=start, stop_pct=stop/100, tp_pct=tp/100, leverage=lev,
@@ -98,169 +99,372 @@ def projection_page(
         p = None
         err_html = f"<div class='err'>{e}</div>"
 
-    # ── Curve rows (the multicolour bands) ──────────────────────────────────
+    # ── SVG sparkline (log-scale equity bands) ───────────────────────────────────
+    def make_sparkline(curve):
+        if not curve or len(curve) < 2: return ""
+        min_v = max(1.0, min(r["p05"] for r in curve if r["p05"] > 0))
+        max_v = max(r["p95"] for r in curve)
+        lmin = math.log(min_v); lmax = math.log(max_v); lr = lmax - lmin or 1
+        mw = curve[-1]["week"]
+        W, H, gx, gy = 880, 148, 6, 8
+        def xc(w): return round(gx + w / mw * (W - 2 * gx), 1)
+        def yc(v): return round(H - gy - (math.log(max(1.0, v)) - lmin) / lr * (H - 2 * gy), 1)
+        def pd(k): return "M " + " L ".join(f"{xc(r['week'])} {yc(r[k])}" for r in curve)
+        fwd = " L ".join(f"{xc(r['week'])} {yc(r['p95'])}" for r in curve)
+        bwd = " L ".join(f"{xc(r['week'])} {yc(r['p05'])}" for r in reversed(curve))
+        lbls = ""
+        for i, r in enumerate(curve):
+            if i in (0, len(curve) // 2, len(curve) - 1):
+                lbls += f'<text x="{xc(r["week"])}" y="{yc(r["p50"]) - 7}" text-anchor="middle" fill="#444" font-size="9">{fmt_eur(r["p50"])}</text>'
+        return (
+            f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:128px;display:block">'
+            f'<path id="sband" d="M {fwd} L {bwd} Z" fill="#7aa2f7" opacity="0.07" style="display:none"/>'
+            f'<path id="sp05" d="{pd("p05")}" stroke="#f7768e" stroke-width="1" fill="none" stroke-dasharray="5 3" opacity="0.65" style="display:none"/>'
+            f'<path id="sp25" d="{pd("p25")}" stroke="#e0af68" stroke-width="1" fill="none" opacity="0.4" style="display:none"/>'
+            f'<path id="sp75" d="{pd("p75")}" stroke="#9ad68a" stroke-width="1" fill="none" opacity="0.4" style="display:none"/>'
+            f'<path id="sp95" d="{pd("p95")}" stroke="#9ece6a" stroke-width="1" fill="none" stroke-dasharray="5 3" opacity="0.65" style="display:none"/>'
+            f'<path id="sp50" d="{pd("p50")}" stroke="#fff" stroke-width="2.5" fill="none"/>'
+            f'{lbls}</svg>'
+        )
+
+    sparkline = make_sparkline(p["curve"]) if p else ""
+
+    # ── Curve rows ───────────────────────────────────────────────────────────────
     curve_rows = ""
     if p:
-        for r in p["curve"]:
-            btc_cell = f"<td class='btc'>{r['btc_p50']:.4f}</td>" if r["btc_p50"] is not None else "<td>—</td>"
+        for i, r in enumerate(p["curve"]):
+            btc_c = f"<td class='btc'>{r['btc_p50']:.4f}</td>" if r["btc_p50"] else "<td class='dim'>—</td>"
+            rc = " class='alt'" if i % 2 else ""
             curve_rows += (
-                f"<tr><td>{r['week']}</td><td class='dim'>{r['trades']}</td>"
+                f"<tr{rc}><td>{r['week']}w</td><td class='dim'>{r['trades']}</td>"
                 f"<td class='p05'>{fmt_eur(r['p05'])}</td>"
                 f"<td class='p25'>{fmt_eur(r['p25'])}</td>"
                 f"<td class='p50'>{fmt_eur(r['p50'])}</td>"
                 f"<td class='p75'>{fmt_eur(r['p75'])}</td>"
                 f"<td class='p95'>{fmt_eur(r['p95'])}</td>"
-                f"{btc_cell}</tr>"
+                f"{btc_c}</tr>"
             )
 
-    # ── Win-rate sensitivity (proves WR is NOT the lever) ───────────────────
+    # ── R-target sensitivity (actual R after fees) ───────────────────────────────
+    r_target_rows = ""
+    cur_ar = p["actual_r"] if p else 0.0
+    for tgt_r in [2.0, 3.0, 4.0, 5.0, 6.0]:
+        tp_f = tgt_r * (stop / 100 + fee / 100) + fee / 100
+        tp_pct_v = tp_f * 100
+        nom_r_v = tp_pct_v / stop
+        is_cur = abs(tgt_r - cur_ar) < 0.3
+        mark = " ←" if is_cur else ""
+        hl = " class='cur-row'" if is_cur else ""
+        try:
+            s = compute_projection(
+                start_balance=start, stop_pct=stop / 100, tp_pct=tp_f,
+                leverage=lev, win_rate=wr / 100, trades_per_week=tpw,
+                weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee / 100,
+            )
+            dbl = f"{s['weeks_to_double']:.0f}w" if s["weeks_to_double"] else "never"
+            ec = "pos" if s["is_positive_ev"] else "neg"
+            rc2 = "pos" if s["risk_of_ruin"] <= 10 else "neg"
+            r_target_rows += (
+                f"<tr{hl}><td><b>{tgt_r:.0f}R actual</b>{mark}</td>"
+                f"<td class='dim'>{nom_r_v:.1f}R nom · {tp_pct_v:.1f}% TP</td>"
+                f"<td class='{ec}'>{s['per_trade_ev']:+.2f}%</td>"
+                f"<td>{s['geometric_drift']:+.2f}%</td>"
+                f"<td>{dbl}</td>"
+                f"<td>{fmt_eur(s['curve'][-1]['p50'])}</td>"
+                f"<td class='{rc2}'>{s['risk_of_ruin']}%</td></tr>"
+            )
+        except CalcError:
+            r_target_rows += f"<tr><td>{tgt_r:.0f}R actual</td><td colspan='6' class='dim'>invalid</td></tr>"
+
+    # ── Win-rate sensitivity ──────────────────────────────────────────────────────
     wr_rows = ""
-    for w in [30, 40, 44, 54, 60]:
+    for w in [30, 40, 44, 50, 55, 60]:
+        is_here = abs(w - wr) < 0.5
+        mark = " ←" if is_here else ""
+        hl = " class='cur-row'" if is_here else ""
         try:
-            s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp/100,
-                                   leverage=lev, win_rate=w/100, trades_per_week=tpw,
-                                   weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee/100)
-            dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
-            cls = "pos" if s["is_positive_ev"] else "neg"
-            here = " ←" if abs(w - wr) < 0.5 else ""
-            final = s["curve"][-1]["p50"]
-            wr_rows += (f"<tr><td>{w}%{here}</td><td class='{cls}'>{s['per_trade_ev']:+.2f}%</td>"
-                        f"<td>{dbl}</td><td>{fmt_eur(final)}</td><td>{s['risk_of_ruin']}%</td></tr>")
+            s = compute_projection(
+                start_balance=start, stop_pct=stop / 100, tp_pct=tp / 100,
+                leverage=lev, win_rate=w / 100, trades_per_week=tpw,
+                weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee / 100,
+            )
+            dbl = f"{s['weeks_to_double']:.0f}w" if s["weeks_to_double"] else "never"
+            ec = "pos" if s["is_positive_ev"] else "neg"
+            rc2 = "pos" if s["risk_of_ruin"] <= 10 else "neg"
+            wr_rows += (
+                f"<tr{hl}><td>{w}%{mark}</td>"
+                f"<td class='{ec}'>{s['per_trade_ev']:+.2f}%</td>"
+                f"<td>{s['geometric_drift']:+.2f}%</td>"
+                f"<td>{dbl}</td>"
+                f"<td>{fmt_eur(s['curve'][-1]['p50'])}</td>"
+                f"<td class='{rc2}'>{s['risk_of_ruin']}%</td></tr>"
+            )
         except CalcError:
-            wr_rows += f"<tr><td>{w}%</td><td colspan=4 class='dim'>invalid</td></tr>"
+            wr_rows += f"<tr><td>{w}%</td><td colspan='5' class='dim'>invalid</td></tr>"
 
-    # ── R sensitivity (proves R IS the lever — vary TP, stop fixed) ─────────
-    r_rows = ""
-    for tp_v in [2.0, 3.0, 4.0, 5.0]:
-        try:
-            s = compute_projection(start_balance=start, stop_pct=stop/100, tp_pct=tp_v/100,
-                                   leverage=lev, win_rate=wr/100, trades_per_week=tpw,
-                                   weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee/100)
-            dbl = f"{s['weeks_to_double']} wk" if s["weeks_to_double"] else "never"
-            cls = "pos" if s["is_positive_ev"] else "neg"
-            here = " ←" if abs(tp_v - tp) < 0.01 else ""
-            final = s["curve"][-1]["p50"]
-            r_rows += (f"<tr><td>{s['nominal_r']:.0f}R{here}</td><td class='{cls}'>{s['per_trade_ev']:+.2f}%</td>"
-                       f"<td>{dbl}</td><td>{fmt_eur(final)}</td><td>{s['risk_of_ruin']}%</td></tr>")
-        except CalcError:
-            r_rows += f"<tr><td>{tp_v:.0f}%</td><td colspan=4 class='dim'>invalid</td></tr>"
-
-    # ── Headline metrics ────────────────────────────────────────────────────
+    # ── Hero metric cards ─────────────────────────────────────────────────────────
     if p:
-        ev_cls = "pos" if p["is_positive_ev"] else "neg"
-        ror_cls = "pos" if p["risk_of_ruin"] <= 5 else ("warn" if p["risk_of_ruin"] <= 20 else "neg")
-        metrics = f"""
-        <div class="card"><div class="n {ev_cls}">{p['per_trade_ev']:+.2f}%</div><div class="l">EV / trade</div></div>
-        <div class="card"><div class="n">{p['actual_r']}R</div><div class="l">Actual R (after fees)</div></div>
-        <div class="card"><div class="n">{p['weeks_to_double'] or '∞'}</div><div class="l">Weeks to double</div></div>
-        <div class="card"><div class="n {ror_cls}">{p['risk_of_ruin']}%</div><div class="l">Ruin risk (−{int(p['max_drawdown'])}%)</div></div>
-        <div class="card"><div class="n {('neg' if wr < p['breakeven_wr'] else 'pos')}">{p['breakeven_wr']}%</div><div class="l">Breakeven WR</div></div>
-        <div class="card"><div class="n pos">{p['acct_gain_win']:+.0f}%</div><div class="l">Account / win</div></div>
-        <div class="card"><div class="n neg">−{p['acct_loss_loss']:.0f}%</div><div class="l">Account / loss</div></div>
-        <div class="card"><div class="n">{p['geometric_drift']:+.2f}%</div><div class="l">Geo growth / trade</div></div>
-        """
+        ar = p["actual_r"]
+        r_cls   = "pos"  if ar >= 3.5 else ("warn" if ar >= 2.5 else "neg")
+        ev_cls  = "pos"  if p["is_positive_ev"] else "neg"
+        ror_cls = "pos"  if p["risk_of_ruin"] <= 5 else ("warn" if p["risk_of_ruin"] <= 20 else "neg")
+        bwrm    = round(wr - p["breakeven_wr"], 1)
+        bwr_cls = "pos"  if bwrm > 0 else "neg"
+        wtd     = f"{p['weeks_to_double']:.0f}w" if p["weeks_to_double"] else "∞"
+        ttd     = f"{p['trades_to_double']:.0f}" if p["trades_to_double"] else "∞"
+        cards = (
+            f'<div class="hcard {r_cls}">'
+            f'<div class="hbig">{ar}R</div>'
+            f'<div class="hlbl">Actual R (after fees)</div>'
+            f'<div class="hsub">Nom {p["nominal_r"]:.1f}R · TP {tp:g}% · SL {stop:g}%</div></div>'
+
+            f'<div class="hcard {ev_cls}">'
+            f'<div class="hbig">{p["per_trade_ev"]:+.2f}%</div>'
+            f'<div class="hlbl">EV / trade</div>'
+            f'<div class="hsub">Geo drift {p["geometric_drift"]:+.2f}% per trade</div></div>'
+
+            f'<div class="hcard neutral">'
+            f'<div class="hbig">+{p["acct_gain_win"]:.0f}% / −{p["acct_loss_loss"]:.0f}%</div>'
+            f'<div class="hlbl">Win / Loss on account</div>'
+            f'<div class="hsub">{lev:g}× lev · breakeven {p["breakeven_wr"]}% WR</div></div>'
+
+            f'<div class="hcard neutral">'
+            f'<div class="hbig">{wtd}</div>'
+            f'<div class="hlbl">Weeks to double</div>'
+            f'<div class="hsub">{ttd} trades to 2×</div></div>'
+
+            f'<div class="hcard {ror_cls}">'
+            f'<div class="hbig">{p["risk_of_ruin"]}%</div>'
+            f'<div class="hlbl">Ruin risk (−{int(p["max_drawdown"])}% DD)</div>'
+            f'<div class="hsub">{round(tpw * weeks)} trades · {weeks:g} weeks</div></div>'
+
+            f'<div class="hcard {bwr_cls}">'
+            f'<div class="hbig">{p["breakeven_wr"]}%</div>'
+            f'<div class="hlbl">Breakeven win rate</div>'
+            f'<div class="hsub">You\'re at {wr:g}% · margin {bwrm:+.1f}pp</div></div>'
+        )
     else:
-        metrics = ""
+        cards = ""
+
+    # ── Monte Carlo final percentiles ─────────────────────────────────────────────
+    mc_html = ""
+    if p and p["curve"]:
+        final = p["curve"][-1]
+        mc_items = [
+            ("P05 · worst 5%", fmt_eur(final["p05"]), "neg"),
+            ("P25",             fmt_eur(final["p25"]), "warn"),
+            ("P50 · median",   fmt_eur(final["p50"]), ""),
+            ("P75",             fmt_eur(final["p75"]), "mc75"),
+            ("P95 · best 5%",  fmt_eur(final["p95"]), "mc95"),
+        ]
+        mc_cards_html = "".join(
+            f'<div class="mc-card"><div class="mc-n {c}">{v}</div><div class="mc-l">{l}</div></div>'
+            for l, v, c in mc_items
+        )
+        mc_html = (
+            f'<p class="note">Log-normal simulation · {round(tpw * weeks)} trades · {weeks:g}w horizon. '
+            f'WR {wr:g}% · {lev:g}× · {p["actual_r"]}R actual.</p>'
+            f'<div class="mc-grid">{mc_cards_html}</div>'
+        )
+
+    wr_r_label = f"{p['actual_r']}R actual" if p else f"{tp:g}% TP"
+
+    # ── CSS ───────────────────────────────────────────────────────────────────────
+    CSS = """
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;background:#09090b;color:#c9c9c9;padding:20px 24px}
+.wrap{max-width:1140px;margin:0 auto}
+a{color:#7aa2f7;text-decoration:none}a:hover{text-decoration:underline}
+.hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+.hdr h1{font-size:20px;letter-spacing:.08em;color:#fff;font-weight:700}
+.hdr .v{font-size:11px;color:#444}
+h2{font-size:9.5px;text-transform:uppercase;letter-spacing:.2em;color:#444;border-bottom:1px solid #1a1a1c;padding-bottom:5px;margin:26px 0 10px}
+.strat{background:#0d0d0f;border:1px solid #1a1a1c;border-left:3px solid #7aa2f7;border-radius:8px;padding:14px 18px;margin:10px 0 14px}
+.strat .tl{color:#a6c1ff;font-style:italic;font-size:12.5px;display:block;margin-bottom:10px}
+.strat ul{padding-left:18px;list-style:disc}
+.strat li{margin:3px 0;color:#888;font-size:12px}
+.strat b{color:#ddd}
+.param-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:11px 14px;margin:10px 0}
+.pf{display:flex;flex-direction:column;gap:3px}
+.pf label{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#444}
+.pf input{background:#09090b;border:1px solid #222224;color:#e0e0e0;padding:6px 9px;border-radius:5px;font:inherit;font-size:12.5px;width:80px;transition:border-color .15s}
+.pf input:focus{outline:none;border-color:#7aa2f7}
+.pf input.calc-on{border-color:#e0af68 !important;color:#e0af68}
+.proj-btn{background:#141d2e;color:#7aa2f7;border:1px solid #243658;padding:8px 16px;border-radius:5px;cursor:pointer;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.12em;transition:all .15s;align-self:flex-end}
+.proj-btn:hover{background:#1c2940;color:#c0d5ff}
+.calc-hint{font-size:9.5px;color:#2e2e30;align-self:flex-end;padding-bottom:10px}
+.hero{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+@media(max-width:800px){.hero{grid-template-columns:repeat(2,1fr)}}
+.hcard{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:13px 15px;position:relative;overflow:hidden}
+.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:8px 8px 0 0}
+.hcard.pos::after{background:linear-gradient(90deg,#9ece6a,#73daca)}
+.hcard.neg::after{background:linear-gradient(90deg,#f7768e,#e06060)}
+.hcard.warn::after{background:linear-gradient(90deg,#e0af68,#ff9e64)}
+.hcard.neutral::after{background:linear-gradient(90deg,#7aa2f7,#bb9af7)}
+.hbig{font-size:24px;font-weight:700;color:#fff;line-height:1;margin-top:4px}
+.hlbl{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#444;margin-top:9px}
+.hsub{font-size:11px;color:#3a3a3c;margin-top:4px}
+.chart-wrap{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:12px 14px;margin:0 0 8px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:7px}
+.chart-legend span{font-size:10px;color:#555;display:flex;align-items:center;gap:5px}
+.dot{display:inline-block;width:14px;height:2px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:780px){.two{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;padding:6px 8px;border-bottom:1px solid #1a1a1c}
+th:first-child,td:first-child{text-align:left}
+td{text-align:right;padding:5px 8px;border-bottom:1px solid #111113}
+tr.alt td{background:#0b0b0d}
+tr.cur-row td{background:#121624}
+tr.cur-row td:first-child{border-left:2px solid #7aa2f7}
+.dim{color:#3a3a3c}
+.p05{color:#f7768e}.p25{color:#e0af68}.p50{color:#fff;font-weight:600}.p75{color:#9ad68a}.p95{color:#9ece6a}
+.btc{color:#f0a000}
+.pos{color:#9ece6a}.neg{color:#f7768e}.warn{color:#e0af68}
+.mc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:8px 0 0}
+@media(max-width:780px){.mc-grid{grid-template-columns:repeat(3,1fr)}}
+.mc-card{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:7px;padding:11px 12px;text-align:center}
+.mc-n{font-size:15px;font-weight:600;color:#fff}
+.mc-n.neg{color:#f7768e}.mc-n.warn{color:#e0af68}.mc-n.mc75{color:#9ad68a}.mc-n.mc95{color:#9ece6a}
+.mc-l{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;margin-top:5px}
+.bt-empty{text-align:center;padding:36px 20px;color:#2a2a2c;border:1px dashed #1e1e20;border-radius:8px;margin:8px 0}
+.bt-empty .ico{font-size:22px;margin-bottom:8px}
+.bt-empty b{color:#3a3a3c}
+.bt-empty p{font-size:11px;margin-top:5px;line-height:1.7;color:#2a2a2c}
+.note{color:#444;font-size:11px;margin:5px 0 10px;line-height:1.6}
+.note b{color:#666}
+.note code{background:#111113;padding:1px 5px;border-radius:3px;color:#777}
+.err{background:#1e0d0f;border:1px solid #4a1e22;color:#f7768e;padding:10px 14px;border-radius:6px;margin:8px 0}
+.leg-btn{background:none;border:none;cursor:pointer;font:inherit;font-size:10px;display:flex;align-items:center;gap:5px;padding:2px 5px;border-radius:3px;transition:opacity .15s}
+.leg-btn:hover{opacity:1 !important}
+"""
+
+    # ── JS ────────────────────────────────────────────────────────────────────────
+    JS = r"""
+// calculator for projection form — type 300*0.1 → Enter → 30
+document.querySelectorAll('.pf input').forEach(function(inp) {
+  function tryCalc() {
+    var v = inp.value.trim();
+    if (!v) return;
+    try {
+      var expr = v.replace(/[^0-9+\-*/.() \t]/g, '');
+      var r = Function('"use strict";return(' + expr + ')')();
+      if (isFinite(r)) { inp.value = parseFloat(r.toFixed(8)); inp.classList.remove('calc-on'); }
+    } catch(e) {}
+  }
+  inp.addEventListener('input', function() { inp.classList.toggle('calc-on', /[+*\/]/.test(inp.value)); });
+  inp.addEventListener('blur', tryCalc);
+  inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { tryCalc(); e.preventDefault(); } });
+});
+
+// percentile band toggle
+function toggleBand(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var show = el.style.display === 'none';
+  el.style.display = show ? '' : 'none';
+  btn.style.opacity = show ? '1' : '0.35';
+  var p05 = document.getElementById('sp05');
+  var p95 = document.getElementById('sp95');
+  var fill = document.getElementById('sband');
+  if (fill && p05 && p95) {
+    fill.style.display = (p05.style.display !== 'none' || p95.style.display !== 'none') ? '' : 'none';
+  }
+}
+"""
 
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<title>LENS — projection</title>
+<html lang="en"><head>
+<meta charset="utf-8"><title>LENS · PROJECTION</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  *{{box-sizing:border-box}}
-  body{{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0c0c0d;color:#d4d4d4;margin:0;padding:24px;max-width:1100px;margin:0 auto}}
-  h1{{font-size:26px;letter-spacing:.08em;margin:0 0 2px;color:#fff;font-weight:600}}
-  h1 .v{{font-size:11px;opacity:.4;margin-left:10px}}
-  a{{color:#7aa2f7;text-decoration:none}} a:hover{{text-decoration:underline}}
-  h2{{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#888;border-bottom:1px solid #272729;padding-bottom:6px;margin:26px 0 12px}}
-  .strat{{background:#111112;border:1px solid #232325;border-left:3px solid #7aa2f7;border-radius:6px;padding:14px 18px;margin:14px 0 8px;font-size:12.5px;color:#bbb}}
-  .strat b{{color:#fff}} .strat .one{{color:#a6c1ff;font-style:italic;display:block;margin-bottom:8px}}
-  .strat ul{{margin:6px 0 0;padding-left:18px}} .strat li{{margin:3px 0}}
-  form{{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#111112;border:1px solid #232325;border-radius:6px;padding:12px 16px;margin:8px 0}}
-  form .f{{display:flex;flex-direction:column;gap:3px}}
-  form label{{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#888}}
-  form input{{background:#0c0c0d;border:1px solid #2a2a2c;color:#fff;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px;width:80px}}
-  form input:focus{{outline:none;border-color:#7aa2f7}}
-  button{{background:#293551;color:#a6c1ff;border:1px solid #3a4a72;padding:7px 16px;border-radius:4px;cursor:pointer;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.1em}}
-  button:hover{{background:#324063;color:#fff}}
-  .status{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0}}
-  @media(max-width:760px){{.status{{grid-template-columns:repeat(2,1fr)}}}}
-  .card{{background:#161617;border:1px solid #272729;border-radius:6px;padding:12px 14px}}
-  .card .n{{font-size:20px;color:#fff;font-weight:600;line-height:1}}
-  .card .l{{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:#777;margin-top:6px}}
-  table{{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}}
-  th{{text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#777;padding:6px 8px;border-bottom:1px solid #272729}}
-  th:first-child,td:first-child{{text-align:left}}
-  td{{text-align:right;padding:5px 8px;border-bottom:1px solid #1a1a1a}}
-  td.dim,.dim{{color:#666}}
-  .p05{{color:#f7768e}} .p25{{color:#e0af68}} .p50{{color:#fff;font-weight:600}} .p75{{color:#9ad68a}} .p95{{color:#9ece6a}}
-  td.btc{{color:#f0a000}}
-  .pos{{color:#9ece6a}} .neg{{color:#f7768e}} .warn{{color:#e0af68}}
-  .two{{display:grid;grid-template-columns:1fr 1fr;gap:16px}} @media(max-width:760px){{.two{{grid-template-columns:1fr}}}}
-  .note{{color:#777;font-size:11px;margin:6px 0}}
-  .err{{background:#3b1d20;border:1px solid #6c3439;color:#f7768e;padding:10px 14px;border-radius:6px;margin:8px 0}}
-</style></head><body>
+<style>{CSS}</style>
+</head><body><div class="wrap">
 
-<h1>LENS · PROJECTION<span class="v">parameter-first · <a href="/">← dashboard (goal-first)</a></span></h1>
+<div class="hdr">
+  <h1>LENS · PROJECTION</h1>
+  <span class="v">parameter-first · <a href="/">← dashboard (goal-first)</a></span>
+</div>
 
 <div class="strat">
-  <span class="one">"I trade BTC perps on Kraken — with-trend, on the 4H chart — risking a fixed 10% of my account to make 40% (a 4R trade). My entire edge is holding winners to the full 4R instead of bailing early."</span>
-  <b>The locked rules:</b>
+  <span class="tl">"I trade BTC perps on Kraken — with-trend, 4H chart — risking a fixed 10% of my account to make 40%+. My entire edge is holding winners to the full target instead of bailing early."</span>
+  <b>TREND_4R_v1 — locked rules:</b>
   <ul>
-    <li><b>Market / TF:</b> BTC perpetual futures, Kraken. 4-hour chart. Holds 1–3 days. Not scalping, not daily swing.</li>
+    <li><b>Market / TF:</b> BTC perpetual futures, Kraken. 4H chart. Holds 1–3 days.</li>
     <li><b>Direction:</b> long or short — <b>only with the trend.</b> Never counter-trend.</li>
-    <li><b>Risk (fixed):</b> 1% price stop = <b>10% of account</b> at 10x. Same 10% on every trade.</li>
-    <li><b>Exit (this IS the edge):</b> take profit at +4% price = <b>+40% account = 4R.</b> Hands-off — set SL/TP, walk away. No closing early.</li>
-    <li><b>Frequency:</b> ~1 trade/day max; 2–3 good setups a week. Most of the time, no trade.</li>
-    <li><b>Not optimizing win rate.</b> 44% is fine. <b>R is the lever</b> — see the two tables below.</li>
+    <li><b>Risk (fixed):</b> 1% price stop = <b>10% of account</b> at 10×. Same risk every trade.</li>
+    <li><b>Exit (this IS the edge):</b> 5.5% TP → <b>+52% account → 4R actual</b> after 0.30% round-trip fee. Set it and walk away.</li>
+    <li><b>Frequency:</b> ~2–5 trades/week. Most of the time, <em>no trade</em>.</li>
+    <li><b>Not chasing WR.</b> 44% is fine. <b>R is the lever</b> — see the sensitivity tables below.</li>
   </ul>
 </div>
 
-<form method="get" action="/projection">
-  <div class="f"><label>Start €</label><input name="start" type="number" step="any" value="{start:g}"></div>
-  <div class="f"><label>Stop %</label><input name="stop" type="number" step="any" value="{stop:g}"></div>
-  <div class="f"><label>TP %</label><input name="tp" type="number" step="any" value="{tp:g}"></div>
-  <div class="f"><label>Leverage</label><input name="lev" type="number" step="any" value="{lev:g}"></div>
-  <div class="f"><label>Win rate %</label><input name="wr" type="number" step="any" value="{wr:g}"></div>
-  <div class="f"><label>Trades/wk</label><input name="tpw" type="number" step="any" value="{tpw:g}"></div>
-  <div class="f"><label>Weeks</label><input name="weeks" type="number" step="any" value="{weeks:g}"></div>
-  <div class="f"><label>BTC € </label><input name="btc" type="number" step="any" value="{btc:g}"></div>
-  <div class="f"><label>Fee % RT</label><input name="fee" type="number" step="any" value="{fee:g}"></div>
-  <button type="submit">Project →</button>
+<form class="param-form" method="get" action="/projection">
+  <div class="pf"><label>Start €</label><input name="start" value="{start:g}"></div>
+  <div class="pf"><label>Stop %</label><input name="stop" value="{stop:g}"></div>
+  <div class="pf"><label>TP %</label><input name="tp" value="{tp:g}"></div>
+  <div class="pf"><label>Leverage</label><input name="lev" value="{lev:g}"></div>
+  <div class="pf"><label>Win rate %</label><input name="wr" value="{wr:g}"></div>
+  <div class="pf"><label>Trades / wk</label><input name="tpw" value="{tpw:g}"></div>
+  <div class="pf"><label>Weeks</label><input name="weeks" value="{weeks:g}"></div>
+  <div class="pf"><label>BTC €</label><input name="btc" value="{btc:g}"></div>
+  <div class="pf"><label>Fee % RT</label><input name="fee" value="{fee:g}"></div>
+  <button class="proj-btn" type="submit">Project →</button>
+  <span class="calc-hint">Tip: type 300*0.1 in any field → Enter</span>
 </form>
 {err_html}
 
-<div class="status">{metrics}</div>
+<div class="hero">{cards}</div>
 
-<h2>Projected equity — percentile bands</h2>
-<p class="note">Median (P50) is the expected path. P05 = unlucky (worst 5%), P95 = lucky. Spread = variance, not a forecast. BTC column converts the median at €{btc:,.0f}/BTC.</p>
+<h2>Equity projection — percentile bands (log scale)</h2>
+<div class="chart-wrap">
+  {sparkline}
+  <div class="chart-legend">
+    <button class="leg-btn" onclick="toggleBand('sp05',this)" style="color:#f7768e;opacity:0.35"><span class="dot" style="background:#f7768e"></span>P05 worst</button>
+    <button class="leg-btn" onclick="toggleBand('sp25',this)" style="color:#e0af68;opacity:0.35"><span class="dot" style="background:#e0af68"></span>P25</button>
+    <button class="leg-btn" onclick="toggleBand('sp50',this)" style="color:#fff"><span class="dot" style="background:#fff;height:2.5px"></span>P50 median</button>
+    <button class="leg-btn" onclick="toggleBand('sp75',this)" style="color:#9ad68a;opacity:0.35"><span class="dot" style="background:#9ad68a"></span>P75</button>
+    <button class="leg-btn" onclick="toggleBand('sp95',this)" style="color:#9ece6a;opacity:0.35"><span class="dot" style="background:#9ece6a"></span>P95 best</button>
+  </div>
+</div>
+<p class="note"><b>P50</b> = expected median path · <b>P05</b> = worst 5% · <b>P95</b> = best 5%. Spread is variance, not a forecast.</p>
 <table>
   <tr><th>Week</th><th>Trades</th><th class="p05">P05</th><th class="p25">P25</th><th class="p50">Median</th><th class="p75">P75</th><th class="p95">P95</th><th>BTC (P50)</th></tr>
   {curve_rows}
 </table>
 
-<div class="two">
+<div class="two" style="margin-top:20px">
   <div>
-    <h2>Win-rate sensitivity <span class="dim">(R held at {p['nominal_r'] if p else tp/stop:g}R)</span></h2>
-    <p class="note">Win rate compounds hard too — but it's a <b>byproduct of entry quality</b>: slow to move, and below the breakeven WR you die. You don't chase it; you let better setups raise it over time.</p>
+    <h2>R-target scenarios <span class="dim">(WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT)</span></h2>
+    <p class="note">What TP% gives you each <b>actual R after fees</b>. R is the one lever you fully control — it's an exit discipline, not a market outcome. ← = current params.</p>
     <table>
-      <tr><th>WR</th><th>EV/trade</th><th>Double</th><th>Final (P50)</th><th>Ruin</th></tr>
-      {wr_rows}
+      <tr><th>Target R</th><th>Params</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
+      {r_target_rows}
     </table>
   </div>
   <div>
-    <h2>R sensitivity <span class="dim">(WR held at {wr:g}%)</span></h2>
-    <p class="note">Same horizon, WR fixed, only R moves. Just as explosive — and <b>R is the one you control</b>: it's an exit choice (hold to target vs. close early), fixable today. That's why it's "the lever".</p>
+    <h2>Win-rate sensitivity <span class="dim">(R held at {wr_r_label})</span></h2>
+    <p class="note">WR is a <b>byproduct of entry quality</b> — hard to control directly. Below breakeven WR you lose money regardless of R. Better setups raise it over time.</p>
     <table>
-      <tr><th>R</th><th>EV/trade</th><th>Double</th><th>Final (P50)</th><th>Ruin</th></tr>
-      {r_rows}
+      <tr><th>WR</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
+      {wr_rows}
     </table>
   </div>
 </div>
 
-<p class="note" style="margin-top:18px">⚠ <b>Read the shape, not the raw totals.</b> Over many trades, compounding produces absurd numbers (millions, hundreds of BTC) — those are arithmetic, not realistic outcomes: liquidity, position size, and your own psychology cap the real path. What's trustworthy here is the <b>early weeks, the EV/trade, the breakeven WR, and the ruin %</b>. It also assumes the win rate holds at a <b>1% stop</b> (unproven — history used wider stops) and ignores funding on multi-day holds. A model, not a promise. Validate via the <code>TREND_4R_v1</code> backtest first.</p>
+<h2>Monte Carlo — final distribution at {weeks:g} weeks</h2>
+{mc_html}
 
-</body></html>"""
+<h2>Backtest tracker</h2>
+<div class="bt-empty">
+  <div class="ico">📋</div>
+  <b>No backtest data yet</b>
+  <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H BTC chart.</p>
+  <p>Fields: date · direction · entry · SL hit / TP hit · hold time · R achieved</p>
+</div>
+
+<p class="note" style="margin-top:20px">⚠ <b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — those are arithmetic, not realistic outcomes. Liquidity, position limits, and psychology cap the real path. Trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise. Validate via <code>TREND_4R_v1</code> backtest first.</p>
+
+</div><script>{JS}</script></body></html>"""
 
 
 # ─── Landing + health ─────────────────────────────────────────────────────────
@@ -280,140 +484,224 @@ def landing():
 
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>LENS — dashboard</title>
+<title>LENS</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  *{{box-sizing:border-box}}
-  body{{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0c0c0d;color:#d4d4d4;margin:0;padding:24px;max-width:1100px;margin:0 auto}}
-  h1{{font-size:28px;letter-spacing:.1em;margin:0 0 2px;color:#fff;font-weight:600}}
-  h1 .v{{font-size:11px;opacity:.4;letter-spacing:.05em;margin-left:10px}}
-  p.mission{{color:#888;border-left:2px solid #333;padding-left:12px;margin:12px 0 20px;font-size:12px}}
-  h2{{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#888;border-bottom:1px solid #272729;padding-bottom:6px;margin:28px 0 12px;display:flex;justify-content:space-between;align-items:end}}
-  h2 .sub{{font-size:10px;opacity:.6;text-transform:none;letter-spacing:.05em}}
-  a{{color:#7aa2f7;text-decoration:none}}
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  :root{{
+    --bg:#08080a;--s1:#0f0f12;--s2:#141418;--s3:#1c1c22;
+    --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
+    --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
+    --ac:#5b8ef7;--adim:#121c36;
+    --gr:#38c068;--re:#e8445a;--am:#e8a23d;
+    --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
+    --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  }}
+  body{{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}}
+  .app{{max-width:1180px;margin:0 auto;padding:0 22px 60px}}
+  a{{color:var(--ac);text-decoration:none}}
   a:hover{{text-decoration:underline}}
-
-  /* Status cards */
-  .status{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px}}
-  .status .card{{background:#161617;border:1px solid #272729;border-radius:6px;padding:14px 16px}}
-  .status .n{{font-size:24px;color:#fff;font-weight:600;line-height:1}}
-  .status .l{{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#777;margin-top:6px}}
-
-  /* Two-column main */
-  .main{{display:grid;grid-template-columns:340px 1fr;gap:16px;margin-top:8px}}
-  @media (max-width:880px){{.main{{grid-template-columns:1fr}}}}
-
-  /* Config form */
-  .panel{{background:#111112;border:1px solid #232325;border-radius:6px;padding:14px 16px}}
-  .panel .title{{font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#888;margin:-2px 0 12px;display:flex;justify-content:space-between;align-items:center}}
-  .panel .title .saved{{font-size:10px;color:#9ece6a;opacity:0;transition:opacity .3s}}
-  .panel .title .saved.show{{opacity:1}}
-  .row{{display:grid;grid-template-columns:130px 1fr;gap:6px;align-items:center;margin-bottom:6px}}
-  .row label{{font-size:11px;color:#999}}
-  .row input{{background:#0c0c0d;border:1px solid #2a2a2c;color:#fff;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px;width:100%}}
-  .row input:focus{{outline:none;border-color:#7aa2f7}}
-  .row input.err{{border-color:#f7768e}}
-  .btnrow{{display:flex;gap:8px;margin-top:12px}}
-  button{{background:#1a1a1c;color:#d4d4d4;border:1px solid #2a2a2c;padding:6px 14px;border-radius:4px;cursor:pointer;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.1em}}
-  button:hover{{background:#222224;color:#fff}}
-  button.primary{{background:#293551;color:#a6c1ff;border-color:#3a4a72}}
-  button.primary:hover{{background:#324063;color:#fff}}
-
-  /* Result grid */
-  .results{{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}}
-  @media (max-width:560px){{.results{{grid-template-columns:1fr}}}}
-  .results .panel{{padding:10px 14px}}
-  .kv{{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12px}}
-  .kv .k{{color:#888}}
-  .kv .v{{color:#fff;text-align:right;font-variant-numeric:tabular-nums}}
-  .kv .v.dim{{color:#666}}
-  .kv .v.pos{{color:#9ece6a}}
-  .kv .v.neg{{color:#f7768e}}
-  .kv .v.warn{{color:#e0af68}}
-
-  .err{{background:#3b1d20;border:1px solid #6c3439;color:#f7768e;padding:10px 14px;border-radius:6px;margin-top:8px;font-size:12px}}
+  /* ─ topbar ─ */
+  .topbar{{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:22px}}
+  .brand{{display:flex;align-items:baseline;gap:11px}}
+  .brand-name{{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}}
+  .brand-name b{{color:var(--ac)}}
+  .brand-meta{{font-family:var(--mono);font-size:10px;color:var(--t3)}}
+  .topnav{{display:flex;gap:2px}}
+  .topnav a{{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;letter-spacing:.01em;transition:all .12s}}
+  .topnav a:hover{{color:var(--t1);background:var(--s2);text-decoration:none}}
+  .topnav a.cur{{color:var(--ac);background:var(--adim)}}
+  /* ─ strip ─ */
+  .strip{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}}
+  .sc{{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:13px 16px}}
+  .sc-n{{font-family:var(--mono);font-size:24px;font-weight:600;color:#fff;line-height:1}}
+  .sc-l{{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-top:6px}}
+  /* ─ main ─ */
+  .main{{display:grid;grid-template-columns:248px 1fr;gap:14px;align-items:start}}
+  @media(max-width:820px){{.main{{grid-template-columns:1fr}}}}
+  /* ─ sidebar ─ */
+  .sidebar{{position:sticky;top:16px}}
+  .panel{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden}}
+  .panel-hd{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--b1)}}
+  .panel-title{{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t2)}}
+  .saved{{font-size:10px;color:var(--gr);opacity:0;transition:opacity .3s}}
+  .saved.show{{opacity:1}}
+  .fsec{{padding:10px 14px;border-bottom:1px solid var(--b1)}}
+  .fsec-lbl{{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.22em;color:var(--t4);margin-bottom:7px}}
+  .frow{{display:grid;grid-template-columns:1fr 90px;gap:3px 6px;align-items:center;margin-bottom:4px}}
+  .frow:last-child{{margin-bottom:0}}
+  .frow label{{font-size:11px;color:var(--t2)}}
+  .frow input{{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;width:100%;transition:border-color .12s}}
+  .frow input:focus{{outline:none;border-color:var(--ac)}}
+  .frow input.cx{{border-color:var(--am)!important;color:var(--am)}}
+  .frow input[type=date]{{font-family:var(--ui);font-size:11px}}
+  .factns{{padding:10px 14px;display:flex;gap:7px;align-items:center}}
+  .btn{{padding:6px 13px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;font-family:inherit;transition:all .12s}}
+  .btn:hover{{color:var(--t1);border-color:var(--b3)}}
+  .btn.p{{background:var(--adim);color:var(--ac);border-color:#1e2e54}}
+  .btn.p:hover{{background:#172448;color:#82b4ff}}
+  .calc-tip{{font-size:9px;color:var(--t4);font-family:var(--mono)}}
+  /* ─ metrics ─ */
+  .metrics{{display:flex;flex-direction:column;gap:10px}}
+  .hero{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}}
+  @media(max-width:960px){{.hero{{grid-template-columns:repeat(2,1fr)}}}}
+  .hcard{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}}
+  .hcard::after{{content:'';position:absolute;top:0;left:0;right:0;height:2px}}
+  .hcard.pos::after{{background:linear-gradient(90deg,var(--gr),#73daca)}}
+  .hcard.neg::after{{background:linear-gradient(90deg,var(--re),#c04060)}}
+  .hcard.warn::after{{background:linear-gradient(90deg,var(--am),#ff9e64)}}
+  .hcard.blue::after{{background:linear-gradient(90deg,var(--ac),#bb9af7)}}
+  .hbig{{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}}
+  .hlbl{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}}
+  .hsub{{font-size:10px;color:var(--t3);margin-top:3px}}
+  .grid2{{display:grid;grid-template-columns:1fr 1fr;gap:8px}}
+  @media(max-width:640px){{.grid2{{grid-template-columns:1fr}}}}
+  .card{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}}
+  .card-title{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--t2);padding-bottom:8px;border-bottom:1px solid var(--b1);margin-bottom:9px}}
+  .kv{{display:grid;grid-template-columns:1fr auto;row-gap:1px}}
+  .kv .k{{font-size:11.5px;color:var(--t2);padding:2.5px 0}}
+  .kv .v{{font-family:var(--mono);font-size:11.5px;color:var(--t1);text-align:right;padding:2.5px 0}}
+  .kv .v.pos{{color:var(--gr)}}.kv .v.neg{{color:var(--re)}}.kv .v.warn{{color:var(--am)}}.kv .v.dim{{color:var(--t3)}}
+  /* ─ error ─ */
+  .err{{background:#140910;border:1px solid #3e1a24;color:var(--re);padding:10px 14px;border-radius:8px;font-size:12px}}
   .err.hide{{display:none}}
+  /* ─ secondary ─ */
+  .sec{{margin-top:28px}}
+  .sec-hd{{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);padding-bottom:7px;margin-bottom:12px}}
+  .sec-hd h2{{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t3)}}
+  .sec-hd a{{font-size:11px;color:var(--t3);text-decoration:none}}
+  .sec-hd a:hover{{color:var(--ac)}}
+  .sigt{{width:100%;border-collapse:collapse}}
+  .sigt td{{padding:5px 0;font-size:12px;border-bottom:1px solid var(--b1);color:var(--t2)}}
+  .sigt td:last-child{{text-align:right;font-family:var(--mono);color:var(--t1)}}
+  .ep{{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:5px}}
+  .ep:hover{{background:var(--s1)}}
+  .ep .m{{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--ac);width:52px;flex-shrink:0}}
+  .ep .m.post{{color:var(--gr)}}.ep .m.patch{{color:var(--am)}}.ep .m.del{{color:var(--re)}}
+  .ep .path{{font-family:var(--mono);font-size:11.5px}}
+  .ep .desc{{font-size:11px;color:var(--t3);margin-left:auto}}
+</style></head><body><div class="app">
 
-  /* Compact secondary sections */
-  table{{width:100%;border-collapse:collapse;font-size:12px}}
-  table td{{padding:5px 0;border-bottom:1px solid #1d1d1f}}
-  .ep{{display:grid;grid-template-columns:55px 1fr;gap:10px;padding:3px 0;border-bottom:1px solid #1a1a1a;font-size:12px}}
-  .ep .m{{color:#bb9af7;font-weight:600;font-size:10px;padding-top:2px}}
-  .ep .p{{color:#9ece6a}}
-  .ep .d{{color:#666;font-size:11px}}
-</style></head><body>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-name">LEN<b>S</b></div>
+    <div class="brand-meta">v1.0-dev · :8765</div>
+  </div>
+  <nav class="topnav">
+    <a href="/" class="cur">Dashboard</a>
+    <a href="/projection">Projection →</a>
+    <a href="/docs">API</a>
+  </nav>
+</div>
 
-<h1>LENS<span class="v">v1.0.0-dev · :8765 · <a href="/projection">projection →</a></span></h1>
-<p class="mission">Build the dataset that makes month-6 predictive scoring possible. Every Pine signal — taken or skipped — captured with locked schema, linked to exchange fills, outcome-attached.</p>
-
-<div class="status">
-  <div class="card"><div class="n">{len(trades)}</div><div class="l">Trades</div></div>
-  <div class="card"><div class="n">{len(sigs)}</div><div class="l">Signals</div></div>
-  <div class="card"><div class="n">{len(pending)}</div><div class="l">Pending decision</div></div>
+<div class="strip">
+  <div class="sc"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades</div></div>
+  <div class="sc"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals</div></div>
+  <div class="sc"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending</div></div>
 </div>
 
 <div class="main">
-
-  <!-- ── Goal config form ─────────────────────────────────────────────── -->
-  <div class="panel">
-    <div class="title">Goal config <span class="saved" id="saved-pulse">saved ✓</span></div>
-    <form id="goal-form" autocomplete="off">
-      <div class="row"><label>Start balance €</label><input type="number" step="any" name="start_balance"></div>
-      <div class="row"><label>Target balance €</label><input type="number" step="any" name="target_balance"></div>
-      <div class="row"><label>Target date</label><input type="date" name="target_date"></div>
-      <div class="row"><label>Trades / week</label><input type="number" step="any" name="trades_per_week"></div>
-      <div class="row"><label>Win rate (0–1)</label><input type="number" step="0.01" min="0.01" max="0.99" name="win_rate"></div>
-      <div class="row"><label>R:R ratio</label><input type="number" step="0.1" name="rr_ratio"></div>
-      <div class="row"><label>Leverage</label><input type="number" step="any" name="leverage"></div>
-      <div class="row"><label>Max drawdown</label><input type="number" step="0.01" min="0.01" max="0.99" name="max_drawdown_allowed"></div>
-      <div class="row"><label>Losses allowed</label><input type="number" step="1" min="1" name="losses_allowed"></div>
-      <div class="row"><label>Fractional Kelly</label><input type="number" step="0.01" min="0.01" max="1" name="fractional_kelly"></div>
-      <div class="row"><label>ATR floor (opt)</label><input type="number" step="any" name="min_underlying_stop_pct" placeholder="null"></div>
-      <div class="row"><label>BTC price € (opt)</label><input type="number" step="any" name="btc_price_eur" placeholder="null"></div>
-      <div class="row"><label>BTC growth /mo</label><input type="number" step="0.01" name="btc_growth_monthly"></div>
-      <div class="btnrow">
-        <button type="button" class="primary" id="save-btn">Save</button>
-        <button type="button" id="reset-btn">Reload</button>
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Parameters</span>
+        <span class="saved" id="saved-pulse">saved ✓</span>
       </div>
-    </form>
-    <div id="err" class="err hide"></div>
-  </div>
-
-  <!-- ── Goal results ─────────────────────────────────────────────────── -->
-  <div>
-    <div class="results">
-
-      <div class="panel"><div class="title">Time to goal</div><div class="kv" id="r-time"></div></div>
-      <div class="panel"><div class="title">Required growth</div><div class="kv" id="r-growth"></div></div>
-
-      <div class="panel"><div class="title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
-      <div class="panel"><div class="title">Risk &amp; Kelly</div><div class="kv" id="r-risk"></div></div>
-
-      <div class="panel"><div class="title">Account impact / trade</div><div class="kv" id="r-acct"></div></div>
-      <div class="panel"><div class="title">Risk analytics</div><div class="kv" id="r-stats"></div></div>
-
-      <div class="panel"><div class="title">Growth projections</div><div class="kv" id="r-proj"></div></div>
-      <div class="panel"><div class="title">BTC / Monte Carlo</div><div class="kv" id="r-btc"></div></div>
-
+      <form id="goal-form" autocomplete="off">
+        <div class="fsec">
+          <div class="fsec-lbl">Account</div>
+          <div class="frow"><label>Start €</label><input type="text" inputmode="decimal" name="start_balance"></div>
+          <div class="frow"><label>Target €</label><input type="text" inputmode="decimal" name="target_balance"></div>
+          <div class="frow"><label>Target date</label><input type="date" name="target_date"></div>
+        </div>
+        <div class="fsec">
+          <div class="fsec-lbl">Trading</div>
+          <div class="frow"><label>Win rate (0–1)</label><input type="text" inputmode="decimal" name="win_rate"></div>
+          <div class="frow"><label>R:R ratio</label><input type="text" inputmode="decimal" name="rr_ratio"></div>
+          <div class="frow"><label>Leverage</label><input type="text" inputmode="decimal" name="leverage"></div>
+          <div class="frow"><label>Trades / week</label><input type="text" inputmode="decimal" name="trades_per_week"></div>
+        </div>
+        <div class="fsec">
+          <div class="fsec-lbl">Risk</div>
+          <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
+          <div class="frow"><label>Losses allowed</label><input type="text" inputmode="decimal" name="losses_allowed"></div>
+          <div class="frow"><label>Frac. Kelly</label><input type="text" inputmode="decimal" name="fractional_kelly"></div>
+          <div class="frow"><label>ATR floor</label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+        </div>
+        <div class="fsec">
+          <div class="fsec-lbl">Optional</div>
+          <div class="frow"><label>BTC price €</label><input type="text" inputmode="decimal" name="btc_price_eur" placeholder="—"></div>
+          <div class="frow"><label>BTC growth /mo</label><input type="text" inputmode="decimal" name="btc_growth_monthly"></div>
+        </div>
+        <div class="factns">
+          <button type="button" class="btn p" id="save-btn">Apply</button>
+          <button type="button" class="btn" id="reset-btn">Reload</button>
+          <span class="calc-tip">300*0.1 → ↵</span>
+        </div>
+      </form>
     </div>
   </div>
 
+  <div class="metrics">
+    <div class="hero">
+      <div class="hcard blue" id="hc-r">
+        <div class="hbig" id="h-r">—</div>
+        <div class="hlbl">Actual R</div>
+        <div class="hsub" id="h-r-sub">after fees</div>
+      </div>
+      <div class="hcard" id="hc-ev">
+        <div class="hbig" id="h-ev">—</div>
+        <div class="hlbl">EV / trade</div>
+        <div class="hsub" id="h-ev-sub">geo drift</div>
+      </div>
+      <div class="hcard" id="hc-ror">
+        <div class="hbig" id="h-ror">—</div>
+        <div class="hlbl">Risk of ruin</div>
+        <div class="hsub" id="h-ror-sub">—</div>
+      </div>
+      <div class="hcard blue">
+        <div class="hbig" id="h-ttg">—</div>
+        <div class="hlbl">Days to goal</div>
+        <div class="hsub" id="h-ttg-sub">—</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><div class="card-title">Time to goal</div><div class="kv" id="r-time"></div></div>
+      <div class="card"><div class="card-title">Required growth</div><div class="kv" id="r-growth"></div></div>
+      <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
+      <div class="card"><div class="card-title">Risk &amp; Kelly</div><div class="kv" id="r-risk"></div></div>
+      <div class="card"><div class="card-title">Account impact</div><div class="kv" id="r-acct"></div></div>
+      <div class="card"><div class="card-title">Risk analytics</div><div class="kv" id="r-stats"></div></div>
+      <div class="card"><div class="card-title">Growth projections</div><div class="kv" id="r-proj"></div></div>
+      <div class="card"><div class="card-title">BTC / Monte Carlo</div><div class="kv" id="r-btc"></div></div>
+    </div>
+
+    <div id="err" class="err hide"></div>
+  </div>
 </div>
 
-<h2>Signals per strategy <span class="sub">→ <a href="/api/signals">/api/signals</a></span></h2>
-<table>{strat_rows}</table>
+<div class="sec">
+  <div class="sec-hd"><h2>Signals by strategy</h2><a href="/api/signals">/api/signals →</a></div>
+  <table class="sigt">{strat_rows}</table>
+</div>
 
-<h2>API <span class="sub">interactive: <a href="/docs">/docs</a> · <a href="/redoc">/redoc</a></span></h2>
-<div class="ep"><span class="m">GET</span><div><span class="p">/health</span> <span class="d">liveness</span></div></div>
-<div class="ep"><span class="m">GET/PATCH</span><div><span class="p">/api/config</span> <span class="d">persisted goal inputs</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/goal</span> <span class="d">EV-first goal model</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/position</span> <span class="d">ATR-adaptive position sizing</span></div></div>
-<div class="ep"><span class="m">GET</span><div><span class="p">/api/trades</span> <span class="d">venue/direction/result/period filters</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/sync/kraken</span> <span class="d">background fill sync</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/sync/bybit</span> <span class="d">closed-pnl sync</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/signals</span> <span class="d">ingest Pine alert (locked schema)</span></div></div>
-<div class="ep"><span class="m">POST</span><div><span class="p">/api/signals/&lt;id&gt;/decide</span> <span class="d">approve or reject</span></div></div>
+<div class="sec">
+  <div class="sec-hd"><h2>API</h2><a href="/docs">interactive docs →</a></div>
+  <div style="display:flex;flex-direction:column;gap:1px">
+    <div class="ep"><span class="m">GET</span><span class="path">/health</span><span class="desc">liveness</span></div>
+    <div class="ep"><span class="m patch">PATCH</span><span class="path">/api/config</span><span class="desc">save goal inputs</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/goal</span><span class="desc">EV-first goal model</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/position</span><span class="desc">ATR-adaptive sizing</span></div>
+    <div class="ep"><span class="m">GET</span><span class="path">/api/trades</span><span class="desc">venue / direction / result filters</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/sync/kraken</span><span class="desc">background fill sync</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/sync/bybit</span><span class="desc">closed-pnl sync</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/signals</span><span class="desc">ingest Pine alert</span></div>
+    <div class="ep"><span class="m post">POST</span><span class="path">/api/signals/&lt;id&gt;/decide</span><span class="desc">approve / reject</span></div>
+  </div>
+</div>
 
+</div>
 <script>
 const FORM     = document.getElementById("goal-form");
 const ERR      = document.getElementById("err");
@@ -458,11 +746,30 @@ function row(k, v, cls="") {{
 }}
 
 function render(g) {{
+  const ar = g.actual_rr;
+  const rCls = ar >= 3.5 ? 'pos' : ar >= 2.5 ? 'warn' : 'neg';
+  document.getElementById('hc-r').className = 'hcard ' + rCls;
+  document.getElementById('h-r').textContent = ar != null ? ar.toFixed(2) + 'R' : '—';
+  document.getElementById('h-r-sub').textContent = 'vs ' + fmtPct(g.underlying_win_pct) + ' TP';
+
+  const evCls = (g.per_trade_ev ?? 0) >= 0 ? 'pos' : 'neg';
+  document.getElementById('hc-ev').className = 'hcard ' + evCls;
+  document.getElementById('h-ev').textContent = g.per_trade_ev != null ? ((g.per_trade_ev >= 0 ? '+' : '') + g.per_trade_ev.toFixed(3) + '%') : '—';
+  document.getElementById('h-ev-sub').textContent = g.geometric_drift != null ? ('drift ' + (g.geometric_drift >= 0 ? '+' : '') + g.geometric_drift.toFixed(3) + '%') : '';
+
+  const rorVal = g.risk_of_ruin ?? 0;
+  document.getElementById('hc-ror').className = 'hcard ' + (rorVal <= 5 ? 'pos' : rorVal <= 20 ? 'warn' : 'neg');
+  document.getElementById('h-ror').textContent = g.risk_of_ruin != null ? g.risk_of_ruin.toFixed(2) + '%' : '—';
+  document.getElementById('h-ror-sub').textContent = g.ror_label ?? '';
+
+  document.getElementById('h-ttg').textContent = g.days_remaining != null ? Math.round(g.days_remaining).toLocaleString() + 'd' : '—';
+  document.getElementById('h-ttg-sub').textContent = g.weeks_remaining != null ? (g.weeks_remaining.toFixed(1) + 'w · ' + (g.months_remaining?.toFixed(1)) + 'mo') : '';
+
   document.getElementById("r-time").innerHTML =
-      row("Days remaining",    fmtInt(g.days_remaining))
-    + row("Weeks remaining",   fmtNum(g.weeks_remaining))
-    + row("Months remaining",  fmtNum(g.months_remaining))
-    + row("Total interest",    fmtPct(g.total_interest));
+      row("Days remaining",   fmtInt(g.days_remaining))
+    + row("Weeks remaining",  fmtNum(g.weeks_remaining))
+    + row("Months remaining", fmtNum(g.months_remaining))
+    + row("Total interest",   fmtPct(g.total_interest));
 
   document.getElementById("r-growth").innerHTML =
       row("Daily",     fmtPct4(g.daily_rate))
@@ -481,27 +788,26 @@ function render(g) {{
     + row("Actual R",    fmtNum(g.actual_rr))
     + row("R multiple",  fmtNum(g.r_multiple))
     + row("Goal %",      fmtPct4(g.goal_pct))
-    + row("Trades needed",      fmtInt(g.trades_needed))
-    + row("Trades in window",   fmtInt(g.total_trades))
-    + row("Trades to double",   g.trades_to_double != null ? fmtInt(g.trades_to_double) : "∞");
+    + row("Trades needed",    fmtInt(g.trades_needed))
+    + row("Trades in window", fmtInt(g.total_trades))
+    + row("Trades to double", g.trades_to_double != null ? fmtInt(g.trades_to_double) : "∞");
 
   document.getElementById("r-risk").innerHTML =
-      row("Leverage",         fmtNum(g.leverage) + "×")
-    + row("Full Kelly",       fmtPct(g.full_kelly))
-    + row("Fractional Kelly", fmtPct(g.fractional_kelly))
-    + row("Kelly risk",       fmtPct(g.kelly_risk))
-    + row("DD constraint",    fmtPct(g.dd_risk_constraint))
-    + row("Optimal risk",     fmtPct(g.optimal_risk_pct))
+      row("Leverage",          fmtNum(g.leverage) + "×")
+    + row("Full Kelly",        fmtPct(g.full_kelly))
+    + row("Fractional Kelly",  fmtPct(g.fractional_kelly))
+    + row("Kelly risk",        fmtPct(g.kelly_risk))
+    + row("DD constraint",     fmtPct(g.dd_risk_constraint))
+    + row("Optimal risk",      fmtPct(g.optimal_risk_pct))
     + row("Used risk / trade", fmtPct(g.risk_per_trade), "warn")
-    + row("DD-implied lev",   g.dd_implied_leverage != null ? fmtNum(g.dd_implied_leverage) + "×" : "—");
+    + row("DD-implied lev",    g.dd_implied_leverage != null ? fmtNum(g.dd_implied_leverage) + "×" : "—");
 
   document.getElementById("r-acct").innerHTML =
-      row("Gain / win",   fmtPct(g.acct_gain_win),  "pos")
-    + row("Loss / loss",  fmtPct(g.acct_loss_loss), "neg")
-    + row("Geom drift",   fmtPct4(g.geometric_drift),
-        g.geometric_drift > 0 ? "pos" : "neg")
-    + row("Typical win (log)",   fmtPct(g.typical_win),  "pos")
-    + row("Typical loss (log)",  fmtPct(g.typical_loss), "neg");
+      row("Gain / win",         fmtPct(g.acct_gain_win),  "pos")
+    + row("Loss / loss",        fmtPct(g.acct_loss_loss), "neg")
+    + row("Geom drift",         fmtPct4(g.geometric_drift), g.geometric_drift > 0 ? "pos" : "neg")
+    + row("Typical win (log)",  fmtPct(g.typical_win),  "pos")
+    + row("Typical loss (log)", fmtPct(g.typical_loss), "neg");
 
   document.getElementById("r-stats").innerHTML =
       row("Sharpe (per trade)", fmtNum(g.sharpe_ratio))
@@ -511,86 +817,78 @@ function render(g) {{
         g.risk_of_ruin <= 1 ? "pos" : g.risk_of_ruin <= 5 ? "warn" : "neg")
     + row("Losses to ruin",     fmtInt(g.losses_to_ruin))
     + row("Wins to breakeven",  fmtInt(g.wins_to_breakeven))
-    + row("Weeks to goal (actual)", g.weeks_to_goal_actual != null ? fmtNum(g.weeks_to_goal_actual) : "∞");
+    + row("Weeks to goal",      g.weeks_to_goal_actual != null ? fmtNum(g.weeks_to_goal_actual) : "∞");
 
   document.getElementById("r-proj").innerHTML =
       row("Weekly",    fmtEur(g.weekly_growth_eur))
     + row("Monthly",   fmtEur(g.monthly_growth_eur))
     + row("Quarterly", fmtEur(g.quarterly_growth_eur));
 
-  let btc = row("BTC @ goal",  g.btc_price_at_goal != null ? fmtEur(g.btc_price_at_goal) : "<span class='v dim'>set BTC price</span>")
-          + row("Target AUM",   g.target_aum_btc != null ? fmtNum(g.target_aum_btc) + " BTC" : "—")
-          + row("MC p05", fmtEur(g.mc_p05), "neg")
-          + row("MC p50", fmtEur(g.mc_p50))
-          + row("MC p95", fmtEur(g.mc_p95), "pos");
-  document.getElementById("r-btc").innerHTML = btc;
+  document.getElementById("r-btc").innerHTML =
+      row("BTC @ goal",  g.btc_price_at_goal != null ? fmtEur(g.btc_price_at_goal) : "<span class='v dim'>set BTC price</span>")
+    + row("Target AUM",  g.target_aum_btc != null ? fmtNum(g.target_aum_btc) + " BTC" : "—")
+    + row("MC P05", fmtEur(g.mc_p05), "neg")
+    + row("MC P50", fmtEur(g.mc_p50))
+    + row("MC P95", fmtEur(g.mc_p95), "pos");
 
   ERR.classList.add("hide");
 }}
 
 async function recompute() {{
   const body = readForm();
-  // /api/goal requires non-null values for these
   const required = ["start_balance","target_balance","target_date","trades_per_week","win_rate","rr_ratio","leverage"];
   for (const r of required) {{
-    if (body[r] === null) {{ ERR.textContent = "Missing required: " + r; ERR.classList.remove("hide"); return; }}
+    if (body[r] === null) {{ ERR.textContent = "Missing: " + r; ERR.classList.remove("hide"); return; }}
   }}
-  // Strip null fields so server-side defaults apply
   const payload = {{}};
   for (const k in body) if (body[k] !== null) payload[k] = body[k];
-
   try {{
-    const r = await fetch("/api/goal", {{
-      method: "POST",
-      headers: {{ "Content-Type": "application/json" }},
-      body: JSON.stringify(payload),
-    }});
+    const r = await fetch("/api/goal", {{method:"POST",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(payload)}});
     if (!r.ok) {{
       const d = await r.json();
       ERR.textContent = typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail);
-      ERR.classList.remove("hide");
-      return;
+      ERR.classList.remove("hide"); return;
     }}
-    const g = await r.json();
-    render(g);
-  }} catch (e) {{
-    ERR.textContent = "Network: " + e.message;
-    ERR.classList.remove("hide");
-  }}
+    render(await r.json());
+  }} catch (e) {{ ERR.textContent = "Network: " + e.message; ERR.classList.remove("hide"); }}
 }}
 
-// Debounced recompute on form input change
 let debounce;
-FORM.addEventListener("input", () => {{
-  clearTimeout(debounce);
-  debounce = setTimeout(recompute, 250);
-}});
+FORM.addEventListener("input", () => {{ clearTimeout(debounce); debounce = setTimeout(recompute, 250); }});
 
 SAVE_BTN.addEventListener("click", async () => {{
-  const body = readForm();
-  const r = await fetch("/api/config", {{
-    method: "PATCH",
-    headers: {{ "Content-Type": "application/json" }},
-    body: JSON.stringify(body),
-  }});
-  if (r.ok) {{
-    SAVED.classList.add("show");
-    setTimeout(() => SAVED.classList.remove("show"), 1500);
-  }}
+  await fetch("/api/config", {{method:"PATCH",headers:{{"Content-Type":"application/json"}},body:JSON.stringify(readForm())}});
+  SAVED.classList.add("show");
+  setTimeout(() => SAVED.classList.remove("show"), 1500);
 }});
 
 RESET.addEventListener("click", async () => {{
-  const cfg = await fetch("/api/config").then(r => r.json());
-  populate(cfg);
+  populate(await fetch("/api/config").then(r => r.json()));
   recompute();
 }});
 
-// Boot
 (async () => {{
-  const cfg = await fetch("/api/config").then(r => r.json());
-  populate(cfg);
+  populate(await fetch("/api/config").then(r => r.json()));
   recompute();
 }})();
+
+// calculator — type 300*0.1 → Enter → 30
+document.querySelectorAll('#goal-form input').forEach(function(inp) {{
+  function tryCalc() {{
+    var v = inp.value.trim();
+    if (!v) return;
+    try {{
+      var r = Function('"use strict";return(' + v.replace(/[^0-9+\-*/.() \t]/g,'') + ')')();
+      if (isFinite(r)) {{ inp.value = parseFloat(r.toFixed(8)); inp.classList.remove('cx'); recompute(); }}
+    }} catch(e) {{}}
+  }}
+  inp.addEventListener('input', function(e) {{
+    if (/[+*\/]/.test(inp.value)) {{ e.stopPropagation(); inp.classList.add('cx'); }}
+    else inp.classList.remove('cx');
+  }});
+  inp.addEventListener('blur', tryCalc);
+  inp.addEventListener('keydown', function(e) {{ if (e.key === 'Enter') {{ tryCalc(); e.preventDefault(); }} }});
+}});
 </script>
 
 </body></html>"""
