@@ -272,83 +272,108 @@ def projection_page(
     # ── CSS ───────────────────────────────────────────────────────────────────────
     CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;background:#09090b;color:#c9c9c9;padding:20px 24px}
-.wrap{max-width:1140px;margin:0 auto}
-a{color:#7aa2f7;text-decoration:none}a:hover{text-decoration:underline}
-.hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
-.hdr h1{font-size:20px;letter-spacing:.08em;color:#fff;font-weight:700}
-.hdr .v{font-size:11px;color:#444}
-h2{font-size:9.5px;text-transform:uppercase;letter-spacing:.2em;color:#444;border-bottom:1px solid #1a1a1c;padding-bottom:5px;margin:26px 0 10px}
-.strat{background:#0d0d0f;border:1px solid #1a1a1c;border-left:3px solid #7aa2f7;border-radius:8px;padding:14px 18px;margin:10px 0 14px}
-.strat .tl{color:#a6c1ff;font-style:italic;font-size:12.5px;display:block;margin-bottom:10px}
+:root{
+  --bg:#08080a;--s1:#0f0f12;--s2:#141418;
+  --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
+  --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
+  --ac:#5b8ef7;--adim:#121c36;
+  --gr:#38c068;--re:#e8445a;--am:#e8a23d;
+  --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
+  --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+body{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}
+.app{max-width:1180px;margin:0 auto;padding:0 22px 60px}
+a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:22px}
+.brand{display:flex;align-items:baseline;gap:11px}
+.brand-name{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}
+.brand-name b{color:var(--ac)}
+.brand-sep{color:var(--t3);margin:0 2px}
+.brand-page{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--t2);letter-spacing:.08em}
+.brand-meta{font-family:var(--mono);font-size:10px;color:var(--t3)}
+.topnav{display:flex;gap:2px}
+.topnav a{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}
+.topnav a:hover{color:var(--t1);background:var(--s2);text-decoration:none}
+.topnav a.cur{color:var(--ac);background:var(--adim)}
+/* strategy block */
+.strat{background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--ac);border-radius:10px;padding:14px 18px;margin:0 0 16px}
+.strat .tl{color:#a6c1ff;font-style:italic;font-size:12.5px;display:block;margin-bottom:10px;line-height:1.6}
 .strat ul{padding-left:18px;list-style:disc}
-.strat li{margin:3px 0;color:#888;font-size:12px}
-.strat b{color:#ddd}
-.param-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:11px 14px;margin:10px 0}
+.strat li{margin:3px 0;color:var(--t2);font-size:12px}
+.strat b{color:var(--t1)}
+/* param form */
+.param-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px 16px;margin:0 0 16px}
 .pf{display:flex;flex-direction:column;gap:3px}
-.pf label{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#444}
-.pf input{background:#09090b;border:1px solid #222224;color:#e0e0e0;padding:6px 9px;border-radius:5px;font:inherit;font-size:12.5px;width:80px;transition:border-color .15s}
-.pf input:focus{outline:none;border-color:#7aa2f7}
-.pf input.calc-on{border-color:#e0af68 !important;color:#e0af68}
-.proj-btn{background:#141d2e;color:#7aa2f7;border:1px solid #243658;padding:8px 16px;border-radius:5px;cursor:pointer;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.12em;transition:all .15s;align-self:flex-end}
-.proj-btn:hover{background:#1c2940;color:#c0d5ff}
-.calc-hint{font-size:9.5px;color:#2e2e30;align-self:flex-end;padding-bottom:10px}
-.hero{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.pf label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--t3)}
+.pf input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:12px;width:80px;transition:border-color .12s}
+.pf input:focus{outline:none;border-color:var(--ac)}
+.pf input.calc-on{border-color:var(--am)!important;color:var(--am)}
+.proj-btn{background:var(--adim);color:var(--ac);border:1px solid #1e2e54;padding:7px 16px;border-radius:5px;cursor:pointer;font-family:var(--ui);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;transition:all .12s;align-self:flex-end}
+.proj-btn:hover{background:#172448;color:#82b4ff}
+.calc-hint{font-size:9px;color:var(--t4);align-self:flex-end;padding-bottom:8px;font-family:var(--mono)}
+/* hero cards */
+.hero{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
 @media(max-width:800px){.hero{grid-template-columns:repeat(2,1fr)}}
-.hcard{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:13px 15px;position:relative;overflow:hidden}
-.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:8px 8px 0 0}
-.hcard.pos::after{background:linear-gradient(90deg,#9ece6a,#73daca)}
-.hcard.neg::after{background:linear-gradient(90deg,#f7768e,#e06060)}
-.hcard.warn::after{background:linear-gradient(90deg,#e0af68,#ff9e64)}
-.hcard.neutral::after{background:linear-gradient(90deg,#7aa2f7,#bb9af7)}
-.hbig{font-size:24px;font-weight:700;color:#fff;line-height:1;margin-top:4px}
-.hlbl{font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#444;margin-top:9px}
-.hsub{font-size:11px;color:#3a3a3c;margin-top:4px}
-.chart-wrap{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:8px;padding:12px 14px;margin:0 0 8px}
-.chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:7px}
-.chart-legend span{font-size:10px;color:#555;display:flex;align-items:center;gap:5px}
+.hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
+.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.hcard.pos::after{background:linear-gradient(90deg,var(--gr),#73daca)}
+.hcard.neg::after{background:linear-gradient(90deg,var(--re),#c04060)}
+.hcard.warn::after{background:linear-gradient(90deg,var(--am),#ff9e64)}
+.hcard.neutral::after{background:linear-gradient(90deg,var(--ac),#bb9af7)}
+.hbig{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff;line-height:1;margin-top:4px}
+.hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
+.hsub{font-size:10px;color:var(--t3);margin-top:3px}
+/* section heads */
+.sec-hd{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);padding-bottom:7px;margin:24px 0 10px}
+.sec-hd h2{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t3)}
+.sec-hd span{font-size:11px;color:var(--t3)}
+/* chart */
+.chart-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin:0 0 8px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
 .dot{display:inline-block;width:14px;height:2px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:780px){.two{grid-template-columns:1fr}}
+.leg-btn{background:none;border:none;cursor:pointer;font-family:var(--ui);font-size:10px;display:flex;align-items:center;gap:5px;padding:2px 5px;border-radius:3px;transition:opacity .12s}
+.leg-btn:hover{opacity:1 !important}
+/* tables */
 table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
-th{text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;padding:6px 8px;border-bottom:1px solid #1a1a1c}
+th{text-align:right;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:6px 8px;border-bottom:1px solid var(--b1)}
 th:first-child,td:first-child{text-align:left}
-td{text-align:right;padding:5px 8px;border-bottom:1px solid #111113}
+td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--b1);color:var(--t1)}
 tr.alt td{background:#0b0b0d}
 tr.cur-row td{background:#121624}
-tr.cur-row td:first-child{border-left:2px solid #7aa2f7}
-.dim{color:#3a3a3c}
-.p05{color:#f7768e}.p25{color:#e0af68}.p50{color:#fff;font-weight:600}.p75{color:#9ad68a}.p95{color:#9ece6a}
+tr.cur-row td:first-child{border-left:2px solid var(--ac)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:780px){.two{grid-template-columns:1fr}}
+/* text styles */
+.dim{color:var(--t3)}
+.p05{color:var(--re)}.p25{color:var(--am)}.p50{color:#fff;font-weight:600}.p75{color:#9ad68a}.p95{color:var(--gr)}
 .btc{color:#f0a000}
-.pos{color:#9ece6a}.neg{color:#f7768e}.warn{color:#e0af68}
+.pos{color:var(--gr)}.neg{color:var(--re)}.warn{color:var(--am)}
+/* mc grid */
 .mc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:8px 0 0}
 @media(max-width:780px){.mc-grid{grid-template-columns:repeat(3,1fr)}}
-.mc-card{background:#0d0d0f;border:1px solid #1a1a1c;border-radius:7px;padding:11px 12px;text-align:center}
-.mc-n{font-size:15px;font-weight:600;color:#fff}
-.mc-n.neg{color:#f7768e}.mc-n.warn{color:#e0af68}.mc-n.mc75{color:#9ad68a}.mc-n.mc95{color:#9ece6a}
-.mc-l{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;margin-top:5px}
-.bt-empty{text-align:center;padding:36px 20px;color:#2a2a2c;border:1px dashed #1e1e20;border-radius:8px;margin:8px 0}
-.bt-empty .ico{font-size:22px;margin-bottom:8px}
-.bt-empty b{color:#3a3a3c}
-.bt-empty p{font-size:11px;margin-top:5px;line-height:1.7;color:#2a2a2c}
-.note{color:#444;font-size:11px;margin:5px 0 10px;line-height:1.6}
-.note b{color:#666}
-.note code{background:#111113;padding:1px 5px;border-radius:3px;color:#777}
-.err{background:#1e0d0f;border:1px solid #4a1e22;color:#f7768e;padding:10px 14px;border-radius:6px;margin:8px 0}
-.leg-btn{background:none;border:none;cursor:pointer;font:inherit;font-size:10px;display:flex;align-items:center;gap:5px;padding:2px 5px;border-radius:3px;transition:opacity .15s}
-.leg-btn:hover{opacity:1 !important}
+.mc-card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:12px 12px;text-align:center}
+.mc-n{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff}
+.mc-n.neg{color:var(--re)}.mc-n.warn{color:var(--am)}.mc-n.mc75{color:#9ad68a}.mc-n.mc95{color:var(--gr)}
+.mc-l{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-top:5px}
+/* misc */
+.bt-empty{text-align:center;padding:32px 20px;color:var(--t3);border:1px dashed var(--b2);border-radius:10px;margin:8px 0}
+.bt-empty p{font-size:11px;margin-top:5px;line-height:1.7;color:var(--t3)}
+.note{color:var(--t3);font-size:11px;margin:5px 0 10px;line-height:1.6}
+.note b{color:var(--t2)}
+.note code{background:var(--s2);padding:1px 5px;border-radius:3px;color:var(--t2)}
+.err{background:#140910;border:1px solid #3e1a24;color:var(--re);padding:10px 14px;border-radius:8px;margin:8px 0}
 """
 
     # ── JS ────────────────────────────────────────────────────────────────────────
     JS = r"""
-// calculator for projection form — type 300*0.1 → Enter → 30
+// calculator — type 300*0.1 → Enter → 30
 document.querySelectorAll('.pf input').forEach(function(inp) {
   function tryCalc() {
     var v = inp.value.trim();
     if (!v) return;
     try {
-      var expr = v.replace(/[^0-9+\-*/.() \t]/g, '');
-      var r = Function('"use strict";return(' + expr + ')')();
+      var r = Function('"use strict";return(' + v.replace(/[^0-9+\-*/.() \t]/g,'') + ')')();
       if (isFinite(r)) { inp.value = parseFloat(r.toFixed(8)); inp.classList.remove('calc-on'); }
     } catch(e) {}
   }
@@ -364,25 +389,30 @@ function toggleBand(id, btn) {
   var show = el.style.display === 'none';
   el.style.display = show ? '' : 'none';
   btn.style.opacity = show ? '1' : '0.35';
-  var p05 = document.getElementById('sp05');
-  var p95 = document.getElementById('sp95');
-  var fill = document.getElementById('sband');
-  if (fill && p05 && p95) {
-    fill.style.display = (p05.style.display !== 'none' || p95.style.display !== 'none') ? '' : 'none';
-  }
+  var p05 = document.getElementById('sp05'), p95 = document.getElementById('sp95'), fill = document.getElementById('sband');
+  if (fill && p05 && p95) fill.style.display = (p05.style.display !== 'none' || p95.style.display !== 'none') ? '' : 'none';
 }
 """
 
     return f"""<!doctype html>
 <html lang="en"><head>
-<meta charset="utf-8"><title>LENS · PROJECTION</title>
+<meta charset="utf-8"><title>LENS · Projection</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>{CSS}</style>
-</head><body><div class="wrap">
+</head><body><div class="app">
 
-<div class="hdr">
-  <h1>LENS · PROJECTION</h1>
-  <span class="v">parameter-first · <a href="/">← dashboard (goal-first)</a></span>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-name">LEN<b>S</b></div>
+    <span class="brand-sep">·</span>
+    <div class="brand-page">Projection</div>
+    <div class="brand-meta">parameter-first</div>
+  </div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/projection" class="cur">Projection</a>
+    <a href="/docs">API</a>
+  </nav>
 </div>
 
 <div class="strat">
@@ -394,7 +424,7 @@ function toggleBand(id, btn) {
     <li><b>Risk (fixed):</b> 1% price stop = <b>10% of account</b> at 10×. Same risk every trade.</li>
     <li><b>Exit (this IS the edge):</b> 5.5% TP → <b>+52% account → 4R actual</b> after 0.30% round-trip fee. Set it and walk away.</li>
     <li><b>Frequency:</b> ~2–5 trades/week. Most of the time, <em>no trade</em>.</li>
-    <li><b>Not chasing WR.</b> 44% is fine. <b>R is the lever</b> — see the sensitivity tables below.</li>
+    <li><b>Not chasing WR.</b> 44% is fine. <b>R is the lever</b> — see the tables below.</li>
   </ul>
 </div>
 
@@ -409,21 +439,21 @@ function toggleBand(id, btn) {
   <div class="pf"><label>BTC €</label><input name="btc" value="{btc:g}"></div>
   <div class="pf"><label>Fee % RT</label><input name="fee" value="{fee:g}"></div>
   <button class="proj-btn" type="submit">Project →</button>
-  <span class="calc-hint">Tip: type 300*0.1 in any field → Enter</span>
+  <span class="calc-hint">300*0.1 → ↵</span>
 </form>
 {err_html}
 
 <div class="hero">{cards}</div>
 
-<h2>Equity projection — percentile bands (log scale)</h2>
+<div class="sec-hd"><h2>Equity projection — percentile bands (log scale)</h2></div>
 <div class="chart-wrap">
   {sparkline}
   <div class="chart-legend">
-    <button class="leg-btn" onclick="toggleBand('sp05',this)" style="color:#f7768e;opacity:0.35"><span class="dot" style="background:#f7768e"></span>P05 worst</button>
-    <button class="leg-btn" onclick="toggleBand('sp25',this)" style="color:#e0af68;opacity:0.35"><span class="dot" style="background:#e0af68"></span>P25</button>
+    <button class="leg-btn" onclick="toggleBand('sp05',this)" style="color:var(--re);opacity:0.35"><span class="dot" style="background:var(--re)"></span>P05 worst</button>
+    <button class="leg-btn" onclick="toggleBand('sp25',this)" style="color:var(--am);opacity:0.35"><span class="dot" style="background:var(--am)"></span>P25</button>
     <button class="leg-btn" onclick="toggleBand('sp50',this)" style="color:#fff"><span class="dot" style="background:#fff;height:2.5px"></span>P50 median</button>
     <button class="leg-btn" onclick="toggleBand('sp75',this)" style="color:#9ad68a;opacity:0.35"><span class="dot" style="background:#9ad68a"></span>P75</button>
-    <button class="leg-btn" onclick="toggleBand('sp95',this)" style="color:#9ece6a;opacity:0.35"><span class="dot" style="background:#9ece6a"></span>P95 best</button>
+    <button class="leg-btn" onclick="toggleBand('sp95',this)" style="color:var(--gr);opacity:0.35"><span class="dot" style="background:var(--gr)"></span>P95 best</button>
   </div>
 </div>
 <p class="note"><b>P50</b> = expected median path · <b>P05</b> = worst 5% · <b>P95</b> = best 5%. Spread is variance, not a forecast.</p>
@@ -432,18 +462,18 @@ function toggleBand(id, btn) {
   {curve_rows}
 </table>
 
-<div class="two" style="margin-top:20px">
+<div class="two" style="margin-top:24px">
   <div>
-    <h2>R-target scenarios <span class="dim">(WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT)</span></h2>
-    <p class="note">What TP% gives you each <b>actual R after fees</b>. R is the one lever you fully control — it's an exit discipline, not a market outcome. ← = current params.</p>
+    <div class="sec-hd"><h2>R-target scenarios</h2><span>WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT</span></div>
+    <p class="note">What TP% gives you each <b>actual R after fees</b>. R is the one lever you fully control — exit discipline, not a market outcome. ← = current params.</p>
     <table>
       <tr><th>Target R</th><th>Params</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
       {r_target_rows}
     </table>
   </div>
   <div>
-    <h2>Win-rate sensitivity <span class="dim">(R held at {wr_r_label})</span></h2>
-    <p class="note">WR is a <b>byproduct of entry quality</b> — hard to control directly. Below breakeven WR you lose money regardless of R. Better setups raise it over time.</p>
+    <div class="sec-hd"><h2>Win-rate sensitivity</h2><span>R held at {wr_r_label}</span></div>
+    <p class="note">WR is a <b>byproduct of entry quality</b> — hard to control directly. Below breakeven WR you lose money regardless of R.</p>
     <table>
       <tr><th>WR</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
       {wr_rows}
@@ -451,18 +481,17 @@ function toggleBand(id, btn) {
   </div>
 </div>
 
-<h2>Monte Carlo — final distribution at {weeks:g} weeks</h2>
+<div class="sec-hd" style="margin-top:24px"><h2>Monte Carlo — final distribution at {weeks:g} weeks</h2></div>
 {mc_html}
 
-<h2>Backtest tracker</h2>
+<div class="sec-hd" style="margin-top:24px"><h2>Backtest tracker</h2></div>
 <div class="bt-empty">
-  <div class="ico">📋</div>
-  <b>No backtest data yet</b>
-  <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H BTC chart.</p>
+  <b style="color:var(--t2)">No backtest data yet</b>
+  <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H chart.</p>
   <p>Fields: date · direction · entry · SL hit / TP hit · hold time · R achieved</p>
 </div>
 
-<p class="note" style="margin-top:20px">⚠ <b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — those are arithmetic, not realistic outcomes. Liquidity, position limits, and psychology cap the real path. Trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise. Validate via <code>TREND_4R_v1</code> backtest first.</p>
+<p class="note" style="margin-top:20px"><b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise.</p>
 
 </div><script>{JS}</script></body></html>"""
 
