@@ -1,0 +1,195 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / TREND_4R_v1
+// 4H intraday-swing strategy built to the LOCKED parameters from the
+// 2026-06-02 working session (see "Compounding 10% returns over 120 trades.md"
+// and "PRISM-SYSTEM-SPEC (1).md" at repo root):
+//
+//   Timeframe   4H
+//   Leverage    10x  (≡ 5x @ 2% stop — same 10% account risk)
+//   Stop        FIXED 1% price move  = 10% account risk
+//   Target      FIXED 4% price move  = 40% account gain  = 4R
+//   Frequency   ≤ 1 trade / UTC day
+//   Hold        1–3 days typical
+//
+// PURPOSE OF THIS STRATEGY: answer the one unvalidated question the whole
+// compounding plan rests on —
+//   "Does a 4H entry signal reach +4% before getting wicked out at −1%,
+//    and what is the REAL win rate at that tight a stop?"
+// The historical 44% WR came from PRISM trades at WIDER stops; it cannot be
+// assumed here. Run the Strategy Tester and read WR / avg-R / PF / max DD.
+//
+// Entry premise (v1, to be refined): trade WITH the 4H trend, on a momentum-
+// confirmed break of recent structure. Counter-trend is explicitly excluded —
+// the one live win was a with-trend short into a breakdown.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("LENS / TREND_4R_v1", overlay=true,
+     initial_capital=360, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100, commission_type=strategy.commission.percent,
+     commission_value=0.15, slippage=2,
+     margin_long=1, margin_short=1,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+strategyName    = "TREND_4R_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Locked risk inputs (defaults = the thesis; change only with a reason) ──
+grpRisk = "Risk / target (LOCKED)"
+stopPct = input.float(1.0, "Stop — % price move from entry", group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(4.0, "Take profit — % price move from entry", group=grpRisk, minval=1.0, step=0.5)
+lev     = input.float(10.0, "Leverage (for equity-curve / ruin read)", group=grpRisk, minval=1.0, step=1.0)
+// account risk% = lev × stopPct ; account gain% = lev × tpPct ; R = tpPct/stopPct
+
+// ─── Trend filter (4H) ──────────────────────────────────────────────────────
+grpTrend = "Trend filter"
+emaFastLen = input.int(20, "Fast EMA", group=grpTrend, minval=2)
+emaSlowLen = input.int(50, "Slow EMA", group=grpTrend, minval=5)
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+longTrend  = close > emaFast and emaFast > emaSlow
+shortTrend = close < emaFast and emaFast < emaSlow
+
+// ─── Momentum (MACD histogram direction) ────────────────────────────────────
+grpMom = "Momentum"
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+histRising  = histLine > histLine[1]
+histFalling = histLine < histLine[1]
+
+// ─── Structure break ─────────────────────────────────────────────────────────
+grpStruct = "Structure"
+brkLookback = input.int(20, "Break lookback (bars, excl. current)", group=grpStruct, minval=3)
+requireBreak = input.bool(true, "Require structure break", group=grpStruct)
+brkHigh = ta.highest(high[1], brkLookback)
+brkLow  = ta.lowest(low[1],  brkLookback)
+longBreak  = close > brkHigh
+shortBreak = close < brkLow
+
+// ─── Volume confirmation ─────────────────────────────────────────────────────
+grpVol = "Volume"
+requireVol = input.bool(false, "Require volume spike", group=grpVol)
+volMult = input.float(1.5, "Volume spike × 20-bar SMA", group=grpVol, minval=1.0, step=0.1)
+volSpike = volume > ta.sma(volume, 20) * volMult
+
+// ─── Discipline (4H-relevant subset of app/discipline.py) ───────────────────
+// Note: the PRISM bleed-hour (02/11 UTC) and 5-min cooldown filters are moot on
+// 4H bars (they close at 00/04/08/12/16/20 UTC), so only the meaningful ones
+// survive here: no Saturday, and ≤1 trade per UTC day.
+grpDisc = "Discipline"
+skipSat   = input.bool(true, "Skip Saturday", group=grpDisc)
+oncePerDay = input.bool(true, "Max 1 trade per UTC day", group=grpDisc)
+
+dow = dayofweek(time, "UTC")
+passDay = not skipSat or dow != dayofweek.saturday
+
+curDayId = year(time, "UTC") * 10000 + month(time, "UTC") * 100 + dayofmonth(time, "UTC")
+var int lastTradeDay = na
+passDayCap = not oncePerDay or na(lastTradeDay) or curDayId != lastTradeDay
+
+// ─── Context tags ────────────────────────────────────────────────────────────
+grpCtx  = "Context tags (for LENS payload)"
+venueIn = input.string("kraken", "Venue tag", options=["kraken","bybit"], group=grpCtx)
+
+grpAlert = "Alert"
+emitJson = input.bool(true, "Emit LENS JSON in alert message", group=grpAlert)
+
+// ─── Entry conditions ────────────────────────────────────────────────────────
+longSig  = longTrend  and histRising  and (not requireBreak or longBreak)  and (not requireVol or volSpike) and passDay and passDayCap
+shortSig = shortTrend and histFalling and (not requireBreak or shortBreak) and (not requireVol or volSpike) and passDay and passDayCap
+
+if longSig or shortSig
+    lastTradeDay := curDayId
+
+// ─── Fixed-% SL / TP off the signal-bar close ───────────────────────────────
+longStop    = close * (1 - stopPct / 100)
+longTarget  = close * (1 + tpPct / 100)
+shortStop   = close * (1 + stopPct / 100)
+shortTarget = close * (1 - tpPct / 100)
+
+// ─── Strategy execution — notional = equity × leverage ──────────────────────
+qtyLong  = (strategy.equity * lev) / close
+qtyShort = (strategy.equity * lev) / close
+if longSig
+    strategy.entry("long", strategy.long, qty=qtyLong)
+    strategy.exit("long-x", "long", stop=longStop, limit=longTarget)
+if shortSig
+    strategy.entry("short", strategy.short, qty=qtyShort)
+    strategy.exit("short-x", "short", stop=shortStop, limit=shortTarget)
+
+// ─── Context for JSON ────────────────────────────────────────────────────────
+hourUtc = hour(time, "UTC")
+sessionStr = hourUtc >= 0 and hourUtc < 8  ? "asia"
+           : hourUtc >= 8 and hourUtc < 13 ? "london"
+           : hourUtc >= 13 and hourUtc < 21 ? "ny" : "off-hours"
+htfBiasStr = longTrend ? "bullish" : shortTrend ? "bearish" : "neutral"
+atr14dPct  = (request.security(syminfo.tickerid, "1D", ta.atr(14),
+                  lookahead=barmerge.lookahead_off) / close) * 100
+
+btc1dClose = request.security("BTCUSDT", "1D", close, lookahead=barmerge.lookahead_off)
+btc1dSma   = request.security("BTCUSDT", "1D", ta.sma(close, 20), lookahead=barmerge.lookahead_off)
+btc1dTrend = btc1dClose > btc1dSma * 1.02 ? "up" : btc1dClose < btc1dSma * 0.98 ? "down" : "range"
+btc1wClose = request.security("BTCUSDT", "1W", close, lookahead=barmerge.lookahead_off)
+btc1wSma   = request.security("BTCUSDT", "1W", ta.sma(close, 10), lookahead=barmerge.lookahead_off)
+btc1wTrend = btc1wClose > btc1wSma * 1.02 ? "up" : btc1wClose < btc1wSma * 0.98 ? "down" : "range"
+
+// ─── JSON payload (matches SignalIngest in app/models.py) ───────────────────
+f_jsonStr(k, v) => '"' + k + '":"' + v + '"'
+f_jsonNum(k, v) => '"' + k + '":' + str.tostring(v)
+
+buildPayload(dir, entryPx, stopPx, tgtPx) =>
+    sigId = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    triggerType = dir == "long" ? "trend_break_long" : "trend_break_short"
+
+    // Confluence is context only — sizing is FIXED per the locked thesis.
+    conf = 1
+    conf += (dir == "long" ? longBreak : shortBreak) ? 1 : 0
+    conf += volSpike ? 1 : 0
+    conf += (sessionStr == "ny" or sessionStr == "london") ? 1 : 0
+
+    mtf = '['
+    parts = '"trend_aligned"'
+    if (dir == "long" ? longBreak : shortBreak)
+        parts := parts + ',"structure_break"'
+    if volSpike
+        parts := parts + ',"vol_spike"'
+    if sessionStr == "ny" or sessionStr == "london"
+        parts := parts + ',"active_session"'
+    mtf := mtf + parts + ']'
+
+    s  = '{'
+    s += f_jsonStr("signal_id",        sigId)             + ','
+    s += f_jsonStr("strategy_name",    strategyName)      + ','
+    s += f_jsonStr("strategy_version", strategyVersion)   + ','
+    s += f_jsonStr("symbol",           syminfo.ticker)    + ','
+    s += f_jsonStr("venue",            venueIn)           + ','
+    s += f_jsonStr("session_utc",      sessionStr)        + ','
+    s += f_jsonStr("btc_1d_trend",     btc1dTrend)        + ','
+    s += f_jsonStr("btc_1w_trend",     btc1wTrend)        + ','
+    s += f_jsonNum("atr_14d_pct",      math.round(atr14dPct * 1000) / 1000) + ','
+    s += f_jsonStr("trigger_type",     triggerType)       + ','
+    s += f_jsonStr("htf_bias",         htfBiasStr)        + ','
+    s += '"mtf_confluence":' + mtf                        + ','
+    s += f_jsonNum("confluence_count", conf)              + ','
+    s += f_jsonStr("direction",        dir)               + ','
+    s += f_jsonNum("entry_price",      math.round(entryPx * 100) / 100) + ','
+    s += f_jsonNum("stop_price",       math.round(stopPx  * 100) / 100) + ','
+    s += f_jsonNum("target_price",     math.round(tgtPx   * 100) / 100) + ','
+    s += f_jsonNum("suggested_size_pct", math.round(lev * stopPct * 10) / 10) + ','  // = account risk %
+    s += f_jsonNum("suggested_leverage", lev)             + ','
+    s += f_jsonNum("expected_rr",      math.round(tpPct / stopPct * 100) / 100)
+    s += '}'
+    s
+
+if longSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("long", close, longStop, longTarget) : "long"
+    alert(payload, alert.freq_once_per_bar_close)
+if shortSig and barstate.isconfirmed
+    payload = emitJson ? buildPayload("short", close, shortStop, shortTarget) : "short"
+    alert(payload, alert.freq_once_per_bar_close)
+
+// ─── Visuals ─────────────────────────────────────────────────────────────────
+plot(emaFast, "EMA fast", color=color.new(color.orange, 30))
+plot(emaSlow, "EMA slow", color=color.new(color.blue, 30))
+plotshape(longSig,  title="Long",  location=location.belowbar,
+     style=shape.triangleup,   color=color.new(color.green, 0), size=size.small)
+plotshape(shortSig, title="Short", location=location.abovebar,
+     style=shape.triangledown, color=color.new(color.red, 0), size=size.small)
