@@ -412,6 +412,112 @@ def _signal_asian_rsi_dip_v1(df, i, params):
     return None
 
 
+def _signal_1h_pullback_v1(df, i, params):
+    """
+    1H EMA21 touch-and-go in trend. Designed for 5-10 signals/week on 1H BTC.
+    Trend: 1H EMA21 > EMA50 + daily close > daily EMA50.
+    Entry: prev bar touched EMA21, current bar closes back above it.
+    MACD hist rising. RSI 35-65 (not overbought entry). Bull/bear bar quality.
+    No session filter — trades all sessions. Cooldown 3 bars (3h) between trades.
+    """
+    if i < 80:
+        return None
+
+    c      = df["close"].iloc[i]
+    o      = df["open"].iloc[i]
+    c_prv  = df["close"].iloc[i - 1]
+    l_prv  = df["low"].iloc[i - 1]
+    h_prv  = df["high"].iloc[i - 1]
+
+    ema21     = df["ema21"].iloc[i]
+    ema21_prv = df["ema21"].iloc[i - 1]
+    ema50     = df["ema50"].iloc[i]
+    ema50_old = df["ema50"].iloc[i - 6]   # 6h slope on 1H chart
+
+    up1h   = ema21 > ema50
+    down1h = ema21 < ema50
+
+    ema50_up   = ema50 > ema50_old
+    ema50_down = ema50 < ema50_old
+
+    d_close = df["daily_close"].iloc[i]
+    d_ema50 = df["daily_ema50"].iloc[i]
+    if pd.isna(d_ema50):
+        return None
+    daily_bull = d_close > d_ema50
+    daily_bear = d_close < d_ema50
+
+    hist     = df["macd_hist"].iloc[i]
+    hist_prv = df["macd_hist"].iloc[i - 1]
+    rising   = hist > hist_prv
+    falling  = hist < hist_prv
+
+    long_touch  = l_prv <= ema21_prv and c > ema21
+    short_touch = h_prv >= ema21_prv and c < ema21
+    long_cross  = c_prv <= ema21_prv and c > ema21
+    short_cross = c_prv >= ema21_prv and c < ema21
+
+    rsi     = df["rsi14"].iloc[i]
+    rsi_prv = df["rsi14"].iloc[i - 1]
+    rsi_long_ok  = 35 <= rsi <= 65 and rsi > rsi_prv    # bouncing, not overbought
+    rsi_short_ok = 35 <= rsi <= 65 and rsi < rsi_prv
+
+    bull_bar = c > o
+    bear_bar = c < o
+
+    long_sig = (
+        (long_touch or long_cross)
+        and up1h and daily_bull
+        and rising and rsi_long_ok
+        and bull_bar and ema50_up
+    )
+    short_sig = (
+        (short_touch or short_cross)
+        and down1h and daily_bear
+        and falling and rsi_short_ok
+        and bear_bar and ema50_down
+    )
+
+    if long_sig:  return "long"
+    if short_sig: return "short"
+    return None
+
+
+def _signal_1h_rsi_dip_v1(df, i, params):
+    """
+    1H RSI crosses back above 40 in uptrend (or below 60 in downtrend).
+    More permissive than Asian filter — all sessions, 1H bars.
+    Daily EMA50 gate kept for quality. Designed for 5-8 signals/week.
+    """
+    if i < 80:
+        return None
+
+    c   = df["close"].iloc[i]
+    e21 = df["ema21"].iloc[i]
+    e50 = df["ema50"].iloc[i]
+
+    d_close = df["daily_close"].iloc[i]
+    d_ema50 = df["daily_ema50"].iloc[i]
+    if pd.isna(d_ema50):
+        return None
+
+    rsi     = df["rsi14"].iloc[i]
+    rsi_prv = df["rsi14"].iloc[i - 1]
+
+    up1h   = e21 > e50 and c > e21
+    down1h = e21 < e50 and c < e21
+    daily_bull = d_close > d_ema50
+    daily_bear = d_close < d_ema50
+
+    # RSI cross: was below 40, now above (or was above 60, now below)
+    long_sig  = up1h and daily_bull and rsi_prv < 40 and rsi >= 40
+    short_sig = down1h and daily_bear and rsi_prv > 60 and rsi <= 60
+
+    if long_sig:  return "long"
+    if short_sig: return "short"
+    return None
+
+
 def _signal_asian_pullback_v1(df, i, params):
     """
     PULLBACK_4R_v1 restricted to Asian-session bar closes only (00:00 and 04:00 UTC).
@@ -898,6 +1004,46 @@ STRATEGIES: dict = {
             "once_per_day": True,
         },
     },
+    "1H_PULLBACK_v1": {
+        "description": "1H EMA21 touch-and-go in trend. All sessions. Daily EMA50 gate. Targets 5-10 signals/week. Stop 1% / TP 4% / 10x.",
+        "signal_fn": _signal_1h_pullback_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 3,
+            "once_per_day": False,
+        },
+    },
+    "1H_PULLBACK_6R_v1": {
+        "description": "1H EMA21 pullback, wider 6% TP (6R). Fewer wins but bigger. Positive EV at ~25% WR.",
+        "signal_fn": _signal_1h_pullback_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 6.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 3,
+            "once_per_day": False,
+        },
+    },
+    "1H_RSI_DIP_v1": {
+        "description": "1H RSI crosses back above 40 in uptrend. All sessions. Daily gate. Targets 5-8 signals/week.",
+        "signal_fn": _signal_1h_rsi_dip_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 3,
+            "once_per_day": False,
+        },
+    },
+    "1H_RSI_DIP_6R_v1": {
+        "description": "1H RSI dip, 6% TP. More hold time per trade, higher EV if WR ≥ 20%.",
+        "signal_fn": _signal_1h_rsi_dip_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 6.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 3,
+            "once_per_day": False,
+        },
+    },
 }
 
 
@@ -910,7 +1056,8 @@ def run_strategy(name: str, months: int = 30,
         return {"error": f"unknown strategy: {name}"}
 
     strat = STRATEGIES[name]
-    df = load_ohlcv(months=months)
+    tf = strat.get("timeframe", "4h")
+    df = load_ohlcv(months=months, timeframe=tf)
     df = add_indicators(df)
 
     result  = _run_backtest(df, strat["signal_fn"], strat["params"], initial_capital)

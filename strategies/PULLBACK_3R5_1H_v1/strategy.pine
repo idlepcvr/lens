@@ -1,0 +1,188 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / PULLBACK_3R5_1H_v1
+//
+// WHY THIS EXISTS:
+//   Python backtest over real DB (455 trades, 60 weeks) shows:
+//     - Actual tpw  : 7.5   (natural trading frequency)
+//     - Actual WR   : 42.6%  (entry quality is fine)
+//     - Actual R    : 1.6R   (early exits are killing the edge)
+//
+//   Math result: with 7.5 tpw and 42.6% WR, the MINIMUM TP to reach
+//   P50 €300k in 26 weeks from €637 is 3.29% price move (2.30R actual).
+//   This strategy uses 3.5% TP as the safe round number above that floor.
+//
+// SIGNAL (1H EMA21 pullback):
+//   Long:  EMA21 > EMA50 on 1H  +  daily close > daily EMA50
+//          Previous bar's low touched EMA21; current bar closes above it
+//          MACD histogram rising (momentum turning)
+//          RSI between 35–65 (bouncing, not overbought entry)
+//          Entry bar is a bull bar (close > open)
+//
+//   Short: Mirror of the above in downtrend
+//
+// LOCKED PARAMETERS (do not change without re-running Python backtest math):
+//   Timeframe   : 1H
+//   Stop        : 1.0% price move from entry close
+//   Take profit : 3.5% price move from entry close
+//   Leverage    : 10x implied (1% stop = 10% account risk)
+//   After fees  : win = +29.9% account  /  loss = −13.0% account
+//   Actual R    : 2.3R after 0.30% round-trip fee
+//   Breakeven WR: 30.3%   Your WR: 42.6%   Margin: +12.3pp
+//   EV/trade    : +5.28%
+//
+// BACKTEST SETUP (TradingView Strategy Tester):
+//   Symbol      : XBTUSD (Kraken) or BTCUSDT.P (Bybit)
+//   Timeframe   : 1H
+//   Capital     : €637 (or current balance)
+//   Commission  : 0.15% per side (Kraken taker)
+//   Slippage    : 2 ticks
+//   Date range  : last 18 months minimum (needs bull + bear regimes)
+// ─────────────────────────────────────────────────────────────────────────────
+
+strategy("LENS / PULLBACK_3R5_1H_v1", overlay=true,
+     initial_capital=637,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100,
+     commission_type=strategy.commission.percent,
+     commission_value=0.15,
+     slippage=2,
+     margin_long=10, margin_short=10,
+     process_orders_on_close=true,
+     calc_on_every_tick=false)
+
+// ─── Risk / target (LOCKED) ──────────────────────────────────────────────────
+grpRisk = "Risk / target (LOCKED — change breaks the projection math)"
+stopPct = input.float(1.0,  "Stop %  (price move from entry)", group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(3.5,  "Target % (price move from entry)", group=grpRisk, minval=0.5,  step=0.25)
+lev     = input.float(10.0, "Leverage (display only, for labels)", group=grpRisk, minval=1.0, step=1.0)
+
+// ─── Trend EMAs ──────────────────────────────────────────────────────────────
+grpEma = "Trend EMAs (1H)"
+emaFastLen = input.int(21, "EMA fast", group=grpEma, minval=5)
+emaSlowLen = input.int(50, "EMA slow", group=grpEma, minval=10)
+
+ema21 = ta.ema(close, emaFastLen)
+ema50 = ta.ema(close, emaSlowLen)
+
+upTrend   = ema21 > ema50
+downTrend = ema21 < ema50
+
+// ─── Daily HTF gate ──────────────────────────────────────────────────────────
+grpHtf = "Daily HTF filter"
+requireDaily = input.bool(true, "Require daily trend alignment", group=grpHtf)
+dailyEmaLen  = input.int(50, "Daily EMA length", group=grpHtf, minval=10)
+
+dailyClose = request.security(syminfo.tickerid, "1D", close,         lookahead=barmerge.lookahead_off)
+dailyEma   = request.security(syminfo.tickerid, "1D", ta.ema(close, dailyEmaLen), lookahead=barmerge.lookahead_off)
+
+dailyBull = not requireDaily or dailyClose > dailyEma
+dailyBear = not requireDaily or dailyClose < dailyEma
+
+// ─── MACD histogram ──────────────────────────────────────────────────────────
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+histRising  = histLine > histLine[1]
+histFalling = histLine < histLine[1]
+
+// ─── RSI ─────────────────────────────────────────────────────────────────────
+rsi = ta.rsi(close, 14)
+
+// ─── EMA21 touch-and-go entry ────────────────────────────────────────────────
+// Long: previous bar's low touched/pierced EMA21; current bar closes back above
+longTouch = low[1] <= ema21[1] and close > ema21
+longCross = close[1] <= ema21[1] and close > ema21
+// Short: mirror
+shortTouch = high[1] >= ema21[1] and close < ema21
+shortCross = close[1] >= ema21[1] and close < ema21
+
+rsiLongOk  = rsi >= 35 and rsi <= 65 and rsi > rsi[1]
+rsiShortOk = rsi >= 35 and rsi <= 65 and rsi < rsi[1]
+
+bullBar = close > open
+bearBar = close < open
+
+longSignal  = (longTouch  or longCross)  and upTrend   and dailyBull and histRising  and rsiLongOk  and bullBar
+shortSignal = (shortTouch or shortCross) and downTrend and dailyBear and histFalling and rsiShortOk and bearBar
+
+// ─── Strategy execution ──────────────────────────────────────────────────────
+if longSignal and strategy.position_size == 0
+    slPrice = close * (1 - stopPct / 100)
+    tpPrice = close * (1 + tpPct   / 100)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=slPrice, limit=tpPrice)
+
+if shortSignal and strategy.position_size == 0
+    slPrice = close * (1 + stopPct / 100)
+    tpPrice = close * (1 - tpPct   / 100)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=slPrice, limit=tpPrice)
+
+// ─── Visual: SL / TP lines ───────────────────────────────────────────────────
+var line slLine = na
+var line tpLine = na
+var label entryLbl = na
+
+if longSignal and strategy.position_size == 0
+    slP = close * (1 - stopPct / 100)
+    tpP = close * (1 + tpPct   / 100)
+    line.delete(slLine)
+    line.delete(tpLine)
+    label.delete(entryLbl)
+    slLine    := line.new(bar_index, slP, bar_index + 30, slP, color=color.red,   width=1, style=line.style_dashed)
+    tpLine    := line.new(bar_index, tpP, bar_index + 30, tpP, color=color.green, width=1, style=line.style_dashed)
+    entryLbl  := label.new(bar_index, close,
+         "▲ L  SL " + str.tostring(math.round(slP, 0)) +
+         "  TP " + str.tostring(math.round(tpP, 0)) +
+         "  (−" + str.tostring(stopPct) + "% / +" + str.tostring(tpPct) + "%)",
+         color=color.new(color.green, 80), textcolor=color.white,
+         style=label.style_label_right, size=size.small)
+
+if shortSignal and strategy.position_size == 0
+    slP = close * (1 + stopPct / 100)
+    tpP = close * (1 - tpPct   / 100)
+    line.delete(slLine)
+    line.delete(tpLine)
+    label.delete(entryLbl)
+    slLine    := line.new(bar_index, slP, bar_index + 30, slP, color=color.red,   width=1, style=line.style_dashed)
+    tpLine    := line.new(bar_index, tpP, bar_index + 30, tpP, color=color.green, width=1, style=line.style_dashed)
+    entryLbl  := label.new(bar_index, close,
+         "▼ S  SL " + str.tostring(math.round(slP, 0)) +
+         "  TP " + str.tostring(math.round(tpP, 0)) +
+         "  (+" + str.tostring(stopPct) + "% / −" + str.tostring(tpPct) + "%)",
+         color=color.new(color.red, 80), textcolor=color.white,
+         style=label.style_label_right, size=size.small)
+
+// ─── Visual: EMA lines ───────────────────────────────────────────────────────
+plot(ema21, "EMA 21", color=color.new(color.blue,  20), linewidth=1)
+plot(ema50, "EMA 50", color=color.new(color.orange, 20), linewidth=1)
+
+// ─── Visual: signal arrows ───────────────────────────────────────────────────
+plotshape(longSignal,  title="Long entry",  location=location.belowbar,
+     style=shape.triangleup,   color=color.green, size=size.small)
+plotshape(shortSignal, title="Short entry", location=location.abovebar,
+     style=shape.triangledown, color=color.red,   size=size.small)
+
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+alertcondition(longSignal,
+     title="PULLBACK_3R5_1H — Long",
+     message='{"strategy":"PULLBACK_3R5_1H_v1","side":"long","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"leverage":10}')
+
+alertcondition(shortSignal,
+     title="PULLBACK_3R5_1H — Short",
+     message='{"strategy":"PULLBACK_3R5_1H_v1","side":"short","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"leverage":10}')
+
+// ─── Info table ──────────────────────────────────────────────────────────────
+var table infoTbl = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 70), border_width=1)
+if barstate.islast
+    table.cell(infoTbl, 0, 0, "PULLBACK_3R5_1H_v1", text_color=color.white,  text_size=size.small, bgcolor=color.new(color.blue, 60))
+    table.cell(infoTbl, 1, 0, "1H · EMA21 pullback",  text_color=color.gray, text_size=size.small, bgcolor=color.new(color.blue, 60))
+    table.cell(infoTbl, 0, 1, "Stop",    text_color=color.gray,  text_size=size.small)
+    table.cell(infoTbl, 1, 1, str.tostring(stopPct) + "% → −" + str.tostring(stopPct * lev) + "% acct", text_color=color.red,   text_size=size.small)
+    table.cell(infoTbl, 0, 2, "Target",  text_color=color.gray,  text_size=size.small)
+    table.cell(infoTbl, 1, 2, str.tostring(tpPct)   + "% → +" + str.tostring(math.round((tpPct - 0.30) * lev, 1)) + "% acct", text_color=color.green, text_size=size.small)
+    table.cell(infoTbl, 0, 3, "Actual R",  text_color=color.gray,  text_size=size.small)
+    table.cell(infoTbl, 1, 3, str.tostring(math.round((tpPct - 0.30) / (stopPct + 0.30), 2)) + "R after fees", text_color=color.yellow, text_size=size.small)
+    table.cell(infoTbl, 0, 4, "BE win rate", text_color=color.gray,  text_size=size.small)
+    table.cell(infoTbl, 1, 4, str.tostring(math.round(100 * (stopPct + 0.30) / (tpPct + stopPct), 1)) + "%  (yours: 42.6%)", text_color=color.white, text_size=size.small)
+    table.cell(infoTbl, 0, 5, "P50 / 26w", text_color=color.gray,  text_size=size.small)
+    table.cell(infoTbl, 1, 5, ">€300k at 7.5 tpw",   text_color=color.green, text_size=size.small)
