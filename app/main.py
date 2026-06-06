@@ -34,10 +34,15 @@ from .database import (
     create_trade, get_trades, get_trade, update_trade, delete_trade,
     upsert_exchange_trade,
     get_transfers, upsert_transfer,
-    get_daily_snapshots,
+    get_daily_snapshots, upsert_daily_snapshot,
     insert_signal, get_signals, get_signal, decide_signal, expire_stale_signals,
     get_last_non_rejected_signal_for_symbol,
     get_lens_config, upsert_lens_config,
+    save_projection_plan, get_projection_plans, get_projection_plan,
+    update_projection_plan, delete_projection_plan,
+    add_projection_actual, get_projection_actuals, delete_projection_actual,
+    autofill_projection_actuals,
+    get_actual_stats,
 )
 from . import discipline
 from .models import (
@@ -68,17 +73,34 @@ def startup():
 
 @app.get("/projection", response_class=HTMLResponse)
 def projection_page(
-    start: float = Query(360,   description="Start balance €"),
-    stop:  float = Query(1.0,   description="Stop — % price move"),
-    tp:    float = Query(5.5,   description="Take profit — % price move (5.5% → actual 4R after 0.30% fee)"),
-    lev:   float = Query(10.0,  description="Leverage"),
-    wr:    float = Query(44.0,  description="Win rate %"),
-    tpw:   float = Query(5.0,   description="Trades / week"),
-    weeks: float = Query(26.0,  description="Horizon (weeks)"),
-    btc:   float = Query(60000, description="BTC price € (for BTC equivalent)"),
-    fee:   float = Query(0.30,  description="Fee % round trip (0.15%/side)"),
+    start:      float = Query(360,   description="Start balance €"),
+    stop:       float = Query(1.0,   description="Stop — % price move"),
+    tp:         float = Query(5.5,   description="Take profit — % price move (5.5% → actual 4R after 0.30% fee)"),
+    lev:        float = Query(10.0,  description="Leverage"),
+    wr:         float = Query(44.0,  description="Win rate %"),
+    tpw:        float = Query(5.0,   description="Trades / week"),
+    weeks:      float = Query(26.0,  description="Horizon (weeks)"),
+    btc:        float = Query(60000, description="BTC price € (for BTC equivalent)"),
+    fee:        float = Query(0.30,  description="Fee % round trip (0.15%/side)"),
+    start_date: str   = Query("",    description="Plan start date (YYYY-MM-DD)"),
 ):
     import math
+    from datetime import date as _date, timedelta as _td
+
+    # ── start date handling ───────────────────────────────────────────────────────
+    try:
+        _sd = _date.fromisoformat(start_date) if start_date else None
+    except ValueError:
+        _sd = None
+    sd_default = _date.today().isoformat()
+    start_date_val = start_date or sd_default
+
+    def week_date(w):
+        if _sd is None: return ""
+        return (_sd + _td(weeks=int(w))).strftime("%-d %b %Y")
+
+    # ── live account stats (feedback loop) ───────────────────────────────────────
+    actual = get_actual_stats()
 
     # ── helpers ──────────────────────────────────────────────────────────────────
     def fmt_eur(v):
@@ -135,8 +157,10 @@ def projection_page(
         for i, r in enumerate(p["curve"]):
             btc_c = f"<td class='btc'>{r['btc_p50']:.4f}</td>" if r["btc_p50"] else "<td class='dim'>—</td>"
             rc = " class='alt'" if i % 2 else ""
+            wd = week_date(r["week"])
+            date_col = f"<td class='dim' style='font-size:10px'>{wd}</td>" if wd else "<td class='dim'>—</td>"
             curve_rows += (
-                f"<tr{rc}><td>{r['week']}w</td><td class='dim'>{r['trades']}</td>"
+                f"<tr{rc}><td>{r['week']}w</td>{date_col}<td class='dim'>{r['trades']}</td>"
                 f"<td class='p05'>{fmt_eur(r['p05'])}</td>"
                 f"<td class='p25'>{fmt_eur(r['p25'])}</td>"
                 f"<td class='p50'>{fmt_eur(r['p50'])}</td>"
@@ -268,6 +292,91 @@ def projection_page(
         )
 
     wr_r_label = f"{p['actual_r']}R actual" if p else f"{tp:g}% TP"
+    p50_final_val = round(p["curve"][-1]["p50"], 2) if (p and p.get("curve")) else 0
+    import json as _json
+
+    # ── Live stats widget ─────────────────────────────────────────────────────────
+    def _live_stats_html():
+        items = []
+        live_bal  = actual.get("current_balance")
+        live_date = actual.get("balance_date", "")
+        live_wr   = actual.get("actual_wr")
+        n_trades  = actual.get("total_trades", 0)
+        wins      = actual.get("wins", 0)
+        losses    = actual.get("losses", 0)
+        total_pnl = actual.get("total_pnl")
+        avg_win   = actual.get("avg_win_eur")
+        avg_loss  = actual.get("avg_loss_eur")
+
+        # Actual R — THE key metric (is the exit discipline holding?)
+        if avg_win and avg_loss and n_trades >= 10:
+            real_r = avg_win / abs(avg_loss)
+            model_r = p["actual_r"] if p else None
+            r_cls = "live-pos" if (model_r and real_r >= model_r * 0.85) else "live-neg"
+            model_hint = f' <span class="live-dim">(model {model_r}R)</span>' if model_r else ""
+            items.append(
+                f'<div class="live-item live-item-wide">'
+                f'<div class="live-lbl">Actual R achieved — exit discipline</div>'
+                f'<div class="live-val {r_cls}" style="font-size:16px;font-weight:700">'
+                f'{real_r:.2f}R{model_hint}'
+                f'</div>'
+                f'<div class="live-dim" style="font-size:10px;margin-top:2px">'
+                f'avg win {fmt_eur(avg_win)} · avg loss {fmt_eur(avg_loss)} · {n_trades} closed trades'
+                f'</div>'
+                f'</div>'
+            )
+
+        # Balance item
+        if live_bal is not None:
+            bal_str = fmt_eur(live_bal)
+            use_link = ""
+            if abs(live_bal - start) > 0.5:
+                import urllib.parse as _up
+                params = dict(start=live_bal, stop=stop, tp=tp, lev=lev, wr=wr,
+                              tpw=tpw, weeks=weeks, btc=btc, fee=fee,
+                              start_date=start_date_val)
+                qs = _up.urlencode({k: v for k, v in params.items() if v != ""})
+                use_link = f' <a href="/projection?{qs}" class="live-use">use →</a>'
+            date_hint = f' <span class="live-dim">({live_date})</span>' if live_date else ""
+            items.append(
+                f'<div class="live-item">'
+                f'<div class="live-lbl">Account balance</div>'
+                f'<div class="live-val">{bal_str}{date_hint}{use_link}</div>'
+                f'</div>'
+            )
+
+        # Win rate item
+        if live_wr is not None:
+            wr_diff = live_wr - wr
+            diff_cls = "live-pos" if wr_diff >= 0 else "live-neg"
+            diff_str = f' <span class="{diff_cls}">({wr_diff:+.1f}pp vs model)</span>' if n_trades >= 10 else \
+                       f' <span class="live-dim">(need ≥10 trades)</span>'
+            items.append(
+                f'<div class="live-item">'
+                f'<div class="live-lbl">Actual win rate</div>'
+                f'<div class="live-val">{live_wr}% — {wins}W / {losses}L{diff_str}</div>'
+                f'</div>'
+            )
+
+        # Total PnL
+        if total_pnl is not None:
+            pnl_cls = "live-pos" if total_pnl >= 0 else "live-neg"
+            items.append(
+                f'<div class="live-item">'
+                f'<div class="live-lbl">Realised PnL ({n_trades} trades)</div>'
+                f'<div class="live-val {pnl_cls}">{fmt_eur(total_pnl)}</div>'
+                f'</div>'
+            )
+
+        if not items:
+            return ""
+        return '<div class="live-strip">' + "".join(items) + "</div>"
+
+    live_stats_html = _live_stats_html()
+    import json as _json
+    curve_json_val = _json.dumps(
+        [{"week": r["week"], "p50": round(r["p50"], 2)} for r in p["curve"]]
+    ) if (p and p.get("curve")) else "[]"
 
     # ── CSS ───────────────────────────────────────────────────────────────────────
     CSS = """
@@ -363,10 +472,77 @@ tr.cur-row td:first-child{border-left:2px solid var(--ac)}
 .note b{color:var(--t2)}
 .note code{background:var(--s2);padding:1px 5px;border-radius:3px;color:var(--t2)}
 .err{background:#140910;border:1px solid #3e1a24;color:var(--re);padding:10px 14px;border-radius:8px;margin:8px 0}
+/* collapse toggle */
+.collapse-btn{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:11px;padding:3px 7px;border-radius:4px;transition:all .12s;line-height:1}
+.collapse-btn:hover{color:var(--t1);background:var(--s2)}
+/* save plan */
+.save-plan-btn{background:#0e1f10;color:var(--gr);border-color:#1a3d1e}
+.save-plan-btn:hover{background:#132518;color:#5de08a}
+.saved-flash{font-size:10px;color:var(--gr);opacity:0;transition:opacity .3s;align-self:flex-end;padding-bottom:8px;font-family:var(--mono)}
+.saved-flash.show{opacity:1}
+/* plan cards */
+.plan-card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 16px;margin:8px 0}
+.plan-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.plan-label-inp{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--t1);font-size:13px;font-weight:600;font-family:var(--ui);padding:2px 4px;border-radius:3px;flex:1;min-width:120px;transition:border-color .15s}
+.plan-label-inp:hover{border-bottom-color:var(--b3)}
+.plan-label-inp:focus{outline:none;border-bottom-color:var(--ac);background:var(--s2)}
+.plan-meta{font-size:11px;color:var(--t3);margin-bottom:10px;font-family:var(--mono)}
+.plan-target{font-size:11px;color:var(--t2);margin-bottom:10px}
+.plan-target b{color:var(--t1)}
+.status-chip{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;padding:2px 7px;border-radius:20px;cursor:pointer;border:none;font-family:var(--ui);transition:all .12s}
+.status-active{background:#0e1f10;color:var(--gr)}
+.status-paused{background:#1e1a0a;color:var(--am)}
+.status-completed{background:#0a1220;color:var(--ac)}
+.sync-btn{background:transparent;border:1px solid var(--b2);color:var(--t3);cursor:pointer;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 8px;border-radius:4px;font-family:var(--ui);transition:all .12s}
+.sync-btn:hover{color:var(--ac);border-color:var(--ac)}
+.sync-btn:disabled{opacity:.4;cursor:default}
+.plan-del-btn{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;margin-left:auto;line-height:1;transition:color .12s}
+.plan-del-btn:hover{color:var(--re)}
+.act-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
+.act-table th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:4px 8px;border-bottom:1px solid var(--b1);text-align:left}
+.act-table th:not(:first-child){text-align:right}
+.act-table td{padding:5px 8px;border-bottom:1px solid var(--b1);color:var(--t1);text-align:right}
+.act-table td:first-child{text-align:left;color:var(--t2);font-family:var(--mono)}
+.act-table td.act-note{color:var(--t3);font-size:10px;text-align:left;max-width:200px}
+.act-del{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:12px;padding:1px 5px;border-radius:3px;transition:color .12s}
+.act-del:hover{color:var(--re)}
+.add-act-row td{padding:6px 8px;border-bottom:none}
+.add-act-inp{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 7px;border-radius:4px;font-family:var(--mono);font-size:11px;transition:border-color .12s}
+.add-act-inp:focus{outline:none;border-color:var(--ac)}
+.add-act-inp[type=date]{width:120px}
+.add-act-inp[type=number]{width:90px}
+.add-act-inp[type=text]{width:140px}
+.add-act-btn{background:var(--adim);color:var(--ac);border:1px solid #1e2e54;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:var(--ui);letter-spacing:.08em;transition:all .12s}
+.add-act-btn:hover{background:#172448;color:#82b4ff}
+/* live stats strip */
+.live-strip{display:flex;flex-wrap:wrap;gap:6px;background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--gr);border-radius:10px;padding:10px 16px;margin:0 0 12px}
+.live-item{flex:1;min-width:160px}
+.live-lbl{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-bottom:2px}
+.live-val{font-family:var(--mono);font-size:12px;color:var(--t1)}
+.live-dim{color:var(--t3);font-size:10px;font-family:var(--ui)}
+.live-pos{color:var(--gr)}
+.live-neg{color:var(--re)}
+.live-use{font-size:10px;color:var(--ac);text-decoration:none;margin-left:6px;font-family:var(--ui)}
+.live-use:hover{text-decoration:underline}
+.live-item-wide{flex-basis:100%;border-bottom:1px solid var(--b1);padding-bottom:8px;margin-bottom:2px}
 """
 
     # ── JS ────────────────────────────────────────────────────────────────────────
     JS = r"""
+// persist projection params in localStorage — restore on bare /projection visit
+(function() {
+  var LS_KEY = 'lens_proj_params';
+  var qs = window.location.search;
+  if (qs && qs.length > 1) {
+    try { localStorage.setItem(LS_KEY, qs); } catch(e) {}
+  } else {
+    try {
+      var saved = localStorage.getItem(LS_KEY);
+      if (saved) { window.location.replace('/projection' + saved); }
+    } catch(e) {}
+  }
+})();
+
 // calculator — type 300*0.1 → Enter → 30
 document.querySelectorAll('.pf input').forEach(function(inp) {
   function tryCalc() {
@@ -392,6 +568,287 @@ function toggleBand(id, btn) {
   var p05 = document.getElementById('sp05'), p95 = document.getElementById('sp95'), fill = document.getElementById('sband');
   if (fill && p05 && p95) fill.style.display = (p05.style.display !== 'none' || p95.style.display !== 'none') ? '' : 'none';
 }
+
+// ── My Plans ──────────────────────────────────────────────────────────────────
+
+function fmtEur(v) {
+  if (v == null) return '—';
+  var n = parseFloat(v);
+  if (isNaN(n)) return '—';
+  if (Math.abs(n) >= 1000000) return '€' + (n/1000000).toFixed(2) + 'M';
+  if (Math.abs(n) >= 10000)   return '€' + (n/1000).toFixed(1) + 'k';
+  return '€' + n.toFixed(0);
+}
+
+function fmtPct(v) {
+  return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+}
+
+function savePlan() {
+  var params = new URLSearchParams(window.location.search);
+  var p50 = parseFloat(document.getElementById('proj-p50-val').dataset.val) || 0;
+  var curveEl = document.getElementById('proj-curve-data');
+  var curveJson = curveEl ? curveEl.textContent.trim() : '[]';
+  var today = new Date().toISOString().slice(0, 10);
+  var payload = {
+    label: 'Plan ' + today,
+    start_bal: parseFloat(params.get('start') || 360),
+    stop_pct:  parseFloat(params.get('stop')  || 1.0),
+    tp_pct:    parseFloat(params.get('tp')    || 5.5),
+    leverage:  parseFloat(params.get('lev')   || 10),
+    win_rate:  parseFloat(params.get('wr')    || 44),
+    tpw:       parseFloat(params.get('tpw')   || 5),
+    weeks:     parseFloat(params.get('weeks') || 26),
+    btc_price: parseFloat(params.get('btc')   || 60000),
+    fee_rt:          parseFloat(params.get('fee')   || 0.30),
+    p50_final:       p50,
+    plan_start_date: params.get('start_date') || today,
+    curve_json: curveJson,
+  };
+  fetch('/api/projections', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  }).then(function(r) {
+    if (!r.ok) throw new Error('save failed');
+    var flash = document.getElementById('plan-saved-flash');
+    flash.classList.add('show');
+    setTimeout(function() { flash.classList.remove('show'); }, 2000);
+    loadPlans();
+  }).catch(function(e) { alert('Save failed: ' + e.message); });
+}
+
+function loadPlans() {
+  fetch('/api/projections').then(function(r) { return r.json(); }).then(function(data) {
+    var plans = data.plans || [];
+    var countEl = document.getElementById('plans-count');
+    var emptyEl = document.getElementById('plans-empty');
+    var listEl  = document.getElementById('plans-list');
+    if (countEl) countEl.textContent = plans.length ? plans.length + ' saved' : '';
+    if (emptyEl) emptyEl.style.display = plans.length ? 'none' : '';
+    if (!listEl) return;
+    listEl.innerHTML = plans.map(renderPlanCard).join('');
+    // Sync form start_date to active plan's start date
+    var activePlan = plans.find(function(p) { return p.status === 'active' && p.plan_start_date; });
+    if (activePlan) {
+      var sdInput = document.querySelector('input[name="start_date"]');
+      if (sdInput) sdInput.value = activePlan.plan_start_date;
+    }
+  });
+}
+
+function renderPlanCard(plan) {
+  var created = plan.created_at ? plan.created_at.slice(0, 10) : '';
+  var statusMap = {active:'status-active', paused:'status-paused', completed:'status-completed'};
+  var statusCls = statusMap[plan.status] || 'status-active';
+  var nextStatus = {active:'paused', paused:'completed', completed:'active'}[plan.status] || 'active';
+  var meta = [
+    '€' + plan.start_bal,
+    plan.stop_pct + '% SL',
+    plan.tp_pct + '% TP',
+    plan.leverage + '×',
+    plan.win_rate + '% WR',
+    plan.tpw + '/wk',
+    plan.weeks + 'w',
+    plan.btc_price ? 'BTC €' + Number(plan.btc_price).toLocaleString('en') : '',
+  ].filter(Boolean).join(' · ');
+  var targetLine = plan.p50_final
+    ? '<span class="plan-target">P50 target: <b>' + fmtEur(plan.p50_final) + '</b> in ' + plan.weeks + 'w · projected gain <b>' + fmtPct((plan.p50_final - plan.start_bal) / plan.start_bal * 100) + '</b></span>'
+    : '';
+  var startDateField =
+    '<span style="font-size:10px;color:var(--t3)">start </span>' +
+    '<input class="plan-label-inp" style="width:100px;font-size:11px" ' +
+      'value="' + escHtml(plan.plan_start_date || '') + '" ' +
+      'type="date" ' +
+      'onblur="updatePlanStartDate(' + plan.id + ', this.value)" ' +
+      'onkeydown="if(event.key===\'Enter\')this.blur()">';
+  var actualsHtml = renderActualsTable(plan);
+  return (
+    '<div class="plan-card" id="plan-' + plan.id + '">' +
+    '<div class="plan-hdr">' +
+    '<input class="plan-label-inp" value="' + escHtml(plan.label || 'Plan ' + created) + '" ' +
+      'onblur="updatePlanLabel(' + plan.id + ', this.value)" ' +
+      'onkeydown="if(event.key===\'Enter\')this.blur()">' +
+    '<button class="status-chip ' + statusCls + '" onclick="cycleStatus(' + plan.id + ',\'' + nextStatus + '\')">' + plan.status + '</button>' +
+    startDateField +
+    '<button class="plan-del-btn" onclick="deletePlan(' + plan.id + ')" title="Delete plan">×</button>' +
+    '</div>' +
+    '<div class="plan-meta">' + meta + '</div>' +
+    targetLine +
+    actualsHtml +
+    '</div>'
+  );
+}
+
+function projectedAtDate(plan, dateStr) {
+  if (!plan.plan_start_date) return null;
+  var startMs   = new Date(plan.plan_start_date).getTime();
+  var checkMs   = new Date(dateStr).getTime();
+  var weeksFrac = (checkMs - startMs) / (7 * 24 * 3600 * 1000);
+  if (weeksFrac < 0) return null;
+
+  // Use stored curve if available — exact Monte Carlo P50 values
+  var curve = null;
+  try { curve = plan.curve_json ? JSON.parse(plan.curve_json) : null; } catch(e) {}
+  if (curve && curve.length) {
+    // Find the two surrounding week points and linearly interpolate
+    var prev = curve[0], next = curve[curve.length - 1];
+    for (var i = 0; i < curve.length; i++) {
+      if (curve[i].week <= weeksFrac) prev = curve[i];
+      if (curve[i].week >= weeksFrac) { next = curve[i]; break; }
+    }
+    if (prev.week === next.week) return prev.p50;
+    var t = (weeksFrac - prev.week) / (next.week - prev.week);
+    return prev.p50 + t * (next.p50 - prev.p50);
+  }
+
+  // Fallback: geometric interpolation
+  if (!plan.p50_final) return null;
+  var ratio = plan.p50_final / plan.start_bal;
+  return plan.start_bal * Math.pow(ratio, weeksFrac / plan.weeks);
+}
+
+function renderActualsTable(plan) {
+  var hasActuals = (plan.actuals || []).length > 0;
+  var syncNote = '';
+  if (!hasActuals) {
+    syncNote = '<p style="font-size:10px;color:var(--t3);margin:6px 0 4px">No checkpoints yet — daily balances auto-fill at 00:05. Add manually below.</p>';
+  }
+
+  var addRow =
+    '<tr class="add-act-row">' +
+    '<td><input class="add-act-inp" type="date" id="act-date-' + plan.id + '" value="' + new Date().toISOString().slice(0,10) + '"></td>' +
+    '<td><input class="add-act-inp" type="number" id="act-bal-' + plan.id + '" placeholder="actual €" step="0.01"></td>' +
+    '<td colspan="2"><input class="add-act-inp" type="text" id="act-note-' + plan.id + '" placeholder="note (optional)" style="width:180px"></td>' +
+    '<td><button class="add-act-btn" onclick="addActual(' + plan.id + ')">+ Add</button></td>' +
+    '</tr>';
+
+  var rows = (plan.actuals || []).map(function(a) {
+    var proj = projectedAtDate(plan, a.date);
+    var diff = (proj != null) ? (a.balance - proj) : null;
+    var diffCls = diff == null ? '' : (diff >= 0 ? 'pos' : 'neg');
+    var projCell = proj != null ? fmtEur(proj) : '<span class="dim">—</span>';
+    var diffCell = diff != null ? ('<span class="' + diffCls + '">' + fmtPct(diff / proj * 100) + '</span>') : '<span class="dim">—</span>';
+    var autoNote = a.note === 'auto: daily snapshot' ? '<span style="color:var(--ac);font-size:9px">auto</span>' : escHtml(a.note || '');
+    return '<tr>' +
+      '<td>' + (a.date || '') + '</td>' +
+      '<td style="font-weight:600">' + fmtEur(a.balance) + '</td>' +
+      '<td class="dim">' + projCell + '</td>' +
+      '<td>' + diffCell + '</td>' +
+      '<td class="act-note">' + autoNote + '</td>' +
+      '<td><button class="act-del" onclick="deleteActual(' + plan.id + ',' + a.id + ')" title="Delete">×</button></td>' +
+      '</tr>';
+  }).join('');
+
+  return (
+    syncNote +
+    '<table class="act-table">' +
+    '<tr><th>Date</th><th>Actual €</th><th>Proj P50</th><th>vs Plan</th><th>Note</th><th></th></tr>' +
+    rows + addRow +
+    '</table>'
+  );
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function addActual(planId) {
+  var date  = document.getElementById('act-date-' + planId).value;
+  var bal   = parseFloat(document.getElementById('act-bal-' + planId).value);
+  var note  = document.getElementById('act-note-' + planId).value;
+  if (!date || isNaN(bal)) { alert('Date and balance required'); return; }
+  fetch('/api/projections/' + planId + '/actuals', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({date: date, balance: bal, note: note || null}),
+  }).then(function(r) {
+    if (!r.ok) throw new Error('add failed');
+    loadPlans();
+  }).catch(function(e) { alert('Failed: ' + e.message); });
+}
+
+function deleteActual(planId, actualId) {
+  fetch('/api/projections/' + planId + '/actuals/' + actualId, {method:'DELETE'})
+    .then(function() { loadPlans(); });
+}
+
+function deletePlan(planId) {
+  if (!confirm('Delete this plan and all its checkpoints?')) return;
+  fetch('/api/projections/' + planId, {method:'DELETE'})
+    .then(function() { loadPlans(); });
+}
+
+function cycleStatus(planId, newStatus) {
+  fetch('/api/projections/' + planId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: newStatus}),
+  }).then(function() { loadPlans(); });
+}
+
+function updatePlanLabel(planId, label) {
+  fetch('/api/projections/' + planId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({label: label}),
+  });
+}
+
+function updatePlanStartDate(planId, date) {
+  if (!date) return;
+  fetch('/api/projections/' + planId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({plan_start_date: date}),
+  }).then(function() { loadPlans(); });
+}
+
+function syncActuals(planId) {
+  var btn = event.target;
+  var orig = btn.textContent;
+  btn.textContent = 'syncing…';
+  btn.disabled = true;
+  fetch('/api/projections/' + planId + '/actuals/autofill', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      if (d.added > 0) {
+        btn.textContent = '✓ +' + d.added + ' added';
+        setTimeout(function() { btn.textContent = orig; }, 2500);
+      } else {
+        btn.textContent = 'no new snapshots';
+        btn.title = 'No daily_snapshots found for this plan\'s date range. Run a Kraken sync first via /api/sync/kraken.';
+        setTimeout(function() { btn.textContent = orig; btn.title = 'Auto-fill from Kraken daily balance snapshots'; }, 3500);
+      }
+      loadPlans();
+    })
+    .catch(function() { btn.textContent = orig; btn.disabled = false; });
+}
+
+// ── Collapse chart section ────────────────────────────────────────────────────
+(function() {
+  var LS_KEY = 'lens_chart_collapsed';
+  try { if (localStorage.getItem(LS_KEY) === '1') applyChartCollapse(true); } catch(e) {}
+})();
+
+function applyChartCollapse(collapsed) {
+  var body = document.getElementById('chart-body');
+  var btn  = document.getElementById('chart-toggle');
+  if (!body || !btn) return;
+  body.style.display = collapsed ? 'none' : '';
+  btn.textContent    = collapsed ? '▶' : '▼';
+}
+
+function toggleChartSection() {
+  var body = document.getElementById('chart-body');
+  if (!body) return;
+  var collapsed = body.style.display === 'none';
+  applyChartCollapse(!collapsed);
+  try { localStorage.setItem('lens_chart_collapsed', !collapsed ? '1' : '0'); } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', loadPlans);
 """
 
     return f"""<!doctype html>
@@ -410,8 +867,9 @@ function toggleBand(id, btn) {
   </div>
   <nav class="topnav">
     <a href="/">Dashboard</a>
+    <a href="/signals">Signals</a>
     <a href="/projection" class="cur">Projection</a>
-    <a href="/docs">API</a>
+    <a href="/backtest">Backtest</a>
   </nav>
 </div>
 
@@ -438,14 +896,21 @@ function toggleBand(id, btn) {
   <div class="pf"><label>Weeks</label><input name="weeks" value="{weeks:g}"></div>
   <div class="pf"><label>BTC €</label><input name="btc" value="{btc:g}"></div>
   <div class="pf"><label>Fee % RT</label><input name="fee" value="{fee:g}"></div>
+  <div class="pf"><label>Start date</label><input name="start_date" type="date" value="{start_date_val}" style="width:110px"></div>
   <button class="proj-btn" type="submit">Project →</button>
+  <button class="proj-btn save-plan-btn" type="button" id="save-plan-btn" onclick="savePlan()">Save Plan</button>
+  <span class="saved-flash" id="plan-saved-flash">saved ✓</span>
   <span class="calc-hint">300*0.1 → ↵</span>
 </form>
+<span id="proj-p50-val" data-val="{p50_final_val}" style="display:none"></span>
+<script id="proj-curve-data" type="application/json">{curve_json_val}</script>
+{live_stats_html}
 {err_html}
 
 <div class="hero">{cards}</div>
 
-<div class="sec-hd"><h2>Equity projection — percentile bands (log scale)</h2></div>
+<div class="sec-hd"><h2>Equity projection — percentile bands (log scale)</h2><button class="collapse-btn" id="chart-toggle" onclick="toggleChartSection()" title="Collapse">▼</button></div>
+<div id="chart-body">
 <div class="chart-wrap">
   {sparkline}
   <div class="chart-legend">
@@ -458,9 +923,10 @@ function toggleBand(id, btn) {
 </div>
 <p class="note"><b>P50</b> = expected median path · <b>P05</b> = worst 5% · <b>P95</b> = best 5%. Spread is variance, not a forecast.</p>
 <table>
-  <tr><th>Week</th><th>Trades</th><th class="p05">P05</th><th class="p25">P25</th><th class="p50">Median</th><th class="p75">P75</th><th class="p95">P95</th><th>BTC (P50)</th></tr>
+  <tr><th>Week</th><th>Date</th><th>Trades</th><th class="p05">P05</th><th class="p25">P25</th><th class="p50">Median</th><th class="p75">P75</th><th class="p95">P95</th><th>BTC (P50)</th></tr>
   {curve_rows}
 </table>
+</div>
 
 <div class="two" style="margin-top:24px">
   <div>
@@ -489,6 +955,15 @@ function toggleBand(id, btn) {
   <b style="color:var(--t2)">No backtest data yet</b>
   <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H chart.</p>
   <p>Fields: date · direction · entry · SL hit / TP hit · hold time · R achieved</p>
+</div>
+
+<div class="sec-hd" style="margin-top:24px"><h2>My plans</h2><span id="plans-count"></span></div>
+<div id="plans-section">
+  <div class="bt-empty" id="plans-empty" style="display:none">
+    <b style="color:var(--t2)">No saved plans yet</b>
+    <p>Click <b>Save Plan</b> above to snapshot the current projection and track actual results over time.</p>
+  </div>
+  <div id="plans-list"></div>
 </div>
 
 <p class="note" style="margin-top:20px"><b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise.</p>
@@ -618,8 +1093,9 @@ def landing():
   </div>
   <nav class="topnav">
     <a href="/" class="cur">Dashboard</a>
-    <a href="/projection">Projection →</a>
-    <a href="/docs">API</a>
+    <a href="/signals">Signals</a>
+    <a href="/projection">Projection</a>
+    <a href="/backtest">Backtest</a>
   </nav>
 </div>
 
@@ -1037,6 +1513,33 @@ class SyncRequest(BaseModel):
 _kraken_sync_status: dict = {}
 
 
+def _timeline_to_daily_snapshots(eur_timeline: list) -> int:
+    """Take (datetime, eur_balance) timeline, insert one snapshot per calendar day (last balance that day).
+    Skips dates that already have a snapshot — live-API captures (portfolioValue) take priority."""
+    if not eur_timeline:
+        return 0
+    by_day: dict = {}
+    for dt, bal in eur_timeline:
+        day = dt.strftime("%Y-%m-%d")
+        by_day[day] = bal
+    from app.database import _conn as _db_conn, _DSNAP_COLS
+    c = _db_conn()
+    existing_dates = {
+        row[0] for row in c.execute("SELECT snapshot_date FROM daily_snapshots").fetchall()
+    }
+    count = 0
+    for day, bal in by_day.items():
+        if day in existing_dates:
+            continue  # don't overwrite live-API snapshots with EUR-wallet-only data
+        try:
+            upsert_daily_snapshot({"snapshot_date": day, "eur_balance": round(bal, 2)})
+            count += 1
+        except Exception:
+            pass
+    c.close()
+    return count
+
+
 def _run_kraken_sync(account: str, api_key: str, api_secret: str, last_fill_time):
     _kraken_sync_status[account] = {"running": True}
     try:
@@ -1046,6 +1549,7 @@ def _run_kraken_sync(account: str, api_key: str, api_secret: str, last_fill_time
             db_transfer_fn=upsert_transfer,
             last_fill_time=last_fill_time,
         )
+        result.pop("eur_timeline", None)
         result["running"] = False
         _kraken_sync_status[account] = result
     except Exception as e:
@@ -1134,6 +1638,151 @@ def patch_config(data: ConfigUpdate):
     return upsert_lens_config(updates)
 
 
+# ─── Balance snapshot (all accounts → daily_snapshots) ───────────────────────
+
+def _fetch_all_balances() -> dict:
+    """Fetch live equity from every configured account, return per-account breakdown + total."""
+    from datetime import timezone
+    results = {}
+    total_eur = 0.0
+    total_unrealized = 0.0
+
+    for account in ("personal", "biz"):
+        try:
+            key, secret = kraken_sync.get_api_keys(account)
+            b = kraken_sync.fetch_live_balance(key, secret)
+            results[f"kraken_{account}"] = b
+            total_eur        += b.get("eur_balance", 0.0)
+            total_unrealized += b.get("unrealized_pnl", 0.0)
+        except Exception as e:
+            results[f"kraken_{account}"] = {"eur_balance": 0.0, "error": str(e)}
+
+    for account in ("personal", "biz"):
+        try:
+            key, secret = bybit_sync.get_api_keys(account)
+            b = bybit_sync.fetch_live_balance(key, secret)
+            results[f"bybit_{account}"] = b
+            total_eur        += b.get("eur_balance", 0.0)
+            total_unrealized += b.get("unrealized_pnl", 0.0)
+        except Exception as e:
+            results[f"bybit_{account}"] = {"eur_balance": 0.0, "error": str(e)}
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    upsert_daily_snapshot({
+        "snapshot_date":  today,
+        "eur_balance":    round(total_eur, 2),
+        "unrealized_pnl": round(total_unrealized, 2),
+    })
+    results["total_eur"]        = round(total_eur, 2)
+    results["unrealized_pnl"]   = round(total_unrealized, 2)
+    results["snapshot_date"]    = today
+    return results
+
+
+@app.post("/api/snapshot/balance")
+def snapshot_balance():
+    """Fetch live equity from all configured accounts and upsert today's daily_snapshot."""
+    return _fetch_all_balances()
+
+
+# ─── Projection plans ─────────────────────────────────────────────────────────
+
+class ProjectionPlanCreate(BaseModel):
+    label:           str            = ""
+    start_bal:       float
+    stop_pct:        float
+    tp_pct:          float
+    leverage:        float
+    win_rate:        float
+    tpw:             float
+    weeks:           float
+    btc_price:       float
+    fee_rt:          float
+    p50_final:       Optional[float] = None
+    plan_start_date: Optional[str]   = None
+    curve_json:      Optional[str]   = None
+
+
+class ProjectionPlanUpdate(BaseModel):
+    label:           Optional[str] = None
+    status:          Optional[str] = None   # active|paused|completed
+    plan_start_date: Optional[str] = None
+    curve_json:      Optional[str] = None
+
+
+class ActualCreate(BaseModel):
+    date:    str
+    balance: float
+    note:    Optional[str] = None
+
+
+def _plan_with_actuals(plan: dict) -> dict:
+    if not plan:
+        return plan
+    plan["actuals"] = get_projection_actuals(plan["id"])
+    return plan
+
+
+@app.post("/api/projections", status_code=201)
+def create_projection(data: ProjectionPlanCreate):
+    plan = save_projection_plan(data.model_dump())
+    return _plan_with_actuals(plan)
+
+
+@app.get("/api/projections")
+def list_projections():
+    plans = get_projection_plans()
+    for p in plans:
+        if p.get("status") in ("active", None, "paused"):
+            autofill_projection_actuals(p["id"])
+    plans = get_projection_plans()
+    return {"plans": [_plan_with_actuals(p) for p in plans]}
+
+
+@app.patch("/api/projections/{plan_id}")
+def update_projection(plan_id: int, data: ProjectionPlanUpdate):
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    plan = update_projection_plan(plan_id, updates)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return _plan_with_actuals(plan)
+
+
+@app.delete("/api/projections/{plan_id}", status_code=204)
+def remove_projection(plan_id: int):
+    if not delete_projection_plan(plan_id):
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+
+@app.post("/api/projections/{plan_id}/actuals", status_code=201)
+def add_actual(plan_id: int, data: ActualCreate):
+    if not get_projection_plan(plan_id):
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return add_projection_actual(plan_id, data.date, data.balance, data.note)
+
+
+@app.get("/api/projections/{plan_id}/actuals")
+def list_actuals(plan_id: int):
+    if not get_projection_plan(plan_id):
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return {"actuals": get_projection_actuals(plan_id)}
+
+
+@app.delete("/api/projections/{plan_id}/actuals/{actual_id}", status_code=204)
+def remove_actual(plan_id: int, actual_id: int):
+    if not delete_projection_actual(actual_id):
+        raise HTTPException(status_code=404, detail="Actual not found")
+
+
+@app.post("/api/projections/{plan_id}/actuals/autofill")
+def autofill_actuals(plan_id: int):
+    if not get_projection_plan(plan_id):
+        raise HTTPException(status_code=404, detail="Plan not found")
+    added = autofill_projection_actuals(plan_id)
+    plan = _plan_with_actuals(get_projection_plan(plan_id))
+    return {"added": added, "plan": plan}
+
+
 # ─── Signals (week 3 wires the real ingestion path; endpoint exists now) ──────
 
 @app.post("/api/signals", response_model=SignalResponse, status_code=201)
@@ -1198,3 +1847,675 @@ def expire_stale(older_than_minutes: int = Query(30, ge=1, le=10080)):
     """Mark pending signals older than N minutes as 'expired'. Week 4 cron target."""
     n = expire_stale_signals(older_than_minutes=older_than_minutes)
     return {"expired": n}
+
+
+# ─── Signals / Conviction page ───────────────────────────────────────────────
+
+@app.get("/signals", response_class=HTMLResponse)
+def signals_page():
+    from datetime import date, datetime, timezone
+    all_sigs   = get_signals(limit=5000)
+    pending    = [s for s in all_sigs if s["status"] == "pending"]
+    now        = datetime.now(timezone.utc)
+    month_key  = (now.year, now.month)
+
+    approved_this_month = [
+        s for s in all_sigs
+        if s["status"] == "approved"
+        and s.get("decided_at")
+        and datetime.fromisoformat(s["decided_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc).year  == month_key[0]
+        and datetime.fromisoformat(s["decided_at"].replace("Z", "+00:00")).replace(tzinfo=timezone.utc).month == month_key[1]
+    ]
+
+    MONTHLY_TARGET = 13   # minimum needed to hit goal — no hard cap, more = better
+    used  = len(approved_this_month)
+    left  = max(0, MONTHLY_TARGET - used)  # remaining to minimum, not a limit
+    pct   = min(100, round(used / MONTHLY_TARGET * 100))
+
+    # Goal math
+    START_EUR   = 637
+    GOAL_EUR    = 375_000
+    WIN_PCT     = 0.37    # +37% per win at 10x 4R 0.15% fee
+    LOSS_PCT    = 0.13    # -13% per loss
+    CONV_WR     = 0.532   # PRISM conviction WR
+
+    def project_month(n_trades: int, start: float) -> float:
+        ev = CONV_WR * WIN_PCT - (1 - CONV_WR) * LOSS_PCT
+        eq = start
+        for _ in range(n_trades):
+            eq *= (1 + ev)
+        return eq
+
+    m1 = project_month(MONTHLY_TARGET, START_EUR)
+    m2 = project_month(MONTHLY_TARGET, m1)
+    m3 = project_month(MONTHLY_TARGET, m2)
+    m4 = project_month(MONTHLY_TARGET, m3)
+
+    # Build pending signal cards
+    def fmt_signal_card(s: dict) -> str:
+        sid   = s["signal_id"]
+        strat = s.get("strategy_name", "")
+        sym   = s.get("symbol", "BTC")
+        dirn  = (s.get("direction") or "?").upper()
+        sess  = s.get("session_utc") or "—"
+        htf   = s.get("htf_bias") or "—"
+        trig  = s.get("trigger_type") or strat
+        ep    = s.get("entry_price") or 0
+        sp    = s.get("stop_price") or 0
+        tp    = s.get("target_price") or 0
+        rr    = s.get("expected_rr") or 0
+        recv  = s.get("received_at") or ""
+        rsi   = s.get("atr_14d_pct")  # reuse field if rsi passed here
+        # Parse received_at for age display
+        try:
+            rt   = datetime.fromisoformat(recv.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
+            age_min = int((now - rt).total_seconds() / 60)
+            age_str = f"{age_min}m ago" if age_min < 60 else f"{age_min//60}h ago"
+        except Exception:
+            age_str = recv[:16] if recv else "?"
+
+        dir_col  = "#38c068" if dirn == "LONG" else "#e8445a"
+        htf_col  = "#38c068" if "bull" in (htf or "") else "#e8445a" if "bear" in (htf or "") else "#72728a"
+
+        # Pre-check what discipline already validated
+        auto_sat  = "✓" if (now.weekday() != 5) else "✗"
+        auto_htf  = "✓" if "bull" in (htf or "") or "bear" in (htf or "") else "?"
+        auto_sess = "✓" if sess in ("asia", "london") else "⚠"
+
+        return f"""
+<div class="sig-card" id="sig-{sid}">
+  <div class="sig-top">
+    <span class="sig-dir" style="color:{dir_col}">{dirn}</span>
+    <span class="sig-sym">{sym}</span>
+    <span class="sig-strat">{strat}</span>
+    <span class="sig-age">{age_str}</span>
+    <span class="sig-sess" title="session">{sess.upper()}</span>
+  </div>
+  <div class="sig-prices">
+    <div class="sig-px"><span class="px-lbl">Entry</span><span class="px-val">${ep:,.0f}</span></div>
+    <div class="sig-px"><span class="px-lbl">Stop</span><span class="px-val" style="color:#e8445a">${sp:,.0f}</span></div>
+    <div class="sig-px"><span class="px-lbl">Target</span><span class="px-val" style="color:#38c068">${tp:,.0f}</span></div>
+    <div class="sig-px"><span class="px-lbl">R:R</span><span class="px-val">{rr}×</span></div>
+    <div class="sig-px"><span class="px-lbl">HTF</span><span class="px-val" style="color:{htf_col}">{(htf or '—').upper()}</span></div>
+    <div class="sig-px"><span class="px-lbl">Trigger</span><span class="px-val" style="font-size:10px">{trig}</span></div>
+  </div>
+  <div class="checklist">
+    <div class="ck-title">Conviction checklist — tick all 5 before approving</div>
+    <label class="ck-row"><input type="checkbox" class="ck" data-sid="{sid}" name="trend"> {auto_htf} 4H trend aligned (EMA21 &gt; EMA50)</label>
+    <label class="ck-row"><input type="checkbox" class="ck" data-sid="{sid}" name="daily"> {auto_htf} Daily gate (daily close &gt; daily EMA50)</label>
+    <label class="ck-row"><input type="checkbox" class="ck" data-sid="{sid}" name="nosat"> {auto_sat} Not Saturday</label>
+    <label class="ck-row"><input type="checkbox" class="ck" data-sid="{sid}" name="hold"> ○ Planning to hold ≥ 60 min (not scalping)</label>
+    <label class="ck-row"><input type="checkbox" class="ck" data-sid="{sid}" name="conviction"> ○ This is an A+ conviction setup (not FOMO)</label>
+  </div>
+  <div class="sig-conviction">
+    <span class="cv-lbl">Conviction score</span>
+    <div class="cv-stars" id="stars-{sid}">
+      <button class="star" data-sid="{sid}" data-v="1" onclick="setStar('{sid}',1)">1</button>
+      <button class="star" data-sid="{sid}" data-v="2" onclick="setStar('{sid}',2)">2</button>
+      <button class="star" data-sid="{sid}" data-v="3" onclick="setStar('{sid}',3)">3</button>
+      <button class="star" data-sid="{sid}" data-v="4" onclick="setStar('{sid}',4)">4</button>
+      <button class="star" data-sid="{sid}" data-v="5" onclick="setStar('{sid}',5)">5</button>
+    </div>
+  </div>
+  <div class="sig-actions">
+    <button class="btn-approve" onclick="decide('{sid}','approved')" disabled id="approve-{sid}">APPROVE</button>
+    <button class="btn-skip"    onclick="decide('{sid}','rejected')">SKIP</button>
+  </div>
+</div>"""
+
+    pending_html = "".join(fmt_signal_card(s) for s in pending) if pending else """
+<div class="empty-state">
+  <div class="es-icon">—</div>
+  <div class="es-text">No pending signals</div>
+  <div class="es-sub">Wire up the Pine Script alert to POST to /api/signals.<br>
+  Or submit a manual signal below.</div>
+</div>"""
+
+    # Recent signals (last 20 decided)
+    recent = [s for s in all_sigs if s["status"] in ("approved", "rejected", "expired")][-20:]
+    def status_chip(s: str) -> str:
+        cols = {"approved": "#38c068", "rejected": "#e8445a", "expired": "#5a5a80"}
+        color = cols.get(s, "#72728a")
+        return f'<span style="color:{color};font-size:10px">{s.upper()}</span>'
+    recent_rows = "".join(
+        f'<tr><td>{r.get("received_at","")[:16]}</td>'
+        f'<td>{r.get("symbol","")}</td>'
+        f'<td>{(r.get("direction") or "?").upper()}</td>'
+        f'<td>{r.get("strategy_name","")}</td>'
+        f'<td>{status_chip(r["status"])}</td>'
+        f'<td style="color:#72728a">{r.get("rejection_reason") or r.get("your_conviction") or "—"}</td></tr>'
+        for r in reversed(recent)
+    ) or "<tr><td colspan=6 style='opacity:.4'>no history yet</td></tr>"
+
+    month_name = now.strftime("%b %Y")
+    pace_color = "#38c068" if used <= MONTHLY_TARGET else "#e8445a"
+
+    return HTMLResponse(f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>LENS — Signals</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+:root{{
+  --bg:#08080a;--s1:#0f0f12;--s2:#141418;--s3:#1c1c22;
+  --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
+  --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
+  --ac:#5b8ef7;--adim:#121c36;
+  --gr:#38c068;--re:#e8445a;--am:#e8a23d;
+  --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
+  --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}}
+body{{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}}
+.app{{max-width:960px;margin:0 auto;padding:0 20px 60px}}
+a{{color:var(--ac);text-decoration:none}}
+.topbar{{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:24px}}
+.brand-name{{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}}
+.brand-name b{{color:var(--ac)}}
+.topnav{{display:flex;gap:2px}}
+.topnav a{{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}}
+.topnav a:hover{{color:var(--t1);background:var(--s2)}}
+.topnav a.cur{{color:var(--ac);background:var(--adim)}}
+
+/* pace bar */
+.pace-bar{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:18px 22px;margin-bottom:14px}}
+.pace-row{{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}}
+.pace-count{{font-family:var(--mono);font-size:28px;font-weight:700;color:{pace_color}}}
+.pace-label{{font-size:11px;color:var(--t2)}}
+.pace-month{{font-size:11px;color:var(--t3)}}
+.pace-track{{background:var(--b1);border-radius:4px;height:6px;overflow:hidden}}
+.pace-fill{{background:{pace_color};height:6px;border-radius:4px;width:{pct}%;transition:width .3s}}
+
+/* goal projector */
+.goal-box{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 22px;margin-bottom:14px}}
+.goal-title{{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--t3);margin-bottom:10px}}
+.goal-months{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}}
+.goal-mo{{background:var(--bg);border:1px solid var(--b2);border-radius:6px;padding:10px 12px;text-align:center}}
+.goal-mo-lbl{{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
+.goal-mo-val{{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--t1)}}
+.goal-mo-val.hit{{color:var(--gr)}}
+.goal-note{{font-size:10px;color:var(--t3);margin-top:10px}}
+
+/* signal cards */
+.sec-hd{{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--t3);margin-bottom:10px}}
+.sig-card{{background:var(--s1);border:1px solid var(--b2);border-radius:10px;padding:18px 20px;margin-bottom:12px}}
+.sig-top{{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}}
+.sig-dir{{font-family:var(--mono);font-size:20px;font-weight:700}}
+.sig-sym{{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--t1)}}
+.sig-strat{{font-size:10px;color:var(--t2);background:var(--s3);padding:2px 7px;border-radius:4px}}
+.sig-age{{font-size:10px;color:var(--t3);margin-left:auto}}
+.sig-sess{{font-size:10px;color:var(--ac);background:var(--adim);padding:2px 7px;border-radius:4px}}
+.sig-prices{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}}
+@media(max-width:600px){{.sig-prices{{grid-template-columns:repeat(3,1fr)}}}}
+.sig-px{{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:8px 10px}}
+.px-lbl{{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:3px}}
+.px-val{{font-family:var(--mono);font-size:13px;font-weight:600}}
+.checklist{{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:12px 14px;margin-bottom:12px}}
+.ck-title{{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);margin-bottom:8px}}
+.ck-row{{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer;user-select:none}}
+.ck-row input{{accent-color:var(--ac);width:14px;height:14px}}
+.sig-conviction{{display:flex;align-items:center;gap:12px;margin-bottom:12px}}
+.cv-lbl{{font-size:10px;color:var(--t3);white-space:nowrap}}
+.cv-stars{{display:flex;gap:4px}}
+.star{{background:var(--s3);border:1px solid var(--b2);color:var(--t3);border-radius:4px;width:28px;height:28px;font-size:12px;cursor:pointer;transition:all .12s}}
+.star.active{{background:var(--am);border-color:var(--am);color:#000;font-weight:700}}
+.sig-actions{{display:flex;gap:10px}}
+.btn-approve{{background:var(--gr);border:none;color:#000;font-weight:700;font-size:13px;padding:9px 22px;border-radius:7px;cursor:pointer;transition:opacity .12s}}
+.btn-approve:disabled{{opacity:.35;cursor:default}}
+.btn-approve:not(:disabled):hover{{opacity:.85}}
+.btn-skip{{background:var(--s3);border:1px solid var(--b2);color:var(--t2);font-size:13px;padding:9px 18px;border-radius:7px;cursor:pointer}}
+.btn-skip:hover{{color:var(--t1);border-color:var(--b3)}}
+.empty-state{{text-align:center;padding:48px 20px;color:var(--t3)}}
+.es-icon{{font-size:32px;margin-bottom:12px}}
+.es-text{{font-size:16px;font-weight:600;color:var(--t2);margin-bottom:6px}}
+.es-sub{{font-size:12px;line-height:1.7}}
+table{{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)}}
+th{{text-align:left;color:var(--t3);font-size:9px;text-transform:uppercase;letter-spacing:.1em;padding:0 0 8px;border-bottom:1px solid var(--b1)}}
+td{{padding:7px 0;border-bottom:1px solid var(--b1);color:var(--t2)}}
+.manual-box{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 20px;margin-top:14px}}
+.manual-row{{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end}}
+@media(max-width:600px){{.manual-row{{grid-template-columns:1fr 1fr}}}}
+.field{{display:flex;flex-direction:column;gap:4px}}
+.field label{{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em}}
+.field input,.field select{{background:var(--bg);border:1px solid var(--b2);color:var(--t1);border-radius:5px;padding:7px 10px;font-size:12px;font-family:var(--mono)}}
+.btn-submit{{background:var(--ac);border:none;color:#fff;font-weight:700;padding:9px 18px;border-radius:6px;cursor:pointer;white-space:nowrap}}
+.toast{{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#1a1a2e;border:1px solid var(--ac);border-radius:8px;padding:10px 20px;font-size:12px;color:var(--t1);opacity:0;transition:all .3s;pointer-events:none;z-index:999}}
+.toast.show{{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body><div class="app">
+
+<div class="topbar">
+  <div class="brand-name"><b>L</b>ENS</div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a>
+    <a href="/signals" class="cur">Signals</a>
+    <a href="/projection">Projection</a>
+    <a href="/backtest">Backtest</a>
+  </nav>
+</div>
+
+<!-- Monthly pace -->
+<div class="pace-bar">
+  <div class="pace-row">
+    <div>
+      <div class="pace-count">{used} <span style="font-size:14px;color:var(--t3)">approved</span></div>
+      <div class="pace-label">conviction trades this month — {month_name}</div>
+    </div>
+    <div class="pace-month">{left} to minimum · no cap — more = better</div>
+  </div>
+  <div class="pace-track"><div class="pace-fill"></div></div>
+</div>
+
+<!-- Goal projector -->
+<div class="goal-box">
+  <div class="goal-title">Goal path at {CONV_WR*100:.0f}% WR — minimum {MONTHLY_TARGET} conviction trades/month (more trades = faster)</div>
+  <div class="goal-months">
+    <div class="goal-mo"><div class="goal-mo-lbl">Month 1</div><div class="goal-mo-val">€{m1:,.0f}</div></div>
+    <div class="goal-mo"><div class="goal-mo-lbl">Month 2</div><div class="goal-mo-val">€{m2:,.0f}</div></div>
+    <div class="goal-mo"><div class="goal-mo-lbl">Month 3</div><div class="goal-mo-val">€{m3:,.0f}</div></div>
+    <div class="goal-mo"><div class="goal-mo-lbl">Month 4</div><div class="goal-mo-val {'hit' if m4 >= GOAL_EUR else ''}">€{m4:,.0f}</div></div>
+  </div>
+  <div class="goal-note">Conviction = Kraken · not Saturday · hold ≥ 60 min · size 10x · feels A+. Win=+37%, Loss=−13%.</div>
+  <div style="margin-top:12px">
+    <div class="goal-title" style="margin-bottom:8px">What if you trade more? (at same 53% WR)</div>
+    <div class="goal-months">
+      <div class="goal-mo"><div class="goal-mo-lbl">10/mo × 4mo</div><div class="goal-mo-val">€104k</div></div>
+      <div class="goal-mo"><div class="goal-mo-lbl">13/mo × 4mo</div><div class="goal-mo-val hit">€482k ✓</div></div>
+      <div class="goal-mo"><div class="goal-mo-lbl">20/mo × 4mo</div><div class="goal-mo-val hit">€17M</div></div>
+      <div class="goal-mo"><div class="goal-mo-lbl">30/mo × 4mo</div><div class="goal-mo-val hit">€2.8B</div></div>
+    </div>
+    <div class="goal-note" style="color:#e8a23d">⚠ These numbers ONLY hold at 53% WR. Drop to 40% WR = €21k at 13/mo. The checklist IS the strategy.</div>
+  </div>
+</div>
+
+<!-- Pending signals -->
+<div class="sec-hd">Pending signals ({len(pending)})</div>
+{pending_html}
+
+<!-- Manual signal entry -->
+<div class="manual-box">
+  <div class="sec-hd" style="margin-bottom:12px">Log a manual setup</div>
+  <div class="manual-row">
+    <div class="field"><label>Direction</label><select id="m-dir" onchange="calcLevels()"><option value="long">Long ↑</option><option value="short">Short ↓</option></select></div>
+    <div class="field"><label>Entry price $</label><input id="m-entry" type="number" placeholder="98500" oninput="calcLevels()"></div>
+    <button class="btn-submit" onclick="submitManual()">Log signal →</button>
+  </div>
+  <div id="calc-preview" style="display:none;background:var(--bg);border:1px solid var(--b2);border-radius:6px;padding:12px 14px;margin-top:8px">
+    <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);margin-bottom:10px">Set these exact levels on Kraken</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div>
+        <div style="font-size:9px;color:var(--t3);margin-bottom:3px">ENTRY (market/limit)</div>
+        <div id="c-entry" style="font-family:var(--mono);font-size:18px;font-weight:700;color:#fff"></div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#e8445a;margin-bottom:3px">STOP LOSS (−1%)</div>
+        <div id="c-stop" style="font-family:var(--mono);font-size:18px;font-weight:700;color:#e8445a"></div>
+        <div id="c-stop-loss" style="font-size:10px;color:#e8445a;margin-top:2px"></div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#38c068;margin-bottom:3px">TAKE PROFIT (+4%)</div>
+        <div id="c-tp" style="font-family:var(--mono);font-size:18px;font-weight:700;color:#38c068"></div>
+        <div id="c-tp-gain" style="font-size:10px;color:#38c068;margin-top:2px"></div>
+      </div>
+    </div>
+    <div id="c-note" style="font-size:10px;color:var(--t3);margin-top:10px;border-top:1px solid var(--b1);padding-top:8px"></div>
+  </div>
+</div>
+
+<!-- Recent history -->
+<div class="sec-hd" style="margin-top:24px;margin-bottom:10px">Recent signal history</div>
+<table>
+  <thead><tr><th>Received</th><th>Symbol</th><th>Dir</th><th>Strategy</th><th>Status</th><th>Note</th></tr></thead>
+  <tbody id="recent-body">{recent_rows}</tbody>
+</table>
+
+<div class="toast" id="toast"></div>
+</div>
+
+<script>
+const convictions = {{}};
+
+function setStar(sid, v) {{
+  convictions[sid] = v;
+  const stars = document.querySelectorAll(`[data-sid="${{sid}}"].star`);
+  stars.forEach(s => s.classList.toggle('active', parseInt(s.dataset.v) <= v));
+  checkCanApprove(sid);
+}}
+
+function checkCanApprove(sid) {{
+  const checks = document.querySelectorAll(`.ck[data-sid="${{sid}}"]`);
+  const allChecked = Array.from(checks).every(c => c.checked);
+  const hasConviction = (convictions[sid] || 0) >= 3;
+  const btn = document.getElementById(`approve-${{sid}}`);
+  if (btn) btn.disabled = !(allChecked && hasConviction);
+}}
+
+document.querySelectorAll('.ck').forEach(c => {{
+  c.addEventListener('change', () => checkCanApprove(c.dataset.sid));
+}});
+
+async function decide(sid, status) {{
+  const cv = convictions[sid] || null;
+  const reason = status === 'rejected' ? 'user_skip' : null;
+  const res = await fetch(`/api/signals/${{sid}}/decide`, {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{ status, your_conviction: cv, rejection_reason: reason }})
+  }});
+  if (res.ok) {{
+    const card = document.getElementById(`sig-${{sid}}`);
+    if (card) {{
+      card.style.opacity = '0.4';
+      card.style.pointerEvents = 'none';
+      setTimeout(() => card.remove(), 400);
+    }}
+    showToast(status === 'approved' ? '✓ Trade approved — execute on Kraken' : '✗ Signal skipped');
+    if (status === 'approved') {{
+      // bump pace counter
+      const el = document.querySelector('.pace-count');
+      if (el) {{
+        const n = parseInt(el.textContent) + 1;
+        el.innerHTML = n + ' <span style="font-size:14px;color:var(--t3)">/ {MONTHLY_TARGET}</span>';
+      }}
+    }}
+  }} else {{
+    showToast('Error: ' + res.status);
+  }}
+}}
+
+const STOP_PCT  = 0.01;   // 1% stop
+const TP_PCT    = 0.04;   // 4% target
+const LEVERAGE  = 10;
+const WIN_ACCT  = 0.37;   // +37% account per win after fees
+const LOSS_ACCT = 0.13;   // -13% account per loss after fees
+
+function calcLevels() {{
+  const ep  = parseFloat(document.getElementById('m-entry').value) || 0;
+  const dir = document.getElementById('m-dir').value;
+  if (!ep) {{ document.getElementById('calc-preview').style.display='none'; return; }}
+
+  const isLong = dir === 'long';
+  const stop = isLong ? ep * (1 - STOP_PCT) : ep * (1 + STOP_PCT);
+  const tp   = isLong ? ep * (1 + TP_PCT)   : ep * (1 - TP_PCT);
+
+  const fmt = v => '$' + v.toLocaleString('en-US', {{minimumFractionDigits:0, maximumFractionDigits:0}});
+
+  document.getElementById('c-entry').textContent = fmt(ep);
+  document.getElementById('c-stop').textContent  = fmt(stop);
+  document.getElementById('c-tp').textContent    = fmt(tp);
+  document.getElementById('c-stop-loss').textContent  = '-' + (STOP_PCT*100).toFixed(0) + '% price → -' + (LOSS_ACCT*100).toFixed(0) + '% account';
+  document.getElementById('c-tp-gain').textContent    = '+' + (TP_PCT*100).toFixed(0) + '% price → +' + (WIN_ACCT*100).toFixed(0) + '% account';
+  document.getElementById('c-note').textContent = 'Leverage: ' + LEVERAGE + 'x · Size: full account · After fees: win +' + (WIN_ACCT*100).toFixed(0) + '% / loss -' + (LOSS_ACCT*100).toFixed(0) + '% · R:R 4:1';
+  document.getElementById('calc-preview').style.display = 'block';
+}}
+
+async function submitManual() {{
+  const dir = document.getElementById('m-dir').value;
+  const ep  = parseFloat(document.getElementById('m-entry').value) || 0;
+  if (!ep) {{ showToast('Enter a price first'); return; }}
+  const isLong = dir === 'long';
+  const sp = isLong ? ep * (1 - STOP_PCT) : ep * (1 + STOP_PCT);
+  const tp = isLong ? ep * (1 + TP_PCT)   : ep * (1 - TP_PCT);
+  const payload = {{
+    signal_id: 'manual_' + Date.now(),
+    strategy_name: 'MANUAL',
+    strategy_version: 'v1',
+    symbol: 'XBTUSD',
+    venue: 'kraken',
+    direction: dir,
+    entry_price: ep,
+    stop_price: Math.round(sp * 100) / 100,
+    target_price: Math.round(tp * 100) / 100,
+    expected_rr: 4.0,
+    htf_bias: 'manual',
+    session_utc: 'manual',
+    trigger_type: 'manual'
+  }};
+  const res = await fetch('/api/signals', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(payload)
+  }});
+  if (res.ok) {{
+    showToast('Logged — reload to see checklist');
+    document.getElementById('m-entry').value = '';
+    document.getElementById('calc-preview').style.display = 'none';
+  }} else {{
+    const txt = await res.text();
+    showToast('Error: ' + txt.slice(0,80));
+  }}
+}}
+
+function showToast(msg) {{
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}}
+</script>
+</body></html>""")
+
+
+# ─── Backtest ─────────────────────────────────────────────────────────────────
+
+from app.backtest_engine import STRATEGIES as BT_STRATEGIES, run_strategy as _run_strategy
+import threading as _threading
+
+_bt_cache: dict = {}       # name → result
+_bt_running: dict = {}     # name → True/False
+
+
+@app.get("/backtest", response_class=HTMLResponse)
+def backtest_page():
+    strat_opts = "".join(
+        f'<option value="{k}">{k} — {v["description"][:70]}</option>'
+        for k, v in BT_STRATEGIES.items()
+    )
+    return HTMLResponse(f"""<!doctype html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS — Backtest</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0d0d14;color:#c9c9d9;font-family:'Inter',system-ui,sans-serif;font-size:13px;padding:24px}}
+h1{{color:#e2e2f0;font-size:18px;margin-bottom:4px}}
+.sub{{color:#5a5a80;font-size:11px;margin-bottom:24px}}
+select,button{{background:#1a1a2e;border:1px solid #2a2a45;color:#c9c9d9;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer}}
+button.run{{background:#7c3aed;border:none;color:#fff;font-weight:600;padding:9px 22px}}
+button.run:hover{{background:#6d28d9}}
+button.run:disabled{{opacity:.5;cursor:default}}
+.row{{display:flex;gap:12px;align-items:center;margin-bottom:24px}}
+.card{{background:#13131f;border:1px solid #1e1e35;border-radius:8px;padding:16px 20px;margin-bottom:16px}}
+.metrics{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}}
+.metric{{background:#0d0d14;border:1px solid #1e1e35;border-radius:6px;padding:10px 14px}}
+.metric .lbl{{font-size:9px;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}}
+.metric .val{{font-size:20px;font-weight:700;font-family:monospace;color:#e2e2f0}}
+.metric .val.good{{color:#34d399}}.metric .val.bad{{color:#f87171}}.metric .val.warn{{color:#fbbf24}}
+.metric .val.big{{font-size:14px}}
+table{{width:100%;border-collapse:collapse;font-size:11px}}
+th{{padding:6px 10px;text-align:left;font-size:9px;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #1e1e35}}
+td{{padding:6px 10px;border-bottom:1px solid #1a1a2e}}
+.win{{color:#34d399}}.loss{{color:#f87171}}
+#status{{color:#7c3aed;font-size:12px;margin-left:12px}}
+canvas{{width:100%;height:200px;display:block}}
+a.back{{color:#5a5a80;font-size:11px;text-decoration:none;display:inline-block;margin-bottom:18px}}
+a.back:hover{{color:#c9c9d9}}
+</style>
+</head><body>
+<a class="back" href="/">← Dashboard</a>
+<h1>Strategy Backtest</h1>
+<div class="sub">BTC/USDT 4H · Bybit perpetuals · 30 months · €637 initial · 0.15%/side fee</div>
+
+<div class="row">
+  <select id="strat">{strat_opts}</select>
+  <button class="run" id="run-btn" onclick="runBacktest()">▶ Run</button>
+  <span id="status"></span>
+</div>
+
+<div id="results" style="display:none">
+  <div class="card">
+    <div id="strat-name" style="font-size:14px;font-weight:700;color:#e2e2f0;margin-bottom:4px"></div>
+    <div id="strat-desc" style="font-size:11px;color:#5a5a80;margin-bottom:14px"></div>
+    <div class="metrics" id="metrics-grid"></div>
+    <canvas id="eq-chart"></canvas>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;font-weight:600;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Trade Log</div>
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
+    <table>
+      <thead><tr><th>Entry</th><th>Exit</th><th>Dir</th><th>Entry $</th><th>Exit $</th><th>Result</th><th>PnL %</th><th>Hours</th><th>Equity</th></tr></thead>
+      <tbody id="trade-tbody"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function runBacktest() {{
+  var name = document.getElementById('strat').value;
+  var btn  = document.getElementById('run-btn');
+  var stat = document.getElementById('status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running…';
+  stat.textContent = 'Fetching data + running backtest…';
+  document.getElementById('results').style.display = 'none';
+
+  fetch('/api/backtest/run', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{name: name}})
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(d) {{
+    btn.disabled = false; btn.textContent = '▶ Run';
+    if (d.error) {{ stat.textContent = 'Error: ' + d.error; return; }}
+    stat.textContent = '';
+    renderResults(d);
+  }})
+  .catch(function(e) {{ btn.disabled = false; btn.textContent = '▶ Run'; stat.textContent = 'Failed: ' + e; }});
+}}
+
+function metricColor(key, val) {{
+  if (key === 'win_rate') return val >= 48 ? 'good' : val >= 31 ? 'warn' : 'bad';
+  if (key === 'profit_factor') return val >= 1.5 ? 'good' : val >= 1.0 ? 'warn' : 'bad';
+  if (key === 'max_drawdown_pct') return val < 40 ? 'good' : val < 70 ? 'warn' : 'bad';
+  if (key === 'net_pct') return val > 0 ? 'good' : 'bad';
+  return '';
+}}
+
+function renderResults(d) {{
+  document.getElementById('strat-name').textContent = d.strategy;
+  document.getElementById('strat-desc').textContent = d.description;
+
+  var m = d.metrics;
+  var fields = [
+    ['win_rate',          'Win Rate',        m.win_rate + '%',     '≥48% = goal'],
+    ['profit_factor',     'Profit Factor',   m.profit_factor,      '≥1.5 target'],
+    ['n',                 'Trades',          m.n,                  d.months + 'mo'],
+    ['trades_per_week',   'Trades/wk',       m.trades_per_week,    'target 1–5'],
+    ['avg_r',             'Avg R',           m.avg_r,              'target ≥3.5'],
+    ['max_drawdown_pct',  'Max DD',          m.max_drawdown_pct + '%', '<40% safe'],
+    ['max_consec_losses', 'Max Consec Loss', m.max_consec_losses,  'risk of ruin'],
+    ['avg_hours_held',    'Avg Hold (h)',    m.avg_hours_held,     '≥24h = multi-day'],
+    ['net_pct',           'Net Return',      m.net_pct + '%',      d.months + 'mo'],
+    ['final_equity',      'Final €',         '€' + m.final_equity.toLocaleString('en', {{maximumFractionDigits:0}}), 'from €' + m.initial_equity],
+  ];
+  var grid = document.getElementById('metrics-grid');
+  grid.innerHTML = fields.map(function(f) {{
+    var cls = metricColor(f[0], parseFloat(f[2])) + (String(f[2]).length > 8 ? ' big' : '');
+    return '<div class="metric"><div class="lbl">' + f[1] + '</div>' +
+           '<div class="val ' + cls + '">' + f[2] + '</div>' +
+           '<div style="font-size:9px;color:#3a3a55;margin-top:2px">' + f[3] + '</div></div>';
+  }}).join('');
+
+  // Equity curve
+  drawChart(d.equity_curve);
+
+  // Trades
+  var tbody = document.getElementById('trade-tbody');
+  tbody.innerHTML = d.trades.slice().reverse().map(function(t) {{
+    var cls = t.result === 'win' ? 'win' : 'loss';
+    return '<tr>' +
+      '<td>' + t.entry_ts.slice(0,10) + '</td>' +
+      '<td>' + t.exit_ts.slice(0,10)  + '</td>' +
+      '<td>' + t.direction + '</td>' +
+      '<td style="font-family:monospace">$' + t.entry_px.toLocaleString('en') + '</td>' +
+      '<td style="font-family:monospace">$' + t.exit_px.toLocaleString('en') + '</td>' +
+      '<td class="' + cls + '">' + t.result + '</td>' +
+      '<td class="' + cls + '" style="font-family:monospace">' + (t.pnl_pct >= 0 ? '+' : '') + t.pnl_pct + '%</td>' +
+      '<td>' + t.hours_held + 'h</td>' +
+      '<td style="font-family:monospace">€' + t.equity.toLocaleString('en', {{maximumFractionDigits:0}}) + '</td>' +
+    '</tr>';
+  }}).join('');
+
+  document.getElementById('results').style.display = '';
+}}
+
+function drawChart(curve) {{
+  var canvas = document.getElementById('eq-chart');
+  var ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio || 800;
+  canvas.height = 200 * window.devicePixelRatio || 200;
+  ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+  var W = canvas.offsetWidth, H = 200;
+  ctx.clearRect(0,0,W,H);
+
+  var vals = curve.map(function(p) {{ return p.equity; }});
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (mx === mn) return;
+
+  function px(i) {{ return (i / (curve.length-1)) * (W-20) + 10; }}
+  function py(v) {{ return H - 20 - ((v - mn) / (mx - mn)) * (H - 40); }}
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(vals[0]));
+  for (var i=1; i<vals.length; i++) ctx.lineTo(px(i), py(vals[i]));
+  ctx.lineTo(px(vals.length-1), H-20);
+  ctx.lineTo(px(0), H-20);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(124,58,237,0.15)';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 1.5;
+  ctx.moveTo(px(0), py(vals[0]));
+  for (var i=1; i<vals.length; i++) ctx.lineTo(px(i), py(vals[i]));
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#5a5a80'; ctx.font = '10px monospace';
+  ctx.fillText('€' + Math.round(mn).toLocaleString('en'), 10, H-8);
+  ctx.fillText('€' + Math.round(mx).toLocaleString('en'), 10, 14);
+  ctx.fillText(curve[0].date.slice(0,7), 10, H-20);
+  ctx.fillText(curve[curve.length-1].date.slice(0,7), W-60, H-20);
+}}
+</script>
+</body></html>""")
+
+
+class BtRunRequest(BaseModel):
+    name: str = "PULLBACK_4R_v1"
+    months: int = 30
+    initial_capital: float = 637.0
+
+
+@app.post("/api/backtest/run")
+def api_backtest_run(req: BtRunRequest):
+    if req.name not in BT_STRATEGIES:
+        return {"error": f"unknown strategy '{req.name}'. Available: {list(BT_STRATEGIES)}"}
+    try:
+        result = _run_strategy(req.name, months=req.months, initial_capital=req.initial_capital)
+        _bt_cache[req.name] = result
+        return result
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
+
+
+@app.get("/api/backtest/strategies")
+def api_backtest_strategies():
+    return {
+        k: {"description": v["description"], "params": v["params"]}
+        for k, v in BT_STRATEGIES.items()
+    }

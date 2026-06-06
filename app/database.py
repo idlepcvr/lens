@@ -144,6 +144,37 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_signals_received_at   ON signals(received_at);
         CREATE INDEX IF NOT EXISTS idx_signals_symbol        ON signals(symbol);
 
+        -- Projection plans + actuals ─────────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS projection_plans (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            label       TEXT    NOT NULL DEFAULT '',
+            created_at  TEXT    NOT NULL,
+            status      TEXT    NOT NULL DEFAULT 'active',
+            start_bal   REAL    NOT NULL,
+            stop_pct    REAL    NOT NULL,
+            tp_pct      REAL    NOT NULL,
+            leverage    REAL    NOT NULL,
+            win_rate    REAL    NOT NULL,
+            tpw         REAL    NOT NULL,
+            weeks       REAL    NOT NULL,
+            btc_price   REAL    NOT NULL,
+            fee_rt      REAL    NOT NULL,
+            p50_final        REAL,
+            plan_start_date  TEXT,
+            curve_json       TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_proj_plans_created ON projection_plans(created_at);
+
+        CREATE TABLE IF NOT EXISTS projection_actuals (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id     INTEGER NOT NULL REFERENCES projection_plans(id) ON DELETE CASCADE,
+            date        TEXT    NOT NULL,
+            balance     REAL    NOT NULL,
+            note        TEXT,
+            created_at  TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_proj_actuals_plan ON projection_actuals(plan_id);
+
         -- Single-row config (id=1) — drives goal/position calculator defaults
         CREATE TABLE IF NOT EXISTS lens_config (
             id                      INTEGER PRIMARY KEY,
@@ -165,6 +196,14 @@ def init_db():
             updated_at              TEXT
         );
     """)
+
+    # Migrations — add columns that may not exist on older DBs
+    existing_cols = {row[1] for row in c.execute("PRAGMA table_info(projection_plans)").fetchall()}
+    if "plan_start_date" not in existing_cols:
+        c.execute("ALTER TABLE projection_plans ADD COLUMN plan_start_date TEXT")
+    if "curve_json" not in existing_cols:
+        c.execute("ALTER TABLE projection_plans ADD COLUMN curve_json TEXT")
+    c.commit()
 
     # Seed default config row on first init
     row = c.execute("SELECT id FROM lens_config WHERE id = 1").fetchone()
@@ -620,6 +659,176 @@ def upsert_lens_config(updates: dict) -> dict:
     row = c.execute("SELECT * FROM lens_config WHERE id = 1").fetchone()
     c.close()
     return _row_to_dict(row)
+
+
+# ─── Projection plans ─────────────────────────────────────────────────────────
+
+def save_projection_plan(params: dict) -> dict:
+    now = datetime.utcnow().isoformat()
+    c = _conn()
+    cur = c.execute(
+        """INSERT INTO projection_plans
+           (label, created_at, status, start_bal, stop_pct, tp_pct,
+            leverage, win_rate, tpw, weeks, btc_price, fee_rt, p50_final, plan_start_date, curve_json)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            params.get("label", ""),
+            now,
+            params["start_bal"], params["stop_pct"], params["tp_pct"],
+            params["leverage"], params["win_rate"], params["tpw"],
+            params["weeks"], params["btc_price"], params["fee_rt"],
+            params.get("p50_final"),
+            params.get("plan_start_date"),
+            params.get("curve_json"),
+        ),
+    )
+    c.commit()
+    row = c.execute("SELECT * FROM projection_plans WHERE id = ?", (cur.lastrowid,)).fetchone()
+    c.close()
+    return _row_to_dict(row)
+
+
+def get_projection_plans() -> list[dict]:
+    c = _conn()
+    rows = c.execute(
+        "SELECT * FROM projection_plans ORDER BY created_at DESC"
+    ).fetchall()
+    c.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_projection_plan(plan_id: int) -> Optional[dict]:
+    c = _conn()
+    row = c.execute("SELECT * FROM projection_plans WHERE id = ?", (plan_id,)).fetchone()
+    c.close()
+    return _row_to_dict(row) if row else None
+
+
+def update_projection_plan(plan_id: int, updates: dict) -> Optional[dict]:
+    allowed = {"label", "status", "plan_start_date", "curve_json"}
+    payload = {k: v for k, v in updates.items() if k in allowed}
+    if not payload:
+        return get_projection_plan(plan_id)
+    set_clause = ", ".join(f"{k} = ?" for k in payload)
+    c = _conn()
+    c.execute(
+        f"UPDATE projection_plans SET {set_clause} WHERE id = ?",
+        list(payload.values()) + [plan_id],
+    )
+    c.commit()
+    row = c.execute("SELECT * FROM projection_plans WHERE id = ?", (plan_id,)).fetchone()
+    c.close()
+    return _row_to_dict(row) if row else None
+
+
+def delete_projection_plan(plan_id: int) -> bool:
+    c = _conn()
+    cur = c.execute("DELETE FROM projection_plans WHERE id = ?", (plan_id,))
+    c.commit()
+    c.close()
+    return cur.rowcount > 0
+
+
+# ─── Projection actuals ────────────────────────────────────────────────────────
+
+def add_projection_actual(plan_id: int, date: str, balance: float, note: Optional[str]) -> dict:
+    now = datetime.utcnow().isoformat()
+    c = _conn()
+    cur = c.execute(
+        "INSERT INTO projection_actuals (plan_id, date, balance, note, created_at) VALUES (?, ?, ?, ?, ?)",
+        (plan_id, date, balance, note, now),
+    )
+    c.commit()
+    row = c.execute("SELECT * FROM projection_actuals WHERE id = ?", (cur.lastrowid,)).fetchone()
+    c.close()
+    return _row_to_dict(row)
+
+
+def get_projection_actuals(plan_id: int) -> list[dict]:
+    c = _conn()
+    rows = c.execute(
+        "SELECT * FROM projection_actuals WHERE plan_id = ? ORDER BY date ASC",
+        (plan_id,),
+    ).fetchall()
+    c.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def delete_projection_actual(actual_id: int) -> bool:
+    c = _conn()
+    cur = c.execute("DELETE FROM projection_actuals WHERE id = ?", (actual_id,))
+    c.commit()
+    c.close()
+    return cur.rowcount > 0
+
+
+def autofill_projection_actuals(plan_id: int) -> int:
+    """Pull daily_snapshots with eur_balance >= plan.created_at date and insert as actuals.
+    Skips dates already present. Returns count of new rows inserted."""
+    c = _conn()
+    plan = c.execute("SELECT created_at, plan_start_date FROM projection_plans WHERE id = ?", (plan_id,)).fetchone()
+    if not plan:
+        c.close()
+        return 0
+    since = plan["plan_start_date"] or plan["created_at"][:10]  # YYYY-MM-DD
+    existing = {
+        row["date"]
+        for row in c.execute(
+            "SELECT date FROM projection_actuals WHERE plan_id = ?", (plan_id,)
+        ).fetchall()
+    }
+    snapshots = c.execute(
+        "SELECT snapshot_date, eur_balance FROM daily_snapshots "
+        "WHERE snapshot_date >= ? AND eur_balance IS NOT NULL ORDER BY snapshot_date ASC",
+        (since,),
+    ).fetchall()
+    now = datetime.utcnow().isoformat()
+    count = 0
+    for row in snapshots:
+        d = row["snapshot_date"]
+        if d in existing:
+            continue
+        c.execute(
+            "INSERT INTO projection_actuals (plan_id, date, balance, note, created_at) VALUES (?, ?, ?, ?, ?)",
+            (plan_id, d, row["eur_balance"], "auto: daily snapshot", now),
+        )
+        count += 1
+    c.commit()
+    c.close()
+    return count
+
+
+def get_actual_stats() -> dict:
+    """Live trading stats for the projection feedback loop."""
+    c = _conn()
+    row = c.execute('''
+        SELECT
+            COUNT(*)                                              AS total_trades,
+            SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END)            AS wins,
+            SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END)            AS losses,
+            ROUND(AVG(CASE WHEN pnl > 0 THEN pnl END), 2)       AS avg_win_eur,
+            ROUND(AVG(CASE WHEN pnl < 0 THEN pnl END), 2)       AS avg_loss_eur,
+            ROUND(SUM(CASE WHEN pnl IS NOT NULL THEN pnl ELSE 0 END), 2) AS total_pnl
+        FROM trades WHERE closed_at IS NOT NULL AND pnl IS NOT NULL
+    ''').fetchone()
+    snap = c.execute(
+        'SELECT eur_balance, snapshot_date FROM daily_snapshots ORDER BY snapshot_date DESC LIMIT 1'
+    ).fetchone()
+    c.close()
+
+    total = row['total_trades'] or 0
+    wins  = row['wins']  or 0
+    return {
+        'total_trades':    total,
+        'wins':            wins,
+        'losses':          row['losses'] or 0,
+        'actual_wr':       round(wins / total * 100, 1) if total > 0 else None,
+        'avg_win_eur':     row['avg_win_eur'],
+        'avg_loss_eur':    row['avg_loss_eur'],
+        'total_pnl':       row['total_pnl'],
+        'current_balance': snap['eur_balance']    if snap else None,
+        'balance_date':    snap['snapshot_date']  if snap else None,
+    }
 
 
 def expire_stale_signals(older_than_minutes: int = 30) -> int:
