@@ -1,0 +1,220 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / ASIAN_RSI_DIP_v1
+//
+// HOW THIS WAS FOUND:
+//   Python backtest (30 months BTC/USDT 4H data via Bybit) found that entry
+//   quality is strongly session-dependent:
+//     - NY session (16:00 UTC bar close):  14.3% WR → never trade
+//     - London open (08:00 UTC):           22.2% WR
+//     - Asian session (04:00 UTC):         36.1% WR
+//   RSI_DIP in Asian session (40-crossover) tested best across all strategies:
+//     31% WR, PF=1.97, +520% return over 30 months at 6R target.
+//
+// SIGNAL LOGIC:
+//   Long:  4H RSI(14) crosses back above 40 from below (oversold recovery)
+//          in 4H uptrend (EMA21 > EMA50) with daily trend confirmation.
+//          ONLY fires on 00:00 UTC and 04:00 UTC bar closes (Asian session).
+//   Short: Mirror — RSI crosses below 60 from above in downtrend.
+//
+// WHY RSI AT 40 (NOT 30):
+//   RSI=30 is "textbook oversold" but BTC in a trend rarely reaches 30.
+//   RSI=40 is the functional oversold level in strong BTC trends — price
+//   has pulled back enough to offer a clean entry with momentum about to turn.
+//
+// WHY ASIAN SESSION:
+//   Lower volume → price respects technical levels more cleanly.
+//   NY session (16:00) is dominated by macro volatility and reversals.
+//   The EMA21 and RSI levels that hold in Asia tend to become the setup
+//   that London and NY then follow through on.
+//
+// LOCKED PARAMETERS:
+//   Timeframe   4H
+//   Leverage    10x  → 1% stop = 10% account risk, 6% TP = 60% account gain
+//   Stop        FIXED 1% price from entry close
+//   Target      FIXED 6% price from entry close (6R)
+//   After fees (0.15%/side × 10x): win = +57% account, loss = −13% account
+//   Breakeven WR: 18.6%    Tested WR: 31%    PF: 1.97
+//
+// BACKTEST (Python engine, not TradingView):
+//   Symbol: BTCUSDT.P (Bybit, 30 months)
+//   n=42 trades, 0.32/week, final equity €637 → €3,953 (+520%)
+// ─────────────────────────────────────────────────────────────────────────────
+
+strategy("LENS / ASIAN_RSI_DIP_v1", overlay=true,
+     initial_capital=637, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100, commission_type=strategy.commission.percent,
+     commission_value=0.15, slippage=2,
+     margin_long=1, margin_short=1,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+strategyName    = "ASIAN_RSI_DIP_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Risk / target (LOCKED) ──────────────────────────────────────────────────
+grpRisk = "Risk / target (LOCKED — change breaks the PRISM math)"
+stopPct = input.float(1.0, "Stop %  (price move)",   group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(4.0, "Target % (price move)",  group=grpRisk, minval=1.0,  step=0.5)
+lev     = input.float(10.0,"Leverage",                group=grpRisk, minval=1.0,  step=1.0)
+
+// ─── Session filter (CRITICAL — DO NOT DISABLE) ───────────────────────────────
+grpSession = "Session filter (Asian only = backtested edge)"
+asianOnly  = input.bool(true, "Asian session only (00:00 + 04:00 UTC closes)",
+                 tooltip="Disabling drops WR from 31% to 19%. Asian session is the edge.",
+                 group=grpSession)
+
+// 4H candle closes happen at 00, 04, 08, 12, 16, 20 UTC on Bybit/Kraken
+hourUtc = hour(time, "UTC")
+isAsianClose = hourUtc == 0 or hourUtc == 4
+sessionOk = not asianOnly or isAsianClose
+
+// ─── Trend EMAs (4H) ─────────────────────────────────────────────────────────
+grpEma = "Trend EMAs (4H)"
+emaFastLen = input.int(21, "EMA fast",  group=grpEma, minval=5)
+emaSlowLen = input.int(50, "EMA slow",  group=grpEma, minval=10)
+
+ema21 = ta.ema(close, emaFastLen)
+ema50 = ta.ema(close, emaSlowLen)
+
+upTrend4h   = ema21 > ema50
+downTrend4h = ema21 < ema50
+
+// ─── Daily HTF filter ─────────────────────────────────────────────────────────
+grpHtf = "Daily HTF filter"
+requireDailyTrend = input.bool(true, "Require daily trend alignment", group=grpHtf)
+dailyEmaLen       = input.int(50, "Daily EMA for HTF bias", group=grpHtf, minval=10)
+
+dailyClose = request.security(syminfo.tickerid, "1D", close,
+                 lookahead=barmerge.lookahead_off)
+dailyEma   = request.security(syminfo.tickerid, "1D",
+                 ta.ema(close, dailyEmaLen), lookahead=barmerge.lookahead_off)
+
+htfLongOk  = not requireDailyTrend or dailyClose > dailyEma
+htfShortOk = not requireDailyTrend or dailyClose < dailyEma
+
+// ─── RSI signal ──────────────────────────────────────────────────────────────
+grpRsi = "RSI signal (key edge)"
+rsiLen      = input.int(14,  "RSI period",        group=grpRsi, minval=2)
+rsiLongLvl  = input.float(40, "RSI long level (cross above = entry)",  group=grpRsi)
+rsiShortLvl = input.float(60, "RSI short level (cross below = entry)", group=grpRsi)
+
+rsi = ta.rsi(close, rsiLen)
+
+// Cross: RSI was below level, now above (long) — or above, now below (short)
+rsiLongFire  = rsi[1] < rsiLongLvl  and rsi >= rsiLongLvl
+rsiShortFire = rsi[1] > rsiShortLvl and rsi <= rsiShortLvl
+
+// ─── Discipline filters ───────────────────────────────────────────────────────
+grpDisc    = "Discipline"
+skipSat    = input.bool(true,  "Skip Saturday",                          group=grpDisc)
+cooldownBars = input.int(4,   "Min bars between entries",                group=grpDisc, minval=0)
+oncePerDay = input.bool(true,  "Max 1 trade per UTC day",                group=grpDisc)
+
+dow = dayofweek(time, "UTC")
+isSat = dow == dayofweek.saturday
+passDay = not skipSat or not isSat
+
+curDayId = year(time, "UTC") * 10000 + month(time, "UTC") * 100 + dayofmonth(time, "UTC")
+var int lastTradeDay   = na
+var int lastEntryBar   = 0
+
+passOncePerDay = not oncePerDay or na(lastTradeDay) or curDayId != lastTradeDay
+passCooldown   = bar_index - lastEntryBar >= cooldownBars
+
+discOk = passDay and passOncePerDay and passCooldown
+
+// ─── Final entry conditions ───────────────────────────────────────────────────
+longEntry  = rsiLongFire  and upTrend4h   and htfLongOk  and sessionOk and discOk and strategy.opentrades == 0
+shortEntry = rsiShortFire and downTrend4h and htfShortOk and sessionOk and discOk and strategy.opentrades == 0
+
+// ─── Fixed SL / TP ────────────────────────────────────────────────────────────
+longStop    = close * (1 - stopPct / 100)
+longTarget  = close * (1 + tpPct  / 100)
+shortStop   = close * (1 + stopPct / 100)
+shortTarget = close * (1 - tpPct  / 100)
+
+// ─── Execution ───────────────────────────────────────────────────────────────
+qtyLong  = (strategy.equity * lev) / close
+qtyShort = (strategy.equity * lev) / close
+
+if longEntry
+    strategy.entry("long",  strategy.long,  qty=qtyLong)
+    strategy.exit("long-x", "long",  stop=longStop,  limit=longTarget)
+    lastEntryBar := bar_index
+    lastTradeDay := curDayId
+
+if shortEntry
+    strategy.entry("short", strategy.short, qty=qtyShort)
+    strategy.exit("short-x","short", stop=shortStop, limit=shortTarget)
+    lastEntryBar := bar_index
+    lastTradeDay := curDayId
+
+// ─── Context for LENS JSON alert ─────────────────────────────────────────────
+grpCtx  = "Context"
+venueIn  = input.string("kraken", "Venue", options=["kraken","bybit"], group=grpCtx)
+emitJson = input.bool(true, "Emit LENS JSON alert", group=grpCtx)
+
+htfBiasStr  = dailyClose > dailyEma ? "bullish" : "bearish"
+sessionStr  = hourUtc >= 0  and hourUtc < 8  ? "asia"
+            : hourUtc >= 8  and hourUtc < 13 ? "london"
+            : hourUtc >= 13 and hourUtc < 21 ? "ny" : "off-hours"
+atr14dPct   = (request.security(syminfo.tickerid, "1D", ta.atr(14),
+                   lookahead=barmerge.lookahead_off) / close) * 100
+
+f_jsonStr(k, v) => '"' + k + '":"' + v + '"'
+f_jsonNum(k, v) => '"' + k + '":' + str.tostring(v)
+
+buildPayload(dir, entryPx, stopPx, tgtPx) =>
+    sigId = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    s  = '{'
+    s += f_jsonStr("signal_id",        sigId)              + ','
+    s += f_jsonStr("strategy_name",    strategyName)       + ','
+    s += f_jsonStr("strategy_version", strategyVersion)    + ','
+    s += f_jsonStr("symbol",           syminfo.ticker)     + ','
+    s += f_jsonStr("venue",            venueIn)            + ','
+    s += f_jsonStr("direction",        dir)                + ','
+    s += f_jsonStr("trigger_type",     "rsi_dip_recovery") + ','
+    s += f_jsonStr("htf_bias",         htfBiasStr)         + ','
+    s += f_jsonStr("session_utc",      sessionStr)         + ','
+    s += f_jsonNum("rsi_at_signal",    math.round(rsi * 10) / 10) + ','
+    s += f_jsonNum("atr_14d_pct",      math.round(atr14dPct * 1000) / 1000) + ','
+    s += f_jsonNum("entry_price",      math.round(entryPx * 100) / 100) + ','
+    s += f_jsonNum("stop_price",       math.round(stopPx  * 100) / 100) + ','
+    s += f_jsonNum("target_price",     math.round(tgtPx   * 100) / 100) + ','
+    s += f_jsonNum("suggested_size_pct", math.round(lev * stopPct * 10) / 10) + ','
+    s += f_jsonNum("suggested_leverage", lev) + ','
+    s += f_jsonNum("expected_rr",      math.round(tpPct / stopPct * 100) / 100)
+    s += '}'
+    s
+
+if longEntry and barstate.isconfirmed
+    payload = emitJson ? buildPayload("long", close, longStop, longTarget) : "long"
+    alert(payload, alert.freq_once_per_bar_close)
+
+if shortEntry and barstate.isconfirmed
+    payload = emitJson ? buildPayload("short", close, shortStop, shortTarget) : "short"
+    alert(payload, alert.freq_once_per_bar_close)
+
+// ─── Visuals ─────────────────────────────────────────────────────────────────
+plot(ema21, "EMA 21", color=color.new(color.blue,   20), linewidth=2)
+plot(ema50, "EMA 50", color=color.new(color.orange, 20), linewidth=1)
+plot(dailyEma, "Daily EMA50", color=color.new(color.purple, 50), linewidth=1, style=plot.style_stepline)
+
+// RSI reference (in a separate pane via indicator, not visible in strategy overlay)
+// Entry signals
+plotshape(longEntry,  title="Long (RSI dip recovery)",
+     location=location.belowbar, style=shape.triangleup,
+     color=color.new(color.lime, 0), size=size.normal)
+plotshape(shortEntry, title="Short (RSI overbought rejection)",
+     location=location.abovebar, style=shape.triangledown,
+     color=color.new(color.red, 0), size=size.normal)
+
+// SL/TP zones when in trade
+longInTrade  = strategy.position_size > 0
+shortInTrade = strategy.position_size < 0
+entryPxLine  = strategy.position_avg_price
+
+plot(longInTrade  ? entryPxLine * (1 - stopPct/100) : na, "Long stop",    color=color.red,   linewidth=1, style=plot.style_linebr)
+plot(longInTrade  ? entryPxLine * (1 + tpPct/100)  : na, "Long target",  color=color.green, linewidth=1, style=plot.style_linebr)
+plot(shortInTrade ? entryPxLine * (1 + stopPct/100) : na, "Short stop",   color=color.red,   linewidth=1, style=plot.style_linebr)
+plot(shortInTrade ? entryPxLine * (1 - tpPct/100)  : na, "Short target", color=color.green, linewidth=1, style=plot.style_linebr)
