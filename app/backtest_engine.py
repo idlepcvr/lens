@@ -150,11 +150,31 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     rs    = gain / loss.replace(0, np.nan)
     df["rsi14"] = 100 - (100 / (1 + rs))
 
-    # Daily close / EMA50 (resample 4H → daily, ffill back)
+    # Daily close / EMA50 (resample → daily, ffill back)
     daily_close = c.resample("1D").last()
     daily_ema50 = daily_close.ewm(span=50, adjust=False).mean()
     df["daily_close"] = daily_close.reindex(df.index, method="ffill")
     df["daily_ema50"] = daily_ema50.reindex(df.index, method="ffill")
+
+    # 4H resampled EMAs (for 1H MTF signals — ffill each 4H bar into its 4 child 1H bars)
+    h4_close      = c.resample("4h").last()
+    df["h4_ema21"] = h4_close.ewm(span=21, adjust=False).mean().reindex(df.index, method="ffill")
+    df["h4_ema50"] = h4_close.ewm(span=50, adjust=False).mean().reindex(df.index, method="ffill")
+    df["h4_close"] = h4_close.reindex(df.index, method="ffill")
+
+    # RSI lookback: min RSI over last N bars (how deep the dip was)
+    df["rsi14_min8"]  = df["rsi14"].rolling(8).min()
+    df["rsi14_min16"] = df["rsi14"].rolling(16).min()
+
+    # EMA21 slope: change over last N bars (trend momentum)
+    df["ema21_slope4"]  = df["ema21"] - df["ema21"].shift(4)
+    df["ema21_slope8"]  = df["ema21"] - df["ema21"].shift(8)
+    df["ema50_slope8"]  = df["ema50"] - df["ema50"].shift(8)
+
+    # Candle body ratio: body / total range (0=doji, 1=marubozu)
+    body  = (df["close"] - df["open"]).abs()
+    range_ = (df["high"] - df["low"]).replace(0, np.nan)
+    df["body_ratio"] = body / range_
 
     # Rolling structure highs/lows (for TREND_4R breakout)
     df["hi20"] = df["high"].shift(1).rolling(20).max()

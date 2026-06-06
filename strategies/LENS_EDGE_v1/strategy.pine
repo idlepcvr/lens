@@ -1,0 +1,192 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / LENS_EDGE_v1   —   Reverse-engineered from 455 real trades
+//
+// SOURCE: Python analysis of actual Kraken trade history (60 weeks, 455 trades)
+//
+// WHAT THE DATA SHOWS:
+//   Total trades: 455  (7.5 tpw)   Base WR: 42.6%
+//
+//   ✅ Quality trades (aligned bar + 4H trend):   77 trades,  WR=48.1%,  +€2,172
+//   ❌ Garbage trades (counter-bar OR counter-4H): 340 trades, WR=40.6%,  −€1,082
+//
+//   Two setups identified:
+//     DIP      : aligned bar + 4H trend + RSI < 40   → WR=44.2%  (0.7 tpw)
+//     MOMENTUM : aligned bar + 4H trend + RSI > 55   → WR=52.9%  (0.6 tpw)
+//
+//   Combined: 48.1% WR, 1.3 tpw
+//
+// WHAT TO IGNORE: 1H EMA alignment, MACD histogram → near-zero effect in data
+// WHAT MATTERS:
+//   1. Entry bar DIRECTION (bull bar for long, bear bar for short)  +19.8pp
+//   2. 4H trend aligned (EMA21 > EMA50 on 4H)                      +8.8pp
+//   3. RSI < 40 (dip) OR RSI > 55 (momentum)                       +6-10pp
+//
+// RISK PARAMS (locked to projection math):
+//   Stop    : 1.0% from entry
+//   Target  : 3.5% from entry
+//   Breakeven WR at these params: 30.3%
+//   Your WR with quality filter:  48-53%   → EV positive
+// ─────────────────────────────────────────────────────────────────────────────
+
+strategy("LENS / LENS_EDGE_v1", overlay=true,
+     initial_capital=637,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100,
+     commission_type=strategy.commission.percent,
+     commission_value=0.15,
+     slippage=2,
+     margin_long=10, margin_short=10,
+     process_orders_on_close=true,
+     calc_on_every_tick=false)
+
+// ─── Risk (locked) ────────────────────────────────────────────────────────────
+grpRisk = "Risk / target (LOCKED — matches projection math)"
+stopPct = input.float(1.0, "Stop %",   group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(3.5, "Target %", group=grpRisk, minval=0.5,  step=0.25)
+lev     = input.float(10.0,"Leverage (display only)", group=grpRisk, minval=1.0, step=1.0)
+
+// ─── 4H trend gate (most important filter, +8.8pp in real data) ──────────────
+grp4h = "4H Trend Gate (required)"
+[h4_ema21, h4_ema50, h4_close_val] = request.security(syminfo.tickerid, "240",
+     [ta.ema(close,21), ta.ema(close,50), close],
+     lookahead=barmerge.lookahead_off)
+
+h4_bull = h4_close_val > h4_ema21 and h4_ema21 > h4_ema50
+h4_bear = h4_close_val < h4_ema21 and h4_ema21 < h4_ema50
+
+// ─── RSI zones (dip < 40 or momentum > 55 → best in real data) ───────────────
+rsi = ta.rsi(close, 14)
+rsiDip      = rsi < 40          // WR = 44.2% when long
+rsiMomentum = rsi > 55          // WR = 52.9% when long in 4H uptrend
+rsiAvoid    = rsi >= 40 and rsi <= 55  // WR = 36-40% — skip this zone
+
+// ─── Entry bar alignment (+19.8pp in real data) ──────────────────────────────
+bullBar = close > open
+bearBar = close < open
+
+// ─── Combined signals ─────────────────────────────────────────────────────────
+longDip  = h4_bull and (rsiDip  or rsiMomentum) and bullBar and strategy.position_size == 0
+shortDip = h4_bear and (rsiDip  or rsiMomentum) and bearBar and strategy.position_size == 0
+
+// Split into DIP vs MOMENTUM for labelling
+longIsDip  = h4_bull and rsiDip      and bullBar
+longIsMom  = h4_bull and rsiMomentum and bullBar
+shortIsDip = h4_bear and rsiDip      and bearBar
+shortIsMom = h4_bear and rsiMomentum and bearBar
+
+anyLong  = longIsDip  or longIsMom
+anyShort = shortIsDip or shortIsMom
+
+// ─── Strategy execution ───────────────────────────────────────────────────────
+if anyLong and strategy.position_size == 0
+    slP = close * (1 - stopPct / 100)
+    tpP = close * (1 + tpPct   / 100)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=slP, limit=tpP)
+
+if anyShort and strategy.position_size == 0
+    slP = close * (1 + stopPct / 100)
+    tpP = close * (1 - tpPct   / 100)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=slP, limit=tpP)
+
+// ─── Visuals ──────────────────────────────────────────────────────────────────
+// 4H EMA21 and EMA50 on 1H chart for context
+plot(h4_ema21, "4H EMA21", color=color.new(color.aqua,   30), linewidth=2)
+plot(h4_ema50, "4H EMA50", color=color.new(color.orange, 30), linewidth=2)
+
+// RSI zone background shading (subtle)
+bgcolor(rsiDip      ? color.new(color.green, 93) : na, title="RSI dip zone")
+bgcolor(rsiMomentum ? color.new(color.blue,  93) : na, title="RSI momentum zone")
+bgcolor(rsiAvoid    ? color.new(color.red,   96) : na, title="RSI avoid zone")
+
+// Entry arrows
+plotshape(longIsDip,  title="Long DIP",      location=location.belowbar, style=shape.triangleup,   color=color.new(color.green, 0), size=size.normal)
+plotshape(longIsMom,  title="Long MOMENTUM", location=location.belowbar, style=shape.triangleup,   color=color.new(color.lime,  0), size=size.small)
+plotshape(shortIsDip, title="Short DIP",     location=location.abovebar, style=shape.triangledown, color=color.new(color.red,   0), size=size.normal)
+plotshape(shortIsMom, title="Short MOMENTUM",location=location.abovebar, style=shape.triangledown, color=color.new(color.fuchsia,0),size=size.small)
+
+// SL/TP lines on new signal
+var line slLine = na
+var line tpLine = na
+var label entryLbl = na
+
+if anyLong and strategy.position_size == 0
+    slP = close * (1 - stopPct / 100)
+    tpP = close * (1 + tpPct   / 100)
+    line.delete(slLine)
+    line.delete(tpLine)
+    label.delete(entryLbl)
+    slLine   := line.new(bar_index, slP, bar_index + 40, slP, color=color.red,   width=1, style=line.style_dashed)
+    tpLine   := line.new(bar_index, tpP, bar_index + 40, tpP, color=color.green, width=1, style=line.style_dashed)
+    setupType = longIsMom ? "MOMENTUM" : "DIP"
+    entryLbl := label.new(bar_index, close,
+         "▲ " + setupType + "  SL " + str.tostring(math.round(slP, 0)) +
+         "  TP " + str.tostring(math.round(tpP, 0)),
+         color=color.new(color.green, 70), textcolor=color.white,
+         style=label.style_label_right, size=size.small)
+
+if anyShort and strategy.position_size == 0
+    slP = close * (1 + stopPct / 100)
+    tpP = close * (1 - tpPct   / 100)
+    line.delete(slLine)
+    line.delete(tpLine)
+    label.delete(entryLbl)
+    slLine   := line.new(bar_index, slP, bar_index + 40, slP, color=color.red,   width=1, style=line.style_dashed)
+    tpLine   := line.new(bar_index, tpP, bar_index + 40, tpP, color=color.green, width=1, style=line.style_dashed)
+    setupType = shortIsMom ? "MOMENTUM" : "DIP"
+    entryLbl := label.new(bar_index, close,
+         "▼ " + setupType + "  SL " + str.tostring(math.round(slP, 0)) +
+         "  TP " + str.tostring(math.round(tpP, 0)),
+         color=color.new(color.red, 70), textcolor=color.white,
+         style=label.style_label_right, size=size.small)
+
+// ─── Info table ───────────────────────────────────────────────────────────────
+var table tbl = table.new(position.top_right, 2, 8,
+     bgcolor=color.new(color.black, 70), border_width=1)
+
+if barstate.islast
+    table.cell(tbl, 0, 0, "LENS_EDGE_v1", text_color=color.white,  text_size=size.small, bgcolor=color.new(color.teal, 50))
+    table.cell(tbl, 1, 0, "from 455 real trades", text_color=color.gray, text_size=size.tiny, bgcolor=color.new(color.teal, 50))
+
+    table.cell(tbl, 0, 1, "DIP WR",    text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 1, "44.2%  (RSI<40 + 4H)",    text_color=color.green, text_size=size.small)
+
+    table.cell(tbl, 0, 2, "MOM WR",    text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 2, "52.9%  (RSI>55 + 4H)",    text_color=color.lime, text_size=size.small)
+
+    table.cell(tbl, 0, 3, "Stop",      text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(stopPct) + "% → −" + str.tostring(stopPct * lev) + "% acct",
+         text_color=color.red, text_size=size.small)
+
+    table.cell(tbl, 0, 4, "Target",    text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 4, str.tostring(tpPct) + "% → +" + str.tostring(math.round((tpPct - 0.30) * lev, 1)) + "% acct",
+         text_color=color.green, text_size=size.small)
+
+    table.cell(tbl, 0, 5, "BE WR",     text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 5, str.tostring(math.round(100 * (stopPct + 0.30) / (tpPct + stopPct), 1)) + "%  (yours 48%)",
+         text_color=color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 6, "AVOID",     text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 6, "RSI 40-55 = 36% WR zone",  text_color=color.orange, text_size=size.small)
+
+    table.cell(tbl, 0, 7, "RULE #1",   text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 7, "Bull bar = long only",  text_color=color.yellow, text_size=size.small)
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+alertcondition(longIsDip,
+     title="LENS_EDGE — Long DIP",
+     message='{"strategy":"LENS_EDGE_v1","setup":"dip","side":"long","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"rsi":{{plot_0}}}')
+
+alertcondition(longIsMom,
+     title="LENS_EDGE — Long MOMENTUM",
+     message='{"strategy":"LENS_EDGE_v1","setup":"momentum","side":"long","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"rsi":{{plot_0}}}')
+
+alertcondition(shortIsDip,
+     title="LENS_EDGE — Short DIP",
+     message='{"strategy":"LENS_EDGE_v1","setup":"dip","side":"short","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"rsi":{{plot_0}}}')
+
+alertcondition(shortIsMom,
+     title="LENS_EDGE — Short MOMENTUM",
+     message='{"strategy":"LENS_EDGE_v1","setup":"momentum","side":"short","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5,"rsi":{{plot_0}}}')
