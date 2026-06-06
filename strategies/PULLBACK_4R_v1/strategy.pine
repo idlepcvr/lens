@@ -1,0 +1,226 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / PULLBACK_4R_v1
+//
+// WHY THIS EXISTS (from prism_fingerprint.md analysis):
+//   TREND_4R_v1 failed at 18.8% WR — entered ON breakout (close above 20-bar
+//   high), i.e. at resistance after the move already happened.
+//   PRISM history shows 53.2% WR when filtered for conviction trades on Kraken
+//   with hold ≥ 60 min and no Saturday. Those entries were pullback/reversion
+//   trades, not breakouts.
+//
+// ENTRY PREMISE:
+//   Enter at SUPPORT (EMA21 in an established trend), not at RESISTANCE (20-bar
+//   high breakout). "Touch and go" — price dips to EMA21, next bar closes back
+//   above it. Requires DAILY trend alignment so we only take 4H setups that
+//   have the bigger picture behind them.
+//
+// LOCKED PARAMETERS (same as TREND_4R_v1, do not change without re-running math):
+//   Timeframe   4H
+//   Leverage    10x  → 1% stop = 10% account risk, 4% TP = 40% account gain
+//   Stop        FIXED 1% price from entry
+//   Target      FIXED 4% price from entry
+//   After fees: ~37% win / ~13% loss on account (0.30% RT at 10x)
+//
+// BREAKEVEN WR (after fees): ~31%    TARGET WR: ≥ 48% (hits €375k goal)
+// PRISM conviction WR: 53%           MARGIN: +5pp above target
+//
+// BACKTEST SETUP:
+//   Symbol   : PF_XBTUSD on Kraken (or BTCUSDT.P on Bybit for richer history)
+//   TF       : 4H
+//   Range    : last 24 months (needs bull and bear regimes)
+//   Capital  : €637 (current real balance)
+//   Commission: 0.15% per side (already set below)
+// ─────────────────────────────────────────────────────────────────────────────
+
+strategy("LENS / PULLBACK_4R_v1", overlay=true,
+     initial_capital=637, default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100, commission_type=strategy.commission.percent,
+     commission_value=0.15, slippage=2,
+     margin_long=1, margin_short=1,
+     process_orders_on_close=true, calc_on_every_tick=false)
+
+strategyName    = "PULLBACK_4R_v1"
+strategyVersion = "v1.0.0"
+
+// ─── Risk / target (LOCKED) ──────────────────────────────────────────────────
+grpRisk = "Risk / target (LOCKED — change breaks the PRISM math)"
+stopPct = input.float(1.0, "Stop %  (price move)",   group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(4.0, "Target % (price move)",  group=grpRisk, minval=1.0,  step=0.5)
+lev     = input.float(10.0,"Leverage",                group=grpRisk, minval=1.0,  step=1.0)
+
+// ─── Trend EMAs (4H) ─────────────────────────────────────────────────────────
+grpEma = "Trend EMAs (4H)"
+emaFastLen = input.int(21, "EMA fast",  group=grpEma, minval=5)
+emaSlowLen = input.int(50, "EMA slow",  group=grpEma, minval=10)
+
+ema21 = ta.ema(close, emaFastLen)
+ema50 = ta.ema(close, emaSlowLen)
+
+// ─── Daily HTF filter ────────────────────────────────────────────────────────
+grpHtf = "Daily HTF filter"
+requireDailyTrend = input.bool(true, "Require daily trend alignment", group=grpHtf)
+dailyEmaLen       = input.int(50, "Daily EMA for HTF bias", group=grpHtf, minval=10)
+
+dailyClose = request.security(syminfo.tickerid, "1D", close,
+                 lookahead=barmerge.lookahead_off)
+dailyEma   = request.security(syminfo.tickerid, "1D",
+                 ta.ema(close, dailyEmaLen), lookahead=barmerge.lookahead_off)
+
+dailyBull = dailyClose > dailyEma
+dailyBear = dailyClose < dailyEma
+
+// ─── EMA21 pullback ("touch and go") ─────────────────────────────────────────
+// Previous bar touched or crossed below EMA21; current bar closed above it.
+// This is the "dip to support and bounce" — entry is at/near EMA21,
+// stop is 1% below it, price has room to run to the 4% target.
+grpEntry = "Entry — EMA21 Touch & Go"
+requireMacd = input.bool(true,  "Require MACD hist momentum",  group=grpEntry)
+requireVol  = input.bool(false, "Require volume spike (≥ 1.3× SMA20)", group=grpEntry)
+
+[_, _, histLine] = ta.macd(close, 12, 26, 9)
+histRising  = histLine > histLine[1]
+histFalling = histLine < histLine[1]
+
+volSpike = volume > ta.sma(volume, 20) * 1.3
+
+// 4H trend conditions
+upTrend4h   = ema21 > ema50
+downTrend4h = ema21 < ema50
+
+// Touch and go: prev bar wick went to or below EMA21; current bar closed above
+longTouch  = low[1]  <= ema21[1] and close > ema21     // dipped to support, bounced
+shortTouch = high[1] >= ema21[1] and close < ema21     // spiked to resistance, rejected
+
+// Optional: also allow entry when price has been below EMA21 for ≤2 bars then
+// reclaims it (slightly wider window for catching the recovery)
+longRecover  = ta.crossover(close, ema21)   // current bar crosses above EMA21
+shortRecover = ta.crossunder(close, ema21)  // current bar crosses below EMA21
+
+longSignal4h  = (longTouch  or longRecover)  and upTrend4h
+shortSignal4h = (shortTouch or shortRecover) and downTrend4h
+
+// ─── HTF alignment gate ──────────────────────────────────────────────────────
+htfLongOk  = not requireDailyTrend or dailyBull
+htfShortOk = not requireDailyTrend or dailyBear
+
+// ─── Momentum gate ───────────────────────────────────────────────────────────
+momLongOk  = not requireMacd or histRising
+momShortOk = not requireMacd or histFalling
+
+// ─── Volume gate ─────────────────────────────────────────────────────────────
+volOk = not requireVol or volSpike
+
+// ─── Discipline filters (from PRISM fingerprint — hard evidence, not opinion) ─
+grpDisc    = "Discipline (backed by 2315-trade PRISM analysis)"
+skipSat    = input.bool(true,  "Skip Saturday (+€2,606 edge from data)",  group=grpDisc)
+cooldownBars = input.int(4,   "Min bars between entries (≥4 = no revenge)", group=grpDisc, minval=0)
+oncePerDay = input.bool(true,  "Max 1 trade per UTC day",                 group=grpDisc)
+
+dow = dayofweek(time, "UTC")
+isSat = dow == dayofweek.saturday
+passDay = not skipSat or not isSat
+
+curDayId = year(time, "UTC") * 10000 + month(time, "UTC") * 100 + dayofmonth(time, "UTC")
+var int lastTradeDay   = na
+var int lastEntryBar   = 0
+
+passOncePerDay = not oncePerDay or na(lastTradeDay) or curDayId != lastTradeDay
+passCooldown   = bar_index - lastEntryBar >= cooldownBars
+
+discOk = passDay and passOncePerDay and passCooldown
+
+// ─── Final entry conditions ───────────────────────────────────────────────────
+longEntry  = longSignal4h  and htfLongOk  and momLongOk  and volOk and discOk and strategy.opentrades == 0
+shortEntry = shortSignal4h and htfShortOk and momShortOk and volOk and discOk and strategy.opentrades == 0
+
+// ─── Fixed SL / TP ────────────────────────────────────────────────────────────
+longStop    = close * (1 - stopPct / 100)
+longTarget  = close * (1 + tpPct  / 100)
+shortStop   = close * (1 + stopPct / 100)
+shortTarget = close * (1 - tpPct  / 100)
+
+// ─── Execution ───────────────────────────────────────────────────────────────
+qtyLong  = (strategy.equity * lev) / close
+qtyShort = (strategy.equity * lev) / close
+
+if longEntry
+    strategy.entry("long",  strategy.long,  qty=qtyLong)
+    strategy.exit("long-x", "long",  stop=longStop,  limit=longTarget)
+    lastEntryBar := bar_index
+    lastTradeDay := curDayId
+
+if shortEntry
+    strategy.entry("short", strategy.short, qty=qtyShort)
+    strategy.exit("short-x","short", stop=shortStop, limit=shortTarget)
+    lastEntryBar := bar_index
+    lastTradeDay := curDayId
+
+// ─── Context for LENS JSON alert ─────────────────────────────────────────────
+grpCtx  = "Context"
+venueIn = input.string("kraken", "Venue", options=["kraken","bybit"], group=grpCtx)
+emitJson = input.bool(true, "Emit LENS JSON alert", group=grpCtx)
+
+hourUtc    = hour(time, "UTC")
+sessionStr = hourUtc >= 0  and hourUtc < 8  ? "asia"
+           : hourUtc >= 8  and hourUtc < 13 ? "london"
+           : hourUtc >= 13 and hourUtc < 21 ? "ny" : "off-hours"
+htfBiasStr = dailyBull ? "bullish" : dailyBear ? "bearish" : "neutral"
+atr14dPct  = (request.security(syminfo.tickerid, "1D", ta.atr(14),
+                  lookahead=barmerge.lookahead_off) / close) * 100
+
+f_jsonStr(k, v) => '"' + k + '":"' + v + '"'
+f_jsonNum(k, v) => '"' + k + '":' + str.tostring(v)
+
+buildPayload(dir, entryPx, stopPx, tgtPx) =>
+    sigId = strategyName + "_" + syminfo.ticker + "_" + str.tostring(time) + "_" + dir
+    s  = '{'
+    s += f_jsonStr("signal_id",        sigId)             + ','
+    s += f_jsonStr("strategy_name",    strategyName)      + ','
+    s += f_jsonStr("strategy_version", strategyVersion)   + ','
+    s += f_jsonStr("symbol",           syminfo.ticker)    + ','
+    s += f_jsonStr("venue",            venueIn)           + ','
+    s += f_jsonStr("direction",        dir)               + ','
+    s += f_jsonStr("trigger_type",     "ema21_pullback")  + ','
+    s += f_jsonStr("htf_bias",         htfBiasStr)        + ','
+    s += f_jsonStr("session_utc",      sessionStr)        + ','
+    s += f_jsonNum("atr_14d_pct",      math.round(atr14dPct * 1000) / 1000) + ','
+    s += f_jsonNum("entry_price",      math.round(entryPx * 100) / 100) + ','
+    s += f_jsonNum("stop_price",       math.round(stopPx  * 100) / 100) + ','
+    s += f_jsonNum("target_price",     math.round(tgtPx   * 100) / 100) + ','
+    s += f_jsonNum("suggested_size_pct", math.round(lev * stopPct * 10) / 10) + ','
+    s += f_jsonNum("suggested_leverage", lev) + ','
+    s += f_jsonNum("expected_rr",      math.round(tpPct / stopPct * 100) / 100)
+    s += '}'
+    s
+
+if longEntry and barstate.isconfirmed
+    payload = emitJson ? buildPayload("long", close, longStop, longTarget) : "long"
+    alert(payload, alert.freq_once_per_bar_close)
+
+if shortEntry and barstate.isconfirmed
+    payload = emitJson ? buildPayload("short", close, shortStop, shortTarget) : "short"
+    alert(payload, alert.freq_once_per_bar_close)
+
+// ─── Visuals ─────────────────────────────────────────────────────────────────
+plot(ema21, "EMA 21", color=color.new(color.blue,   20), linewidth=2)
+plot(ema50, "EMA 50", color=color.new(color.orange, 20), linewidth=1)
+
+// Daily EMA as a reference line (lighter, shows the HTF context)
+plot(dailyEma, "Daily EMA50", color=color.new(color.purple, 50), linewidth=1, style=plot.style_stepline)
+
+// Entry signals
+plotshape(longEntry,  title="Long",  location=location.belowbar,
+     style=shape.triangleup,   color=color.new(color.lime,  0), size=size.normal)
+plotshape(shortEntry, title="Short", location=location.abovebar,
+     style=shape.triangledown, color=color.new(color.red,   0), size=size.normal)
+
+// SL/TP zones when in a trade (helps visualise the 1%/4% on the chart)
+longInTrade  = strategy.position_size > 0
+shortInTrade = strategy.position_size < 0
+entryPxLine  = strategy.position_avg_price
+
+plot(longInTrade  ? entryPxLine * (1 - stopPct/100) : na, "Long stop",   color=color.red,   linewidth=1, style=plot.style_linebr)
+plot(longInTrade  ? entryPxLine * (1 + tpPct/100)  : na, "Long target", color=color.green, linewidth=1, style=plot.style_linebr)
+plot(shortInTrade ? entryPxLine * (1 + stopPct/100) : na, "Short stop",  color=color.red,   linewidth=1, style=plot.style_linebr)
+plot(shortInTrade ? entryPxLine * (1 - tpPct/100)  : na, "Short target",color=color.green, linewidth=1, style=plot.style_linebr)

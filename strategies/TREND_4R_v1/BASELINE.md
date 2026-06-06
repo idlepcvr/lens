@@ -44,14 +44,14 @@ funding when the real fills land in PRISM Core.
 
 | Metric | Value | Read |
 |---|---|---|
-| Total trades (n) | | want ≥ 40 for any confidence |
-| **Win rate %** | | **the headline — is it anywhere near 44%, or nearer 20%?** |
-| **Avg R (avg win % ÷ avg loss %)** | | should sit near 4.0 if exits are clean; <4 means TP rarely reached |
-| Profit factor | | want > 2.0 (the plan's target); > 1.0 is the floor |
-| Net profit | | ignore the raw number — leverage inflates it |
-| **Max drawdown %** | | **the ruin read — at 10x this is where blow-up shows** |
-| Max consecutive losses | | 7 in a row ≈ −50% account at 10x/1% |
-| Avg bars in trade | | ×4h = hold time; confirms it's a 1–3 day swing not a scalp |
+| Total trades (n) | 32 | want ≥ 40 for any confidence |
+| **Win rate %** | 18.8% | **the headline — is it anywhere near 44%, or nearer 20%?** |
+| **Avg R (avg win % ÷ avg loss %)** | 3.7 | should sit near 4.0 if exits are clean; <4 means TP rarely reached |
+| Profit factor | 0.33 | want > 2.0 (the plan's target); > 1.0 is the floor |
+| Net profit | -296.0 EUR | ignore the raw number — leverage inflates it |
+| **Max drawdown %** | -91.2% | **the ruin read — at 10x this is where blow-up shows** |
+| Max consecutive losses | 14 | 7 in a row ≈ −50% account at 10x/1% |
+| Avg bars in trade | 6.8 (27h) | ×4h = hold time; confirms it's a 1–3 day swing not a scalp |
 | Trades/week | | want 2–3; the plan assumes ~1/day max |
 
 ## How to read the outcome

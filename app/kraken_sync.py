@@ -492,6 +492,7 @@ def sync_account(
         "trades_processed":    len(trades),
         "transfers_imported":  transfers_imported,
         "eur_usd":             round(eur_usd, 4),
+        "eur_timeline":        eur_timeline,
     }
 
 
@@ -512,6 +513,24 @@ def get_api_keys(account: str = "personal") -> tuple[str, str]:
     if not key or not secret:
         raise RuntimeError(f"Kraken API keys not set for account='{account}' in .env")
     return key, secret
+
+
+def fetch_live_balance(api_key: str, api_secret: str) -> dict:
+    """Return total portfolio value (EUR) from the flex multi-collateral account.
+    portfolioValue = wallet + all collateral mark-to-market. Includes unrealized PnL when in position."""
+    try:
+        user_client   = User(key=api_key, secret=api_secret)
+        market_client = Market(key=api_key, secret=api_secret)
+        eur_usd = _get_eur_usd(market_client)
+        wallets = user_client.get_wallets()
+        flex = wallets.get("accounts", {}).get("flex", {})
+        portfolio_usd = float(flex.get("portfolioValue") or 0)
+        pnl_usd       = float(flex.get("pnl") or flex.get("totalUnrealized") or 0)
+        eur_balance   = round(portfolio_usd / eur_usd, 2) if eur_usd else 0.0
+        unrealized    = round(pnl_usd / eur_usd, 2)      if eur_usd else 0.0
+        return {"eur_balance": eur_balance, "unrealized_pnl": unrealized, "eur_usd": round(eur_usd, 4)}
+    except Exception as e:
+        return {"eur_balance": 0.0, "unrealized_pnl": 0.0, "error": str(e)}
 
 
 def fetch_open_positions(api_key: str, api_secret: str) -> list[dict]:
