@@ -52,6 +52,8 @@ from .models import (
     SignalIngest, SignalDecision, SignalResponse,
 )
 from . import bybit_sync, kraken_sync
+from .review import REVIEW_HTML, get_enriched_trades, get_ohlcv_1h
+from .montecarlo import MONTECARLO_HTML
 
 
 app = FastAPI(title="LENS", version="1.0.0-dev")
@@ -870,6 +872,8 @@ document.addEventListener('DOMContentLoaded', loadPlans);
     <a href="/signals">Signals</a>
     <a href="/projection" class="cur">Projection</a>
     <a href="/backtest">Backtest</a>
+    <a href="/review">Review</a>
+    <a href="/montecarlo">Monte Carlo</a>
   </nav>
 </div>
 
@@ -1096,6 +1100,8 @@ def landing():
     <a href="/signals">Signals</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
+    <a href="/review">Review</a>
+    <a href="/montecarlo">Monte Carlo</a>
   </nav>
 </div>
 
@@ -2091,6 +2097,8 @@ td{{padding:7px 0;border-bottom:1px solid var(--b1);color:var(--t2)}}
     <a href="/signals" class="cur">Signals</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
+    <a href="/review">Review</a>
+    <a href="/montecarlo">Monte Carlo</a>
   </nav>
 </div>
 
@@ -2316,32 +2324,48 @@ def backtest_page():
 <title>LENS — Backtest</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:#0d0d14;color:#c9c9d9;font-family:'Inter',system-ui,sans-serif;font-size:13px;padding:24px}}
-h1{{color:#e2e2f0;font-size:18px;margin-bottom:4px}}
-.sub{{color:#5a5a80;font-size:11px;margin-bottom:24px}}
-select,button{{background:#1a1a2e;border:1px solid #2a2a45;color:#c9c9d9;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer}}
-button.run{{background:#7c3aed;border:none;color:#fff;font-weight:600;padding:9px 22px}}
-button.run:hover{{background:#6d28d9}}
+:root{{--bg:#08080a;--s1:#0f0f12;--s2:#141418;--b1:#1e1e26;--b2:#28282e;--t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--ac:#5b8ef7;--adim:#121c36;--ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;--mono:'SF Mono',ui-monospace,'Cascadia Code',monospace}}
+body{{background:var(--bg);color:var(--t1);font-family:var(--ui);font-size:13px;-webkit-font-smoothing:antialiased}}
+.app{{max-width:1180px;margin:0 auto;padding:0 22px 60px}}
+.topbar{{display:flex;align-items:center;justify-content:space-between;padding:12px 0 12px;border-bottom:1px solid var(--b1);margin-bottom:24px}}
+.brand{{display:flex;align-items:baseline;gap:10px}}
+.brand-name{{font-family:var(--mono);font-size:15px;font-weight:700;color:#fff;letter-spacing:.12em}}
+.brand-name b{{color:var(--ac)}}
+.brand-sep{{color:var(--t3)}}
+.brand-page{{font-family:var(--mono);font-size:12px;color:var(--t2);letter-spacing:.08em}}
+.topnav{{display:flex;gap:2px}}
+.topnav a{{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}}
+.topnav a:hover{{color:var(--t1);background:var(--s2);text-decoration:none}}
+.topnav a.cur{{color:var(--ac);background:var(--adim)}}
+h1{{color:var(--t1);font-size:17px;margin-bottom:4px}}
+.sub{{color:var(--t3);font-size:11px;margin-bottom:24px}}
+select,button{{background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:var(--ui)}}
+button.run{{background:var(--adim);color:var(--ac);border-color:#1e2e54;font-weight:600;padding:9px 22px}}
+button.run:hover{{background:#172448}}
 button.run:disabled{{opacity:.5;cursor:default}}
 .row{{display:flex;gap:12px;align-items:center;margin-bottom:24px}}
-.card{{background:#13131f;border:1px solid #1e1e35;border-radius:8px;padding:16px 20px;margin-bottom:16px}}
+.card{{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:16px 20px;margin-bottom:16px}}
 .metrics{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}}
-.metric{{background:#0d0d14;border:1px solid #1e1e35;border-radius:6px;padding:10px 14px}}
-.metric .lbl{{font-size:9px;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}}
-.metric .val{{font-size:20px;font-weight:700;font-family:monospace;color:#e2e2f0}}
-.metric .val.good{{color:#34d399}}.metric .val.bad{{color:#f87171}}.metric .val.warn{{color:#fbbf24}}
+.metric{{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:10px 14px}}
+.metric .lbl{{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}}
+.metric .val{{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--t1)}}
+.metric .val.good{{color:#38c068}}.metric .val.bad{{color:#e8445a}}.metric .val.warn{{color:#e8a23d}}
 .metric .val.big{{font-size:14px}}
 table{{width:100%;border-collapse:collapse;font-size:11px}}
-th{{padding:6px 10px;text-align:left;font-size:9px;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #1e1e35}}
-td{{padding:6px 10px;border-bottom:1px solid #1a1a2e}}
-.win{{color:#34d399}}.loss{{color:#f87171}}
-#status{{color:#7c3aed;font-size:12px;margin-left:12px}}
+th{{padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b1)}}
+td{{padding:6px 10px;border-bottom:1px solid var(--b1)}}
+.win{{color:#38c068}}.loss{{color:#e8445a}}
+#status{{color:var(--ac);font-size:12px;margin-left:12px}}
 canvas{{width:100%;height:200px;display:block}}
-a.back{{color:#5a5a80;font-size:11px;text-decoration:none;display:inline-block;margin-bottom:18px}}
-a.back:hover{{color:#c9c9d9}}
 </style>
-</head><body>
-<a class="back" href="/">← Dashboard</a>
+</head><body><div class="app">
+<div class="topbar">
+  <div class="brand"><div class="brand-name">LEN<b>S</b></div><span class="brand-sep">·</span><div class="brand-page">Backtest</div></div>
+  <nav class="topnav">
+    <a href="/">Dashboard</a><a href="/signals">Signals</a><a href="/projection">Projection</a>
+    <a href="/backtest" class="cur">Backtest</a><a href="/review">Review</a><a href="/montecarlo">Monte Carlo</a>
+  </nav>
+</div>
 <h1>Strategy Backtest</h1>
 <div class="sub">BTC/USDT 4H · Bybit perpetuals · 30 months · €637 initial · 0.15%/side fee</div>
 
@@ -2491,7 +2515,7 @@ function drawChart(curve) {{
   ctx.fillText(curve[curve.length-1].date.slice(0,7), W-60, H-20);
 }}
 </script>
-</body></html>""")
+</div></body></html>""")
 
 
 class BtRunRequest(BaseModel):
@@ -2519,3 +2543,25 @@ def api_backtest_strategies():
         k: {"description": v["description"], "params": v["params"]}
         for k, v in BT_STRATEGIES.items()
     }
+
+
+# ─── Trade Review ─────────────────────────────────────────────────────────────
+
+@app.get("/review", response_class=HTMLResponse)
+def review_page():
+    return REVIEW_HTML
+
+
+@app.get("/montecarlo", response_class=HTMLResponse)
+def montecarlo_page():
+    return MONTECARLO_HTML
+
+
+@app.get("/api/review/trades")
+def api_review_trades():
+    return get_enriched_trades()
+
+
+@app.get("/api/review/ohlcv")
+def api_review_ohlcv():
+    return get_ohlcv_1h()

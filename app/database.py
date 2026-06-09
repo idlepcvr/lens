@@ -203,6 +203,10 @@ def init_db():
         c.execute("ALTER TABLE projection_plans ADD COLUMN plan_start_date TEXT")
     if "curve_json" not in existing_cols:
         c.execute("ALTER TABLE projection_plans ADD COLUMN curve_json TEXT")
+
+    trade_cols = {row[1] for row in c.execute("PRAGMA table_info(trades)").fetchall()}
+    if "setup_tag" not in trade_cols:
+        c.execute("ALTER TABLE trades ADD COLUMN setup_tag TEXT")
     c.commit()
 
     # Seed default config row on first init

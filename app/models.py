@@ -195,6 +195,8 @@ class TradeCreate(BaseModel):
     fill_count:   Optional[int] = None
     # LENS: back-link to originating signal (UUID)
     linked_signal_id: Optional[str] = None
+    # Setup classification
+    setup_tag: Optional[str] = None
 
 
 class TradeUpdate(BaseModel):
@@ -220,6 +222,7 @@ class TradeUpdate(BaseModel):
     followed_strategy: Optional[bool]  = None
     balance_after:     Optional[float] = None
     linked_signal_id:  Optional[str]   = None
+    setup_tag:         Optional[str]   = None
 
 
 class TradeResponse(TradeCreate):

@@ -11,6 +11,15 @@ It runs locally on a miniPC (FastAPI + SQLite, no cloud), and you open it in a
 browser. Nothing here trades for you — it's a thinking/measuring tool. You place the
 trades on Kraken yourself.
 
+LENS has two jobs, and they feed each other:
+
+1. **Plan & size the next trade** with discipline (the goal/projection pages).
+2. **Review the trades you already took** on an interactive ICT-style chart —
+   replay each fill against its setup, see which conditions actually produced
+   winners, and turn that into **better, pre-defined entries** going forward.
+   Setups come from a methodology — **PRISM**, ICT concepts, or your own — and
+   LENS measures whether they reach target instead of guessing.
+
 ---
 
 ## The core idea (the "4R" philosophy)
@@ -41,9 +50,10 @@ LENS shows you the honest number, not the brochure one.
 
 ---
 
-## What you actually open (the two pages)
+## What you actually open (the pages)
 
-Start the server (below), then visit **http://localhost:8765**.
+Start the server (below), then visit **http://localhost:8765**. A top nav links the
+five pages: **Dashboard · Projection · Backtest · Review · Monte Carlo**.
 
 ### 1. `/` — Dashboard (goal-*first*)
 Asks: **"What do I *need* each trade to do to hit my goal by a date?"**
@@ -66,9 +76,29 @@ You set the fixed rules and a win rate, and it projects the equity curve *forwar
 > The page is deliberately honest: far-out totals go to absurd numbers (compounding
 > does that) — it tells you to read the *shape and the early weeks*, not the raw totals.
 
+### 3. `/review` — Trade Review (ICT-*visual*) — **review the real trades**
+The feedback lens. Every closed fill is replayed on an **interactive chart** with the
+**edge conditions** computed at the entry bar — 4H trend alignment, EMA stack, RSI zone,
+entry-bar direction. You *see* the setup next to the outcome and learn **which conditions
+actually reach target.** This is where "good trade vs. lucky trade" gets separated, and
+where the next iteration of pre-defined entries comes from. (Findings so far:
+`LENS_EDGE_v1` — entry-bar alignment, 4H trend, and RSI zone each lift hit rate.)
+
+### 4. `/montecarlo` — PRISM Monte Carlo — **stress a methodology before risking it**
+A standalone simulator for a **pre-defined entry method** (PRISM, or any ruleset). Set
+capital, win rate, R, and trade count; it runs a Monte Carlo and shows the distribution
+of outcomes and **risk of ruin**. Use it to pressure-test a setup idea from Review
+*before* it becomes a live rule.
+
+### 5. `/backtest` — Backtest — validate the premise
+Runs a strategy over history to answer the open question: *does a 4H signal reach 4R
+behind a 1% stop, and at what real win rate?*
+
 *(Screenshots: drop PNGs into `docs/img/` and they'll show here.)*
 <!-- ![Dashboard](docs/img/dashboard.png) -->
 <!-- ![Projection](docs/img/projection.png) -->
+<!-- ![Review](docs/img/review.png) -->
+<!-- ![Monte Carlo](docs/img/montecarlo.png) -->
 
 ---
 
