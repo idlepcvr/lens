@@ -2,142 +2,127 @@
 
 **A personal cockpit for trading BTC perpetual futures with discipline.**
 
-LENS exists to fix one specific problem: I take good trades but I close my winners
-too early. Historically that turned a real edge into break-even results. LENS is the
-toolkit that forces the discipline — find a clean setup, risk a fixed slice of the
-account, and **hold the winner all the way to target** instead of bailing.
+LENS runs locally on a miniPC (FastAPI + SQLite, no cloud) and you open it in a
+browser. Nothing here trades for you — it's a thinking/measuring tool. You place
+the trades on Kraken yourself.
 
-It runs locally on a miniPC (FastAPI + SQLite, no cloud), and you open it in a
-browser. Nothing here trades for you — it's a thinking/measuring tool. You place the
-trades on Kraken yourself.
+It started as a "hold winners to 4R" discipline tool. Then we mined the actual
+trade history (464 closed Kraken trades) and the data said something different —
+so LENS now has a primary, evidence-based job and a secondary, still-unproven one:
 
-LENS has two jobs, and they feed each other:
-
-1. **Plan & size the next trade** with discipline (the goal/projection pages).
-2. **Review the trades you already took** on an interactive ICT-style chart —
-   replay each fill against its setup, see which conditions actually produced
-   winners, and turn that into **better, pre-defined entries** going forward.
-   Setups come from a methodology — **PRISM**, ICT concepts, or your own — and
-   LENS measures whether they reach target instead of guessing.
+1. **Trade the mapped edge (LENS_EDGE_v3)** — five setups and seven vetoes mined
+   from the real fills, run as a live loop: hourly scanner → phone alert →
+   `/desk` checklist → trade on Kraken → auto-tagged on sync → per-setup
+   scoreboard → re-mine when enough data accumulates.
+2. **The 4H/4R thesis (legacy track)** — plan/projection tooling for the
+   "risk 10% to make 40%" idea. Still unproven; kept and clearly labelled.
 
 ---
 
-## The core idea (the "4R" philosophy)
+## What the data actually said (LENS_EDGE_v3, 2026-06-12)
 
-> **Win rate is not the problem. The exit is.**
+Mined from 464 real trades (41.8% WR, €+736) with outlier-trimming and
+old-half/new-half robustness checks. Full detail:
+`strategies/LENS_EDGE_v3_ICT/FINDINGS.md`.
 
-The whole strategy in one sentence:
+**You are a momentum-continuation trader, not a reversal trader.**
+Trading *with* a liquidity sweep: 50% WR, €+15/trade. Fading the sweep
+(classic ICT turtle-soup): 33% WR. Displacement with you: 55%. Against: 35%.
 
-> *I trade BTC perps on Kraken — with the 4H trend — risking a fixed **10% of my
-> account to make 40%** (a **4R** trade). My entire edge is holding winners to the
-> full target instead of closing early.*
+**Five setups that survived everything** (realized/mined WR):
 
-Why this works, in plain terms:
+| ID | Setup | Direction | WR |
+|---|---|---|---|
+| S1 | NY AM killzone flush — RSI<40 + 3 bear bars, 13–16 UTC | short | 90.9% (n=11 tagged) |
+| S2 | Premium of 7d range + bearish displacement | short | 65% |
+| S3 | RSI>55 + buyside sweep (continuation) | long | 56.7% (n=30) |
+| S4 | RSI<40 in discount, no recent sweep | long | 62% |
+| S5 | RSI>55 in London killzone 07–10 UTC | long | 60% |
 
-- A **44% win rate is fine.** You don't need to be right more often — that's the hard
-  thing to improve and it barely moves the needle.
-- What moves everything is **R** — how many multiples of your risk you make on a win.
-  Closing at +11% when you risked 10% is ~1R; that's a slow death after fees. Holding
-  to +40% is ~4R; that compounds.
-- **R is the lever because it's the one you control.** Win rate is a slow byproduct of
-  entry quality. R is a *decision you make at the exit* — fixable today.
+**Seven vetoes — where the account bleeds** (302 of 464 trades, −€1,760):
+RSI 40–55 dead zone · 1h EMA21 slope against · fading a sweep · fading a
+prior-day-level raid · displacement against · entering inside an FVG retrace ·
+NY PM 18–21 UTC.
 
-The honest catch (the reason this isn't just a fantasy spreadsheet): the 4R target
-behind a **1% stop** is *unproven*. A 1% stop is tight; it gets wicked by noise, which
-can drop the win rate. **Validating that is the job of the backtest** (see Strategies
-below). After real fees (0.30% round trip at 10x), the clean "4R" is really **~2.85R** —
-LENS shows you the honest number, not the brochure one.
+**Timeframe, settled by the fills:** 1H context, winners resolve in 2–8h
+(+€1,552 at 50% WR). Sub-2h trades — over half of everything — bled −€747 at
+34–35%. Not a 1m/5m scalper, not (yet) a 4H swing trader.
+
+**The honest caveat that defines the whole design:** mechanically (take every
+occurrence, no judgment) every setup is a coin flip at the realized
+0.63% SL / 0.95% TP geometry. The 57–91% realized WR came from *discretionary
+selection inside these contexts*. So LENS alerts and checklists — it never
+auto-enters. Off-playbook trades ("NONE" tag) look profitable only because of
+5 outlier wins; without them they're −€736.
 
 ---
 
-## What you actually open (the pages)
+## The loop (how it actually helps on a live trade)
 
-Start the server (below), then visit **http://localhost:8765**. A top nav links the
-five pages: **Dashboard · Projection · Backtest · Review · Monte Carlo**.
+```mermaid
+flowchart TD
+    CRON["hourly scanner\npython3 -m app.setups (cron)"]
+    NTFY["phone push (ntfy)\n'S1 — SHORT setup live'"]
+    DESK["/desk\nverdict + checklist + ticket in EUR"]
+    ME["Me\ntake it or skip it"]
+    KR["Kraken\nplace the trade"]
+    DB["LENS server\nfills synced + auto setup_tag"]
+    SB["scoreboard /api/stats/setups\nrealized vs mined WR, drift halves"]
+    V4["re-mine (v4)\nwhen enough tagged trades"]
 
-### 1. `/` — Dashboard (goal-*first*)
-Asks: **"What do I *need* each trade to do to hit my goal by a date?"**
-You type in a target (e.g. €360 → 1 BTC by December) and it works *backwards* to tell
-you the required per-trade growth, R, stop %, and position size, plus Kelly/risk-of-ruin
-checks. This is the planning lens.
+    CRON --> NTFY --> DESK --> ME -->|execute| KR -->|sync| DB --> SB --> V4 -->|better setups| CRON
+    CRON -->|pending signal| DB
+```
 
-### 2. `/projection` — Projection (parameter-*first*) — **the newer page**
-The exact inverse. Asks: **"My parameters are *locked* (1% stop, 4% TP, 10x) — so
-where do I actually *land*?"**
-You set the fixed rules and a win rate, and it projects the equity curve *forward*:
+Every signal — taken or skipped — lands in the `/signals` approve/reject flow
+with discipline filters (no Saturday, bleed hours, cooldown). Every synced trade
+gets a `setup_tag`. That tagged dataset is what v4 will mine — including new
+feature candidates (order flow: CVD, delta, funding, open interest).
 
-- **Coloured percentile bands** (P05 unlucky → median → P95 lucky) week by week.
-- **Headline metrics:** EV per trade, real R after fees, weeks-to-double, breakeven
-  win rate, risk of ruin.
-- **Two sensitivity tables** — turn the win-rate dial vs. turn the R dial — so you can
-  *see* why R is the lever you control.
-- A **Fee %** field so the costs match your real Kraken fees.
+---
 
-> The page is deliberately honest: far-out totals go to absurd numbers (compounding
-> does that) — it tells you to read the *shape and the early weeks*, not the raw totals.
+## The pages
 
-### 3. `/review` — Trade Review (ICT-*visual*) — **review the real trades**
-The feedback lens. Every closed fill is replayed on an **interactive chart** with the
-**edge conditions** computed at the entry bar — 4H trend alignment, EMA stack, RSI zone,
-entry-bar direction. You *see* the setup next to the outcome and learn **which conditions
-actually reach target.** This is where "good trade vs. lucky trade" gets separated, and
-where the next iteration of pre-defined entries comes from. (Findings so far:
-`LENS_EDGE_v1` — entry-bar alignment, 4H trend, and RSI zone each lift hit rate.)
+Start the server (below), then visit **http://localhost:8765**.
+Nav: **Dashboard · Desk · Signals · Projection · Backtest · Review · Monte Carlo**.
 
-### 4. `/montecarlo` — PRISM Monte Carlo — **stress a methodology before risking it**
-A standalone simulator for a **pre-defined entry method** (PRISM, or any ruleset). Set
-capital, win rate, R, and trade count; it runs a Monte Carlo and shows the distribution
-of outcomes and **risk of ruin**. Use it to pressure-test a setup idea from Review
-*before* it becomes a live rule.
+### `/desk` — **the live one. "Can I enter right now?"**
+Per-direction verdict (ENTER / BLOCKED / STAND DOWN) with the active vetoes
+spelled out, live S1–S5 condition checklists (✓/✗ per condition), and an
+always-on trade ticket in money: entry/stop/target, position size from your
+risk €, margin at 10x, and the three outcomes — if target / if +0.7% early
+exit / if stopped (as % of account). Refreshes every 60s.
 
-### 5. `/backtest` — Backtest — validate the premise
-Runs a strategy over history to answer the open question: *does a 4H signal reach 4R
-behind a 1% stop, and at what real win rate?*
+### `/signals` — approve/reject queue
+Scanner-emitted (and Pine-webhook) signals land here as pending. Decisions and
+rejection reasons are stored — skipped signals are data too.
 
-*(Screenshots: drop PNGs into `docs/img/` and they'll show here.)*
-<!-- ![Dashboard](docs/img/dashboard.png) -->
-<!-- ![Projection](docs/img/projection.png) -->
-<!-- ![Review](docs/img/review.png) -->
-<!-- ![Monte Carlo](docs/img/montecarlo.png) -->
+### `/review` — replay real trades on an ICT-style chart
+Every closed fill with its entry context computed. Where v1→v3 came from.
+
+### `/` Dashboard + `/projection` — the 4R planning track (legacy)
+Goal-first ("what does each trade need to do?") and parameter-first ("where do
+locked params land?") calculators with percentile bands, fee-honest R, ruin %.
+
+### `/backtest` + `/montecarlo` — pressure-testing
+Backtest engine over cached OHLCV (includes `LIVE_SCALP_v1`, a baseline that
+reproduces the realized ~42% WR from pure SL/TP geometry — the bar any
+strategy must beat). Monte Carlo can seed its inputs from live trades or any
+backtest strategy.
 
 ---
 
 ## Strategies (the TradingView side)
 
-LENS doesn't draw charts — TradingView does that far better. The `strategies/` folder
-holds **Pine Script** strategies that encode the rules above so you can **backtest them**
-in TradingView's Strategy Tester and (later) get phone alerts.
+`strategies/` holds Pine Script. Load in TradingView → Pine Editor.
 
-- **`TREND_4R_v1`** — the current one. 4H, with-trend only, fixed 1% stop / 4% TP (4R),
-  10x, skip-Saturday + one-trade-per-day discipline. Its `BASELINE.md` explains the
-  experiment: *does a 4H signal actually reach 4R behind a 1% stop, and at what real
-  win rate?* Fill in the Strategy Tester numbers there.
-
-See `strategies/README.md` for how to load a strategy and set up alerts.
-
----
-
-## How it fits together
-
-```mermaid
-flowchart TD
-    TV["TradingView — Pine strategy (Lens)\nfinds 4H 4R setups, draws SL/TP"]
-    ME["Me\ndecide: take it or skip it"]
-    KR["Kraken\nplace the trade (10x, 1% stop, 4% TP)"]
-    DB["LENS server (this repo)\nSQLite + FastAPI on the miniPC"]
-    PG["Dashboard / Projection\n(browser)"]
-
-    TV -->|signal + alert| ME
-    ME -->|execute| KR
-    TV -->|signal JSON| DB
-    KR -->|fills synced| DB
-    DB --> PG
-    PG -->|plan & measure| ME
-```
-
-Every signal — *taken or skipped* — is stored with its full feature set and linked to
-the real fill. Over ~150–300 trades that becomes a dataset of *(setup → outcome)*, which
-is the long-term goal: learn which setups actually reach 4R.
+- **`LENS_EDGE_v3_ICT/indicator.pine`** — **the current one.** Not a strategy:
+  a HUD. S1–S5 markers, veto background shading, ghost-marks where a setup
+  fired but was vetoed, live checklist table, per-setup alerts.
+- `LENS_EDGE_v2/` — the flush short + the mechanical-validation failure that
+  taught us setups are contexts, not triggers. Kept for the paper trail.
+- `TREND_4R_v1/` — the 4H/4R thesis strategy. Still not validated.
+- Older experiments (`PULLBACK_*`, `MOM_BREAK_v1`, …) — see `strategies/README.md`.
 
 ---
 
@@ -148,14 +133,6 @@ is the long-term goal: learn which setups actually reach 4R.
 ./stop.sh      # stops it
 ```
 
-`start.sh` runs it as a background service and prints:
-
-```
-✅ LENS is up. Open the dashboard:
-   →  http://localhost:8765
-   →  http://192.168.1.114:8765   (from your phone on the same Wi-Fi)
-```
-
 First-time setup:
 
 ```bash
@@ -163,51 +140,47 @@ pip install -r requirements.txt
 cp prism.env .env       # exchange keys etc.
 ```
 
+**Enable the loop (two one-time steps):**
+
+```bash
+# 1. schedule the hourly scanner (minute 2, right after the 1H bar closes)
+(crontab -l 2>/dev/null; echo '2 * * * * cd /home/mini/lens && /home/mini/prism/.venv/bin/python3 -m app.setups >> setup_scan.log 2>&1') | crontab -
+
+# 2. phone alerts: install the ntfy app, subscribe to a topic you invent,
+#    then add it to prism.env:
+echo 'LENS_NTFY_TOPIC=your-secret-topic-name' >> prism.env
+```
+
 Health check: `curl localhost:8765/health` · API docs: http://localhost:8765/docs
 
----
-
-## Working across machines (laptop ↔ miniPC)
-
-Active work lives on the branch **`lens-4r-projection`** (direct pushes to `master`
-are blocked by a review guard).
-
-**To pick up where you left off on another machine:**
-
-```bash
-git fetch origin
-git checkout lens-4r-projection     # first time
-# or, if already on the branch:
-git pull
-```
-
-**To save and sync your work back up:**
-
-```bash
-git add -A
-git commit -m "what changed"
-git push origin HEAD:lens-4r-projection
-```
-
-**When the branch is solid and you want it as your main line:**
-
-```bash
-git checkout master
-git merge lens-4r-projection
-```
-
-Current progress snapshot is always in **`STATUS.md`** — read that first to remember
-where things stand and what the next step is.
+Useful API: `POST /api/setups/scan` (scan now) ·
+`GET /api/setups/state` (desk JSON) · `GET /api/stats/setups` (scoreboard) ·
+`POST /api/setups/backfill-tags` (re-tag trades).
 
 ---
 
 ## Status / honesty
 
-- ✅ Goal calculator, projection page, exchange sync, signal ingestion, discipline filters.
-- 🧪 `TREND_4R_v1` written — **not yet backtested.** The 4R-at-1%-stop premise is the open question.
-- ⚠️ Projections are models, not promises. They assume the win rate holds at a tight
-  stop and bake in 0.30% round-trip fees — but funding cost on multi-day holds is not
-  modelled. Treat the early weeks and the ruin % as the trustworthy parts.
+- ✅ v3 edge mapped and live: setup engine, /desk, phone alerts, auto-tagging,
+  scoreboard. All 464 historical trades tagged.
+- ✅ Exchange sync, signal ingestion, discipline filters, projection/goal math.
+- ⏳ Loop needs the crontab line + ntfy topic installed (user-side, above).
+- ⏳ v4 needs ~3 months of tagged trades; candidate new features: order-flow
+  data (CVD, delta, funding, OI).
+- 🧪 `TREND_4R_v1` (4H/4R thesis) — still not backtested; separate track.
+- ⚠️ Setup WRs are realized-history numbers, not promises. Mechanical
+  occurrence of any setup is ~coin-flip — the edge is selection inside the
+  context. Funding cost on multi-day holds is not modelled.
 
-See `LENS_PLAN.md` for the full build plan and `PRISM-SYSTEM-SPEC (1).md` for the
-four-component architecture (Core / Lens / Dashboard / Notify).
+Current progress snapshot: **`STATUS.md`** (read first). Full playbook:
+`strategies/LENS_EDGE_v3_ICT/FINDINGS.md`. Build plan history: `LENS_PLAN.md`,
+`PRISM-SYSTEM-SPEC (1).md`.
+
+## Working across machines
+
+Active line is **`master`** (the old `lens-4r-projection` branch was merged).
+
+```bash
+git pull                              # pick up where you left off
+git add -A && git commit -m "..." && git push
+```
