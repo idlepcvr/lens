@@ -1,0 +1,204 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / LENS_EDGE_v3 — ICT Setup & Veto HUD   (mined from 464 real trades)
+//
+// ⚠️ INDICATOR, NOT A STRATEGY. The patterns are coin-flip mechanical; the
+// realized 57–91% WR came from discretionary selection inside these contexts
+// plus fast exits (+0.5–0.9%). This script paints the contexts where YOUR
+// trading historically wins, and shades the contexts where it provably
+// bleeds. You still pick the trade. See FINDINGS.md.
+//
+// Designed for the 1H chart of BTC perps. All sessions in UTC.
+//
+// SETUPS (realized WR from your tagged history):
+//   S1 short — NY AM killzone flush: RSI<40 + 3 bear bars, 13–16 UTC  (90.9%)
+//   S2 short — premium of 7d range + bearish displacement bar          (65%)
+//   S3 long  — RSI>55 + buyside sweep (continuation, NOT fade)         (57%)
+//   S4 long  — RSI<40 + discount of 7d range + no recent sweep         (62%)
+//   S5 long  — RSI>55 in London killzone 07–10 UTC                     (60%)
+//
+// VETOES (your realized bleed, 302/464 trades, −€1,760):
+//   RSI 40–55 · EMA21 slope against · sweep fade · prior-day-raid fade ·
+//   displacement against · entry inside FVG retrace · NY PM 18–21 UTC
+// ─────────────────────────────────────────────────────────────────────────────
+
+indicator("LENS / LENS_EDGE_v3 — ICT HUD", overlay=true, max_lines_count=50, max_labels_count=100)
+
+// ─── Inputs ───────────────────────────────────────────────────────────────────
+grp = "Display"
+showRange = input.bool(true,  "Show 7d premium/discount range", group=grp)
+showKz    = input.bool(true,  "Shade killzones",                group=grp)
+showVetoBg= input.bool(true,  "Shade no-trade contexts",        group=grp)
+
+// ─── Core indicators (same math the miner used) ──────────────────────────────
+rsi    = ta.rsi(close, 14)
+ema21  = ta.ema(close, 21)
+atr14  = ta.atr(14)
+
+slopeUp = ema21 > ema21[3]
+slopeDn = ema21 < ema21[3]
+
+bearBar = close < open
+bullBar = close > open
+bear3   = bearBar and bearBar[1] and bearBar[2]
+
+utcH      = hour(time, "UTC")
+kzLondon  = utcH >= 7  and utcH < 10
+kzNyAm    = utcH >= 13 and utcH < 16
+kzNyPm    = utcH >= 18 and utcH < 21
+
+// ─── Liquidity sweep: 24-bar swing taken out within last 3 bars ──────────────
+brokeHi = high > ta.highest(high, 24)[1]
+brokeLo = low  < ta.lowest(low, 24)[1]
+bsHi = ta.barssince(brokeHi)
+bsLo = ta.barssince(brokeLo)
+sweepBuy  = not na(bsHi) and bsHi <= 2 and (na(bsLo) or bsHi <= bsLo)
+sweepSell = not na(bsLo) and bsLo <= 2 and not sweepBuy
+sweepNone = not sweepBuy and not sweepSell
+
+// ─── Prior-day high/low raid within last 3 bars ───────────────────────────────
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_on)
+raidHiBar = high > pdh
+raidLoBar = low  < pdl
+bsRaidHi = ta.barssince(raidHiBar)
+bsRaidLo = ta.barssince(raidLoBar)
+raidPdh = not na(bsRaidHi) and bsRaidHi <= 2 and (na(bsRaidLo) or bsRaidHi <= bsRaidLo)
+raidPdl = not na(bsRaidLo) and bsRaidLo <= 2 and not raidPdh
+
+// ─── Displacement: prior bar range > 1.5× ATR ─────────────────────────────────
+rng1     = high[1] - low[1]
+dispBull = rng1 > 1.5 * atr14[1] and close[1] >= open[1]
+dispBear = rng1 > 1.5 * atr14[1] and close[1] <  open[1]
+
+// ─── 7-day dealing range: premium / eq / discount ─────────────────────────────
+rHi = ta.highest(high, 168)
+rLo = ta.lowest(low, 168)
+rangePos   = rHi > rLo ? (close - rLo) / (rHi - rLo) : 0.5
+inPremium  = rangePos > 0.55
+inDiscount = rangePos < 0.45
+
+// ─── FVG tracking (unfilled, formed within last 12 bars) ─────────────────────
+var fvgTop  = array.new_float()
+var fvgBot  = array.new_float()
+var fvgBull = array.new_bool()
+var fvgBar  = array.new_int()
+
+if low > high[2]                                    // bullish FVG below price
+    array.push(fvgTop, low), array.push(fvgBot, high[2])
+    array.push(fvgBull, true), array.push(fvgBar, bar_index)
+if high < low[2]                                    // bearish FVG above price
+    array.push(fvgTop, low[2]), array.push(fvgBot, high)
+    array.push(fvgBull, false), array.push(fvgBar, bar_index)
+
+inFvgLong  = false
+inFvgShort = false
+if array.size(fvgTop) > 0
+    for i = 0 to array.size(fvgTop) - 1
+        if close >= array.get(fvgBot, i) and close <= array.get(fvgTop, i)
+            if array.get(fvgBull, i)
+                inFvgLong := true
+            else
+                inFvgShort := true
+// prune filled / aged gaps AFTER the entry check (entry bar can't fill its own gap)
+if array.size(fvgTop) > 0
+    for i = array.size(fvgTop) - 1 to 0
+        isBull = array.get(fvgBull, i)
+        filled = isBull ? low <= array.get(fvgBot, i) : high >= array.get(fvgTop, i)
+        if filled or bar_index - array.get(fvgBar, i) > 12
+            array.remove(fvgTop, i), array.remove(fvgBot, i)
+            array.remove(fvgBull, i), array.remove(fvgBar, i)
+
+// ─── Vetoes per direction ─────────────────────────────────────────────────────
+rsiNeutral = rsi >= 40 and rsi <= 55
+
+vetoLong  = rsiNeutral or slopeDn or sweepSell or raidPdl or dispBear or inFvgLong  or kzNyPm
+vetoShort = rsiNeutral or slopeUp or sweepBuy  or raidPdh or dispBull or inFvgShort or kzNyPm
+
+vetoLongTxt  = (rsiNeutral ? "rsi40-55 " : "") + (slopeDn ? "slope↓ " : "") +
+               (sweepSell ? "sweep-fade " : "") + (raidPdl ? "pdl-fade " : "") +
+               (dispBear ? "disp↓ " : "") + (inFvgLong ? "fvg " : "") + (kzNyPm ? "nyPM" : "")
+vetoShortTxt = (rsiNeutral ? "rsi40-55 " : "") + (slopeUp ? "slope↑ " : "") +
+               (sweepBuy ? "sweep-fade " : "") + (raidPdh ? "pdh-fade " : "") +
+               (dispBull ? "disp↑ " : "") + (inFvgShort ? "fvg " : "") + (kzNyPm ? "nyPM" : "")
+
+// ─── Setups ───────────────────────────────────────────────────────────────────
+s1 = kzNyAm and rsi < 40 and bear3                  // short
+s2 = inPremium and dispBear                         // short
+s3 = rsi > 55 and sweepBuy                          // long
+s4 = rsi < 40 and inDiscount and sweepNone          // long
+s5 = rsi > 55 and kzLondon                          // long
+
+s1c = s1 and not vetoShort
+s2c = s2 and not vetoShort
+s3c = s3 and not vetoLong
+s4c = s4 and not vetoLong
+s5c = s5 and not vetoLong
+
+anyShortClean = s1c or s2c
+anyLongClean  = s3c or s4c or s5c
+
+// ─── Visuals ──────────────────────────────────────────────────────────────────
+plot(ema21, "EMA21", color=color.new(color.aqua, 30), linewidth=2)
+plot(showRange ? rHi : na, "7d range high", color=color.new(color.orange, 60), style=plot.style_linebr)
+plot(showRange ? rLo : na, "7d range low",  color=color.new(color.teal, 60),   style=plot.style_linebr)
+
+bgcolor(showKz and kzNyAm   ? color.new(color.green, 94)  : na, title="NY AM killzone (your best)")
+bgcolor(showKz and kzLondon ? color.new(color.blue, 95)   : na, title="London killzone")
+bgcolor(showVetoBg and kzNyPm     ? color.new(color.maroon, 92) : na, title="NY PM (your worst hours)")
+bgcolor(showVetoBg and rsiNeutral ? color.new(color.red, 96)    : na, title="RSI 40–55 dead zone")
+
+plotshape(s1c, "S1 flush short",   location=location.abovebar, style=shape.triangledown, color=color.new(color.red, 0),    size=size.normal, text="S1")
+plotshape(s2c, "S2 premium short", location=location.abovebar, style=shape.triangledown, color=color.new(color.orange, 0), size=size.small,  text="S2")
+plotshape(s3c, "S3 cont. long",    location=location.belowbar, style=shape.triangleup,   color=color.new(color.green, 0),  size=size.normal, text="S3")
+plotshape(s4c, "S4 discount long", location=location.belowbar, style=shape.triangleup,   color=color.new(color.lime, 0),   size=size.small,  text="S4")
+plotshape(s5c, "S5 london long",   location=location.belowbar, style=shape.triangleup,   color=color.new(color.teal, 0),   size=size.small,  text="S5")
+// setup fired but a veto killed it — ghost marker so you SEE the discipline working
+plotshape((s1 or s2) and vetoShort, "short setup vetoed", location=location.abovebar, style=shape.xcross, color=color.new(color.gray, 40), size=size.tiny)
+plotshape((s3 or s4 or s5) and vetoLong, "long setup vetoed", location=location.belowbar, style=shape.xcross, color=color.new(color.gray, 40), size=size.tiny)
+
+// ─── Live checklist table ─────────────────────────────────────────────────────
+var table tbl = table.new(position.top_right, 2, 9, bgcolor=color.new(color.black, 70), border_width=1)
+if barstate.islast
+    table.cell(tbl, 0, 0, "LENS_EDGE_v3", text_color=color.white, text_size=size.small, bgcolor=color.new(color.navy, 40))
+    table.cell(tbl, 1, 0, "your edge, mapped", text_color=color.gray, text_size=size.tiny, bgcolor=color.new(color.navy, 40))
+
+    table.cell(tbl, 0, 1, "RSI", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 1, str.tostring(math.round(rsi, 1)) + (rsiNeutral ? "  ☠ dead zone" : rsi < 40 ? "  flush" : rsi > 55 ? "  momentum" : ""),
+         text_color=rsiNeutral ? color.red : color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 2, "Range", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(math.round(rangePos * 100)) + "%  " + (inPremium ? "premium" : inDiscount ? "discount" : "eq"),
+         text_color=color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 3, "Killzone", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 3, kzNyAm ? "NY AM ★" : kzLondon ? "London" : kzNyPm ? "NY PM ☠" : "—",
+         text_color=kzNyAm ? color.green : kzNyPm ? color.red : color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 4, "Sweep", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 4, sweepBuy ? "buyside (long ok / short = fade)" : sweepSell ? "sellside (short ok / long = fade)" : "none",
+         text_color=color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 5, "Displ.", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 5, dispBull ? "bull" : dispBear ? "bear" : "—", text_color=color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 6, "Slope", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 6, slopeUp ? "up" : slopeDn ? "down" : "flat", text_color=color.white, text_size=size.small)
+
+    table.cell(tbl, 0, 7, "LONG", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 7, anyLongClean ? "✓ " + (s3c ? "S3 " : "") + (s4c ? "S4 " : "") + (s5c ? "S5" : "")
+         : vetoLong ? "✗ " + vetoLongTxt : "no setup",
+         text_color=anyLongClean ? color.green : vetoLong ? color.red : color.gray, text_size=size.small)
+
+    table.cell(tbl, 0, 8, "SHORT", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 8, anyShortClean ? "✓ " + (s1c ? "S1 " : "") + (s2c ? "S2" : "")
+         : vetoShort ? "✗ " + vetoShortTxt : "no setup",
+         text_color=anyShortClean ? color.green : vetoShort ? color.red : color.gray, text_size=size.small)
+
+// ─── Alerts (clean setups only — vetoed contexts stay silent) ─────────────────
+alertcondition(s1c, "v3 S1 — NY AM flush SHORT",      '{"strategy":"LENS_EDGE_v3","setup":"S1","side":"short","symbol":"{{ticker}}","price":{{close}}}')
+alertcondition(s2c, "v3 S2 — premium displacement SHORT", '{"strategy":"LENS_EDGE_v3","setup":"S2","side":"short","symbol":"{{ticker}}","price":{{close}}}')
+alertcondition(s3c, "v3 S3 — continuation LONG",      '{"strategy":"LENS_EDGE_v3","setup":"S3","side":"long","symbol":"{{ticker}}","price":{{close}}}')
+alertcondition(s4c, "v3 S4 — discount dip LONG",      '{"strategy":"LENS_EDGE_v3","setup":"S4","side":"long","symbol":"{{ticker}}","price":{{close}}}')
+alertcondition(s5c, "v3 S5 — london momentum LONG",   '{"strategy":"LENS_EDGE_v3","setup":"S5","side":"long","symbol":"{{ticker}}","price":{{close}}}')
+alertcondition(anyLongClean or anyShortClean, "v3 — ANY clean setup", '{"strategy":"LENS_EDGE_v3","setup":"any","symbol":"{{ticker}}","price":{{close}}}')

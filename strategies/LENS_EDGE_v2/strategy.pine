@@ -1,0 +1,166 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// LENS / LENS_EDGE_v2   —   The Flush Short (mined from 464 real trades)
+//
+// ⚠️ NOT A MECHANICAL STRATEGY — DISCRETIONARY CONTEXT TOOL ONLY.
+// Mechanical backtest over 30 months (1,413 occurrences): 22.4% WR vs 28.9%
+// breakeven → account to zero. Forward move after signal ≈ 0%. The 60% WR
+// below came from discretionary selection (you took 1 in 40 occurrences)
+// plus early exits. Use this script to SEE the context you historically
+// traded well — never to auto-enter. See FINDINGS.md.
+//
+// SOURCE: edge_miner.py over actual Kraken trade history (464 closed trades).
+// Every rule below survived outlier-trimming AND old-half/new-half splits.
+// See FINDINGS.md for the full robustness table.
+//
+// PRIMARY SETUP — FLUSH SHORT:
+//   RSI(14) < 40  +  3 consecutive bear bars  →  short the 3rd bear bar
+//     All sessions : WR=60.0%  n=35   avg move +0.48%
+//     NY (13–21 UTC): WR=81.2%  n=16   avg move +0.92%
+//   This is momentum continuation INTO the flush, not a dip-buy.
+//   4H trend alignment does not improve it — no 4H gate on this setup.
+//
+// HARD AVOID (robust, worsening in recent data):
+//   RSI 40–55 zone          : 34.7% WR, −€1,243  (39%→30% old→new half)
+//   1h EMA21 slope against  : 38.1% WR, −€1,177  (42%→34%)
+//
+// LONG MIRROR (RSI>60 + 3 bull bars): ZERO occurrences in real data.
+// Untested — ships disabled. Enable at your own risk.
+//
+// RISK PARAMS (locked to projection math):
+//   Stop 1.0% / Target 3.5% → breakeven WR ≈ 30% after fees.
+//   Avg realized move was only +0.48% — the edge needs the TP left alone.
+// ─────────────────────────────────────────────────────────────────────────────
+
+strategy("LENS / LENS_EDGE_v2", overlay=true,
+     initial_capital=637,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=100,
+     commission_type=strategy.commission.percent,
+     commission_value=0.15,
+     slippage=2,
+     margin_long=10, margin_short=10,
+     process_orders_on_close=true,
+     calc_on_every_tick=false)
+
+// ─── Risk (locked) ────────────────────────────────────────────────────────────
+grpRisk = "Risk / target (LOCKED — matches projection math)"
+stopPct = input.float(1.0, "Stop %",   group=grpRisk, minval=0.25, step=0.25)
+tpPct   = input.float(3.5, "Target %", group=grpRisk, minval=0.5,  step=0.25)
+lev     = input.float(10.0,"Leverage (display only)", group=grpRisk, minval=1.0, step=1.0)
+
+// ─── Setup inputs ─────────────────────────────────────────────────────────────
+grpSetup    = "Flush setup"
+rsiFlushMax = input.float(40.0, "RSI below (short flush)", group=grpSetup, minval=20, maxval=50)
+nyOnly      = input.bool(false, "NY session only (13–21 UTC) — 81% WR but 0.3 tpw", group=grpSetup)
+enableLong  = input.bool(false, "Enable UNTESTED long mirror (0 real trades!)", group=grpSetup)
+rsiLongMin  = input.float(60.0, "RSI above (long mirror)", group=grpSetup, minval=50, maxval=80)
+
+// ─── Indicators ───────────────────────────────────────────────────────────────
+rsi      = ta.rsi(close, 14)
+ema21    = ta.ema(close, 21)
+slopeUp  = ema21 > ema21[3]
+slopeDn  = ema21 < ema21[3]
+
+bearBar  = close < open
+bullBar  = close > open
+bear3    = bearBar and bearBar[1] and bearBar[2]
+bull3    = bullBar and bullBar[1] and bullBar[2]
+
+nySession = hour(time, "UTC") >= 13 and hour(time, "UTC") < 21
+sessionOk = not nyOnly or nySession
+
+rsiAvoid  = rsi >= 40 and rsi <= 55     // 34.7% WR zone — never trade
+
+// ─── Signals ──────────────────────────────────────────────────────────────────
+// FLUSH SHORT: oversold + 3 bear bars. Slope-against filter is implied
+// (3 bear bars force EMA21 down), kept explicit as a guard anyway.
+flushShort = rsi < rsiFlushMax and bear3 and slopeDn and sessionOk
+
+// Long mirror — UNTESTED, zero occurrences in the 464 real trades.
+mirrorLong = enableLong and rsi > rsiLongMin and bull3 and slopeUp and sessionOk
+
+// ─── Strategy execution ───────────────────────────────────────────────────────
+if flushShort and strategy.position_size == 0
+    slP = close * (1 + stopPct / 100)
+    tpP = close * (1 - tpPct   / 100)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=slP, limit=tpP)
+
+if mirrorLong and strategy.position_size == 0
+    slP = close * (1 - stopPct / 100)
+    tpP = close * (1 + tpPct   / 100)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=slP, limit=tpP)
+
+// ─── Visuals ──────────────────────────────────────────────────────────────────
+plot(ema21, "EMA21", color=color.new(color.aqua, 30), linewidth=2)
+
+// Zone backgrounds: avoid zone red, flush zone green when in NY session
+bgcolor(rsiAvoid ? color.new(color.red, 96) : na, title="RSI avoid zone (40–55)")
+bgcolor(rsi < rsiFlushMax and nySession ? color.new(color.green, 93) : na,
+     title="Flush zone in NY (best window)")
+
+plotshape(flushShort, title="FLUSH SHORT",
+     location=location.abovebar, style=shape.triangledown,
+     color=color.new(color.red, 0), size=size.normal)
+plotshape(mirrorLong, title="Mirror long (untested)",
+     location=location.belowbar, style=shape.triangleup,
+     color=color.new(color.gray, 0), size=size.small)
+
+// SL/TP lines on new signal
+var line slLine = na
+var line tpLine = na
+var label entryLbl = na
+
+if flushShort and strategy.position_size == 0
+    slP = close * (1 + stopPct / 100)
+    tpP = close * (1 - tpPct   / 100)
+    line.delete(slLine)
+    line.delete(tpLine)
+    label.delete(entryLbl)
+    slLine   := line.new(bar_index, slP, bar_index + 40, slP, color=color.red,   width=1, style=line.style_dashed)
+    tpLine   := line.new(bar_index, tpP, bar_index + 40, tpP, color=color.green, width=1, style=line.style_dashed)
+    tag = nySession ? "FLUSH (NY 81%)" : "FLUSH (60%)"
+    entryLbl := label.new(bar_index, close,
+         "▼ " + tag + "  SL " + str.tostring(math.round(slP, 0)) +
+         "  TP " + str.tostring(math.round(tpP, 0)),
+         color=color.new(color.red, 70), textcolor=color.white,
+         style=label.style_label_right, size=size.small)
+
+// ─── Info table ───────────────────────────────────────────────────────────────
+var table tbl = table.new(position.top_right, 2, 7,
+     bgcolor=color.new(color.black, 70), border_width=1)
+
+if barstate.islast
+    table.cell(tbl, 0, 0, "LENS_EDGE_v2", text_color=color.white, text_size=size.small, bgcolor=color.new(color.maroon, 50))
+    table.cell(tbl, 1, 0, "flush short · 464 trades", text_color=color.gray, text_size=size.tiny, bgcolor=color.new(color.maroon, 50))
+
+    table.cell(tbl, 0, 1, "Setup", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 1, "RSI<40 + 3 bear bars → short", text_color=color.red, text_size=size.small)
+
+    table.cell(tbl, 0, 2, "WR", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 2, "60%  ·  81% in NY 13–21 UTC", text_color=color.green, text_size=size.small)
+
+    table.cell(tbl, 0, 3, "Stop", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(stopPct) + "% → −" + str.tostring(stopPct * lev) + "% acct",
+         text_color=color.red, text_size=size.small)
+
+    table.cell(tbl, 0, 4, "Target", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 4, str.tostring(tpPct) + "% → +" + str.tostring(math.round((tpPct - 0.30) * lev, 1)) + "% acct",
+         text_color=color.green, text_size=size.small)
+
+    table.cell(tbl, 0, 5, "AVOID", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 5, "RSI 40–55 · slope against", text_color=color.orange, text_size=size.small)
+
+    table.cell(tbl, 0, 6, "RULE #1", text_color=color.gray, text_size=size.small)
+    table.cell(tbl, 1, 6, "Context only — NOT mechanical", text_color=color.yellow, text_size=size.small)
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+alertcondition(flushShort,
+     title="LENS_EDGE_v2 — FLUSH SHORT",
+     message='{"strategy":"LENS_EDGE_v2","setup":"flush","side":"short","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5}')
+
+alertcondition(mirrorLong,
+     title="LENS_EDGE_v2 — mirror long (untested)",
+     message='{"strategy":"LENS_EDGE_v2","setup":"mirror","side":"long","symbol":"{{ticker}}","price":{{close}},"sl_pct":1.0,"tp_pct":3.5}')
