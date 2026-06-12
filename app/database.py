@@ -812,7 +812,9 @@ def get_actual_stats() -> dict:
             SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END)            AS losses,
             ROUND(AVG(CASE WHEN pnl > 0 THEN pnl END), 2)       AS avg_win_eur,
             ROUND(AVG(CASE WHEN pnl < 0 THEN pnl END), 2)       AS avg_loss_eur,
-            ROUND(SUM(CASE WHEN pnl IS NOT NULL THEN pnl ELSE 0 END), 2) AS total_pnl
+            ROUND(SUM(CASE WHEN pnl IS NOT NULL THEN pnl ELSE 0 END), 2) AS total_pnl,
+            MIN(closed_at)                                       AS first_close,
+            MAX(closed_at)                                       AS last_close
         FROM trades WHERE closed_at IS NOT NULL AND pnl IS NOT NULL
     ''').fetchone()
     snap = c.execute(
@@ -822,13 +824,32 @@ def get_actual_stats() -> dict:
 
     total = row['total_trades'] or 0
     wins  = row['wins']  or 0
+    avg_win  = row['avg_win_eur']
+    avg_loss = row['avg_loss_eur']
+
+    # Realized reward:risk = avg win / |avg loss|
+    actual_rr = round(avg_win / abs(avg_loss), 2) if avg_win and avg_loss else None
+
+    # Trade frequency over the closed-trade span
+    trades_per_week = None
+    if total >= 2 and row['first_close'] and row['last_close']:
+        try:
+            span_days = (datetime.fromisoformat(row['last_close'])
+                         - datetime.fromisoformat(row['first_close'])).days
+            if span_days >= 7:
+                trades_per_week = round(total / (span_days / 7), 1)
+        except (ValueError, TypeError):
+            pass
+
     return {
         'total_trades':    total,
         'wins':            wins,
         'losses':          row['losses'] or 0,
         'actual_wr':       round(wins / total * 100, 1) if total > 0 else None,
-        'avg_win_eur':     row['avg_win_eur'],
-        'avg_loss_eur':    row['avg_loss_eur'],
+        'actual_rr':       actual_rr,
+        'trades_per_week': trades_per_week,
+        'avg_win_eur':     avg_win,
+        'avg_loss_eur':    avg_loss,
         'total_pnl':       row['total_pnl'],
         'current_balance': snap['eur_balance']    if snap else None,
         'balance_date':    snap['snapshot_date']  if snap else None,

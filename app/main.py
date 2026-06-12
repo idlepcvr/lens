@@ -353,10 +353,29 @@ def projection_page(
             diff_cls = "live-pos" if wr_diff >= 0 else "live-neg"
             diff_str = f' <span class="{diff_cls}">({wr_diff:+.1f}pp vs model)</span>' if n_trades >= 10 else \
                        f' <span class="live-dim">(need ≥10 trades)</span>'
+
+            # "use live →": seed model with realized WR, trade freq, and R-target
+            seed_link = ""
+            live_rr  = actual.get("actual_rr")
+            live_tpw = actual.get("trades_per_week")
+            if n_trades >= 10:
+                import urllib.parse as _up
+                seed = dict(start=start, stop=stop, tp=tp, lev=lev, wr=live_wr,
+                            tpw=tpw, weeks=weeks, btc=btc, fee=fee,
+                            start_date=start_date_val)
+                seed["wr"] = live_wr
+                if live_tpw is not None:
+                    seed["tpw"] = round(live_tpw)
+                if live_rr is not None:
+                    # map realized R → TP% via same formula as the R-target table
+                    seed["tp"] = round((live_rr * (stop / 100 + fee / 100) + fee / 100) * 100, 2)
+                qs = _up.urlencode({k: v for k, v in seed.items() if v != ""})
+                seed_link = f' <a href="/projection?{qs}" class="live-use">use live →</a>'
+
             items.append(
                 f'<div class="live-item">'
                 f'<div class="live-lbl">Actual win rate</div>'
-                f'<div class="live-val">{live_wr}% — {wins}W / {losses}L{diff_str}</div>'
+                f'<div class="live-val">{live_wr}% — {wins}W / {losses}L{diff_str}{seed_link}</div>'
                 f'</div>'
             )
 
@@ -869,6 +888,7 @@ document.addEventListener('DOMContentLoaded', loadPlans);
   </div>
   <nav class="topnav">
     <a href="/">Dashboard</a>
+    <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/projection" class="cur">Projection</a>
     <a href="/backtest">Backtest</a>
@@ -1097,6 +1117,7 @@ def landing():
   </div>
   <nav class="topnav">
     <a href="/" class="cur">Dashboard</a>
+    <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
@@ -2094,6 +2115,7 @@ td{{padding:7px 0;border-bottom:1px solid var(--b1);color:var(--t2)}}
   <div class="brand-name"><b>L</b>ENS</div>
   <nav class="topnav">
     <a href="/">Dashboard</a>
+    <a href="/desk">Desk</a>
     <a href="/signals" class="cur">Signals</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
@@ -2362,7 +2384,8 @@ canvas{{width:100%;height:200px;display:block}}
 <div class="topbar">
   <div class="brand"><div class="brand-name">LEN<b>S</b></div><span class="brand-sep">·</span><div class="brand-page">Backtest</div></div>
   <nav class="topnav">
-    <a href="/">Dashboard</a><a href="/signals">Signals</a><a href="/projection">Projection</a>
+    <a href="/">Dashboard</a><a href="/desk">Desk</a>
+    <a href="/signals">Signals</a><a href="/projection">Projection</a>
     <a href="/backtest" class="cur">Backtest</a><a href="/review">Review</a><a href="/montecarlo">Monte Carlo</a>
   </nav>
 </div>
@@ -2565,3 +2588,53 @@ def api_review_trades():
 @app.get("/api/review/ohlcv")
 def api_review_ohlcv():
     return get_ohlcv_1h()
+
+
+@app.get("/api/stats/trades")
+def api_stats_trades():
+    """Realized stats from closed trades — feeds Monte Carlo + projection seeding."""
+    return get_actual_stats()
+
+
+# ─── LENS_EDGE_v3 setup engine (see strategies/LENS_EDGE_v3_ICT/FINDINGS.md) ──
+
+@app.get("/desk", response_class=HTMLResponse)
+def desk_page():
+    from .desk import DESK_HTML
+    return DESK_HTML
+
+
+@app.get("/api/setups/state")
+def api_setups_state(refresh: bool = Query(True, description="fetch fresh candles first")):
+    """Live desk state: per-direction verdicts, checklists, vetoes, scoreboard."""
+    from . import setups
+    return setups.desk_state(refresh=refresh)
+
+
+@app.post("/api/setups/scan")
+def api_setups_scan(emit: bool = Query(True, description="insert pending signals for clean matches")):
+    """Evaluate the latest closed 1h bar against S1–S5 + vetoes.
+
+    Clean matches (setup hit, zero vetoes) become pending signals in the
+    normal /signals approve/reject flow. Also re-tags any untagged synced
+    trades so the scoreboard stays current.
+    """
+    from . import setups
+    scan = setups.scan_latest()
+    scan["signals_emitted"] = setups.emit_signals(scan) if emit else []
+    scan["tag_backfill"] = setups.backfill_setup_tags(only_untagged=True)
+    return scan
+
+
+@app.post("/api/setups/backfill-tags")
+def api_setups_backfill(all: bool = Query(False, description="re-tag every trade, not just untagged")):
+    """Classify entry context of closed trades → trades.setup_tag."""
+    from . import setups
+    return setups.backfill_setup_tags(only_untagged=not all)
+
+
+@app.get("/api/stats/setups")
+def api_stats_setups():
+    """Realized WR / expectancy per setup tag, halves split for drift."""
+    from . import setups
+    return setups.setup_scoreboard()

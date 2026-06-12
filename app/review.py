@@ -326,6 +326,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
   </div>
   <nav class="topnav">
     <a href="/">Dashboard</a>
+    <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>

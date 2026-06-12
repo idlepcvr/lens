@@ -1,12 +1,42 @@
 # LENS — Status & Progress
 
-*Last updated: 2026-06-03*
+*Last updated: 2026-06-12*
 
 ## Where we are in one line
 
-The trading thesis is locked and the tools that express it are built — what's
-**not** yet done is the one thing that proves it's real: backtesting whether a 4H
-signal actually reaches 4R behind a 1% stop.
+The edge is mapped: five robust setups (S1–S5) and seven vetoes mined from 464
+real trades now run live — hourly scanner → phone alert → /desk checklist →
+auto-tagged trades → per-setup scoreboard. Missing: the user-side crontab line
+that schedules the scan, and ~3 months of tagged trades to mine v4.
+
+---
+
+## Shipped 2026-06-12 (LENS_EDGE_v3 + the loop)
+
+- **`ict_miner.py`** — re-mined all 464 trades in ICT/visual language.
+  Headline: user is a momentum-CONTINUATION trader (sweep-with 50% WR vs
+  sweep-fade 33%). Five robust setups, seven vetoes. Mechanical first-touch
+  at realized geometry (0.63% SL / 0.95% TP) is still coin-flip → setups are
+  discretionary checklists, NOT bot signals.
+- **`strategies/LENS_EDGE_v3_ICT/`** — FINDINGS.md (playbook + NONE-bucket
+  autopsy: minus 5 outliers it's −€736 · hold-time table: 2–8h holds made
+  +€1,552 at 50% WR, sub-2h bled −€747 at 34–35%) and indicator.pine
+  (TradingView HUD: setup markers, veto shading, live checklist, alerts).
+- **`app/setups.py`** — setup engine: hourly scan CLI (`python3 -m app.setups`),
+  signals into the existing /signals approve/reject flow, ntfy phone push
+  (`LENS_NTFY_TOPIC`), auto setup_tag backfill (464/464 tagged; VETO bucket
+  = 302 trades, 36.4% WR, −€1,760), per-tag scoreboard with drift halves.
+- **`/desk` page** — live verdict per direction (ENTER / BLOCKED / STAND
+  DOWN), always-on trade ticket in € (size, margin at 10x, win/early-exit/
+  stop outcomes, stop as % of account), live S1–S5 checklists, scoreboard.
+- **`LIVE_SCALP_v1`** baseline in backtest engine + Monte Carlo input seeding
+  from live trades or any backtest strategy.
+
+**Open:** install the crontab line (permission-denied for the agent), set
+`LENS_NTFY_TOPIC` in prism.env, then trade only S1–S5 and let tags accumulate.
+
+The 4H/4R trend thesis below is a separate track and still unproven — v3
+showed realized trading is 1H-context with 2–8h holds, not 4H swing.
 
 ---
 

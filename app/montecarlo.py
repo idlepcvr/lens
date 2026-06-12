@@ -215,7 +215,8 @@ MONTECARLO_HTML = r"""<!DOCTYPE html>
 
 <nav class="topnav">
   <a href="/">Dashboard</a>
-  <a href="/signals">Signals</a>
+  <a href="/desk">Desk</a>
+    <a href="/signals">Signals</a>
   <a href="/projection">Projection</a>
   <a href="/backtest">Backtest</a>
   <a href="/review">Review</a>
@@ -224,6 +225,18 @@ MONTECARLO_HTML = r"""<!DOCTYPE html>
 
 <h1>PRISM // Monte Carlo</h1>
 <div class="subtitle">BTC perp · 4H · systematic</div>
+
+<div id="seed-banner" style="display:none;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:10px 12px;margin-bottom:16px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">
+  <span id="seed-text"></span>
+  <a href="#" id="seed-reset" style="color:var(--accent);text-decoration:none;margin-left:8px">reset defaults ↺</a>
+</div>
+
+<div class="control" style="margin-bottom:10px">
+  <label>Seed inputs from</label>
+  <select id="src" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:7px 8px;font-family:var(--font-mono);font-size:12px">
+    <option value="live">Live trades (realized)</option>
+  </select>
+</div>
 
 <div class="controls">
   <div class="control">
@@ -544,8 +557,87 @@ function drawDistChart(finals, capital) {
   }
 }
 
-// Auto-run on load
-window.addEventListener('load', runSimulation);
+// ── Seed inputs from live trades OR a backtest strategy, then run ────────────
+const MC_DEFAULTS = { winrate: 44, rr: 4, tpw: 5 };
+const B = (v) => `<b style="color:var(--text)">${v}</b>`;
+
+function setInputs(wr, rr, tpw) {
+  if (wr  != null) document.getElementById('winrate').value = wr;
+  if (rr  != null) document.getElementById('rr').value      = rr;
+  if (tpw != null) document.getElementById('tpw').value     = Math.round(tpw);
+}
+
+function showBanner(html) {
+  document.getElementById('seed-text').innerHTML = html;
+  document.getElementById('seed-banner').style.display = 'block';
+}
+
+function applyDefaults() {
+  setInputs(MC_DEFAULTS.winrate, MC_DEFAULTS.rr, MC_DEFAULTS.tpw);
+  runSimulation();
+}
+
+// Populate strategy options from the backtest engine
+async function loadStrategies() {
+  try {
+    const r = await fetch('/api/backtest/strategies');
+    if (!r.ok) return;
+    const strats = await r.json();
+    const sel = document.getElementById('src');
+    for (const name of Object.keys(strats)) {
+      const o = document.createElement('option');
+      o.value = 'bt:' + name;
+      o.textContent = 'Backtest · ' + name;
+      sel.appendChild(o);
+    }
+  } catch (e) { /* backtest engine unavailable — live-only */ }
+}
+
+async function seedFromSource() {
+  const src = document.getElementById('src').value;
+  try {
+    if (src === 'live') {
+      const s = await (await fetch('/api/stats/trades')).json();
+      const n = s.total_trades || 0;
+      if (n >= 10 && s.actual_wr != null && s.actual_rr != null) {
+        setInputs(s.actual_wr, s.actual_rr, s.trades_per_week);
+        showBanner(`seeded from your ${B(n)} real closed trades · WR ${B(s.actual_wr + '%')} · ` +
+          `R:R ${B(s.actual_rr)}` + (s.trades_per_week != null ? ` · ${B(s.trades_per_week)}/wk` : ''));
+      } else {
+        showBanner(`only ${n} closed trades — using default assumptions`);
+      }
+    } else if (src.startsWith('bt:')) {
+      const name = src.slice(3);
+      showBanner(`running backtest <b style="color:var(--text)">${name}</b>…`);
+      const r = await fetch('/api/backtest/run', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const d = await r.json();
+      if (d.error || !d.metrics) throw new Error(d.error || 'no metrics');
+      const m = d.metrics;
+      setInputs(m.win_rate, m.avg_r, m.trades_per_week);
+      showBanner(`seeded from backtest ${B(name)} · ${B(m.n)} trades · ` +
+        `WR ${B(m.win_rate + '%')} · avg ${B(m.avg_r + 'R')} · ${B(m.trades_per_week)}/wk ` +
+        `<span style="color:var(--muted)">(historical, not live)</span>`);
+    }
+  } catch (e) {
+    showBanner(`could not seed (${e.message}) — using current inputs`);
+  }
+  runSimulation();
+}
+
+document.getElementById('seed-reset').addEventListener('click', (e) => {
+  e.preventDefault();
+  applyDefaults();
+});
+document.getElementById('src').addEventListener('change', seedFromSource);
+
+// Load strategy list, then auto-seed from live trades + run
+window.addEventListener('load', async () => {
+  await loadStrategies();
+  seedFromSource();
+});
 </script>
 </body>
 </html>
