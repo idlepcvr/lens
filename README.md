@@ -112,6 +112,96 @@ backtest strategy.
 
 ---
 
+## Prop Sidebar — Kraken Prop integration (planned, not built yet)
+
+LENS finds the edge; it doesn't know whether the edge survives a **prop firm's
+rules**. Kraken Prop funds you up to **$200,000** of their capital ($5k → $200k
+across active eval + funded accounts) and kills the account on **path-dependent**
+limits, not lifetime ruin. So a new sidebar consumes the LENS setup stats
+(WR, RR, expectancy) and answers one question: *"will this edge pass and survive
+a Kraken Prop account, and at what risk-per-trade?"*
+
+> ⚠️ Rules below are sourced from Kraken's own docs (June 2026) — see Sources at
+> end of section. **Verify on the dashboard before trading; firms change rules.**
+> Fees (4bps/side + 0.033%/4h funding) count against MDL/MDD — model them in.
+
+### Kraken Prop rules (the constraint layer)
+
+| Track | Profit target | Max Drawdown (MDD, lifetime, no reset) | Max Daily Loss (MDL) |
+|---|---|---|---|
+| Starter | 10% | 6% | 3% |
+| Intermediate | 12% | 5% | 3% |
+| Advanced | 9% | 3% | 3% |
+
+- **MDL** = 3% of balance at **00:30 UTC**, resets daily off prior day's *ending*
+  balance. Equity may not fall 3% below that mark intraday → day blown.
+- **MDD** = lifetime equity floor, **does not reset**. Breach = account dead.
+- **No** time limit, **no** consistency rule, **no** profit cap, **no** strategy
+  restriction. Simulated execution during eval.
+- Split: **80/20** default, **90/10** if bought at eval purchase (+20% of price).
+- Fees: **0.04%/side** commission + **0.033% per 4h** funding on open positions —
+  both hit MDL/MDD equity checks.
+
+### The calc the sidebar runs
+
+Two numbers drive survival, both independent of account size (rules are %):
+
+```
+losses_to_breach_MDD  = MDD%  / risk_per_trade%      ← lifetime kill
+losses_to_breach_MDL  = 3%    / risk_per_trade%      ← worst day kill
+trades_to_target      ≈ target% / expectancy_per_trade%
+expectancy_per_trade% = (WR·RR − (1−WR)) · risk_per_trade%
+```
+
+**Loss-streak survival** (consecutive full-stop losses before account dies):
+
+| risk/trade | Starter MDD 6% | Inter. MDD 5% | Adv. MDD 3% | Any track MDL 3% (per day) |
+|---|---|---|---|---|
+| 0.5% | 12 | 10 | 6 | 6 |
+| 1.0% | 6 | 5 | 3 | 3 |
+| 1.5% | 4 | 3 | 2 | 2 |
+| 2.0% | 3 | 2 (2.5) | 1 (1.5) | 1 (1.5) |
+
+Read it as the survival engine: at **1% risk on Advanced**, *three* losses in a
+row = dead, and three losses in *one day* = day blown. LENS's sub-2h bleed bucket
+(34% WR) makes that a real path. **0.5% risk** is the only setting that buys a
+double-digit streak buffer on Starter.
+
+**Days/trades to pass** (expectancy-based, RR≈2.8 actual):
+
+- At **50% WR** (S1/S3-grade selected setups): expectancy ≈ 0.9R/trade →
+  Starter 10% target ≈ **~11 winning-expectancy trades** at 1% risk.
+- At **42% WR** (mechanical, take-everything): expectancy ≈ 0.6R/trade →
+  ~17 trades, but the higher trade count raises streak-breach odds. **Selection,
+  not volume, is what passes the eval** — the same conclusion as the edge map.
+
+### Sidebar engine layout (consumes Setup Engine output)
+
+```
+Prop Sidebar
+├── Strategy Engine  ← reads LENS WR/RR/expectancy/trades-wk (no new calc)
+├── Risk Engine      ← account size, risk%/$, ATR/0.63% stop, pos size, 10x margin
+├── Survival Engine  ← MDD/MDL tables above, loss-streak, days-to-breach
+├── Prop Rules Engine ← MDL 00:30 reset, MDD floor, fee drag, split
+└── Equity Sim       ← Monte Carlo from WR+RR; per-trade path checks in order:
+                         1) daily loss limit → flat rest of day
+                         2) trailing MDD floor → kill run
+                         3) profit target hit → pass
+                       reports: pass rate, fail freq, median trades-to-pass
+```
+
+Monte Carlo must apply MDL/MDD **inside each run per-trade** (path-dependent),
+not as a closed-form ruin %. Reuses the existing `/montecarlo` engine —
+seed WR/RR from `GET /api/stats/setups`, add the Kraken constraint checks.
+
+**Sources:**
+[Kraken Prop](https://www.kraken.com/prop) ·
+[Prop FAQ](https://support.kraken.com/articles/kraken-prop-faq) ·
+[How evaluations work](https://support.kraken.com/articles/how-kraken-prop-evaluations-work) ·
+[Maximum Daily Loss explained](https://support.kraken.com/articles/maximum-daily-loss-mdl-explained)
+
+---
+
 ## Strategies (the TradingView side)
 
 `strategies/` holds Pine Script. Load in TradingView → Pine Editor.
