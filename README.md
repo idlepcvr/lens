@@ -110,95 +110,97 @@ reproduces the realized ~42% WR from pure SL/TP geometry — the bar any
 strategy must beat). Monte Carlo can seed its inputs from live trades or any
 backtest strategy.
 
+### `/prop` — Kraken Prop (Breakout) eval planner
+Live Monte Carlo of evaluation paths against the floor/target walls, with the
+locked plan, the speed↔probability frontier, and funded-income tables. See the
+**Prop track** section below.
+
 ---
 
-## Prop Sidebar — Kraken Prop integration (planned, not built yet)
+## Prop track — Kraken Prop Trading (via Breakout) ✅ BUILT
 
-LENS finds the edge; it doesn't know whether the edge survives a **prop firm's
-rules**. Kraken Prop funds you up to **$200,000** of their capital ($5k → $200k
-across active eval + funded accounts) and kills the account on **path-dependent**
-limits, not lifetime ruin. So a new sidebar consumes the LENS setup stats
-(WR, RR, expectancy) and answers one question: *"will this edge pass and survive
-a Kraken Prop account, and at what risk-per-trade?"*
+A **separate system** from the hedge-fund thesis above. LENS-proper maximises
+compounding on your own money (risk 10%/trade for 40%). A prop eval is the
+opposite game: **survive hard equity walls to a modest target.** Risk 10%/trade
+and one stop blows the whole eval. So the prop track has its own objective
+function — **pass-probability, not expectancy** — and its own simulator + page.
 
-> ⚠️ Rules below are sourced from Kraken's own docs (June 2026) — see Sources at
-> end of section. **Verify on the dashboard before trading; firms change rules.**
-> Fees (4bps/side + 0.033%/4h funding) count against MDL/MDD — model them in.
+Firm: **Breakout** (the prop firm Kraken acquired Sept 2025). Funds you up to
+**$200,000**. Rules verified June 2026 across 3 review sources (see plan doc).
 
-### Kraken Prop rules (the constraint layer)
+### What's built (`/prop` page + `app/prop_eval.py`)
 
-| Track | Profit target | Max Drawdown (MDD, lifetime, no reset) | Max Daily Loss (MDL) |
-|---|---|---|---|
-| Starter | 10% | 6% | 3% |
-| Intermediate | 12% | 5% | 3% |
-| Advanced | 9% | 3% | 3% |
+- **Eval rules engine** — `EVALS` dict: Breakout 1-Step Classic / Pro / Turbo +
+  2-Step, with each firm's daily-loss / max-drawdown / target / leverage cap.
+- **Eval simulator** — replays any LENS strategy at *legal* sizing under the
+  walls, returns PASS / FAIL. `simulate_eval()` (one historical path) +
+  `monte_carlo_eval()` (bootstrapped pass-rate).
+- **Portfolio sim** — `monte_carlo_portfolio()` runs a basket on one account.
+- **Full sweep** — `python3 -m app.prop_eval sweep` ranks every strategy × risk
+  level by pass% and est. months to pass.
+- **`/prop` page** — live Monte Carlo of eval paths against the floor/target
+  walls (green=pass, red=bust), $5k/$200k + 1/1.5/2% toggles, plus the written
+  plan, the speed↔probability frontier, and the funded-income tables.
 
-- **MDL** = 3% of balance at **00:30 UTC**, resets daily off prior day's *ending*
-  balance. Equity may not fall 3% below that mark intraday → day blown.
-- **MDD** = lifetime equity floor, **does not reset**. Breach = account dead.
-- **No** time limit, **no** consistency rule, **no** profit cap, **no** strategy
-  restriction. Simulated execution during eval.
-- Split: **80/20** default, **90/10** if bought at eval purchase (+20% of price).
-- Fees: **0.04%/side** commission + **0.033% per 4h** funding on open positions —
-  both hit MDL/MDD equity checks.
+### Breakout 1-Step Classic rules (the constraint layer)
 
-### The calc the sidebar runs
+| | Value |
+|---|---|
+| Profit target | **10%** |
+| Max drawdown | **6% STATIC** — locked to start balance, does NOT trail |
+| Daily loss | **3%**, resets 00:30 UTC off prior day's close |
+| Leverage cap | 5x · Time limit | none known (confirm) |
 
-Two numbers drive survival, both independent of account size (rules are %):
+Static drawdown on $5k → floor **$4,700, fixed forever**. Profit only adds
+cushion (rare among firms — most trail and punish pullbacks). Two kill
+conditions: touch the floor ever, OR lose 3% in one day.
 
-```
-losses_to_breach_MDD  = MDD%  / risk_per_trade%      ← lifetime kill
-losses_to_breach_MDL  = 3%    / risk_per_trade%      ← worst day kill
-trades_to_target      ≈ target% / expectancy_per_trade%
-expectancy_per_trade% = (WR·RR − (1−WR)) · risk_per_trade%
-```
+### The locked plan
 
-**Loss-streak survival** (consecutive full-stop losses before account dies):
+> **`ASIAN_RSI_DIP_v1`** — 4H chart, Asian killzone (00:00+04:00 UTC), 1% stop /
+> 4% TP (4R).
+> - **Eval phase: 2% risk (2x lev) → ~70% pass in ~2 months** (best of a
+>   25-strategy × 5-risk sweep). Cheap retries make expected time ~3mo / ~$29.
+> - **Funded phase: drop to 1% risk** for survival and payout longevity.
+> - **Size-independent** — same odds on $5k and $200k. Pass the cheap $5k first,
+>   then buy the biggest eval directly; **don't ladder** 5k→25k→100k→200k.
 
-| risk/trade | Starter MDD 6% | Inter. MDD 5% | Adv. MDD 3% | Any track MDL 3% (per day) |
-|---|---|---|---|---|
-| 0.5% | 12 | 10 | 6 | 6 |
-| 1.0% | 6 | 5 | 3 | 3 |
-| 1.5% | 4 | 3 | 2 | 2 |
-| 2.0% | 3 | 2 (2.5) | 1 (1.5) | 1 (1.5) |
+The speed↔probability frontier (the hard law the sweep proved):
 
-Read it as the survival engine: at **1% risk on Advanced**, *three* losses in a
-row = dead, and three losses in *one day* = day blown. LENS's sub-2h bleed bucket
-(34% WR) makes that a real path. **0.5% risk** is the only setting that buys a
-double-digit streak buffer on Starter.
+| Pass within | Best pass% | Config |
+|---|---|---|
+| 1 month | 45% | coin flip — reject |
+| **2 months** | **70%** | **ASIAN_RSI_DIP_v1 @2%** |
+| 9 months | 91% | ASIAN_RSI_DIP_v1 @0.75% |
 
-**Days/trades to pass** (expectancy-based, RR≈2.8 actual):
+No high-probability sub-month pass exists — BTC mean-reversion lacks that edge.
+Stacking strategies for more trades was tested and **rejected** (dilutes WR,
+craters pass). For an eval, **quality > quantity** — same conclusion as the edge map.
 
-- At **50% WR** (S1/S3-grade selected setups): expectancy ≈ 0.9R/trade →
-  Starter 10% target ≈ **~11 winning-expectancy trades** at 1% risk.
-- At **42% WR** (mechanical, take-everything): expectancy ≈ 0.6R/trade →
-  ~17 trades, but the higher trade count raises streak-breach odds. **Selection,
-  not volume, is what passes the eval** — the same conclusion as the edge map.
+Mechanic at 2% on $5k: WR 40%, win +7.4%/+$370, loss −2.6%/−$130, ~1.5 trades/mo.
+You only fail on a **cold 3-loss start (~22%)**; one win → the static-floor
+cushion carries it home. Funded $200k earns ~$3.4k/mo @2% (lumpy) or ~$1.7k @1%.
 
-### Sidebar engine layout (consumes Setup Engine output)
+### Steps taken
+1. Verified Breakout rules (static 6% DD, 3% daily, 10% target).
+2. Built eval simulator + `/prop` page; proved the 10x hedge-fund thesis busts
+   the eval (19% pass) → confirmed the need for a separate system.
+3. Swept 25 strategies × 5 risk levels → locked `ASIAN_RSI_DIP_v1 @2%`.
+4. Mapped funded income + the 2%-pass / 1%-funded split + direct-scale plan.
 
-```
-Prop Sidebar
-├── Strategy Engine  ← reads LENS WR/RR/expectancy/trades-wk (no new calc)
-├── Risk Engine      ← account size, risk%/$, ATR/0.63% stop, pos size, 10x margin
-├── Survival Engine  ← MDD/MDL tables above, loss-streak, days-to-breach
-├── Prop Rules Engine ← MDL 00:30 reset, MDD floor, fee drag, split
-└── Equity Sim       ← Monte Carlo from WR+RR; per-trade path checks in order:
-                         1) daily loss limit → flat rest of day
-                         2) trailing MDD floor → kill run
-                         3) profit target hit → pass
-                       reports: pass rate, fail freq, median trades-to-pass
-```
+### Next (later)
+- [ ] Confirm in Breakout dashboard: **time limit, exact fees, $200k eval cost.**
+- [ ] **Forward-test** ASIAN_RSI_DIP_v1 @2% on demo before paying the $20.
+- [ ] Harden the sim: add **open-equity (intra-trade) drawdown** — Breakout checks
+      live equity, the sim currently checks closed PnL → optimistic by a few pts.
+- [ ] Long game: lift WR/R via the LENS discretionary edge (real flush WR ~60%
+      vs 40% mechanical) → roughly doubles funded income.
 
-Monte Carlo must apply MDL/MDD **inside each run per-trade** (path-dependent),
-not as a closed-form ruin %. Reuses the existing `/montecarlo` engine —
-seed WR/RR from `GET /api/stats/setups`, add the Kraken constraint checks.
+Full detail: [`strategies/_prop/BREAKOUT_5K_PLAN.md`](strategies/_prop/BREAKOUT_5K_PLAN.md).
 
-**Sources:**
-[Kraken Prop](https://www.kraken.com/prop) ·
-[Prop FAQ](https://support.kraken.com/articles/kraken-prop-faq) ·
-[How evaluations work](https://support.kraken.com/articles/how-kraken-prop-evaluations-work) ·
-[Maximum Daily Loss explained](https://support.kraken.com/articles/maximum-daily-loss-mdl-explained)
+**Sources:** thetrustedprop.com/prop-firms/breakout-prop ·
+quantvps.com/blog/breakout-crypto-prop-firm-rules ·
+proptradingvibes.com/blog/breakout-faq · **verify on the Breakout dashboard before trading.**
 
 ---
 
