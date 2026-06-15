@@ -116,6 +116,7 @@ td.gr{color:var(--gr)}td.re{color:var(--re)}td.mut{color:var(--t2)}
       <a href="/backtest">Backtest</a>
       <a href="/review">Review</a>
       <a href="/montecarlo">Monte Carlo</a>
+      <a href="/prop">Prop</a>
     </nav>
   </div>
 

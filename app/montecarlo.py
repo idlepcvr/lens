@@ -221,6 +221,7 @@ MONTECARLO_HTML = r"""<!DOCTYPE html>
   <a href="/backtest">Backtest</a>
   <a href="/review">Review</a>
   <a href="/montecarlo" class="cur">Monte Carlo</a>
+  <a href="/prop">Prop</a>
 </nav>
 
 <h1>PRISM // Monte Carlo</h1>

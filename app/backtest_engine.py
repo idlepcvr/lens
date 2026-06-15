@@ -503,6 +503,43 @@ def _signal_1h_pullback_v1(df, i, params):
     return None
 
 
+def _signal_asian_rsi_dip_ltf(df, i, params):
+    """Asian-killzone RSI-dip recovery for lower timeframes (1h/15m/5m).
+    Same edge as ASIAN_RSI_DIP_v1 (RSI crosses back above 40 in uptrend, or
+    below 60 in downtrend) but on a faster chart and over the killzone *hours*
+    (default 00:00–03:59 UTC) instead of just the 4H bar closes. The session
+    filter is what gives the 4H version its high WR — we keep it here and let
+    the higher bar count drive more trades/month."""
+    if i < 80:
+        return None
+    hours = params.get("asian_hours", (0, 1, 2, 3))
+    if df.index[i].hour not in hours:
+        return None
+
+    c   = df["close"].iloc[i]
+    e21 = df["ema21"].iloc[i]
+    e50 = df["ema50"].iloc[i]
+
+    d_close = df["daily_close"].iloc[i]
+    d_ema50 = df["daily_ema50"].iloc[i]
+    if pd.isna(d_ema50):
+        return None
+
+    rsi     = df["rsi14"].iloc[i]
+    rsi_prv = df["rsi14"].iloc[i - 1]
+
+    up   = e21 > e50 and c > e21
+    down = e21 < e50 and c < e21
+    daily_bull = d_close > d_ema50
+    daily_bear = d_close < d_ema50
+
+    if up   and daily_bull and rsi_prv < 40 and rsi >= 40:
+        return "long"
+    if down and daily_bear and rsi_prv > 60 and rsi <= 60:
+        return "short"
+    return None
+
+
 def _signal_1h_rsi_dip_v1(df, i, params):
     """
     1H RSI crosses back above 40 in uptrend (or below 60 in downtrend).
@@ -1083,6 +1120,86 @@ STRATEGIES: dict = {
             "stop_pct": 1.0, "tp_pct": 6.0, "leverage": 10.0,
             "commission": 0.0015, "skip_sat": True, "cooldown_bars": 3,
             "once_per_day": False,
+        },
+    },
+    "ASIAN_RSI_DIP_1H_v1": {
+        "description": "ASIAN_RSI_DIP edge on 1H, killzone hours 00:00-03:59 UTC. More trades than the 4H version. Stop 1% / TP 4% / no once-per-day.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": (0, 1, 2, 3),
+        },
+    },
+    "ASIAN_RSI_DIP_15M_v1": {
+        "description": "ASIAN_RSI_DIP edge on 15m, killzone hours 00:00-03:59 UTC. Many more trades — speed play. Stop 1% / TP 4%.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "15m",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": (0, 1, 2, 3),
+        },
+    },
+    "ASIAN_RSI_DIP_15M_TIGHT_v1": {
+        "description": "15m Asian RSI dip with TF-appropriate geometry: 0.6% stop / 2.4% TP (still 4R). Tighter stop = more trades resolve fast.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "15m",
+        "params": {
+            "stop_pct": 0.6, "tp_pct": 2.4, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": (0, 1, 2, 3),
+        },
+    },
+    "ASIAN_RSI_DIP_5M_v1": {
+        "description": "ASIAN_RSI_DIP edge on 5m, killzone hours 00:00-03:59 UTC. Max trade frequency. 0.5% stop / 2% TP (4R). Speed-first eval play.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "5m",
+        "params": {
+            "stop_pct": 0.5, "tp_pct": 2.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": (0, 1, 2, 3),
+        },
+    },
+    "KZ_RSI_DIP_15M_v1": {
+        "description": "RSI dip on 15m across Asian+London killzones (00:00-08:59 UTC). Wider window = more trades, test if WR survives.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "15m",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": tuple(range(0, 9)),
+        },
+    },
+    "KZ_RSI_DIP_1H_v1": {
+        "description": "RSI dip on 1H across Asian+London+NY-AM killzones (00:00-15:59 UTC). Max signals on 1H.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": tuple(range(0, 16)),
+        },
+    },
+    "KZ_RSI_DIP_15M_2R_v1": {
+        "description": "15m killzone RSI dip, 2R geometry (1% stop / 2% TP). Lower target = need more wins but higher hit rate.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "15m",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 2.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": tuple(range(0, 9)),
+        },
+    },
+    "KZ_RSI_DIP_15M_8R_v1": {
+        "description": "15m killzone RSI dip, 8R geometry (1% stop / 8% TP). One winner ~clears the 10% target; fewer wins needed.",
+        "signal_fn": _signal_asian_rsi_dip_ltf,
+        "timeframe": "15m",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 8.0, "leverage": 10.0,
+            "commission": 0.0015, "skip_sat": True, "cooldown_bars": 2,
+            "once_per_day": False, "asian_hours": tuple(range(0, 9)),
         },
     },
     "LIVE_SCALP_v1": {

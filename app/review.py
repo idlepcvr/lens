@@ -332,6 +332,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/backtest">Backtest</a>
     <a href="/review" class="cur">Review</a>
     <a href="/montecarlo">Monte Carlo</a>
+    <a href="/prop">Prop</a>
   </nav>
   <div class="topbar-right">
     <div class="chips">

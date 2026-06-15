@@ -54,6 +54,7 @@ from .models import (
 from . import bybit_sync, kraken_sync
 from .review import REVIEW_HTML, get_enriched_trades, get_ohlcv_1h
 from .montecarlo import MONTECARLO_HTML
+from .prop_page import PROP_HTML
 
 
 app = FastAPI(title="LENS", version="1.0.0-dev")
@@ -893,7 +894,7 @@ document.addEventListener('DOMContentLoaded', loadPlans);
     <a href="/projection" class="cur">Projection</a>
     <a href="/backtest">Backtest</a>
     <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a>
+    <a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
   </nav>
 </div>
 
@@ -1122,7 +1123,7 @@ def landing():
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
     <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a>
+    <a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
   </nav>
 </div>
 
@@ -2120,7 +2121,7 @@ td{{padding:7px 0;border-bottom:1px solid var(--b1);color:var(--t2)}}
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
     <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a>
+    <a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
   </nav>
 </div>
 
@@ -2386,7 +2387,7 @@ canvas{{width:100%;height:200px;display:block}}
   <nav class="topnav">
     <a href="/">Dashboard</a><a href="/desk">Desk</a>
     <a href="/signals">Signals</a><a href="/projection">Projection</a>
-    <a href="/backtest" class="cur">Backtest</a><a href="/review">Review</a><a href="/montecarlo">Monte Carlo</a>
+    <a href="/backtest" class="cur">Backtest</a><a href="/review">Review</a><a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
   </nav>
 </div>
 <h1>Strategy Backtest</h1>
@@ -2578,6 +2579,11 @@ def review_page():
 @app.get("/montecarlo", response_class=HTMLResponse)
 def montecarlo_page():
     return MONTECARLO_HTML
+
+
+@app.get("/prop", response_class=HTMLResponse)
+def prop_page():
+    return PROP_HTML
 
 
 @app.get("/api/review/trades")
