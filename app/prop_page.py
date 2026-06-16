@@ -1,77 +1,57 @@
 """LENS — Kraken Prop eval page. Visualises the Breakout 1-Step Classic
 evaluation: the locked strategy, the walls, and a live Monte Carlo of eval
 paths playing out (pass vs bust) so the plan is something you can watch, not
-just read. Numbers sourced from app/prop_eval.py + strategies/_prop/BREAKOUT_5K_PLAN.md."""
+just read. Numbers sourced from app/prop_eval.py + strategies/_prop/BREAKOUT_5K_PLAN.md.
 
-PROP_HTML = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LENS — Kraken Prop</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --bg:#0a0a0f;--s1:#12121a;--s2:#1a1a26;--bd:#23233440;
-    --ac:#7c6fff;--adim:#7c6fff22;--green:#3dffa0;--red:#ff4d6d;--yellow:#ffd166;
-    --t1:#e6e6f5;--t2:#8a8ab8;--t3:#56567e;
-    --mono:'SF Mono','Fira Code','Cascadia Code',monospace;
-    --font:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;
-  }
-  body{background:var(--bg);color:var(--t1);font-family:var(--font);min-height:100vh;padding:20px 16px 60px}
-  .wrap{max-width:1080px;margin:0 auto}
-  .topnav{display:flex;gap:2px;margin-bottom:22px;flex-wrap:wrap}
-  .topnav a{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}
-  .topnav a:hover{color:var(--t1);background:var(--s2)}
-  .topnav a.cur{color:var(--ac);background:var(--adim)}
-  h1{font-family:var(--mono);font-size:13px;letter-spacing:.15em;color:var(--ac);text-transform:uppercase;margin-bottom:3px}
-  .sub{color:var(--t2);font-size:13px;margin-bottom:22px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
-  .card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
-  .card .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
-  .card .val{font-family:var(--mono);font-size:20px;font-weight:600}
-  .card .note{font-size:11px;color:var(--t2);margin-top:3px}
-  .green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.ac{color:var(--ac)}
-  .panel{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:20px}
-  .panel h2{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
-  .controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-  .ctl{display:flex;flex-direction:column;gap:4px}
-  .ctl label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3)}
-  .ctl .seg{display:flex;gap:2px}
-  .ctl .seg button{background:var(--s2);color:var(--t2);border:1px solid var(--bd);font-family:var(--mono);
-    font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;transition:all .1s}
-  .ctl .seg button.on{background:var(--adim);color:var(--ac);border-color:var(--ac)}
-  .run{background:var(--ac);color:#0a0a0f;border:none;font-weight:700;font-size:13px;padding:9px 20px;
-    border-radius:7px;cursor:pointer;font-family:var(--font)}
-  .run:hover{filter:brightness(1.1)}
-  canvas{width:100%;height:340px;display:block;background:#08080d;border-radius:8px;border:1px solid var(--bd)}
-  .tally{display:flex;gap:24px;margin-top:14px;font-family:var(--mono);font-size:14px}
-  .tally b{font-size:22px;display:block}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--bd)}
-  th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);font-weight:500}
-  td{font-family:var(--mono)}
-  .hl{background:var(--adim)}
-  .prose{color:var(--t2);font-size:13.5px;line-height:1.65}
-  .prose strong{color:var(--t1)}
-  .prose code{font-family:var(--mono);color:var(--ac);background:var(--s2);padding:1px 5px;border-radius:4px}
-  .flag{border-left:3px solid var(--yellow);padding:8px 14px;background:#ffd16610;border-radius:0 8px 8px 0;
-    font-size:13px;color:var(--t1);margin-top:10px}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <nav class="topnav">
-    <a href="/">Dashboard</a>
-    <a href="/desk">Desk</a>
-    <a href="/signals">Signals</a>
-    <a href="/projection">Projection</a>
-    <a href="/backtest">Backtest</a>
-    <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a>
-    <a href="/prop" class="cur">Prop</a>
-  </nav>
+On the shared LENS design system (app/theme.py shell() + /assets/lens.css)."""
 
+from .theme import shell
+
+# ── page CSS — component styles on the shared token palette ───────────────────
+_HEAD = r"""<style>
+:root{
+  /* mapped onto the shared LENS palette (see app/theme.py LENS_CSS) */
+  --ac:#5b9dff;--adim:#10203f;--green:#1fd989;--red:#ff5468;--yellow:#f6ad3c;
+  --s1:#0b0f16;--s2:#10151e;--bd:#192232;
+  --t1:#e8eef8;--t2:#828ea6;--t3:#465064;--font:var(--hud);
+}
+.pp h1{font-family:var(--mono);font-size:13px;letter-spacing:.15em;color:var(--ac);text-transform:uppercase;margin-bottom:3px}
+.pp .sub{color:var(--t2);font-size:13px;margin-bottom:22px}
+.pp .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+.pp .card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+.pp .card .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
+.pp .card .val{font-family:var(--mono);font-size:20px;font-weight:600}
+.pp .card .note{font-size:11px;color:var(--t2);margin-top:3px}
+.pp .green{color:var(--green)} .pp .red{color:var(--red)} .pp .yellow{color:var(--yellow)} .pp .ac{color:var(--ac)}
+.pp .panel{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:20px}
+.pp .panel h2{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--t2);margin-bottom:14px}
+.pp .controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.pp .ctl{display:flex;flex-direction:column;gap:4px}
+.pp .ctl label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3)}
+.pp .ctl .seg{display:flex;gap:2px}
+.pp .ctl .seg button{background:var(--s2);color:var(--t2);border:1px solid var(--bd);font-family:var(--mono);
+  font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;transition:all .1s}
+.pp .ctl .seg button.on{background:var(--adim);color:var(--ac);border-color:var(--ac)}
+.pp .run{background:var(--ac);color:var(--bg);border:none;font-weight:700;font-size:13px;padding:9px 20px;
+  border-radius:7px;cursor:pointer;font-family:var(--font)}
+.pp .run:hover{filter:brightness(1.1)}
+.pp canvas{width:100%;height:340px;display:block;background:var(--bg);border-radius:8px;border:1px solid var(--bd)}
+.pp .tally{display:flex;gap:24px;margin-top:14px;font-family:var(--mono);font-size:14px;flex-wrap:wrap}
+.pp .tally b{font-size:22px;display:block}
+.pp table{width:100%;border-collapse:collapse;font-size:13px}
+.pp th,.pp td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--bd)}
+.pp th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);font-weight:500}
+.pp td{font-family:var(--mono)}
+.pp .hl{background:var(--adim)}
+.pp .prose{color:var(--t2);font-size:13.5px;line-height:1.65}
+.pp .prose strong{color:var(--t1)}
+.pp .prose code{font-family:var(--mono);color:var(--ac);background:var(--s2);padding:1px 5px;border-radius:4px}
+.pp .flag{border-left:3px solid var(--yellow);padding:8px 14px;background:var(--amber-d);border-radius:0 8px 8px 0;
+  font-size:13px;color:var(--t1);margin-top:10px}
+</style>"""
+
+_BODY = r"""
+<div class="pp">
   <h1>Kraken Prop — Breakout 1-Step Classic</h1>
   <div class="sub">Separate system from the hedge-fund thesis. Objective: survive the walls to +10%, not maximise compounding.</div>
 
@@ -167,10 +147,10 @@ PROP_HTML = r"""<!DOCTYPE html>
       <p style="color:var(--t3);margin-top:10px">Caveats: sim checks closed PnL (real eval counts open equity → a few pts lower) · thin sample (45 trades/30mo) · $200k eval fee ≫ $20, confirm in dashboard.</p>
     </div>
   </div>
-
 </div>
+"""
 
-<script>
+_SCRIPT = r"""
 const WR = 0.40;          // mechanical win rate of ASIAN_RSI_DIP_v1
 const FLOOR = 0.06;       // 6% static drawdown
 const TARGET = 0.10;      // 10% profit target
@@ -209,15 +189,15 @@ function run(){
     x.beginPath(); x.moveTo(40,Y(eq)); x.lineTo(W-15,Y(eq)); x.stroke(); x.setLineDash([]);
     x.fillStyle=color; x.font='11px monospace'; x.fillText(label, 44, Y(eq)-4);
   }
-  hline(1+TARGET,'#3dffa0','+10% target  ($'+Math.round(acct*1.1).toLocaleString()+')');
-  hline(1,'#56567e','start  ($'+acct.toLocaleString()+')');
-  hline(1-FLOOR,'#ff4d6d','−6% floor  ($'+Math.round(acct*0.94).toLocaleString()+')');
+  hline(1+TARGET,'#1fd989','+10% target  ($'+Math.round(acct*1.1).toLocaleString()+')');
+  hline(1,'#465064','start  ($'+acct.toLocaleString()+')');
+  hline(1-FLOOR,'#ff5468','−6% floor  ($'+Math.round(acct*0.94).toLocaleString()+')');
 
   let pass=0, fail=0; const ns=[];
   for(let i=0;i<N;i++){
     const p = simPath();
     if(p.res==='pass'){pass++; ns.push(p.n);} else if(p.res==='fail'){fail++; ns.push(p.n);}
-    x.strokeStyle = p.res==='pass' ? 'rgba(61,255,160,.30)' : p.res==='fail' ? 'rgba(255,77,109,.28)' : 'rgba(138,138,184,.18)';
+    x.strokeStyle = p.res==='pass' ? 'rgba(31,217,137,.30)' : p.res==='fail' ? 'rgba(255,84,104,.28)' : 'rgba(130,142,166,.18)';
     x.lineWidth = 1; x.beginPath();
     p.pts.forEach((e,t)=> t===0 ? x.moveTo(X(t),Y(e)) : x.lineTo(X(t),Y(e)));
     x.stroke();
@@ -254,7 +234,7 @@ document.getElementById('riskSeg').addEventListener('click',e=>{
 });
 document.getElementById('runBtn').addEventListener('click',run);
 walls(); run();
-</script>
-</body>
-</html>
 """
+
+PROP_HTML = shell("/prop", "Prop", _BODY, script=_SCRIPT, head_extra=_HEAD,
+                  meta="breakout eval")

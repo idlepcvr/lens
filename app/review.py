@@ -189,18 +189,24 @@ REVIEW_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LENS · Review</title>
+<title>LENS // Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="apple-touch-icon" href="/assets/favicon.svg">
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#08080a;--s1:#0f0f12;--s2:#141418;
-  --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
-  --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
-  --ac:#5b8ef7;--adim:#121c36;
-  --gr:#38c068;--re:#e8445a;--am:#e8a23d;
-  --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
-  --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  /* mapped onto the shared LENS palette (see app/theme.py LENS_CSS) */
+  --bg:#06080c;--s1:#0b0f16;--s2:#10151e;
+  --b1:#192232;--b2:#28344a;--b3:#313d52;
+  --t1:#e8eef8;--t2:#828ea6;--t3:#465064;--t4:#1c2636;
+  --ac:#5b9dff;--adim:#10203f;
+  --gr:#1fd989;--re:#ff5468;--am:#f6ad3c;
+  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  --ui:'Chakra Petch',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
 }
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
@@ -212,10 +218,10 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 .brand-name b{color:var(--ac)}
 .brand-sep{color:var(--t3)}
 .brand-page{font-family:var(--mono);font-size:12px;color:var(--t2);letter-spacing:.08em}
-.topnav{display:flex;gap:2px}
-.topnav a{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}
-.topnav a:hover{color:var(--t1);background:var(--s2);text-decoration:none}
-.topnav a.cur{color:var(--ac);background:var(--adim)}
+.topnav{display:flex;gap:6px;flex-wrap:wrap}
+.topnav a{font-family:var(--mono);font-size:11px;color:var(--t2);text-decoration:none;padding:6px 12px;border:1px solid var(--b1);border-radius:999px;background:var(--s1);letter-spacing:.04em;transition:all .15s}
+.topnav a:hover{color:var(--t1);border-color:var(--b2);text-decoration:none}
+.topnav a.cur{color:var(--bg);background:var(--ac);border-color:var(--ac);font-weight:700}
 .topbar-right{display:flex;gap:8px;align-items:center;margin-left:auto}
 .tb-btn{background:var(--s1);border:1px solid var(--b2);color:var(--t2);padding:5px 12px;border-radius:5px;cursor:pointer;font-family:var(--ui);font-size:11px;font-weight:600;transition:all .12s;white-space:nowrap}
 .tb-btn:hover{border-color:var(--ac);color:var(--ac)}
@@ -325,14 +331,15 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <div class="brand-page">Review</div>
   </div>
   <nav class="topnav">
-    <a href="/">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
+    <a href="/">Dashboard</a>
+    <a href="/review" class="cur">Review</a>
     <a href="/projection">Projection</a>
     <a href="/backtest">Backtest</a>
-    <a href="/review" class="cur">Review</a>
     <a href="/montecarlo">Monte Carlo</a>
     <a href="/prop">Prop</a>
+    <a href="/style">Style</a>
   </nav>
   <div class="topbar-right">
     <div class="chips">
@@ -433,16 +440,16 @@ let ALL_TRADES = [], CANDLES = [], visible = [], selected = null;
 // ── chart ──────────────────────────────────────────────────────────────────────
 const chartEl = document.getElementById('chart-container');
 const chart = LightweightCharts.createChart(chartEl, {
-  layout: { background:{color:'#08080a'}, textColor:'#3c3c48' },
-  grid:   { vertLines:{color:'#1e1e26'}, horzLines:{color:'#1e1e26'} },
+  layout: { background:{color:'#06080c'}, textColor:'#465064' },
+  grid:   { vertLines:{color:'#192232'}, horzLines:{color:'#192232'} },
   crosshair: { mode:LightweightCharts.CrosshairMode.Normal },
-  rightPriceScale: { borderColor:'#1e1e26' },
-  timeScale: { borderColor:'#1e1e26', timeVisible:true, secondsVisible:false },
+  rightPriceScale: { borderColor:'#192232' },
+  timeScale: { borderColor:'#192232', timeVisible:true, secondsVisible:false },
 });
 const series = chart.addCandlestickSeries({
-  upColor:'#38c068', downColor:'#e8445a',
-  borderUpColor:'#38c068', borderDownColor:'#e8445a',
-  wickUpColor:'#38c068', wickDownColor:'#e8445a',
+  upColor:'#1fd989', downColor:'#ff5468',
+  borderUpColor:'#1fd989', borderDownColor:'#ff5468',
+  wickUpColor:'#1fd989', wickDownColor:'#ff5468',
 });
 new ResizeObserver(() => chart.applyOptions({width:chartEl.clientWidth, height:chartEl.clientHeight})).observe(chartEl);
 
@@ -455,12 +462,12 @@ function clearOverlays() {
 function showTrade(t) {
   clearOverlays();
   const isL = t.direction === 'long';
-  const ec  = isL ? '#38c068' : '#e8445a';
+  const ec  = isL ? '#1fd989' : '#ff5468';
   if (t.entry) activeLines.push(series.createPriceLine({price:t.entry, color:ec, lineWidth:1, lineStyle:LightweightCharts.LineStyle.Solid, axisLabelVisible:true, title:'ENTRY'}));
-  if (t.exit)  activeLines.push(series.createPriceLine({price:t.exit, color:'#72728a', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title:'EXIT'}));
+  if (t.exit)  activeLines.push(series.createPriceLine({price:t.exit, color:'#828ea6', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title:'EXIT'}));
   const ms = [];
   if (t.ts_entry) ms.push({time:t.ts_entry, position:isL?'belowBar':'aboveBar', color:ec, shape:isL?'arrowUp':'arrowDown', text:'E', size:1.5});
-  if (t.ts_exit)  ms.push({time:t.ts_exit, position:isL?'aboveBar':'belowBar', color:isL?'#e8445a':'#38c068', shape:isL?'arrowDown':'arrowUp', text:'X', size:1.5});
+  if (t.ts_exit)  ms.push({time:t.ts_exit, position:isL?'aboveBar':'belowBar', color:isL?'#ff5468':'#1fd989', shape:isL?'arrowDown':'arrowUp', text:'X', size:1.5});
   series.setMarkers(ms);
   chart.timeScale().setVisibleRange({from:t.ts_entry-48*3600, to:(t.ts_exit||t.ts_entry)+24*3600});
 }

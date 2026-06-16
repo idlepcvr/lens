@@ -134,6 +134,11 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
                 trades.append({
                     "eval_day": _eval_day(ts, reset),
                     "pnl_pct": (win_pct if result == "win" else loss_pct) * 100,
+                    # worst adverse excursion before the trade resolves, in account
+                    # %: a full move to the price stop (fees not yet paid intra-trade).
+                    # Even eventual winners transiently dip ~this far → Breakout
+                    # checks LIVE equity, so this is what can trip a wall mid-trade.
+                    "dip_pct": stop_pct * lev * 100,
                 })
                 in_trade = False
             continue
@@ -158,9 +163,15 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
     return trades
 
 
-def _walk_eval(daily_trades, account, eval_rule):
-    """Replay an ordered list of (eval_day -> [pnl_pct,...]) under the eval rules.
-    Returns (result, final_balance, n_trades, fail_reason)."""
+def _walk_eval(daily_trades, account, eval_rule, open_equity=True):
+    """Replay an ordered list of (eval_day -> [(pnl_pct, dip_pct),...]) under the
+    eval rules. Returns (result, final_balance, n_trades, fail_reason).
+
+    open_equity=True (default) also tests each trade's intra-trade trough (a full
+    adverse move to its price stop) against the floor + daily wall BEFORE the
+    closed result is applied — Breakout checks live equity, so a trade that ends
+    a winner can still bust the eval if it dipped through a wall on the way.
+    Set False for the old closed-PnL-only behaviour (optimistic)."""
     daily = eval_rule["daily_loss_pct"] / 100
     max_dd = eval_rule["max_dd_pct"] / 100
     target = eval_rule["profit_target_pct"] / 100
@@ -174,7 +185,15 @@ def _walk_eval(daily_trades, account, eval_rule):
 
     for day_pnls in daily_trades:
         day_start = balance
-        for pnl in day_pnls:
+        for item in day_pnls:
+            pnl, dip = item if isinstance(item, tuple) else (item, 0.0)
+            # open-equity: transient low-water mark before this trade resolves
+            if open_equity and dip:
+                trough = balance * (1 - dip / 100)
+                if trough <= floor:
+                    return "FAIL", trough, n + 1, "max_drawdown_intratrade"
+                if trough <= day_start * (1 - daily):
+                    return "FAIL", trough, n + 1, "daily_loss_intratrade"
             balance *= (1 + pnl / 100)
             n += 1
             if trailing:
@@ -192,14 +211,14 @@ def _walk_eval(daily_trades, account, eval_rule):
 
 
 def _group_by_day(trades):
-    """[{eval_day, pnl_pct}] -> ordered [[pnl,...] per day]."""
+    """[{eval_day, pnl_pct, dip_pct}] -> ordered [[(pnl, dip),...] per day]."""
     out, cur_day, bucket = [], None, []
     for t in trades:
         if t["eval_day"] != cur_day:
             if bucket:
                 out.append(bucket)
             bucket, cur_day = [], t["eval_day"]
-        bucket.append(t["pnl_pct"])
+        bucket.append((t["pnl_pct"], t.get("dip_pct", 0.0)))
     if bucket:
         out.append(bucket)
     return out
@@ -208,7 +227,8 @@ def _group_by_day(trades):
 # ─── Public: single historical path ──────────────────────────────────────────
 
 def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
-                  account=5000.0, risk_per_trade_pct=1.0, months=30):
+                  account=5000.0, risk_per_trade_pct=1.0, months=30,
+                  open_equity=True):
     if strategy_name not in STRATEGIES:
         return {"error": f"unknown strategy: {strategy_name}"}
     if eval_name not in EVALS:
@@ -222,7 +242,7 @@ def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
     trades = _trade_log(df, strat["signal_fn"], strat["params"], rule,
                         risk_per_trade_pct)
     daily_trades = _group_by_day(trades)
-    result, final, n, reason = _walk_eval(daily_trades, account, rule)
+    result, final, n, reason = _walk_eval(daily_trades, account, rule, open_equity)
 
     lev, actual_risk = _legal_leverage(strat["params"].get("stop_pct", 1.0),
                                        risk_per_trade_pct, rule["max_leverage"])
@@ -243,7 +263,7 @@ def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
 
 # ─── Monte Carlo core ────────────────────────────────────────────────────────
 
-def _run_mc(daily_trades, account, rule, paths, max_days, seed):
+def _run_mc(daily_trades, account, rule, paths, max_days, seed, open_equity=True):
     """Bootstrap whole eval-days (preserves intraday clustering for the daily
     limit) and resample until PASS / FAIL / out of days."""
     rng = np.random.default_rng(seed)
@@ -253,14 +273,14 @@ def _run_mc(daily_trades, account, rule, paths, max_days, seed):
     for _ in range(paths):
         idx = rng.integers(0, n_days, size=max_days)
         path_days = [daily_trades[k] for k in idx]
-        result, _, n, reason = _walk_eval(path_days, account, rule)
+        result, _, n, reason = _walk_eval(path_days, account, rule, open_equity)
         if result == "PASS":
             passes += 1
             trades_to_resolve.append(n)
-        elif result == "FAIL" and reason == "max_drawdown":
+        elif result == "FAIL" and reason in ("max_drawdown", "max_drawdown_intratrade"):
             fails_dd += 1
             trades_to_resolve.append(n)
-        elif result == "FAIL" and reason == "daily_loss":
+        elif result == "FAIL" and reason in ("daily_loss", "daily_loss_intratrade"):
             fails_daily += 1
             trades_to_resolve.append(n)
         else:
@@ -279,7 +299,7 @@ def _run_mc(daily_trades, account, rule, paths, max_days, seed):
 
 def monte_carlo_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
                      account=5000.0, risk_per_trade_pct=1.0, months=30,
-                     paths=5000, max_days=252, seed=42):
+                     paths=5000, max_days=252, seed=42, open_equity=True):
     if strategy_name not in STRATEGIES:
         return {"error": f"unknown strategy: {strategy_name}"}
     rule = EVALS[eval_name]
@@ -291,7 +311,7 @@ def monte_carlo_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
     daily_trades = _group_by_day(trades)
     if not daily_trades:
         return {"error": "no trades", "strategy": strategy_name}
-    mc = _run_mc(daily_trades, account, rule, paths, max_days, seed)
+    mc = _run_mc(daily_trades, account, rule, paths, max_days, seed, open_equity)
     mc.update({
         "strategy": strategy_name,
         "eval": eval_name,
@@ -326,12 +346,13 @@ def _portfolio_daily_trades(strategy_names, rule, risk_per_trade_pct, months,
 
 
 def portfolio_eval(strategy_names, eval_name="BREAKOUT_1STEP_CLASSIC",
-                   account=5000.0, risk_per_trade_pct=0.5, months=30):
+                   account=5000.0, risk_per_trade_pct=0.5, months=30,
+                   open_equity=True):
     """Single historical path for a basket of strategies on one account."""
     rule = EVALS[eval_name]
     daily_trades, n = _portfolio_daily_trades(strategy_names, rule,
                                               risk_per_trade_pct, months)
-    result, final, nt, reason = _walk_eval(daily_trades, account, rule)
+    result, final, nt, reason = _walk_eval(daily_trades, account, rule, open_equity)
     return {
         "strategies": strategy_names,
         "eval": eval_name,
@@ -346,7 +367,7 @@ def portfolio_eval(strategy_names, eval_name="BREAKOUT_1STEP_CLASSIC",
 
 def monte_carlo_portfolio(strategy_names, eval_name="BREAKOUT_1STEP_CLASSIC",
                           account=5000.0, risk_per_trade_pct=0.5, months=30,
-                          paths=5000, max_days=252, seed=42):
+                          paths=5000, max_days=252, seed=42, open_equity=True):
     """Monte Carlo pass-rate for a basket + estimated months to pass, derived
     from median trades-to-pass over the basket's real trade frequency."""
     rule = EVALS[eval_name]
@@ -354,7 +375,7 @@ def monte_carlo_portfolio(strategy_names, eval_name="BREAKOUT_1STEP_CLASSIC",
                                               risk_per_trade_pct, months)
     if not daily_trades:
         return {"error": "no trades", "strategies": strategy_names}
-    mc = _run_mc(daily_trades, account, rule, paths, max_days, seed)
+    mc = _run_mc(daily_trades, account, rule, paths, max_days, seed, open_equity)
     tpm = n / months
     med = mc["median_trades_to_resolve"]
     mc.update({

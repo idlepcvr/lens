@@ -24,7 +24,21 @@ NAV = [
     ("/backtest", "Backtest"),
     ("/montecarlo", "Monte Carlo"),
     ("/prop", "Prop"),
+    ("/style", "Style"),
 ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Brand mark — a scope/aperture iris (LENS = optics; concentric reads as a
+# target/scope at 16px). Served at /assets/favicon.svg, <link>ed by shell().
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+    '<rect width="32" height="32" rx="7" fill="#06080c"/>'
+    '<circle cx="16" cy="16" r="9.5" fill="none" stroke="#5b9dff" stroke-width="2"/>'
+    '<circle cx="16" cy="16" r="3" fill="#1fd989"/>'
+    '<path d="M16 2.5v4M16 25.5v4M2.5 16h4M25.5 16h4" stroke="#5b9dff" '
+    'stroke-width="1.6" stroke-linecap="round"/>'
+    '</svg>'
+)
 
 FONT_LINKS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -315,6 +329,8 @@ def shell(current_path: str, page_label: str, body: str, *,
         "<meta name=\"theme-color\" content=\"#06080c\">"
         "<title>LENS // " + page_label + "</title>"
         + FONT_LINKS +
+        "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon.svg\">"
+        "<link rel=\"apple-touch-icon\" href=\"/assets/favicon.svg\">"
         "<link rel=\"stylesheet\" href=\"/assets/lens.css\">"
         + head_extra +
         "</head><body><div class=\"app\">"

@@ -404,29 +404,18 @@ def projection_page(
     CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#08080a;--s1:#0f0f12;--s2:#141418;
-  --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
-  --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
-  --ac:#5b8ef7;--adim:#121c36;
-  --gr:#38c068;--re:#e8445a;--am:#e8a23d;
-  --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
-  --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  /* mapped onto the shared LENS palette (see app/theme.py LENS_CSS) */
+  --bg:#06080c;--s1:#0b0f16;--s2:#10151e;
+  --b1:#192232;--b2:#28344a;--b3:#313d52;
+  --t1:#e8eef8;--t2:#828ea6;--t3:#465064;--t4:#1c2636;
+  --ac:#5b9dff;--adim:#10203f;
+  --gr:#1fd989;--re:#ff5468;--am:#f6ad3c;
+  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  --ui:'Chakra Petch',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
 }
-body{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}
-.app{max-width:1180px;margin:0 auto;padding:0 22px 60px}
+/* page-local container width override (shell provides bar/nav/.app + cockpit bg) */
+.app{max-width:1180px}
 a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
-/* topbar */
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:22px}
-.brand{display:flex;align-items:baseline;gap:11px}
-.brand-name{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}
-.brand-name b{color:var(--ac)}
-.brand-sep{color:var(--t3);margin:0 2px}
-.brand-page{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--t2);letter-spacing:.08em}
-.brand-meta{font-family:var(--mono);font-size:10px;color:var(--t3)}
-.topnav{display:flex;gap:2px}
-.topnav a{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}
-.topnav a:hover{color:var(--t1);background:var(--s2);text-decoration:none}
-.topnav a.cur{color:var(--ac);background:var(--adim)}
 /* strategy block */
 .strat{background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--ac);border-radius:10px;padding:14px 18px;margin:0 0 16px}
 .strat .tl{color:#a6c1ff;font-style:italic;font-size:12.5px;display:block;margin-bottom:10px;line-height:1.6}
@@ -440,8 +429,8 @@ a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
 .pf input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:12px;width:80px;transition:border-color .12s}
 .pf input:focus{outline:none;border-color:var(--ac)}
 .pf input.calc-on{border-color:var(--am)!important;color:var(--am)}
-.proj-btn{background:var(--adim);color:var(--ac);border:1px solid #1e2e54;padding:7px 16px;border-radius:5px;cursor:pointer;font-family:var(--ui);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;transition:all .12s;align-self:flex-end}
-.proj-btn:hover{background:#172448;color:#82b4ff}
+.proj-btn{background:var(--adim);color:var(--ac);border:1px solid #28344a;padding:7px 16px;border-radius:5px;cursor:pointer;font-family:var(--ui);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;transition:all .12s;align-self:flex-end}
+.proj-btn:hover{background:#10203f;color:#8fbaff}
 .calc-hint{font-size:9px;color:var(--t4);align-self:flex-end;padding-bottom:8px;font-family:var(--mono)}
 /* hero cards */
 .hero{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
@@ -534,8 +523,8 @@ tr.cur-row td:first-child{border-left:2px solid var(--ac)}
 .add-act-inp[type=date]{width:120px}
 .add-act-inp[type=number]{width:90px}
 .add-act-inp[type=text]{width:140px}
-.add-act-btn{background:var(--adim);color:var(--ac);border:1px solid #1e2e54;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:var(--ui);letter-spacing:.08em;transition:all .12s}
-.add-act-btn:hover{background:#172448;color:#82b4ff}
+.add-act-btn{background:var(--adim);color:var(--ac);border:1px solid #28344a;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:var(--ui);letter-spacing:.08em;transition:all .12s}
+.add-act-btn:hover{background:#10203f;color:#8fbaff}
 /* live stats strip */
 .live-strip{display:flex;flex-wrap:wrap;gap:6px;background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--gr);border-radius:10px;padding:10px 16px;margin:0 0 12px}
 .live-item{flex:1;min-width:160px}
@@ -873,30 +862,17 @@ function toggleChartSection() {
 document.addEventListener('DOMContentLoaded', loadPlans);
 """
 
-    return f"""<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><title>LENS · Projection</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>{CSS}</style>
-</head><body><div class="app">
+    from .theme import shell
 
-<div class="topbar">
-  <div class="brand">
-    <div class="brand-name">LEN<b>S</b></div>
-    <span class="brand-sep">·</span>
-    <div class="brand-page">Projection</div>
-    <div class="brand-meta">parameter-first</div>
-  </div>
-  <nav class="topnav">
-    <a href="/">Dashboard</a>
-    <a href="/desk">Desk</a>
-    <a href="/signals">Signals</a>
-    <a href="/projection" class="cur">Projection</a>
-    <a href="/backtest">Backtest</a>
-    <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
-  </nav>
-</div>
+    body = f"""
+<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this projection</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-help"><div class="help-body">
+<h4>what this page is</h4>A <b>forward projection</b> of the locked TREND_4R_v1 plan: plug in your parameters and it Monte-Carlos thousands of equity paths, then shows the <b>percentile bands</b> — not one line, a cone of outcomes. It answers: <b>where could this account realistically be in N weeks?</b>
+<h4>the parameters drive everything</h4>Start €, stop %, TP %, leverage, win rate, trades/week, horizon. Edit any field and hit <b>Project →</b>. Every field is a calculator (type <code>300*0.1</code> → ↵). <b>Save Plan</b> snapshots the current params to track actual results against later.
+<h4>read the bands, not the totals</h4><b>P50</b> = median path, <b class="r">P05</b> = unlucky worst 5%, <b class="g">P95</b> = best 5%. The spread is <b>variance, not a forecast</b>. Compounding makes far-out totals absurd — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>.
+<h4>the tables</h4><b>R-target scenarios</b> = what each TP% yields as actual R after fees (the lever you control). <b>Win-rate sensitivity</b> = how fragile the edge is to WR slipping. Below breakeven WR you lose regardless of R.
+<h4>a model, not a promise</h4>Assumes the win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. Validate the assumptions in <a href="/backtest">Backtest</a> and <a href="/review">Review</a>.
+</div></div>
 
 <div class="strat">
   <span class="tl">"I trade BTC perps on Kraken — with-trend, 4H chart — risking a fixed 10% of my account to make 40%+. My entire edge is holding winners to the full target instead of bailing early."</span>
@@ -992,8 +968,12 @@ document.addEventListener('DOMContentLoaded', loadPlans);
 </div>
 
 <p class="note" style="margin-top:20px"><b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise.</p>
+"""
 
-</div><script>{JS}</script></body></html>"""
+    script = ("function tog(id){ document.getElementById('h-'+id).classList.toggle('closed');"
+              " document.getElementById('s-'+id).classList.toggle('closed'); }\n") + JS
+    return shell("/projection", "Projection", body, script=script,
+                 head_extra=f"<style>{CSS}</style>", meta="parameter-first")
 
 
 # ─── Landing + health ─────────────────────────────────────────────────────────
@@ -1011,127 +991,97 @@ def landing():
         for name, n in sorted(by_strat.items())
     ) or "<tr><td colspan=2 style='opacity:.5'>none yet — wire up Pine (Week 2)</td></tr>"
 
-    return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<title>LENS</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  *{{box-sizing:border-box;margin:0;padding:0}}
-  :root{{
-    --bg:#08080a;--s1:#0f0f12;--s2:#141418;--s3:#1c1c22;
-    --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
-    --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
-    --ac:#5b8ef7;--adim:#121c36;
-    --gr:#38c068;--re:#e8445a;--am:#e8a23d;
-    --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
-    --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  }}
-  body{{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}}
-  .app{{max-width:1180px;margin:0 auto;padding:0 22px 60px}}
-  a{{color:var(--ac);text-decoration:none}}
-  a:hover{{text-decoration:underline}}
-  /* ─ topbar ─ */
-  .topbar{{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:22px}}
-  .brand{{display:flex;align-items:baseline;gap:11px}}
-  .brand-name{{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}}
-  .brand-name b{{color:var(--ac)}}
-  .brand-meta{{font-family:var(--mono);font-size:10px;color:var(--t3)}}
-  .topnav{{display:flex;gap:2px}}
-  .topnav a{{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;letter-spacing:.01em;transition:all .12s}}
-  .topnav a:hover{{color:var(--t1);background:var(--s2);text-decoration:none}}
-  .topnav a.cur{{color:var(--ac);background:var(--adim)}}
-  /* ─ strip ─ */
-  .strip{{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}}
-  .sc{{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:13px 16px}}
-  .sc-n{{font-family:var(--mono);font-size:24px;font-weight:600;color:#fff;line-height:1}}
-  .sc-l{{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-top:6px}}
-  /* ─ main ─ */
-  .main{{display:grid;grid-template-columns:248px 1fr;gap:14px;align-items:start}}
-  @media(max-width:820px){{.main{{grid-template-columns:1fr}}}}
-  /* ─ sidebar ─ */
-  .sidebar{{position:sticky;top:16px}}
-  .panel{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden}}
-  .panel-hd{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--b1)}}
-  .panel-title{{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t2)}}
-  .saved{{font-size:10px;color:var(--gr);opacity:0;transition:opacity .3s}}
-  .saved.show{{opacity:1}}
-  .fsec{{padding:10px 14px;border-bottom:1px solid var(--b1)}}
-  .fsec-lbl{{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.22em;color:var(--t4);margin-bottom:7px}}
-  .frow{{display:grid;grid-template-columns:1fr 90px;gap:3px 6px;align-items:center;margin-bottom:4px}}
-  .frow:last-child{{margin-bottom:0}}
-  .frow label{{font-size:11px;color:var(--t2)}}
-  .frow input{{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;width:100%;transition:border-color .12s}}
-  .frow input:focus{{outline:none;border-color:var(--ac)}}
-  .frow input.cx{{border-color:var(--am)!important;color:var(--am)}}
-  .frow input[type=date]{{font-family:var(--ui);font-size:11px}}
-  .factns{{padding:10px 14px;display:flex;gap:7px;align-items:center}}
-  .btn{{padding:6px 13px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;font-family:inherit;transition:all .12s}}
-  .btn:hover{{color:var(--t1);border-color:var(--b3)}}
-  .btn.p{{background:var(--adim);color:var(--ac);border-color:#1e2e54}}
-  .btn.p:hover{{background:#172448;color:#82b4ff}}
-  .calc-tip{{font-size:9px;color:var(--t4);font-family:var(--mono)}}
-  /* ─ metrics ─ */
-  .metrics{{display:flex;flex-direction:column;gap:10px}}
-  .hero{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}}
-  @media(max-width:960px){{.hero{{grid-template-columns:repeat(2,1fr)}}}}
-  .hcard{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}}
-  .hcard::after{{content:'';position:absolute;top:0;left:0;right:0;height:2px}}
-  .hcard.pos::after{{background:linear-gradient(90deg,var(--gr),#73daca)}}
-  .hcard.neg::after{{background:linear-gradient(90deg,var(--re),#c04060)}}
-  .hcard.warn::after{{background:linear-gradient(90deg,var(--am),#ff9e64)}}
-  .hcard.blue::after{{background:linear-gradient(90deg,var(--ac),#bb9af7)}}
-  .hbig{{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}}
-  .hlbl{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}}
-  .hsub{{font-size:10px;color:var(--t3);margin-top:3px}}
-  .grid2{{display:grid;grid-template-columns:1fr 1fr;gap:8px}}
-  @media(max-width:640px){{.grid2{{grid-template-columns:1fr}}}}
-  .card{{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}}
-  .card-title{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--t2);padding-bottom:8px;border-bottom:1px solid var(--b1);margin-bottom:9px}}
-  .kv{{display:grid;grid-template-columns:1fr auto;row-gap:1px}}
-  .kv .k{{font-size:11.5px;color:var(--t2);padding:2.5px 0}}
-  .kv .v{{font-family:var(--mono);font-size:11.5px;color:var(--t1);text-align:right;padding:2.5px 0}}
-  .kv .v.pos{{color:var(--gr)}}.kv .v.neg{{color:var(--re)}}.kv .v.warn{{color:var(--am)}}.kv .v.dim{{color:var(--t3)}}
-  /* ─ error ─ */
-  .err{{background:#140910;border:1px solid #3e1a24;color:var(--re);padding:10px 14px;border-radius:8px;font-size:12px}}
-  .err.hide{{display:none}}
-  /* ─ secondary ─ */
-  .sec{{margin-top:28px}}
-  .sec-hd{{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);padding-bottom:7px;margin-bottom:12px}}
-  .sec-hd h2{{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t3)}}
-  .sec-hd a{{font-size:11px;color:var(--t3);text-decoration:none}}
-  .sec-hd a:hover{{color:var(--ac)}}
-  .sigt{{width:100%;border-collapse:collapse}}
-  .sigt td{{padding:5px 0;font-size:12px;border-bottom:1px solid var(--b1);color:var(--t2)}}
-  .sigt td:last-child{{text-align:right;font-family:var(--mono);color:var(--t1)}}
-  .ep{{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:5px}}
-  .ep:hover{{background:var(--s1)}}
-  .ep .m{{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--ac);width:52px;flex-shrink:0}}
-  .ep .m.post{{color:var(--gr)}}.ep .m.patch{{color:var(--am)}}.ep .m.del{{color:var(--re)}}
-  .ep .path{{font-family:var(--mono);font-size:11.5px}}
-  .ep .desc{{font-size:11px;color:var(--t3);margin-left:auto}}
-</style></head><body><div class="app">
+    from .theme import shell
 
-<div class="topbar">
-  <div class="brand">
-    <div class="brand-name">LEN<b>S</b></div>
-    <div class="brand-meta">v1.0-dev · :8765</div>
-  </div>
-  <nav class="topnav">
-    <a href="/" class="cur">Dashboard</a>
-    <a href="/desk">Desk</a>
-    <a href="/signals">Signals</a>
-    <a href="/projection">Projection</a>
-    <a href="/backtest">Backtest</a>
-    <a href="/review">Review</a>
-    <a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
-  </nav>
-</div>
+    css = r"""<style>
+:root{
+  /* alias the dashboard's local names onto the shared LENS tokens */
+  --s1:var(--panel);--s2:var(--panel2);--s3:var(--panel3);
+  --b1:var(--line);--b2:var(--line2);--b3:#313d52;
+  --t1:var(--ink);--t2:var(--dim);--t3:var(--faint);--t4:#1c2636;
+  --ac:var(--accent);--adim:var(--accent-d);
+  --gr:var(--long);--re:var(--short);--am:var(--amber);--ui:var(--hud);
+}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 18px}
+.sc{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:13px 16px}
+.sc-n{font-family:var(--mono);font-size:24px;font-weight:600;color:#fff;line-height:1}
+.sc-l{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-top:6px}
+.main{display:grid;grid-template-columns:248px 1fr;gap:14px;align-items:start;margin-top:18px}
+@media(max-width:820px){.main{grid-template-columns:1fr}}
+.sidebar{position:sticky;top:74px}
+.panel{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden;margin-bottom:0;padding:0}
+.panel-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--b1)}
+.panel-title{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t2)}
+.saved{font-size:10px;color:var(--gr);opacity:0;transition:opacity .3s}
+.saved.show{opacity:1}
+.fsec{padding:10px 14px;border-bottom:1px solid var(--b1)}
+.fsec-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.22em;color:var(--t4);margin-bottom:7px}
+.frow{display:grid;grid-template-columns:1fr 90px;gap:3px 6px;align-items:center;margin-bottom:4px}
+.frow:last-child{margin-bottom:0}
+.frow label{font-size:11px;color:var(--t2)}
+.frow input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;width:100%;transition:border-color .12s}
+.frow input:focus{outline:none;border-color:var(--ac)}
+.frow input.cx{border-color:var(--am)!important;color:var(--am)}
+.frow input[type=date]{font-family:var(--ui);font-size:11px}
+.factns{padding:10px 14px;display:flex;gap:7px;align-items:center}
+.btn{padding:6px 13px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;font-family:inherit;transition:all .12s}
+.btn:hover{color:var(--t1);border-color:var(--b3)}
+.btn.p{background:var(--adim);color:var(--ac);border-color:var(--b2)}
+.btn.p:hover{filter:brightness(1.3)}
+.calc-tip{font-size:9px;color:var(--t4);font-family:var(--mono)}
+.metrics{display:flex;flex-direction:column;gap:10px}
+.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:960px){.hero{grid-template-columns:repeat(2,1fr)}}
+.hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
+.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.hcard.pos::after{background:linear-gradient(90deg,var(--gr),#73daca)}
+.hcard.neg::after{background:linear-gradient(90deg,var(--re),#c04060)}
+.hcard.warn::after{background:linear-gradient(90deg,var(--am),#ff9e64)}
+.hcard.blue::after{background:linear-gradient(90deg,var(--ac),#bb9af7)}
+.hbig{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}
+.hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
+.hsub{font-size:10px;color:var(--t3);margin-top:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}
+.card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--t2);padding-bottom:8px;border-bottom:1px solid var(--b1);margin-bottom:9px}
+.kv{display:grid;grid-template-columns:1fr auto;row-gap:1px}
+.kv .k{font-size:11.5px;color:var(--t2);padding:2.5px 0;border:none}
+.kv .v{font-family:var(--mono);font-size:11.5px;color:var(--t1);text-align:right;padding:2.5px 0}
+.kv .v.pos{color:var(--gr)}.kv .v.neg{color:var(--re)}.kv .v.warn{color:var(--am)}.kv .v.dim{color:var(--t3)}
+.err{background:var(--short-d);border:1px solid var(--short);color:var(--re);padding:10px 14px;border-radius:8px;font-size:12px}
+.err.hide{display:none}
+.sec{margin-top:28px}
+.sec-hd{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);padding-bottom:7px;margin-bottom:12px}
+.sec-hd h2{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t3)}
+.sec-hd a{font-size:11px;color:var(--t3);text-decoration:none}
+.sec-hd a:hover{color:var(--ac)}
+.sigt{width:100%;border-collapse:collapse}
+.sigt td{padding:5px 0;font-size:12px;border-bottom:1px solid var(--b1);color:var(--t2)}
+.sigt td:last-child{text-align:right;font-family:var(--mono);color:var(--t1)}
+.ep{display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:5px}
+.ep:hover{background:var(--s1)}
+.ep .m{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--ac);width:52px;flex-shrink:0}
+.ep .m.post{color:var(--gr)}.ep .m.patch{color:var(--am)}.ep .m.del{color:var(--re)}
+.ep .path{font-family:var(--mono);font-size:11.5px}
+.ep .desc{font-size:11px;color:var(--t3);margin-left:auto}
+</style>"""
 
+    body = f"""
 <div class="strip">
   <div class="sc"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades</div></div>
   <div class="sc"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals</div></div>
   <div class="sc"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending</div></div>
 </div>
+
+<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this dashboard</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-help"><div class="help-body">
+<h4>what this page is</h4>A <b>live goal-and-risk calculator</b>, not a trade log. Type your account + strategy assumptions into <b>Parameters</b> (left) and every metric recomputes instantly. It answers: <b>given these numbers, do I reach the target — and what's the risk of blowing up before I get there?</b>
+<h4>the only inputs are the parameters</h4>Start €, target €, target date, win rate, R:R, leverage, trades/week, drawdown limits. Every field is a calculator — type <code>300*0.1</code> and hit <b>↵</b> to get <code>30</code>. <b>Apply</b> saves them as your defaults; <b>Reload</b> pulls the last saved set.
+<h4>the four hero cards</h4><b class="a">Actual R</b> = reward ÷ risk after fees — the one lever you fully control. <b>EV / trade</b> = expected geometric drift per trade; must be <b class="g">positive</b> or the account bleeds. <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Days to goal</b> = time at this pace.
+<h4>the metric cards</h4>Break the model down: time-to-goal, required growth rates, the per-trade EV model, Kelly sizing, account impact per win/loss, risk analytics (Sharpe, profit factor, ruin), €-growth projections, and a BTC / Monte-Carlo band (P05 / P50 / P95 outcomes).
+<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/projection">Projection</a> (equity curve over time).
+</div></div>
 
 <div class="main">
   <div class="sidebar">
@@ -1235,7 +1185,10 @@ def landing():
 </div>
 
 </div>
-<script>
+"""
+
+    script = f"""
+function tog(id){{ document.getElementById('h-'+id).classList.toggle('closed'); document.getElementById('s-'+id).classList.toggle('closed'); }}
 const FORM     = document.getElementById("goal-form");
 const ERR      = document.getElementById("err");
 const SAVED    = document.getElementById("saved-pulse");
@@ -1422,9 +1375,9 @@ document.querySelectorAll('#goal-form input').forEach(function(inp) {{
   inp.addEventListener('blur', tryCalc);
   inp.addEventListener('keydown', function(e) {{ if (e.key === 'Enter') {{ tryCalc(); e.preventDefault(); }} }});
 }});
-</script>
+"""
 
-</body></html>"""
+    return shell("/", "Dashboard", body, script=script, head_extra=css, meta="goal model")
 
 
 @app.get("/health")
@@ -2345,60 +2298,49 @@ _bt_running: dict = {}     # name → True/False
 
 @app.get("/backtest", response_class=HTMLResponse)
 def backtest_page():
+    from .theme import shell
     strat_opts = "".join(
         f'<option value="{k}">{k} — {v["description"][:70]}</option>'
         for k, v in BT_STRATEGIES.items()
     )
-    return HTMLResponse(f"""<!doctype html><html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LENS — Backtest</title>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--bg:#08080a;--s1:#0f0f12;--s2:#141418;--b1:#1e1e26;--b2:#28282e;--t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--ac:#5b8ef7;--adim:#121c36;--ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;--mono:'SF Mono',ui-monospace,'Cascadia Code',monospace}}
-body{{background:var(--bg);color:var(--t1);font-family:var(--ui);font-size:13px;-webkit-font-smoothing:antialiased}}
-.app{{max-width:1180px;margin:0 auto;padding:0 22px 60px}}
-.topbar{{display:flex;align-items:center;justify-content:space-between;padding:12px 0 12px;border-bottom:1px solid var(--b1);margin-bottom:24px}}
-.brand{{display:flex;align-items:baseline;gap:10px}}
-.brand-name{{font-family:var(--mono);font-size:15px;font-weight:700;color:#fff;letter-spacing:.12em}}
-.brand-name b{{color:var(--ac)}}
-.brand-sep{{color:var(--t3)}}
-.brand-page{{font-family:var(--mono);font-size:12px;color:var(--t2);letter-spacing:.08em}}
-.topnav{{display:flex;gap:2px}}
-.topnav a{{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}}
-.topnav a:hover{{color:var(--t1);background:var(--s2);text-decoration:none}}
-.topnav a.cur{{color:var(--ac);background:var(--adim)}}
-h1{{color:var(--t1);font-size:17px;margin-bottom:4px}}
-.sub{{color:var(--t3);font-size:11px;margin-bottom:24px}}
-select,button{{background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:var(--ui)}}
-button.run{{background:var(--adim);color:var(--ac);border-color:#1e2e54;font-weight:600;padding:9px 22px}}
-button.run:hover{{background:#172448}}
-button.run:disabled{{opacity:.5;cursor:default}}
-.row{{display:flex;gap:12px;align-items:center;margin-bottom:24px}}
-.card{{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:16px 20px;margin-bottom:16px}}
-.metrics{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}}
-.metric{{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:10px 14px}}
-.metric .lbl{{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}}
-.metric .val{{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--t1)}}
-.metric .val.good{{color:#38c068}}.metric .val.bad{{color:#e8445a}}.metric .val.warn{{color:#e8a23d}}
-.metric .val.big{{font-size:14px}}
-table{{width:100%;border-collapse:collapse;font-size:11px}}
-th{{padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b1)}}
-td{{padding:6px 10px;border-bottom:1px solid var(--b1)}}
-.win{{color:#38c068}}.loss{{color:#e8445a}}
-#status{{color:var(--ac);font-size:12px;margin-left:12px}}
-canvas{{width:100%;height:200px;display:block}}
-</style>
-</head><body><div class="app">
-<div class="topbar">
-  <div class="brand"><div class="brand-name">LEN<b>S</b></div><span class="brand-sep">·</span><div class="brand-page">Backtest</div></div>
-  <nav class="topnav">
-    <a href="/">Dashboard</a><a href="/desk">Desk</a>
-    <a href="/signals">Signals</a><a href="/projection">Projection</a>
-    <a href="/backtest" class="cur">Backtest</a><a href="/review">Review</a><a href="/montecarlo">Monte Carlo</a><a href="/prop">Prop</a>
-  </nav>
-</div>
+    css = r"""<style>
+:root{
+  --s1:var(--panel);--s2:var(--panel2);--b1:var(--line);--b2:var(--line2);
+  --t1:var(--ink);--t2:var(--dim);--t3:var(--faint);--ac:var(--accent);--adim:var(--accent-d);--ui:var(--hud);
+}
+h1{color:var(--t1);font-size:17px;margin:4px 0 4px}
+.sub{color:var(--t3);font-size:11px;margin-bottom:20px}
+select,button{background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:var(--ui)}
+button.run{background:var(--adim);color:var(--ac);border-color:var(--b2);font-weight:600;padding:9px 22px}
+button.run:hover{filter:brightness(1.3)}
+button.run:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:12px;align-items:center;margin-bottom:24px;flex-wrap:wrap}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.metric{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:10px 14px}
+.metric .lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.metric .val{font-size:20px;font-weight:700;font-family:var(--mono);color:var(--t1)}
+.metric .val.good{color:var(--long)}.metric .val.bad{color:var(--short)}.metric .val.warn{color:var(--amber)}
+.metric .val.big{font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b1)}
+td{padding:6px 10px;border-bottom:1px solid var(--b1)}
+.win{color:var(--long)}.loss{color:var(--short)}
+#status{color:var(--ac);font-size:12px;margin-left:12px}
+canvas{width:100%;height:200px;display:block}
+</style>"""
+
+    body = f"""
 <h1>Strategy Backtest</h1>
 <div class="sub">BTC/USDT 4H · Bybit perpetuals · 30 months · €637 initial · 0.15%/side fee</div>
+
+<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this backtest</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-help"><div class="help-body">
+<h4>what this page is</h4>Runs a <b>locked, mechanical strategy</b> over ~30 months of BTC/USDT 4H history and reports exactly how it would have done — no discretion, no curve-fitting. Pick a strategy, hit <b>Run</b>, read the scorecard.
+<h4>the metrics that matter</h4><b class="g">Win rate</b> ≥48% = goal-grade. <b>Profit factor</b> ≥1.5 (gross win ÷ gross loss). <b class="a">Avg R</b> ≥3.5 — the real lever. <b class="r">Max DD</b> &lt;40% survivable, and <b>max consecutive losses</b> = your risk-of-ruin reality check.
+<h4>equity curve + trade log</h4>The curve is account €over the window; the log lists every entry/exit with PnL% and hold time. Look for <b>smooth-ish</b> growth, not one lucky spike.
+<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. These metrics <b>seed Monte Carlo</b>: pick a backtest there to stress-test the same edge forward. Compare against your real results in <a href="/review">Review</a>.
+</div></div>
 
 <div class="row">
   <select id="strat">{strat_opts}</select>
@@ -2408,13 +2350,13 @@ canvas{{width:100%;height:200px;display:block}}
 
 <div id="results" style="display:none">
   <div class="card">
-    <div id="strat-name" style="font-size:14px;font-weight:700;color:#e2e2f0;margin-bottom:4px"></div>
-    <div id="strat-desc" style="font-size:11px;color:#5a5a80;margin-bottom:14px"></div>
+    <div id="strat-name" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px"></div>
+    <div id="strat-desc" style="font-size:11px;color:var(--faint);margin-bottom:14px"></div>
     <div class="metrics" id="metrics-grid"></div>
     <canvas id="eq-chart"></canvas>
   </div>
   <div class="card">
-    <div style="font-size:11px;font-weight:600;color:#5a5a80;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Trade Log</div>
+    <div style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Trade Log</div>
     <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
     <table>
       <thead><tr><th>Entry</th><th>Exit</th><th>Dir</th><th>Entry $</th><th>Exit $</th><th>Result</th><th>PnL %</th><th>Hours</th><th>Equity</th></tr></thead>
@@ -2423,8 +2365,10 @@ canvas{{width:100%;height:200px;display:block}}
     </div>
   </div>
 </div>
+"""
 
-<script>
+    script = f"""
+function tog(id){{ document.getElementById('h-'+id).classList.toggle('closed'); document.getElementById('s-'+id).classList.toggle('closed'); }}
 function runBacktest() {{
   var name = document.getElementById('strat').value;
   var btn  = document.getElementById('run-btn');
@@ -2479,7 +2423,7 @@ function renderResults(d) {{
     var cls = metricColor(f[0], parseFloat(f[2])) + (String(f[2]).length > 8 ? ' big' : '');
     return '<div class="metric"><div class="lbl">' + f[1] + '</div>' +
            '<div class="val ' + cls + '">' + f[2] + '</div>' +
-           '<div style="font-size:9px;color:#3a3a55;margin-top:2px">' + f[3] + '</div></div>';
+           '<div style="font-size:9px;color:#465064;margin-top:2px">' + f[3] + '</div></div>';
   }}).join('');
 
   // Equity curve
@@ -2528,25 +2472,26 @@ function drawChart(curve) {{
   ctx.lineTo(px(vals.length-1), H-20);
   ctx.lineTo(px(0), H-20);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(124,58,237,0.15)';
+  ctx.fillStyle = 'rgba(91,157,255,0.12)';
   ctx.fill();
 
   // Line
   ctx.beginPath();
-  ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#5b9dff'; ctx.lineWidth = 1.5;
   ctx.moveTo(px(0), py(vals[0]));
   for (var i=1; i<vals.length; i++) ctx.lineTo(px(i), py(vals[i]));
   ctx.stroke();
 
   // Labels
-  ctx.fillStyle = '#5a5a80'; ctx.font = '10px monospace';
+  ctx.fillStyle = '#828ea6'; ctx.font = '10px monospace';
   ctx.fillText('€' + Math.round(mn).toLocaleString('en'), 10, H-8);
   ctx.fillText('€' + Math.round(mx).toLocaleString('en'), 10, 14);
   ctx.fillText(curve[0].date.slice(0,7), 10, H-20);
   ctx.fillText(curve[curve.length-1].date.slice(0,7), W-60, H-20);
 }}
-</script>
-</div></body></html>""")
+"""
+
+    return HTMLResponse(shell("/backtest", "Backtest", body, script=script, head_extra=css, meta="30mo history"))
 
 
 class BtRunRequest(BaseModel):
@@ -2631,6 +2576,21 @@ def lens_css():
     from .theme import LENS_CSS
     return Response(LENS_CSS, media_type="text/css",
                     headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/assets/favicon.svg")
+def favicon_svg():
+    """Brand mark (scope/aperture iris) — see app/theme.py FAVICON_SVG."""
+    from fastapi.responses import Response
+    from .theme import FAVICON_SVG
+    return Response(FAVICON_SVG, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/style", response_class=HTMLResponse)
+def style_guide_page():
+    from .style_guide import STYLE_HTML
+    return STYLE_HTML
 
 
 @app.get("/api/setups/state")

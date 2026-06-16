@@ -98,22 +98,44 @@ feature candidates (order flow: CVD, delta, funding, open interest).
 ## The pages
 
 Start the server (below), then visit **http://localhost:8765**.
-Nav: **Dashboard · Desk · Signals · Projection · Backtest · Review · Monte Carlo · Prop**.
+Nav: **Desk · Signals · Dashboard · Review · Projection · Backtest · Monte Carlo · Prop · Style**.
 
 ### Web UI / design system (2026-06)
 
-A shared, responsive **design system** lives in **`app/theme.py`**: `LENS_CSS`
-(a dark "cockpit/HUD" theme — Chakra Petch + JetBrains Mono, all components,
-responsive at 680px / 1080px) is served once at **`/assets/lens.css`** and
-`shell()` builds each page identically (head + sticky bar + auto nav). One file
-restyles the whole app. Built phone-first — open it on the iPhone (Safari →
-Add to Home Screen for a fullscreen app feel), it reflows for iPad / desktop.
+A shared, responsive **design system** lives in **`app/theme.py`** — the single
+source of truth for the whole app:
 
-- **Migrated:** `/desk` (links shared css) and `/signals` (rebuilt on `shell()` —
-  pending queue + inline TAKE A+/TAKE/SKIP + conviction + history).
-- **Not yet migrated** (own inline CSS): Dashboard, Projection, Backtest, Review,
-  Monte Carlo, Prop.
-- **Compare routes** (throwaway): `/desk-old`, `/signals-classic`.
+- **`LENS_CSS`** — the dark "cockpit / HUD" theme. Design tokens (surfaces, text,
+  accent + status colors, radii, glow elevation), the type system (Chakra Petch
+  display + JetBrains Mono data), every component class, and responsive rules at
+  680px / 1080px. Served **once** at `/assets/lens.css` and `<link>`ed by every
+  page, so the browser caches it and there is exactly one place to change styling.
+- **`shell(path, label, body, *, script, head_extra, meta)`** — the page
+  template. Wraps any body in the standard head (fonts + favicon + css), the
+  sticky top bar, and the scroll-chip nav (driven by the one `NAV` list, current
+  page auto-highlighted). Page-specific CSS goes in `head_extra`; JS in `script`.
+- **`FAVICON_SVG`** — the brand mark (a scope / aperture iris; LENS = optics),
+  served at `/assets/favicon.svg`.
+- **`NAV`** — add a page here once and it appears in every nav bar.
+
+**To add a page:** `from .theme import shell` → build `body` (+ optional
+`head_extra` CSS that aliases local var names onto shared tokens, e.g.
+`--ac:var(--accent)`) → `return shell("/x", "X", body, ...)`. To restyle the
+**entire** app, edit `LENS_CSS` once.
+
+- **`/style`** — **living style guide.** Renders every token + component straight
+  from `lens.css`, so it's both the design docs and a visual regression check.
+  See also **`BRAND.md`** (logo, voice, palette in one page).
+- **On `shell()`:** `/desk`, `/signals`, `/`, `/projection`, `/backtest`,
+  `/montecarlo`, `/prop`, `/style` — all share the bar/nav and carry a
+  collapsible "❔ how to read this …" explainer.
+- **Recolor exception:** `/review` keeps its bespoke full-viewport 3-pane chart
+  workstation layout (doesn't fit the scrolling shell), but uses the shared
+  palette + fonts.
+- **Compare routes** (throwaway, delete on signoff): `/desk-old`, `/signals-classic`.
+
+Built phone-first — open it on the iPhone (Safari → Add to Home Screen for a
+fullscreen app feel), it reflows for iPad / desktop.
 
 ### `/desk` — **the live one. "Can I enter right now?"**
 Per-direction verdict (ENTER / BLOCKED / STAND DOWN) with the active vetoes
@@ -148,6 +170,12 @@ backtest strategy.
 Live Monte Carlo of evaluation paths against the floor/target walls, with the
 locked plan, the speed↔probability frontier, and funded-income tables. See the
 **Prop track** section below.
+
+### `/style` — living style guide
+Every design token + component rendered straight from `lens.css` — the design
+docs and a visual regression check in one page. Brand/logo/voice, the full
+colour palette, type scale, spacing, and all components. Written companion:
+**`BRAND.md`**.
 
 ---
 
@@ -195,6 +223,9 @@ conditions: touch the floor ever, OR lose 3% in one day.
 > 4% TP (4R).
 > - **Eval phase: 2% risk (2x lev) → ~70% pass in ~2 months** (best of a
 >   25-strategy × 5-risk sweep). Cheap retries make expected time ~3mo / ~$29.
+>   *(Note: ~70% is the closed-PnL sim. Under the newer **open-equity** check it's
+>   **~57%** — still passable, but re-run the sweep to confirm this is still the
+>   best pick. See Next, below.)*
 > - **Funded phase: drop to 1% risk** for survival and payout longevity.
 > - **Size-independent** — same odds on $5k and $200k. Pass the cheap $5k first,
 >   then buy the biggest eval directly; **don't ladder** 5k→25k→100k→200k.
@@ -225,8 +256,15 @@ cushion carries it home. Funded $200k earns ~$3.4k/mo @2% (lumpy) or ~$1.7k @1%.
 ### Next (later)
 - [ ] Confirm in Breakout dashboard: **time limit, exact fees, $200k eval cost.**
 - [ ] **Forward-test** ASIAN_RSI_DIP_v1 @2% on demo before paying the $20.
-- [ ] Harden the sim: add **open-equity (intra-trade) drawdown** — Breakout checks
-      live equity, the sim currently checks closed PnL → optimistic by a few pts.
+- [x] Harden the sim: **open-equity (intra-trade) drawdown** added (`open_equity=True`,
+      default on in `app/prop_eval.py`). Each trade now tests its worst adverse
+      excursion (a full move to the price stop) against the floor + daily wall
+      *before* the closed result — Breakout checks live equity, so an eventual
+      winner can still bust mid-trade. **Impact: locked plan drops 69.6% → 57.2%
+      pass** (the old closed-PnL number was optimistic by ~12pts, not "a few").
+- [ ] **Re-run the full sweep under open-equity** — the ~70% locked-plan pick was
+      made on the optimistic sim; the strategy × risk ranking may shift now.
+      `python3 -m app.prop_eval sweep` (re-pick before paying any eval fee).
 - [ ] Long game: lift WR/R via the LENS discretionary edge (real flush WR ~60%
       vs 40% mechanical) → roughly doubles funded income.
 
