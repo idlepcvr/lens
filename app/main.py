@@ -1880,6 +1880,13 @@ def expire_stale(older_than_minutes: int = Query(30, ge=1, le=10080)):
 # ─── Signals / Conviction page ───────────────────────────────────────────────
 
 @app.get("/signals", response_class=HTMLResponse)
+def signals_page_new():
+    """Responsive signals queue built on the shared design system."""
+    from .signals_page import render
+    return render()
+
+
+@app.get("/signals-classic", response_class=HTMLResponse)
 def signals_page():
     from datetime import date, datetime, timezone
     all_sigs   = get_signals(limit=5000)
@@ -2608,6 +2615,22 @@ def api_stats_trades():
 def desk_page():
     from .desk import DESK_HTML
     return DESK_HTML
+
+
+@app.get("/desk-old", response_class=HTMLResponse)
+def desk_old_page():
+    """Pre-redesign desk, kept for before/after comparison. Delete once signed off."""
+    from .desk_old import DESK_HTML
+    return DESK_HTML
+
+
+@app.get("/assets/lens.css")
+def lens_css():
+    """Shared design-system stylesheet — single source of truth for every page."""
+    from fastapi.responses import Response
+    from .theme import LENS_CSS
+    return Response(LENS_CSS, media_type="text/css",
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/api/setups/state")

@@ -544,24 +544,68 @@ def desk_state(refresh: bool = True) -> dict:
     }
 
 
-def _notify(title: str, body: str) -> bool:
-    """Push to phone via ntfy.sh if LENS_NTFY_TOPIC is set (env or prism.env)."""
+def _notify(title: str, body: str, signal_id: str = None) -> bool:
+    """Push to phone via ntfy.sh if LENS_NTFY_TOPIC is set (env or prism.env).
+
+    If signal_id is given, attach TAKE / SKIP action buttons that POST the
+    approve/reject decision straight to the LENS server. The phone's ntfy app
+    makes the HTTP request, so the target must be reachable from the phone:
+    LENS_BASE_URL (default the LAN address) — works on home wifi; for mobile
+    data point it at a public tunnel.
+    """
     import os
     import urllib.request
-    topic = os.environ.get("LENS_NTFY_TOPIC")
-    if not topic:
+    cfg = {"LENS_NTFY_TOPIC": os.environ.get("LENS_NTFY_TOPIC"),
+           "LENS_NTFY_SERVER": os.environ.get("LENS_NTFY_SERVER"),
+           "LENS_NTFY_TOKEN": os.environ.get("LENS_NTFY_TOKEN"),
+           "LENS_NTFY_USER": os.environ.get("LENS_NTFY_USER"),
+           "LENS_NTFY_PASS": os.environ.get("LENS_NTFY_PASS"),
+           "LENS_BASE_URL": os.environ.get("LENS_BASE_URL")}
+    if not all(cfg.values()):
         try:
             with open("prism.env") as f:
                 for line in f:
-                    if line.startswith("LENS_NTFY_TOPIC="):
-                        topic = line.split("=", 1)[1].strip()
+                    for k in cfg:
+                        if not cfg[k] and line.startswith(k + "="):
+                            cfg[k] = line.split("=", 1)[1].strip()
         except OSError:
             pass
+    topic = cfg["LENS_NTFY_TOPIC"]
     if not topic:
         return False
+    server = (cfg["LENS_NTFY_SERVER"] or "https://ntfy.sh").rstrip("/")
+    # HTTP headers are latin-1 only; ntfy title may carry em dash / unicode.
+    safe_title = title.replace("—", "-").replace("–", "-")
+    safe_title = safe_title.encode("ascii", "replace").decode("ascii")
+    # notify.restedpc.com is behind Cloudflare; default urllib UA is 403'd (err 1010).
+    headers = {"Title": safe_title, "Priority": "high", "Tags": "chart_with_upwards_trend",
+               "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) LENS/3.0"}
+    if signal_id:
+        base_url = (cfg["LENS_BASE_URL"] or "http://192.168.1.47:8765").rstrip("/")
+        decide = f"{base_url}/api/signals/{signal_id}/decide"
+        # ntfy http action: the request is made by the phone app, so base_url
+        # must be reachable from the phone. ASCII labels only (header is latin-1).
+        # Approving requires your_conviction (1-5) — captured by the button, so
+        # the conviction-WR metric stays honest. Body wrapped in single quotes
+        # so the JSON comma needs no escaping. Max 3 actions per ntfy message.
+        def _act(label, body):
+            return (f"http, {label}, {decide}, method=POST, "
+                    f"headers.Content-Type=application/json, "
+                    f"body='{body}', clear=true")
+        actions = "; ".join([
+            _act("TAKE A+", '{"status":"approved","your_conviction":5}'),
+            _act("TAKE",    '{"status":"approved","your_conviction":3}'),
+            _act("SKIP",    '{"status":"rejected","rejection_reason":"skipped from phone"}'),
+        ])
+        headers["Actions"] = actions.encode("ascii", "replace").decode("ascii")
+    if cfg["LENS_NTFY_USER"] and cfg["LENS_NTFY_PASS"]:
+        import base64
+        creds = f"{cfg['LENS_NTFY_USER']}:{cfg['LENS_NTFY_PASS']}".encode()
+        headers["Authorization"] = "Basic " + base64.b64encode(creds).decode()
+    elif cfg["LENS_NTFY_TOKEN"]:
+        headers["Authorization"] = f"Bearer {cfg['LENS_NTFY_TOKEN']}"
     req = urllib.request.Request(
-        f"https://ntfy.sh/{topic}", data=body.encode(),
-        headers={"Title": title, "Priority": "high", "Tags": "chart_with_upwards_trend"})
+        f"{server}/{topic}", data=body.encode(), headers=headers)
     try:
         urllib.request.urlopen(req, timeout=10)
         return True
@@ -583,8 +627,9 @@ def run_scan_cli():
             _notify(
                 f"LENS {s['trigger_type']} — {s['direction'].upper()} setup live",
                 f"entry ~{s['entry_price']:.0f}  SL {s['stop_price']:.0f}  "
-                f"TP {s['target_price']:.0f}. Open /desk, run the checklist, "
-                f"approve or reject on /signals.")
+                f"TP {s['target_price']:.0f}. Open /desk for the checklist, or "
+                f"TAKE / SKIP below.",
+                signal_id=s["signal_id"])
     tags = backfill_setup_tags(only_untagged=True)
     expired = expire_stale_signals(older_than_minutes=180)
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")

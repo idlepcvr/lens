@@ -62,17 +62,31 @@ auto-enters. Off-playbook trades ("NONE" tag) look profitable only because of
 ```mermaid
 flowchart TD
     CRON["hourly scanner\npython3 -m app.setups (cron)"]
-    NTFY["phone push (ntfy)\n'S1 — SHORT setup live'"]
+    NTFY["phone push (ntfy)\n'S1 — SHORT setup live'\n+ TAKE A+ / TAKE / SKIP buttons"]
     DESK["/desk\nverdict + checklist + ticket in EUR"]
-    ME["Me\ntake it or skip it"]
+    ME["Me\ntap TAKE/SKIP on phone\n(or decide on /signals)"]
     KR["Kraken\nplace the trade"]
     DB["LENS server\nfills synced + auto setup_tag"]
     SB["scoreboard /api/stats/setups\nrealized vs mined WR, drift halves"]
     V4["re-mine (v4)\nwhen enough tagged trades"]
 
-    CRON --> NTFY --> DESK --> ME -->|execute| KR -->|sync| DB --> SB --> V4 -->|better setups| CRON
+    CRON --> NTFY --> DESK --> ME -->|execute| KR -->|MANUAL sync| DB --> SB --> V4 -->|better setups| CRON
     CRON -->|pending signal| DB
+    ME -.->|button POSTs decision| DB
 ```
+
+**Decide from the phone (no app-switch).** Each ntfy push carries three HTTP
+action buttons — **TAKE A+** (approve, conviction 5), **TAKE** (approve,
+conviction 3), **SKIP** (reject) — that POST straight to
+`/api/signals/{id}/decide`. The *phone's* ntfy app makes that request, so the
+LENS server must be reachable from the phone: works on home wifi (LAN), needs a
+public tunnel on mobile data. Target URL is `LENS_BASE_URL` (see *Running it*).
+
+**The one manual step:** the hourly cron does **not** pull your fills from
+Kraken — `run_scan_cli` only scans, emits, notifies, and tags *already-synced*
+untagged trades. After you place a trade you must run a Kraken sync
+(`POST /api/sync/kraken`, or just open the dashboard) for the fill to land in
+the DB and get its `setup_tag`. Automate it with the optional sync cron below.
 
 Every signal — taken or skipped — lands in the `/signals` approve/reject flow
 with discipline filters (no Saturday, bleed hours, cooldown). Every synced trade
@@ -84,18 +98,38 @@ feature candidates (order flow: CVD, delta, funding, open interest).
 ## The pages
 
 Start the server (below), then visit **http://localhost:8765**.
-Nav: **Dashboard · Desk · Signals · Projection · Backtest · Review · Monte Carlo**.
+Nav: **Dashboard · Desk · Signals · Projection · Backtest · Review · Monte Carlo · Prop**.
+
+### Web UI / design system (2026-06)
+
+A shared, responsive **design system** lives in **`app/theme.py`**: `LENS_CSS`
+(a dark "cockpit/HUD" theme — Chakra Petch + JetBrains Mono, all components,
+responsive at 680px / 1080px) is served once at **`/assets/lens.css`** and
+`shell()` builds each page identically (head + sticky bar + auto nav). One file
+restyles the whole app. Built phone-first — open it on the iPhone (Safari →
+Add to Home Screen for a fullscreen app feel), it reflows for iPad / desktop.
+
+- **Migrated:** `/desk` (links shared css) and `/signals` (rebuilt on `shell()` —
+  pending queue + inline TAKE A+/TAKE/SKIP + conviction + history).
+- **Not yet migrated** (own inline CSS): Dashboard, Projection, Backtest, Review,
+  Monte Carlo, Prop.
+- **Compare routes** (throwaway): `/desk-old`, `/signals-classic`.
 
 ### `/desk` — **the live one. "Can I enter right now?"**
 Per-direction verdict (ENTER / BLOCKED / STAND DOWN) with the active vetoes
 spelled out, live S1–S5 condition checklists (✓/✗ per condition), and an
-always-on trade ticket in money: entry/stop/target, position size from your
+always-on trade ticket in money: entry/stop/target/R:R, position size from your
 risk €, margin at 10x, and the three outcomes — if target / if +0.7% early
-exit / if stopped (as % of account). Refreshes every 60s.
+exit / if stopped (as % of account). A collapsible **"how to read this desk"**
+panel explains it in plain English. When a signal is pending, a thumb-zone
+**TAKE A+ / TAKE / SKIP** bar decides it in place. Refreshes every 60s.
 
 ### `/signals` — approve/reject queue
-Scanner-emitted (and Pine-webhook) signals land here as pending. Decisions and
-rejection reasons are stored — skipped signals are data too.
+Scanner-emitted (and Pine-webhook) signals land here as pending, each with
+inline **TAKE A+ (conv 5) / TAKE (conv 3) / SKIP** buttons (same decision path
+as the desk + the ntfy phone alert → `POST /api/signals/{id}/decide`).
+Decisions, conviction, and rejection reasons are stored — skipped signals are
+data too. Recent decisions listed below the queue.
 
 ### `/review` — replay real trades on an ICT-style chart
 Every closed fill with its entry context computed. Where v1→v3 came from.
@@ -241,6 +275,15 @@ cp prism.env .env       # exchange keys etc.
 # 2. phone alerts: install the ntfy app, subscribe to a topic you invent,
 #    then add it to prism.env:
 echo 'LENS_NTFY_TOPIC=your-secret-topic-name' >> prism.env
+
+# 3. (for the TAKE/SKIP buttons) tell the push where the LENS server lives,
+#    as seen FROM THE PHONE. LAN address for home wifi; a public tunnel URL
+#    if you want the buttons to work on mobile data.
+echo 'LENS_BASE_URL=http://192.168.1.47:8765' >> prism.env
+
+# 4. (optional, closes the loop) auto-pull Kraken fills every hour so trades
+#    self-tag without you opening the dashboard:
+(crontab -l 2>/dev/null; echo '5 * * * * curl -s -X POST http://localhost:8765/api/sync/kraken >/dev/null') | crontab -
 ```
 
 Health check: `curl localhost:8765/health` · API docs: http://localhost:8765/docs
@@ -253,10 +296,15 @@ Useful API: `POST /api/setups/scan` (scan now) ·
 
 ## Status / honesty
 
-- ✅ v3 edge mapped and live: setup engine, /desk, phone alerts, auto-tagging,
-  scoreboard. All 464 historical trades tagged.
+- ✅ v3 edge mapped and live: setup engine, /desk, phone alerts with one-tap
+  TAKE/SKIP buttons, auto-tagging, scoreboard. All 464 historical trades tagged.
 - ✅ Exchange sync, signal ingestion, discipline filters, projection/goal math.
-- ⏳ Loop needs the crontab line + ntfy topic installed (user-side, above).
+- ✅ Loop is live: hourly scanner cron installed and firing (first real S1 short
+  emitted + pushed 2026-06-16). Decisions post back from the phone buttons.
+- ⚠️ Kraken fill sync is **manual** (or the optional hourly sync cron above) —
+  the scanner cron does not pull fills itself.
+- ⚠️ Phone buttons reach the server over LAN only unless `LENS_BASE_URL` points
+  at a public tunnel.
 - ⏳ v4 needs ~3 months of tagged trades; candidate new features: order-flow
   data (CVD, delta, funding, OI).
 - 🧪 `TREND_4R_v1` (4H/4R thesis) — still not backtested; separate track.

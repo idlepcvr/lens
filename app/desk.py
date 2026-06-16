@@ -1,259 +1,283 @@
-"""LENS /desk — live entry checklist. One screen that answers: can I enter RIGHT NOW?
+"""LENS /desk — live entry cockpit. One screen that answers: can I enter RIGHT NOW?
 
-Renders desk_state() from app.setups: per-direction verdict (ENTER / BLOCKED /
-STAND DOWN), the trade plan when clean, live S1–S5 condition checklists, active
-vetoes, and the realized per-setup scoreboard. Styled to match the main LENS
-pages (same :root vars + topbar as the landing page).
+Mobile-first HUD / instrument-cluster design. Renders desk_state() from
+app.setups: per-direction verdict (ENTER / BLOCKED / STAND DOWN), the trade plan
++ money ticket when clean, live S1-S5 condition checklists, active vetoes, and the
+realized per-setup scoreboard. NEW: pulls the live pending signal from
+/api/signals and lets you TAKE A+ / TAKE / SKIP it from the thumb zone — the
+decision POSTs straight to /api/signals/{id}/decide (same path as the ntfy
+buttons). Built phone-first: a single ~460px column, big glanceable numbers,
+sticky action bar.
 """
 
 DESK_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#06080c">
 <title>LENS // Desk</title>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#08080a;--s1:#0f0f12;--s2:#141418;
-  --b1:#1e1e26;--b2:#28282e;--b3:#36363e;
-  --t1:#eaeaee;--t2:#72728a;--t3:#3c3c48;--t4:#26262e;
-  --ac:#5b8ef7;--adim:#121c36;
-  --gr:#38c068;--re:#e8445a;--am:#e8a23d;
-  --mono:'SF Mono',ui-monospace,'Cascadia Code',monospace;
-  --ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-}
-body{font-family:var(--ui);font-size:13px;line-height:1.5;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}
-.app{max-width:1180px;margin:0 auto;padding:0 22px 60px}
-a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:22px}
-.brand{display:flex;align-items:baseline;gap:11px}
-.brand-name{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff;letter-spacing:.12em}
-.brand-name b{color:var(--ac)}
-.brand-sep{color:var(--t3);margin:0 2px}
-.brand-page{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--t2);letter-spacing:.08em}
-.brand-meta{font-family:var(--mono);font-size:10px;color:var(--t3)}
-.topnav{display:flex;gap:2px;flex-wrap:wrap}
-.topnav a{font-size:12px;color:var(--t2);text-decoration:none;padding:5px 10px;border-radius:5px;transition:all .12s}
-.topnav a:hover{color:var(--t1);background:var(--s2);text-decoration:none}
-.topnav a.cur{color:var(--ac);background:var(--adim)}
-
-.statusline{display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--t2);margin-bottom:18px}
-.statusline .px{font-size:20px;color:var(--t1);font-weight:700}
-.statusline .stale{color:var(--am)}
-
-.verdicts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
-@media(max-width:760px){.verdicts{grid-template-columns:1fr}}
-.vcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 18px}
-.vcard.enter{border-color:var(--gr);box-shadow:0 0 24px rgba(56,192,104,.12)}
-.vcard.blocked,.vcard.veto{border-color:rgba(232,68,90,.4)}
-.vhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-.vdir{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--t2)}
-.vstate{font-family:var(--mono);font-size:15px;font-weight:700}
-.vstate.enter{color:var(--gr)}.vstate.veto,.vstate.blocked{color:var(--re)}.vstate.stand{color:var(--t3)}
-.vreasons{font-size:11.5px;color:var(--t2)}
-.vreasons li{margin-left:16px;margin-top:2px}
-
-.plan{margin-top:12px;border-top:1px solid var(--b1);padding-top:12px}
-.plan-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.pcell{background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:7px 9px}
-.pcell .k{font-family:var(--mono);font-size:9px;color:var(--t2);letter-spacing:.1em;text-transform:uppercase}
-.pcell .v{font-family:var(--mono);font-size:14px;font-weight:600}
-.pcell .v.gr{color:var(--gr)}.pcell .v.re{color:var(--re)}
-.sizer{display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--t2);flex-wrap:wrap}
-.sizer input{width:74px;background:var(--bg);border:1px solid var(--b2);border-radius:5px;color:var(--t1);padding:4px 7px;font-family:var(--mono);font-size:12px}
-.exit-note{margin-top:8px;font-size:11px;color:var(--am)}
-.plan.dim{opacity:.45}
-.plan-ref{font-family:var(--mono);font-size:10px;color:var(--t2);margin-bottom:8px}
-.outcome{margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--t2)}
-.outcome .gr-t{color:var(--gr)}.outcome .re-t{color:var(--re)}
-
-.ctxrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
-.chip{background:var(--s1);border:1px solid var(--b1);border-radius:6px;padding:6px 11px;font-family:var(--mono);font-size:11px;color:var(--t2)}
-.chip b{color:var(--t1);font-weight:600}
-.chip.good{border-color:rgba(56,192,104,.45)}.chip.good b{color:var(--gr)}
-.chip.bad{border-color:rgba(232,68,90,.45)}.chip.bad b{color:var(--re)}
-
-h2{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--t2);margin:26px 0 12px}
-.setups{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.scard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}
-.scard.active{border-color:var(--gr)}
-.scard.vetoed{border-color:var(--am)}
-.shead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
-.sid{font-family:var(--mono);font-weight:700;font-size:13px}
-.sid .dir-long{color:var(--gr)}.sid .dir-short{color:var(--re)}
-.swr{font-family:var(--mono);font-size:10px;color:var(--t2)}
-.sname{font-size:12px;color:var(--t2);margin-bottom:8px}
-.cond{display:flex;gap:8px;font-family:var(--mono);font-size:11px;padding:2px 0}
-.cond .tick{width:14px}
-.cond.ok{color:var(--t1)}.cond.ok .tick{color:var(--gr)}
-.cond.no{color:var(--t3)}.cond.no .tick{color:var(--t3)}
-.sflag{margin-top:8px;font-family:var(--mono);font-size:10px}
-.sflag.go{color:var(--gr)}.sflag.veto{color:var(--am)}
-
-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
-th{color:var(--t2);text-align:left;font-weight:500;padding:6px 10px;border-bottom:1px solid var(--b1);letter-spacing:.06em}
-td{padding:6px 10px;border-bottom:1px solid var(--t4);color:var(--t1)}
-td.gr{color:var(--gr)}td.re{color:var(--re)}td.mut{color:var(--t2)}
-.sb-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:6px 8px;overflow-x:auto}
-.foot{margin-top:22px;font-size:11px;color:var(--t3)}
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/lens.css">
 </head>
 <body>
 <div class="app">
-  <div class="topbar">
-    <div class="brand">
-      <div class="brand-name">LE<b>N</b>S</div>
-      <span class="brand-sep">·</span>
-      <div class="brand-page">Desk</div>
-      <div class="brand-meta">can I enter right now?</div>
-    </div>
-    <nav class="topnav">
-      <a href="/">Dashboard</a>
-      <a href="/desk" class="cur">Desk</a>
-      <a href="/signals">Signals</a>
-      <a href="/projection">Projection</a>
-      <a href="/backtest">Backtest</a>
-      <a href="/review">Review</a>
-      <a href="/montecarlo">Monte Carlo</a>
-      <a href="/prop">Prop</a>
-    </nav>
+  <div class="bar">
+    <div class="logo">LEN<span class="s">S</span> <span class="pg">DESK</span></div>
+    <div class="live"><span class="dot" id="dot"></span><span id="livetxt">live</span></div>
   </div>
+  <nav class="nav">
+    <a href="/desk" class="cur">Desk</a>
+    <a href="/signals">Signals</a>
+    <a href="/">Dashboard</a>
+    <a href="/review">Review</a>
+    <a href="/projection">Projection</a>
+    <a href="/backtest">Backtest</a>
+    <a href="/montecarlo">Monte&nbsp;Carlo</a>
+    <a href="/prop">Prop</a>
+  </nav>
 
-  <div class="statusline" id="statusline">loading market state…</div>
-  <div class="verdicts" id="verdicts"></div>
-  <div class="ctxrow" id="ctxrow"></div>
-
-  <h2>Setup checklists — live</h2>
-  <div class="setups" id="setups"></div>
-
-  <h2>Realized scoreboard (auto-tagged trades)</h2>
-  <div class="sb-wrap"><table id="sb"></table></div>
+  <div id="body"><div class="skeleton">reading market state…</div></div>
 
   <div class="foot">
-    Patterns are mechanical coin-flips on their own — the realized win rates came from
-    <i>your selection inside these contexts</i> plus fast exits. ENTER means "the context
-    where you historically win is live", not "guaranteed trade".
-    Refreshes every 60s · <a href="#" id="refresh">refresh now</a>
+    Patterns are mechanical coin-flips alone — realized WRs came from <i>your selection inside
+    these contexts</i> + fast exits. ENTER = "the context where you historically win is live",
+    not a guaranteed trade. Refreshes every 60s · <a href="#" id="refresh">refresh now</a>
   </div>
 </div>
+
+<div class="actions" id="actions">
+  <div class="actions-inner">
+    <div class="act-label" id="actlabel"></div>
+    <div class="act-row">
+      <button class="btn skip"  id="b-skip"  onclick="decide('rejected',null)">SKIP<span class="cap">reject</span></button>
+      <button class="btn take"  id="b-take"  onclick="decide('approved',3)">TAKE<span class="cap">conv 3</span></button>
+      <button class="btn aplus" id="b-aplus" onclick="decide('approved',5)">TAKE A+<span class="cap">conv 5</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 const $ = id => document.getElementById(id);
 const VLAB = {long:"LONG", short:"SHORT"};
+const ARROW = {long:"▲", short:"▼"};
+let STATE = null;      // last desk state
+let PENDING = {};      // {long:signal, short:signal} live pending signals
+let RISK = {};         // remembered risk-€ per direction
 
-function chip(label, val, cls) {
-  return `<div class="chip ${cls||''}">${label} <b>${val}</b></div>`;
+const STATE_TXT = {
+  enter:"ENTER", blocked:"BLOCKED", veto:"NO TRADE", stand_down:"STAND DOWN"
+};
+const STATE_SUB = {
+  enter:"context where you win is live — this is a real signal",
+  blocked:"DO NOT TAKE — a setup fired but a veto kills it",
+  veto:"DO NOT TAKE — veto active, sit on hands",
+  stand_down:"nothing here — no setup fired this bar"
+};
+const rank = {enter:3, blocked:2, veto:1, stand_down:0};
+
+function toast(msg, cls){
+  const t = $('toast'); t.textContent = msg; t.className = 'toast show ' + cls;
+  setTimeout(()=>{ t.className = 'toast ' + cls; }, 2600);
+}
+function chip(label,val,cls){return `<div class="chip ${cls||''}">${label} <b>${val}</b></div>`;}
+function secHead(id,title){return `<div class="sect" id="h-${id}" onclick="tog('${id}')"><span class="caret">▾</span><span class="ttl">${title}</span><span class="line"></span></div>`;}
+function tog(id){ $('h-'+id).classList.toggle('closed'); $('s-'+id).classList.toggle('closed'); }
+function money(n){return n.toLocaleString(undefined,{maximumFractionDigits:0});}
+
+function ticketHTML(dir,v,d){
+  if(!v.plan) return '';
+  const p = v.plan, live = v.state==='enter';
+  const risk0 = RISK[dir] ?? (d.balance?Math.max(1,Math.round(d.balance*0.1)):10);
+  return `<div class="ticket ${live?'':'dim'}">
+    ${live?'':'<div class="ticket-ref">reference only — context says no. if price gets here clean, this is the shape:</div>'}
+    <div class="tg">
+      <div class="cell"><div class="k">entry</div><div class="v">${money(p.entry)}</div></div>
+      <div class="cell"><div class="k">R : R</div><div class="v">${p.rr}<span class="sub" style="display:inline"> reward/risk</span></div></div>
+      <div class="cell"><div class="k">stop</div><div class="v r">${money(p.stop)}</div><div class="sub">−${p.sl_pct}% risk</div></div>
+      <div class="cell"><div class="k">target</div><div class="v g">${money(p.target)}</div><div class="sub">+${p.tp_pct}% reward</div></div>
+    </div>
+    <div class="sizer"><label>risk €</label>
+      <input type="number" id="risk-${dir}" value="${risk0}" inputmode="numeric">
+      <span class="size-out" id="size-${dir}"></span></div>
+    <div class="outcome" id="out-${dir}"></div>
+    <div class="exit-note">⏱ winners resolve 2–8h (50% WR, +€1,552). Trades closed &lt;2h ran 34–35% (−€747). Take +0.5–0.9% if it's there — don't panic-scalp out in minutes.</div>
+  </div>`;
 }
 
-function render(d) {
-  const stale = d.bar_age_min > 130;
-  $('statusline').innerHTML =
-    `<span class="px">$${d.close.toLocaleString()}</span>` +
-    `<span>BTC · 1H bar ${d.bar_ts.slice(11,16)} UTC</span>` +
-    `<span class="${stale?'stale':''}">${stale?'⚠ candle data stale — ':''}bar closed ${d.bar_age_min} min ago</span>` +
-    (d.balance ? `<span>account €${d.balance.toFixed(0)}</span>` : '');
+function wireSizer(dir,d){
+  const inp = $('risk-'+dir); if(!inp) return;
+  const p = STATE.verdicts[dir].plan;
+  const upd = ()=>{
+    const risk = parseFloat(inp.value)||0; RISK[dir]=risk;
+    const notional = risk/(p.sl_pct/100), btc = notional/d.close, fee = notional*0.0004;
+    const win = notional*(p.tp_pct/100)-fee, early = notional*0.007-fee, loss = risk+fee;
+    $('size-'+dir).innerHTML = `→ €${money(notional)} <span style="color:var(--dim)">(${btc.toFixed(4)} BTC · €${money(notional/10)} margin @10x)</span>`;
+    $('out-'+dir).innerHTML =
+      `target <b class="g">+€${win.toFixed(2)}</b> · +0.7% early <b class="g">+€${early.toFixed(2)}</b> · stop <b class="r">−€${loss.toFixed(2)}</b>`
+      + (d.balance?` · <span style="color:var(--dim)">stop = ${(loss/d.balance*100).toFixed(1)}% of acct</span>`:'');
+  };
+  inp.addEventListener('input',upd); upd();
+}
 
-  // verdict cards
-  let vh = '';
-  for (const dir of ['long','short']) {
-    const v = d.verdicts[dir];
-    const stateTxt = {enter:'ENTER — '+v.setups.join(' + '),
-                      blocked:'BLOCKED — setup live but vetoed',
-                      veto:'NO — veto active',
-                      stand_down:'STAND DOWN — no setup'}[v.state];
-    const stateCls = {enter:'enter',blocked:'blocked',veto:'veto',stand_down:'stand'}[v.state];
-    let body = '';
-    if (v.vetoes.length)
-      body += `<ul class="vreasons">` + v.vetoes.map(x=>`<li>${x}</li>`).join('') + `</ul>`;
-    if (v.plan) {
-      const p = v.plan;
-      const live = v.state === 'enter';
-      body += `<div class="plan ${live?'':'dim'}">
-        ${live?'':'<div class="plan-ref">reference only — context says NO. If price gets here clean, this is the shape:</div>'}
-        <div class="plan-grid">
-        <div class="pcell"><div class="k">entry</div><div class="v">$${p.entry.toLocaleString()}</div></div>
-        <div class="pcell"><div class="k">stop −${p.sl_pct}%</div><div class="v re">$${p.stop.toLocaleString()}</div></div>
-        <div class="pcell"><div class="k">target +${p.tp_pct}%</div><div class="v gr">$${p.target.toLocaleString()}</div></div>
-        <div class="pcell"><div class="k">R:R</div><div class="v">${p.rr}</div></div></div>
-        <div class="sizer">risk € <input type="number" id="risk-${dir}" value="${d.balance?Math.max(1,Math.round(d.balance*0.1)):10}">
-          <span id="size-${dir}"></span></div>
-        <div class="outcome" id="outcome-${dir}"></div>
-        <div class="exit-note">⏱ winners resolve in 2–8h (50% WR, +€1,552). Trades closed &lt;2h ran 34–35% WR (−€747). Take +0.5–0.9% when it's there — but don't panic-scalp out in minutes.</div>
-      </div>`;
-    }
-    vh += `<div class="vcard ${stateCls}"><div class="vhead">
-      <span class="vdir">${VLAB[dir]}</span>
-      <span class="vstate ${stateCls}">${stateTxt}</span></div>${body}</div>`;
-  }
-  $('verdicts').innerHTML = vh;
-  for (const dir of ['long','short']) {
-    const inp = $('risk-'+dir);
-    if (!inp) continue;
-    const upd = () => {
-      const risk = parseFloat(inp.value)||0;
-      const p = d.verdicts[dir].plan;
-      const notional = risk / (p.sl_pct/100);
-      const btc = notional / d.close;
-      const fee = notional * 0.0004;                      // maker round trip
-      const win  = notional * (p.tp_pct/100) - fee;
-      const earlyWin = notional * 0.007 - fee;            // realistic +0.7% exit
-      const loss = risk + fee;
-      $('size-'+dir).textContent =
-        `→ position €${notional.toFixed(0)} (${btc.toFixed(4)} BTC) · €${(notional/10).toFixed(0)} margin @10x`;
-      $('outcome-'+dir).innerHTML =
-        `if target: <b class="gr-t">+€${win.toFixed(2)}</b> · if +0.7% early exit: <b class="gr-t">+€${earlyWin.toFixed(2)}</b> · if stopped: <b class="re-t">−€${loss.toFixed(2)}</b>` +
-        (d.balance ? ` · stop = ${(loss/d.balance*100).toFixed(1)}% of account` : '');
-    };
-    inp.addEventListener('input', upd); upd();
-  }
+function gaugeHTML(dir,v,d,primary){
+  const cls = v.state;
+  let body = '';
+  if(v.vetoes.length)
+    body += `<ul class="vetolist">`+v.vetoes.map(x=>`<li>${x}</li>`).join('')+`</ul>`;
+  body += ticketHTML(dir,v,d);
+  const setupTag = v.setups.length?`<span class="g-setup">${v.setups.join(' + ')}</span>`:'';
+  return `<div class="gauge ${cls}">
+    <div class="g-top">
+      <span class="g-dir ${dir}"><span class="arrow">${ARROW[dir]}</span> ${VLAB[dir]}</span>
+      ${setupTag}
+    </div>
+    <div class="verdict">${STATE_TXT[v.state]}</div>
+    <div class="verdict-sub">${STATE_SUB[v.state]}<br><span style="color:var(--faint)">read of the 1H bar that closed ${d.bar_ts.slice(11,16)} UTC · ${d.bar_age_min}m ago — not a logged trade</span></div>
+    ${body}
+  </div>`;
+}
+
+function render(){
+  const d = STATE;
+  const stale = d.bar_age_min > 130;
+  $('dot').className = 'dot' + (stale?' stale':'');
+  $('livetxt').textContent = stale ? 'stale' : 'live';
+
+  // order directions: best state first (the actionable one on top)
+  const dirs = ['long','short'].sort((a,b)=> rank[d.verdicts[b].state]-rank[d.verdicts[a].state]);
+
+  let html = `<div class="tape">
+    <div class="px">$${d.close.toLocaleString()}<span class="c"> BTC</span></div>
+    <div class="meta">
+      1H bar <b>${d.bar_ts.slice(11,16)}</b> UTC<br>
+      <span class="${stale?'stale':''}">${stale?'⚠ candle stale · ':''}closed <b>${d.bar_age_min}m</b> ago</span>
+      ${d.balance?`<br>account <b>€${d.balance.toFixed(0)}</b>`:''}
+    </div>
+  </div>`;
+
+  // help / explainer (collapsed by default)
+  html += `<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this desk</span><span class="line"></span></div>`
+    + `<div class="sec-body closed" id="s-help"><div class="help-body">`
+    + `<h4>what this page is</h4>A <b>live read of the 1H candle that just closed</b> — not a trade log. It answers one thing: <b>can I enter right now, long or short?</b> Refreshes every 60s.`
+    + `<h4>the verdict</h4><b class="g">ENTER</b> = real signal, the context where you historically win is live → it also buzzes your phone + lights the buttons below. <b class="r">BLOCKED / NO TRADE</b> = do not take it. <b>STAND DOWN</b> = nothing here. LONG and SHORT both always show so you see both sides.`
+    + `<h4>the only knob is risk €</h4>You don't set entry/stop/target — the <b>strategy</b> does (entry = price now, stop −0.63%, target +0.95%). You only type how many <b>€ you'll risk</b>; it shows position size + exact €-win / €-loss.`
+    + `<h4>R : R</h4>reward ÷ risk → target 0.95% ÷ stop 0.63% = <b>1.51</b>. Modest by design — this edge is hit-rate + fast exits, not home runs.`
+    + `<h4>you place the trade, not LENS</h4>LENS is read-only. You execute on Kraken yourself; it syncs your fills after and tags <i>which setup</i> it was.`
+    + `<h4>sections below</h4><b>context</b> = the readings that caused the verdict (the why). <b>checklists</b> = all 5 recipes, ✓/✗ per condition. <b>scoreboard</b> = how each setup really performed. Tap any header to collapse.`
+    + `</div></div>`;
+  html += `<div class="gauges">`;
+  for(const dir of dirs) html += gaugeHTML(dir, d.verdicts[dir], d, dir===dirs[0]);
+  html += `</div>`;
 
   // context chips
   const c = d.context;
-  const kzName = {london_kz:'London 07–10',ny_am_kz:'NY AM 13–16 ★',ny_pm_kz:'NY PM 18–21 ☠',none:'—'}[c.killzone];
-  $('ctxrow').innerHTML =
-    chip('RSI', c.rsi===null?'—':c.rsi+' '+(c.rsi_zone==='dead'?'☠':c.rsi_zone), c.rsi_zone==='dead'?'bad':(c.rsi_zone?'good':'')) +
-    chip('killzone', kzName, c.killzone==='ny_am_kz'?'good':c.killzone==='ny_pm_kz'?'bad':'') +
-    chip('7d range', c.pd_zone||'—') +
-    chip('sweep', c.sweep?c.sweep+' taken':'none') +
-    chip('prior-day raid', c.pd_raid||'none') +
-    chip('displacement', c.displacement||'—') +
-    chip('EMA21 slope', c.slope||'flat') +
-    chip('bear streak ×3', c.bear_streak3?'yes':'no');
+  const kz = {london_kz:'London 07–10',ny_am_kz:'NY AM 13–16 ★',ny_pm_kz:'NY PM 18–21 ☠',none:'—'}[c.killzone];
+  html += secHead('ctx','context — why the verdict') + `<div class="sec-body" id="s-ctx"><div class="chips">`
+    + chip('RSI', c.rsi===null?'—':c.rsi+' '+(c.rsi_zone==='dead'?'☠':c.rsi_zone), c.rsi_zone==='dead'?'bad':(c.rsi_zone?'good':''))
+    + chip('killzone', kz, c.killzone==='ny_am_kz'?'good':c.killzone==='ny_pm_kz'?'bad':'')
+    + chip('7d range', c.pd_zone||'—')
+    + chip('sweep', c.sweep?c.sweep+' taken':'none')
+    + chip('PD raid', c.pd_raid||'none')
+    + chip('displacement', c.displacement||'—')
+    + chip('EMA21', c.slope||'flat')
+    + chip('3× bear', c.bear_streak3?'yes':'no', c.bear_streak3?'bad':'')
+    + `</div></div>`;
 
   // setup cards
-  $('setups').innerHTML = d.checklists.map(s => {
-    const cls = s.active ? (s.vetoed ? 'vetoed' : 'active') : '';
+  html += secHead('setups','setup checklists') + `<div class="sec-body" id="s-setups"><div class="setups-grid">`;
+  html += d.checklists.map(s=>{
+    const cls = s.active ? (s.vetoed?'vetoed':'active') : '';
     const flag = s.active ? (s.vetoed
         ? `<div class="sflag veto">▲ conditions met but VETOED — stand down</div>`
         : `<div class="sflag go">● LIVE — context active now</div>`) : '';
-    return `<div class="scard ${cls}"><div class="shead">
-      <span class="sid">${s.id} <span class="dir-${s.direction}">${s.direction.toUpperCase()}</span></span>
+    return `<div class="scard ${cls}"><div class="sh">
+      <span class="sid">${s.id} <span class="d-${s.direction}">${s.direction.toUpperCase()}</span></span>
       <span class="swr">${s.wr}</span></div>
-      <div class="sname">${s.name}</div>` +
-      s.conds.map(x=>`<div class="cond ${x.ok?'ok':'no'}"><span class="tick">${x.ok?'✓':'·'}</span>${x.label}</div>`).join('') +
-      flag + `</div>`;
-  }).join('');
+      <div class="sname">${s.name}</div>`
+      + s.conds.map(x=>`<div class="cond ${x.ok?'ok':'no'}"><span class="tk">${x.ok?'✓':'·'}</span>${x.label}</div>`).join('')
+      + flag + `</div>`;
+  }).join('') + `</div></div>`;
 
   // scoreboard
-  const rows = Object.entries(d.scoreboard);
-  $('sb').innerHTML = `<tr><th>tag</th><th>n</th><th>win rate</th><th>PnL €</th><th>exp €/trade</th><th>halves</th></tr>` +
-    rows.map(([k,s]) => `<tr>
-      <td class="${k==='VETO'?'re':k==='NONE'?'mut':''}">${k}</td><td>${s.n}</td>
-      <td class="${s.wr>=50?'gr':s.wr<40?'re':''}">${s.wr??'—'}%</td>
-      <td class="${s.pnl>=0?'gr':'re'}">${s.pnl>=0?'+':''}${s.pnl.toFixed(0)}</td>
-      <td>${s.exp??'—'}</td><td class="mut">${(s.wr_halves||[]).join(' / ')}</td></tr>`).join('');
+  html += secHead('sb','realized scoreboard') + `<div class="sec-body" id="s-sb"><div class="sb-wrap"><table class="sb">
+    <tr><th>tag</th><th>n</th><th>WR</th><th>PnL €</th><th>exp</th><th>halves</th></tr>`
+    + Object.entries(d.scoreboard).map(([k,s])=>`<tr>
+      <td class="${k==='VETO'?'r':k==='NONE'?'m':''}">${k}</td><td>${s.n}</td>
+      <td class="${s.wr>=50?'g':s.wr<40?'r':''}">${s.wr??'—'}%</td>
+      <td class="${s.pnl>=0?'g':'r'}">${s.pnl>=0?'+':''}${s.pnl.toFixed(0)}</td>
+      <td class="m">${s.exp??'—'}</td><td class="m">${(s.wr_halves||[]).join(' / ')}</td></tr>`).join('')
+    + `</table></div></div>`;
+
+  $('body').innerHTML = html;
+  for(const dir of dirs) wireSizer(dir,d);
+  renderActions();
 }
 
-async function load() {
-  try {
-    const r = await fetch('/api/setups/state');
-    render(await r.json());
-  } catch (e) {
-    $('statusline').innerHTML = '<span class="stale">failed to load state — is the candle fetch offline?</span>';
+// ── live pending signal → action bar ──
+function renderActions(){
+  // pick the most actionable pending signal: enter direction first
+  let target = null;
+  for(const dir of ['long','short']){
+    const sig = PENDING[dir];
+    if(sig){ target = {dir, sig}; if(STATE && STATE.verdicts[dir].state==='enter') break; }
+  }
+  const box = $('actions');
+  if(!target){ box.classList.remove('show'); return; }
+  ACTIVE_SIGNAL = target.sig;
+  const v = STATE ? STATE.verdicts[target.dir] : null;
+  const warn = v && v.state!=='enter' ? ` · ⚠ ${STATE_TXT[v.state]}` : '';
+  $('actlabel').innerHTML = `live signal · <b>${target.sig.trigger_type} ${VLAB[target.dir]}</b>${warn}`;
+  ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false);
+  box.classList.add('show');
+}
+
+let ACTIVE_SIGNAL = null;
+async function decide(status, conviction){
+  if(!ACTIVE_SIGNAL) return;
+  ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=true);
+  const payload = status==='approved'
+    ? {status, your_conviction:conviction}
+    : {status, rejection_reason:'skipped from desk'};
+  try{
+    const r = await fetch(`/api/signals/${ACTIVE_SIGNAL.signal_id}/decide`,{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const j = await r.json();
+    if(!r.ok){ toast(j.detail||'decide failed','err'); ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false); return; }
+    if(status==='approved') toast(`✓ TAKEN · conviction ${conviction}`,'ok');
+    else toast('✕ SKIPPED','no');
+    delete PENDING[ACTIVE_SIGNAL.direction];
+    ACTIVE_SIGNAL = null;
+    setTimeout(()=>{ $('actions').classList.remove('show'); loadPending(); }, 900);
+  }catch(e){
+    toast('network error','err'); ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false);
   }
 }
-$('refresh').addEventListener('click', e => { e.preventDefault(); load(); });
+
+async function loadPending(){
+  try{
+    const r = await fetch('/api/signals?status=pending');
+    const j = await r.json();
+    PENDING = {};
+    for(const s of (j.signals||[])) if(!PENDING[s.direction]) PENDING[s.direction]=s;
+    renderActions();
+  }catch(e){ /* non-fatal */ }
+}
+
+async function load(){
+  try{
+    const [stRes] = await Promise.all([fetch('/api/setups/state'), loadPending()]);
+    STATE = await stRes.json();
+    render();
+  }catch(e){
+    $('body').innerHTML = '<div class="skeleton" style="color:var(--amber)">failed to load state — is the candle fetch offline?</div>';
+  }
+}
+$('refresh').addEventListener('click', e=>{e.preventDefault(); load();});
 load();
 setInterval(load, 60000);
 </script>

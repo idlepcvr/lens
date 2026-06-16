@@ -27,6 +27,8 @@ Thumbs.db
 
 # Logs
 lens.log
+setup_scan.log
+*.log
 
 # Node
 node_modules/
