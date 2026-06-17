@@ -97,8 +97,17 @@ feature candidates (order flow: CVD, delta, funding, open interest).
 
 ## The pages
 
-Start the server (below), then visit **http://localhost:8765**.
-Nav: **Desk · Signals · Dashboard · Review · Projection · Backtest · Monte Carlo · Prop · Style**.
+Start the server (below), then visit **http://localhost:8765**. The home page
+("/") is a **two-door mode chooser** — the app is split into two systems that
+never share a nav (2026-06-17):
+
+- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Strategy · Risk ·
+  Survival · Rules · Equity · Regime · Backtest**.
+- **HEDGE** — discretionary own-money trading (the S1–S5 edge). Nav:
+  **Dashboard · Desk · Signals · Review · Projection**.
+
+A `◎ PROP | ▤ HEDGE | ⌂` switch sits above every nav; switching = jumping to
+that mode's home (stateless).
 
 ### Web UI / design system (2026-06)
 
@@ -112,11 +121,13 @@ source of truth for the whole app:
   page, so the browser caches it and there is exactly one place to change styling.
 - **`shell(path, label, body, *, script, head_extra, meta)`** — the page
   template. Wraps any body in the standard head (fonts + favicon + css), the
-  sticky top bar, and the scroll-chip nav (driven by the one `NAV` list, current
-  page auto-highlighted). Page-specific CSS goes in `head_extra`; JS in `script`.
+  sticky top bar, and the **mode-aware** scroll-chip nav + PROP|HEDGE switch
+  (current page auto-highlighted). Page-specific CSS goes in `head_extra`; JS in `script`.
 - **`FAVICON_SVG`** — the brand mark (a scope / aperture iris; LENS = optics),
   served at `/assets/favicon.svg`.
-- **`NAV`** — add a page here once and it appears in every nav bar.
+- **`NAV_PROP` / `NAV_HEDGE`** — two lists, one per mode. `page_mode(path)` maps
+  each route to its mode; `nav_html()` renders only that mode's chips. Add a page
+  to the right list once and it appears in that mode's nav.
 
 **To add a page:** `from .theme import shell` → build `body` (+ optional
 `head_extra` CSS that aliases local var names onto shared tokens, e.g.
@@ -166,10 +177,16 @@ reproduces the realized ~42% WR from pure SL/TP geometry — the bar any
 strategy must beat). Monte Carlo can seed its inputs from live trades or any
 backtest strategy.
 
-### `/prop` — Kraken Prop (Breakout) eval planner
-Live Monte Carlo of evaluation paths against the floor/target walls, with the
-locked plan, the speed↔probability frontier, and funded-income tables. See the
-**Prop track** section below.
+### PROP mode — the eval cockpit, split into engines
+`/prop` is the **Goals hub**: a visual target corridor (floor ── start ──
+target) + the 3 structural upgrades, each linking to its engine page. The
+engines (all fed by one `prop_views.prop_metrics()` so no two views drift):
+**`/strategy`** (WR · R · expectancy R/%), **`/risk`** (risk %/$, stop,
+position-size formula, leverage), **`/survival`** (DD limit · max historical DD ·
+loss-streak stress table · days-to-breach), **`/rules`** (the live constraint
+layer), **`/equity`** (Monte Carlo equity sim from WR+RR — paths, drawdown,
+failure frequency), **`/regime`** (BULL/SIDEWAYS/BEAR + hero WR per regime). See
+the **Prop track** section below.
 
 ### `/style` — living style guide
 Every design token + component rendered straight from `lens.css` — the design
@@ -187,86 +204,84 @@ opposite game: **survive hard equity walls to a modest target.** Risk 10%/trade
 and one stop blows the whole eval. So the prop track has its own objective
 function — **pass-probability, not expectancy** — and its own simulator + page.
 
-Firm: **Breakout** (the prop firm Kraken acquired Sept 2025). Funds you up to
-**$200,000**. Rules verified June 2026 across 3 review sources (see plan doc).
+Firm: **Kraken Prop**, powered by **Breakout** (the prop firm Kraken acquired
+Sept 2025). Funds you up to **$200,000**. Rules verified live at
+**kraken.com/breakout, 2026-06-17.**
 
-### What's built (`/prop` page + `app/prop_eval.py`)
+### What's built (`/prop` engine pages + `app/prop_eval.py`)
 
 - **Eval rules engine** — `EVALS` dict: Breakout 1-Step Classic / Pro / Turbo +
-  2-Step, with each firm's daily-loss / max-drawdown / target / leverage cap.
+  2-Step, each with daily-loss / max-drawdown / target / leverage cap **and the
+  per-side fee** (`commission_per_side` — the fee is a venue property, so it
+  lives on the eval rule and overrides any strategy default).
 - **Eval simulator** — replays any LENS strategy at *legal* sizing under the
-  walls, returns PASS / FAIL. `simulate_eval()` (one historical path) +
-  `monte_carlo_eval()` (bootstrapped pass-rate).
-- **Portfolio sim** — `monte_carlo_portfolio()` runs a basket on one account.
-- **Full sweep** — `python3 -m app.prop_eval sweep` ranks every strategy × risk
-  level by pass% and est. months to pass.
-- **`/prop` page** — live Monte Carlo of eval paths against the floor/target
-  walls (green=pass, red=bust), $5k/$200k + 1/1.5/2% toggles, plus the written
-  plan, the speed↔probability frontier, and the funded-income tables.
+  walls, **open-equity** (each trade's worst adverse excursion is tested against
+  the live walls, not just its closed PnL). `simulate_eval()` + bootstrapped
+  `monte_carlo_eval()` + `eval_summary()` (the one source of truth for the pages).
+- **Full sweep** — `python3 -m app.prop_eval sweep` (one eval) or `sweep-all`
+  (every eval) ranks strategy × risk by pass%.
+- **Engine pages** (see PROP mode above) — Goals hub + Strategy / Risk / Survival
+  / Rules / Equity / Regime, all fed by `prop_views.prop_metrics()`.
 
-### Breakout 1-Step Classic rules (the constraint layer)
+### Verified rules — the constraint layer
+
+Kraken Prop is unusually permissive — the dangerous gotchas **don't exist**:
 
 | | Value |
 |---|---|
-| Profit target | **10%** |
-| Max drawdown | **6% STATIC** — locked to start balance, does NOT trail |
-| Daily loss | **3%**, resets 00:30 UTC off prior day's close |
-| Leverage cap | 5x · Time limit | none known (confirm) |
+| Time limit | **NONE** |
+| Consistency rule | **NONE** (one big win can't void the eval) |
+| Minimum trading days | **NONE** (pass in a single trade) |
+| Daily loss | 3%, resets 00:30 UTC |
+| Max drawdown | static (does NOT trail) — 6% Starter / 5% Intermediate / **3% Advanced** |
+| Profit target | 10% Starter / 12% Intermediate / **9% Advanced** |
+| Leverage cap | 5x BTC (2–3x alts) |
+| Fees | **0.04%/side** (maker+taker) |
+| News / weekend holding | allowed |
 
-Static drawdown on $5k → floor **$4,700, fixed forever**. Profit only adds
-cushion (rare among firms — most trail and punish pullbacks). Two kill
-conditions: touch the floor ever, OR lose 3% in one day.
+Plan ↔ page names: **Starter = `CLASSIC`**, Intermediate = `PRO`,
+**Advanced = `TURBO`**. Two kill conditions only, both on **live equity**: touch
+the static floor, or lose the daily limit in one day.
 
-### The locked plan
+### The locked plan (budget-driven: €20 = Advanced)
 
-> **`ASIAN_RSI_DIP_v1`** — 4H chart, Asian killzone (00:00+04:00 UTC), 1% stop /
-> 4% TP (4R).
-> - **Eval phase: 2% risk (2x lev) → ~70% pass in ~2 months** (best of a
->   25-strategy × 5-risk sweep). Cheap retries make expected time ~3mo / ~$29.
->   *(Note: ~70% is the closed-PnL sim. Under the newer **open-equity** check it's
->   **~57%** — still passable, but re-run the sweep to confirm this is still the
->   best pick. See Next, below.)*
-> - **Funded phase: drop to 1% risk** for survival and payout longevity.
-> - **Size-independent** — same odds on $5k and $200k. Pass the cheap $5k first,
->   then buy the biggest eval directly; **don't ladder** 5k→25k→100k→200k.
+> **`ASIAN_RSI_DIP_v1`** — 4H, Asian killzone (00:00+04:00 UTC), 1% stop / 4% TP (4R).
+> - Eval fees scale with **plan × wallet**. The cheapest eval is the **5k Advanced
+>   at €20** (Starter/Classic 5k = $45). With only €20 → **Advanced, one shot, no
+>   retry budget** → optimise *single-attempt pass*, not expected-cost-over-retries.
+> - **On a 3% static wall, risk % is everything.** Single-shot pass for the hero:
 
-The speed↔probability frontier (the hard law the sweep proved):
+| Risk / trade | Leverage | Pass % | |
+|---|---|---|---|
+| **0.5%** | 0.5x | **~89%** | **the play** — one loss is tiny, survives a cold start |
+| 0.75% | 0.75x | ~74% | faster, still solid |
+| 1.0% | 1.0x | ~59% | risky on a 3% wall |
+| 2.0% | 2.0x | ~35% | two losses ≈ bust — don't |
 
-| Pass within | Best pass% | Config |
-|---|---|---|
-| 1 month | 45% | coin flip — reject |
-| **2 months** | **70%** | **ASIAN_RSI_DIP_v1 @2%** |
-| 9 months | 91% | ASIAN_RSI_DIP_v1 @0.75% |
+> **DECISION: buy the €20 5k Advanced, trade the hero @ 0.5% risk → ~89% one-shot.**
+> It's a slow grind (~1.5 trades/mo, no time limit). Ladder up by buying bigger
+> Advanced evals **from profit** (200k Advanced = $660). Only a **higher-WR entry**
+> lifts the ceiling past 89% — 4R @ 1% stop is already dial-tuned (6R/8R/tighter
+> stops all tested worse).
 
-No high-probability sub-month pass exists — BTC mean-reversion lacks that edge.
-Stacking strategies for more trades was tested and **rejected** (dilutes WR,
-craters pass). For an eval, **quality > quantity** — same conclusion as the edge map.
+Mechanic at 0.5% on $5k: WR ~41%, win +1.96%, loss −0.54% of account, ~1.5
+trades/mo. It takes **~6 losses in a row** to hit the floor (≈4% odds). The
+hero's edge is regime-dependent — **BULL ~50% WR vs BEAR ~25%** (see `/regime`),
+and with no time limit, waiting for a kinder regime is a free lever.
 
-Mechanic at 2% on $5k: WR 40%, win +7.4%/+$370, loss −2.6%/−$130, ~1.5 trades/mo.
-You only fail on a **cold 3-loss start (~22%)**; one win → the static-floor
-cushion carries it home. Funded $200k earns ~$3.4k/mo @2% (lumpy) or ~$1.7k @1%.
-
-### Steps taken
-1. Verified Breakout rules (static 6% DD, 3% daily, 10% target).
-2. Built eval simulator + `/prop` page; proved the 10x hedge-fund thesis busts
-   the eval (19% pass) → confirmed the need for a separate system.
-3. Swept 25 strategies × 5 risk levels → locked `ASIAN_RSI_DIP_v1 @2%`.
-4. Mapped funded income + the 2%-pass / 1%-funded split + direct-scale plan.
+### Steps taken (2026-06-17)
+1. **Verified live rules** at kraken.com/breakout — no time limit / consistency /
+   min-days; fees 0.04%/side (sim was modelling 0.15% → ~3.6pts pessimistic, fixed).
+2. **Pivoted to the €20 Advanced plan** (3% DD) and found **risk % is the whole
+   game** — 0.5% = ~89% single-shot, 2% = ~35%.
+3. **Split the app into PROP / HEDGE modes**; rebuilt `/prop` into a Goals hub +
+   engine pages (Strategy / Risk / Survival / Rules / Equity).
+4. **Ported the market-regime analytic** (`/regime`) and added hero WR-per-regime.
 
 ### Next (later)
-- [ ] Confirm in Breakout dashboard: **time limit, exact fees, $200k eval cost.**
-- [ ] **Forward-test** ASIAN_RSI_DIP_v1 @2% on demo before paying the $20.
-- [x] Harden the sim: **open-equity (intra-trade) drawdown** added (`open_equity=True`,
-      default on in `app/prop_eval.py`). Each trade now tests its worst adverse
-      excursion (a full move to the price stop) against the floor + daily wall
-      *before* the closed result — Breakout checks live equity, so an eventual
-      winner can still bust mid-trade. **Impact: locked plan drops 69.6% → 57.2%
-      pass** (the old closed-PnL number was optimistic by ~12pts, not "a few").
-- [ ] **Re-run the full sweep under open-equity** — the ~70% locked-plan pick was
-      made on the optimistic sim; the strategy × risk ranking may shift now.
-      `python3 -m app.prop_eval sweep` (re-pick before paying any eval fee).
-- [ ] Long game: lift WR/R via the LENS discretionary edge (real flush WR ~60%
-      vs 40% mechanical) → roughly doubles funded income.
+- [ ] **Forward-test** ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
+- [ ] Long game: lift WR via the **HEDGE** discretionary edge (real flush WR ~60%
+      vs 40% mechanical) → the only way past the 89% ceiling.
 
 Full detail: [`strategies/_prop/BREAKOUT_5K_PLAN.md`](strategies/_prop/BREAKOUT_5K_PLAN.md).
 
