@@ -228,7 +228,7 @@ def _group_by_day(trades):
 
 def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
                   account=5000.0, risk_per_trade_pct=1.0, months=30,
-                  open_equity=True):
+                  open_equity=True, df=None):
     if strategy_name not in STRATEGIES:
         return {"error": f"unknown strategy: {strategy_name}"}
     if eval_name not in EVALS:
@@ -237,7 +237,8 @@ def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
     strat = STRATEGIES[strategy_name]
     rule = EVALS[eval_name]
     tf = strat.get("timeframe", "4h")
-    df = add_indicators(load_ohlcv(months=months, timeframe=tf))
+    if df is None:
+        df = add_indicators(load_ohlcv(months=months, timeframe=tf))
 
     trades = _trade_log(df, strat["signal_fn"], strat["params"], rule,
                         risk_per_trade_pct)
@@ -299,13 +300,14 @@ def _run_mc(daily_trades, account, rule, paths, max_days, seed, open_equity=True
 
 def monte_carlo_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
                      account=5000.0, risk_per_trade_pct=1.0, months=30,
-                     paths=5000, max_days=252, seed=42, open_equity=True):
+                     paths=5000, max_days=252, seed=42, open_equity=True, df=None):
     if strategy_name not in STRATEGIES:
         return {"error": f"unknown strategy: {strategy_name}"}
     rule = EVALS[eval_name]
     strat = STRATEGIES[strategy_name]
     tf = strat.get("timeframe", "4h")
-    df = add_indicators(load_ohlcv(months=months, timeframe=tf))
+    if df is None:
+        df = add_indicators(load_ohlcv(months=months, timeframe=tf))
     trades = _trade_log(df, strat["signal_fn"], strat["params"], rule,
                         risk_per_trade_pct)
     daily_trades = _group_by_day(trades)
@@ -319,6 +321,86 @@ def monte_carlo_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
         "legal_leverage": round(_legal_leverage(strat["params"].get("stop_pct", 1.0), risk_per_trade_pct, rule["max_leverage"])[0], 2),
     })
     return mc
+
+
+# ─── Single-call summary for the /prop page (AUTO mode) ───────────────────────
+
+_DF_CACHE: dict = {}
+
+def _cached_df(months, tf):
+    """Load OHLCV+indicators once per (months, timeframe); reused across API
+    calls so the page stays snappy on repeated config changes."""
+    key = (months, tf)
+    if key not in _DF_CACHE:
+        _DF_CACHE[key] = add_indicators(load_ohlcv(months=months, timeframe=tf))
+    return _DF_CACHE[key]
+
+
+def eval_summary(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC", account=5000.0,
+                 risk_per_trade_pct=2.0, months=30, paths=3000, open_equity=True):
+    """Everything the /prop page needs for one config in a single dict: real
+    open-equity pass%, the eval walls, measured WR/R, sizing, and est months.
+    Source of truth — the page reads this so its numbers can never go stale."""
+    if strategy_name not in STRATEGIES:
+        return {"error": f"unknown strategy: {strategy_name}"}
+    if eval_name not in EVALS:
+        return {"error": f"unknown eval: {eval_name}"}
+    strat = STRATEGIES[strategy_name]
+    rule = EVALS[eval_name]
+    tf = strat.get("timeframe", "4h")
+    df = _cached_df(months, tf)
+    trades = _trade_log(df, strat["signal_fn"], strat["params"], rule, risk_per_trade_pct)
+    n = len(trades)
+    daily = _group_by_day(trades)
+    wins = [t["pnl_pct"] for t in trades if t["pnl_pct"] > 0]
+    losses = [t["pnl_pct"] for t in trades if t["pnl_pct"] <= 0]
+    wr = (len(wins) / n * 100) if n else 0.0
+    avg_win = (sum(wins) / len(wins)) if wins else 0.0
+    avg_loss = (sum(losses) / len(losses)) if losses else 0.0
+    mc = _run_mc(daily, account, rule, paths, 252, 42, open_equity) if daily else {}
+    lev, actual = _legal_leverage(strat["params"].get("stop_pct", 1.0),
+                                  risk_per_trade_pct, rule["max_leverage"])
+    tpm = (n / months) if months else 0.0
+    med = mc.get("median_trades_to_resolve")
+    est_mo = round(med / tpm, 1) if med and tpm else None
+    stop = strat["params"].get("stop_pct", 1.0)
+    tp = strat["params"].get("tp_pct", 4.0)
+    return {
+        "strategy": strategy_name, "eval": eval_name, "tf": tf,
+        "account": account, "risk_pct": risk_per_trade_pct,
+        "months": months, "open_equity": open_equity,
+        "pass_pct": mc.get("pass_rate_pct"),
+        "fail_dd_pct": mc.get("fail_max_dd_pct"),
+        "fail_daily_pct": mc.get("fail_daily_pct"),
+        "incomplete_pct": mc.get("incomplete_pct"),
+        "median_trades": med, "est_months": est_mo,
+        "trades_total": n, "trades_per_month": round(tpm, 2),
+        "win_rate_pct": round(wr, 1),
+        "avg_win_pct": round(avg_win, 2), "avg_loss_pct": round(avg_loss, 2),
+        "stop_pct": stop, "tp_pct": tp,
+        "r_multiple": round(tp / stop, 1) if stop else None,
+        "leverage": round(lev, 2), "actual_risk_pct": round(actual, 2),
+        "target_pct": rule["profit_target_pct"], "daily_pct": rule["daily_loss_pct"],
+        "dd_pct": rule["max_dd_pct"], "dd_type": rule["max_dd_type"],
+    }
+
+
+def list_configs():
+    """Dropdown metadata for the page: every strategy (with tf + R) + every eval
+    (with its walls)."""
+    strusing = []
+    for name, s in STRATEGIES.items():
+        p = s.get("params", {})
+        stop, tp = p.get("stop_pct"), p.get("tp_pct")
+        strusing.append({
+            "name": name, "tf": s.get("timeframe", "4h"),
+            "r": round(tp / stop, 1) if stop and tp else None,
+        })
+    evs = [{
+        "name": k, "target_pct": v["profit_target_pct"], "daily_pct": v["daily_loss_pct"],
+        "dd_pct": v["max_dd_pct"], "dd_type": v["max_dd_type"],
+    } for k, v in EVALS.items()]
+    return {"strategies": strusing, "evals": evs}
 
 
 # ─── Portfolio: multiple strategies, one account, shared walls ────────────────
@@ -481,12 +563,17 @@ def _full_sweep(eval_name="BREAKOUT_1STEP_CLASSIC", account=5000.0, months=30,
           f"{rule['max_dd_pct']}% {rule['max_dd_type']} DD | {len(STRATEGIES)} strategies")
     print(f"{'#'*104}")
     rows = []
+    _df_cache: dict = {}  # timeframe → OHLCV+indicators, loaded once (not per risk)
     for name in STRATEGIES:
+        tf = STRATEGIES[name].get("timeframe", "4h")
+        if tf not in _df_cache:
+            _df_cache[tf] = add_indicators(load_ohlcv(months=months, timeframe=tf))
+        df = _df_cache[tf]
         for r in risks:
-            mc = monte_carlo_eval(name, eval_name, account, r, months, paths=paths)
+            mc = monte_carlo_eval(name, eval_name, account, r, months, paths=paths, df=df)
             if "error" in mc:
                 continue
-            sim = simulate_eval(name, eval_name, account, r, months)
+            sim = simulate_eval(name, eval_name, account, r, months, df=df)
             tpm = sim["total_trades_available"] / months
             med = mc["median_trades_to_resolve"]
             mo = round(med / tpm, 1) if med and tpm else None
@@ -535,6 +622,10 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "table"
     if mode == "sweep":
         _full_sweep()
+    elif mode == "sweep-all":
+        # Every strategy × every risk × EVERY eval — open-equity re-confirm.
+        for ev in EVALS:
+            _full_sweep(eval_name=ev)
     elif mode == "search":
         _search_portfolios()
     else:

@@ -2091,6 +2091,24 @@ def prop_page():
     return PROP_HTML
 
 
+@app.get("/api/prop/configs")
+def api_prop_configs():
+    """Dropdown metadata for the /prop AUTO mode."""
+    from .prop_eval import list_configs
+    return list_configs()
+
+
+@app.get("/api/prop/eval")
+def api_prop_eval(strategy: str = "ASIAN_RSI_DIP_v1",
+                  eval: str = "BREAKOUT_1STEP_CLASSIC",
+                  account: float = 5000.0, risk: float = 2.0,
+                  open_equity: bool = True, paths: int = 3000):
+    """Live open-equity numbers for one config — the page's source of truth."""
+    from .prop_eval import eval_summary
+    return eval_summary(strategy, eval, account, risk, paths=paths,
+                        open_equity=open_equity)
+
+
 @app.get("/api/review/trades")
 def api_review_trades():
     return get_enriched_trades()

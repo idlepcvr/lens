@@ -29,7 +29,7 @@ Two kill conditions, both live: touch $4,700 ever, OR lose $150 in one day.
 > **Strategy: `ASIAN_RSI_DIP_v1`** — RSI back-above-40 in Asian session, **4H chart,
 > killzone bars 00:00+04:00 UTC only**, 4H+daily trend gate. 1% stop / 4% TP (4R).
 >
-> - **Eval phase (pass it): 2% risk/trade (2x lev) → ~70% pass in ~2 months.**
+> - **Eval phase (pass it): 2% risk/trade (2x lev) → ~57% pass in ~2 months (open-equity).**
 > - **Funded phase (earn): drop to 1% risk (1x lev) for survival.**
 
 Same strategy on $5k and $200k — rules are %-based, so **odds are identical at any
@@ -38,18 +38,19 @@ ladder).
 
 ### Why 2% to pass (the speed/probability frontier)
 
-Exhaustive sweep (25 strategies × 5 risk levels, `prop_eval.py sweep`):
+Exhaustive sweep (25 strategies × 5 risk levels, `prop_eval.py sweep`, **open-equity**):
 
 | Pass within | Best pass% | Config |
 |---|---|---|
-| 1 month | 45% | ASIAN_PULLBACK_v1 @2% — coin flip, reject |
-| **2 months** | **70%** | **ASIAN_RSI_DIP_v1 @2% — the play** |
-| 6 months | 76% | ASIAN_RSI_DIP_v1 @1.5% |
-| 9 months | 91% | ASIAN_RSI_DIP_v1 @0.75% |
+| 1 month | 36% | ASIAN_PULLBACK_v1 @2% — coin flip, reject |
+| **2 months** | **57%** | **ASIAN_RSI_DIP_v1 @2% — the play** |
+| 6 months | 69% | ASIAN_RSI_DIP_v1 @1.5% |
+| 9 months | 89% | ASIAN_RSI_DIP_v1 @0.75% |
 
 +10% in a month while dodging −6% needs an edge BTC mean-reversion doesn't have.
-Evals are cheap (~$20), so **expected time favours 2%**: ~70% × 2mo + retries ≈
-**~3 months & ~$29 to funded**. The 9-month / 0.75% plan only saves ~$7 in fees.
+Evals are cheap (~$20), so **expected time favours 2%**: ~57% × 2mo + retries ≈
+**~3–4 months to funded**. You can't dial past 57% at 2mo — only a higher-WR
+setup moves that ceiling (tested: higher R/tighter stops all lose to 4R).
 
 ### The pass/fail mechanic (2% risk, $5k)
 
@@ -58,8 +59,11 @@ target **$5,500** · ~1.5 trades/mo (~3 trades in 2mo).
 
 - Loss path: 5000 → 4870 → 4743 → **4620 ❌** (3rd loss busts)
 - Win path: 5000 → 5370 → **5767 ✅** (2 wins clears)
-- **You only fail on a cold 3-loss start (~0.6³ ≈ 22%).** One win → static-floor
-  cushion absorbs ~5 losses → cruise home. That's why ~70%.
+- **Closed-PnL view: you only fail on a cold 3-loss start (~0.6³ ≈ 22%).** One win
+  → static-floor cushion absorbs ~5 losses → cruise home.
+- **Open-equity reality (~57%):** a trade that eventually wins can still dip into
+  the −6% floor mid-trade (worst adverse excursion = full move to price stop).
+  That extra bust path is the ~13pt haircut from the optimistic ~70% closed view.
 
 ### Funded income (after split, ~1.5 trades/mo)
 
