@@ -2139,6 +2139,20 @@ def prop_page():
     return PROP_HTML
 
 
+@app.get("/regime", response_class=HTMLResponse)
+def regime_page():
+    """PROP analytic: market regime + hero win-rate per regime."""
+    from .regime import regime_payload
+    from .regime_page import render
+    return render(regime_payload())
+
+
+@app.get("/api/prop/regime")
+def api_prop_regime():
+    from .regime import regime_payload
+    return regime_payload()
+
+
 @app.get("/api/prop/configs")
 def api_prop_configs():
     """Dropdown metadata for the /prop AUTO mode."""
