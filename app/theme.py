@@ -15,17 +15,26 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
-NAV = [
+NAV_PROP = [
+    ("/prop", "Cockpit"),
+    ("/montecarlo", "Survival"),
+    ("/backtest", "Backtest"),
+]
+NAV_HEDGE = [
+    ("/dashboard", "Dashboard"),
     ("/desk", "Desk"),
     ("/signals", "Signals"),
-    ("/", "Dashboard"),
     ("/review", "Review"),
     ("/projection", "Projection"),
-    ("/backtest", "Backtest"),
-    ("/montecarlo", "Monte Carlo"),
-    ("/prop", "Prop"),
-    ("/style", "Style"),
 ]
+# Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
+_PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
+_PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
+
+
+def page_mode(path: str) -> str:
+    """Which mode a page lives in (defaults to prop for neutral pages)."""
+    return _PAGE_MODE.get(path, "prop")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Brand mark — a scope/aperture iris (LENS = optics; concentric reads as a
@@ -119,6 +128,17 @@ a{color:var(--accent);text-decoration:none}
   letter-spacing:.04em;transition:.15s}
 .nav a.cur{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:700}
 .nav a:active{transform:scale(.95)}
+/* ── mode switch: the two doors (PROP / HEDGE) ── */
+.modesw{display:flex;gap:5px;padding:0 2px 10px}
+.modesw a{flex:0 0 auto;font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:.1em;color:var(--dim);text-decoration:none;padding:6px 16px;
+  border:1px solid var(--line2);border-radius:7px;transition:.15s}
+.modesw a.home{padding:6px 11px;letter-spacing:0;font-size:13px}
+.modesw a:active{transform:scale(.95)}
+.modesw a.on{color:var(--bg)}
+.modesw a:nth-child(1).on{background:var(--accent);border-color:var(--accent)}
+.modesw a:nth-child(2).on{background:var(--amber);border-color:var(--amber)}
+@media (hover:hover){ .modesw a:hover{color:var(--ink);border-color:var(--line2)} }
 
 /* ── price strip ── */
 .tape{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;
@@ -308,12 +328,22 @@ a{color:var(--accent);text-decoration:none}
 
 
 def nav_html(current_path: str) -> str:
-    """Scroll-chip nav; the current page's chip gets .cur."""
+    """Mode-aware nav: a PROP|HEDGE switch, then only the current mode's chips.
+    Switching modes just navigates to that mode's home — stateless, no cookie."""
+    mode = page_mode(current_path)
+    items = NAV_PROP if mode == "prop" else NAV_HEDGE
     out = []
-    for href, label in NAV:
+    for href, label in items:
         cur = " cur" if href == current_path else ""
         out.append('<a href="%s" class="%s">%s</a>' % (href, cur.strip(), label))
-    return '<nav class="nav">' + "".join(out) + "</nav>"
+    sw = (
+        '<div class="modesw">'
+        '<a href="/prop" class="%s">◎ PROP</a>'
+        '<a href="/dashboard" class="%s">▤ HEDGE</a>'
+        '<a href="/" class="home">⌂</a>'
+        '</div>'
+    ) % ("on" if mode == "prop" else "", "on" if mode == "hedge" else "")
+    return sw + '<nav class="nav">' + "".join(out) + "</nav>"
 
 
 def shell(current_path: str, page_label: str, body: str, *,
