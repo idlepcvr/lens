@@ -114,12 +114,15 @@ short-loss-streak strategies win the eval; high-expectancy compounders lose it.
    intra-trade drawdown. Treat pass-rates as optimistic by a few points.
 3. **Regime assumption.** Bootstrap assumes future BTC ≈ 30mo history. Regime
    shift breaks it.
-4. **Fees assumed 0.15%/side.** Confirm Breakout's actual schedule.
+4. **Fees = 0.04%/side** (maker+taker), confirmed kraken.com/breakout 2026-06-17.
+   Earlier sims used 0.15%/side and were ~3.6pts pessimistic; now corrected via
+   `commission_per_side` on each eval rule.
 5. **Patience.** ~1.5 trades/mo → eval takes months. Fine IF no time limit.
 
 ## Next steps
 
-- [ ] Confirm Breakout: time limit? exact fees? min trading days?
+- [x] Confirm Breakout rules (2026-06-17): NO time limit, NO consistency rule,
+      NO min trading days, fees 0.04%/side. Kraken Prop = Breakout backend.
 - [ ] Forward-test ASIAN_RSI_DIP_v1 @ 0.5% on Breakout demo/paper before paying
 - [ ] Add open-equity (intra-trade) drawdown to `prop_eval.py` for a harsher,
       truer sim

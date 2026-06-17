@@ -35,29 +35,35 @@ from app.backtest_engine import load_ohlcv, add_indicators, STRATEGIES
 # reset_min_utc  : minute-of-day the daily window resets (Breakout: 00:30 UTC)
 
 EVALS: dict = {
-    "BREAKOUT_1STEP_CLASSIC": {
+    # Kraken Prop / Breakout fee = 0.04%/side (maker+taker), confirmed
+    # kraken.com/breakout 2026-06-17. The fee is a firm/venue property, so it
+    # lives on the eval rule and overrides any per-strategy commission default.
+    "BREAKOUT_1STEP_CLASSIC": {  # "Starter" on the live page
         "daily_loss_pct": 3.0,
         "max_dd_pct": 6.0,
         "max_dd_type": "static",
         "profit_target_pct": 10.0,
         "max_leverage": 5.0,
         "reset_min_utc": 30,
+        "commission_per_side": 0.0004,
     },
-    "BREAKOUT_1STEP_PRO": {
+    "BREAKOUT_1STEP_PRO": {  # "Intermediate": 12% target / 5% DD
         "daily_loss_pct": 3.0,
         "max_dd_pct": 5.0,
         "max_dd_type": "static",
-        "profit_target_pct": 10.0,
+        "profit_target_pct": 12.0,
         "max_leverage": 5.0,
         "reset_min_utc": 30,
+        "commission_per_side": 0.0004,
     },
-    "BREAKOUT_1STEP_TURBO": {
-        "daily_loss_pct": 2.0,
+    "BREAKOUT_1STEP_TURBO": {  # "Advanced": 9% target / 3% DD / 3% daily
+        "daily_loss_pct": 3.0,
         "max_dd_pct": 3.0,
         "max_dd_type": "static",
-        "profit_target_pct": 10.0,
+        "profit_target_pct": 9.0,
         "max_leverage": 5.0,
         "reset_min_utc": 30,
+        "commission_per_side": 0.0004,
     },
     "BREAKOUT_2STEP_CLASSIC": {
         # Phase-1 target modelled (5%); trailing floor caps at the start balance.
@@ -67,6 +73,7 @@ EVALS: dict = {
         "profit_target_pct": 5.0,
         "max_leverage": 5.0,
         "reset_min_utc": 30,
+        "commission_per_side": 0.0004,
     },
 }
 
@@ -96,7 +103,9 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
     SL-first (conservative). Honours the strategy's own discipline gates."""
     stop_pct   = params.get("stop_pct", 1.0) / 100
     tp_pct     = params.get("tp_pct", 4.0) / 100
-    commission = params.get("commission", 0.0015)
+    # Firm fee (eval rule) wins over the strategy's own default — the venue
+    # sets commissions, not the setup. Breakout = 0.0004/side.
+    commission = eval_rule.get("commission_per_side", params.get("commission", 0.0015))
     skip_sat   = params.get("skip_sat", True)
     cooldown   = params.get("cooldown_bars", 4)
     once_per_day = params.get("once_per_day", True)
