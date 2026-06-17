@@ -10,8 +10,7 @@ BODY = r"""
 <div id="body"><div class="skeleton">loading signals…</div></div>
 <div class="foot">
   Every signal — taken or skipped — is data. Skips train the veto map.
-  Refreshes every 60s · <a href="#" id="refresh">refresh now</a> ·
-  <a href="/signals-classic">classic view</a>
+  Refreshes every 60s · <a href="#" id="refresh">refresh now</a>
 </div>
 <div class="toast" id="toast"></div>
 """
