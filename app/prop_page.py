@@ -85,9 +85,9 @@ _BODY = r"""
       <div class="ctl"><label>Eval</label><select id="selEval"></select></div>
       <div class="ctl"><label>Risk / trade</label>
         <select id="selRisk">
-          <option value="0.5">0.5%</option><option value="0.75">0.75%</option>
+          <option value="0.5" selected>0.5%</option><option value="0.75">0.75%</option>
           <option value="1">1%</option><option value="1.5">1.5%</option>
-          <option value="2" selected>2%</option>
+          <option value="2">2%</option>
         </select></div>
       <div class="ctl"><label>Account</label>
         <select id="selAcct">
@@ -105,7 +105,7 @@ _BODY = r"""
       <div class="ctl"><label>TP %</label><input type="number" id="mTp" value="4.0" step="0.25" min="0.1"></div>
       <div class="ctl"><label>Trades / mo</label><input type="number" id="mTpm" value="1.5" step="0.1" min="0.1"></div>
       <div class="ctl"><label>Eval (walls)</label><select id="mEval"></select></div>
-      <div class="ctl"><label>Risk / trade %</label><input type="number" id="mRisk" value="2.0" step="0.25" min="0.1"></div>
+      <div class="ctl"><label>Risk / trade %</label><input type="number" id="mRisk" value="0.5" step="0.25" min="0.1"></div>
       <div class="ctl"><label>Account</label><input type="number" id="mAcct" value="5000" step="1000" min="100"></div>
       <div class="ctl"><label>&nbsp;</label><button class="run" id="mRun">▶ Run</button></div>
       <div class="ctl"><label>&nbsp;</label><span class="srcbadge whatif">WHAT-IF · client sim</span></div>
@@ -126,6 +126,24 @@ _BODY = r"""
     <div class="flag" id="modeNote"></div>
   </div>
 
+  <!-- Survival engine: loss-streak stress test (upgrade #2) -->
+  <div class="panel">
+    <h2>Survival — loss-streak stress (what actually busts you)</h2>
+    <div class="prose" id="streakHead" style="margin-bottom:12px"></div>
+    <table>
+      <tr><th>Losses in a row</th><th>Account left</th><th>Drawdown</th><th>Odds of this streak</th><th>Status</th></tr>
+      <tbody id="streakBody"></tbody>
+    </table>
+    <div class="flag" id="streakNote"></div>
+  </div>
+
+  <!-- Prop rules engine: the constraint layer (upgrade #3) -->
+  <div class="panel">
+    <h2>Prop rules — Kraken Prop (Breakout), live spec</h2>
+    <div class="grid" id="rulesGrid"></div>
+    <div class="prose" id="rulesFree" style="margin-top:6px"></div>
+  </div>
+
   <!-- The current config -->
   <div class="panel">
     <h2>The config</h2>
@@ -136,25 +154,26 @@ _BODY = r"""
       <tr><td>Geometry</td><td id="cGeo">–</td></tr>
       <tr><td>Win rate (measured)</td><td id="cWr">–</td></tr>
       <tr><td>Per trade</td><td id="cWL">–</td></tr>
+      <tr><td>Expectancy</td><td class="green" id="cExp">–</td></tr>
       <tr><td>Risk / sizing</td><td class="yellow" id="cRisk">–</td></tr>
       <tr><td>Eval walls</td><td id="cWalls">–</td></tr>
       <tr><td class="ac">Pass odds</td><td class="ac" id="cOdds">–</td></tr>
     </table>
   </div>
 
-  <!-- Speed vs probability frontier (CLASSIC, open-equity) -->
+  <!-- Risk sizing ↔ pass (Advanced 3% DD, the €20 plan) -->
   <div class="panel">
-    <h2>Speed ↔ probability frontier — 1-Step Classic, open-equity (the hard law)</h2>
+    <h2>Risk sizing ↔ pass — Advanced (3% DD), single shot, open-equity</h2>
     <table>
-      <tr><th>Pass within</th><th>Best pass%</th><th>Config</th></tr>
-      <tr><td>1 month</td><td class="red">36%</td><td>ASIAN_PULLBACK_v1 @2% — coin flip, reject</td></tr>
-      <tr class="hl"><td>2 months</td><td class="yellow">57%</td><td>ASIAN_RSI_DIP_v1 @2% — the play</td></tr>
-      <tr><td>6 months</td><td>69%</td><td>ASIAN_RSI_DIP_v1 @1.5%</td></tr>
-      <tr><td>9 months</td><td class="green">89%</td><td>ASIAN_RSI_DIP_v1 @0.75%</td></tr>
+      <tr><th>Risk / trade</th><th>Leverage</th><th>Pass %</th><th>Why</th></tr>
+      <tr class="hl"><td>0.5%</td><td>0.5x</td><td class="green">89%</td><td>the play — one loss is tiny, survives a cold start</td></tr>
+      <tr><td>0.75%</td><td>0.75x</td><td class="green">74%</td><td>faster, still solid</td></tr>
+      <tr><td>1.0%</td><td>1.0x</td><td class="yellow">59%</td><td>getting risky on a 3% wall</td></tr>
+      <tr><td>2.0%</td><td>2.0x</td><td class="red">35%</td><td>two losses ≈ bust — don't</td></tr>
     </table>
-    <div class="prose" style="margin-top:12px">+10% in a month while dodging −6% needs an edge BTC mean-reversion doesn't have.
-      Because evals are cheap (~$20), <strong>expected time favours 2%</strong>: ~57% × 2mo + cheap retries ≈ <strong>~3–4 months to funded</strong>.
-      You can't dial past 57% at 2mo — only a <strong>higher-WR setup</strong> moves that ceiling.</div>
+    <div class="prose" style="margin-top:12px">On a <strong>3% static wall, risk % is everything</strong> — same strategy, 0.5% passes 89% while 2% passes 35%.
+      You have <strong>€20 = one eval, no retry budget</strong>, so size for survival not speed: <code>ASIAN_RSI_DIP_v1 @ 0.5%</code>.
+      It's a slow grind (~1.5 trades/mo, no time limit), but ~89% one-shot. Only a <strong>higher-WR setup</strong> lifts the ceiling further.</div>
   </div>
 
   <!-- Funded income -->
@@ -174,20 +193,20 @@ _BODY = r"""
   <div class="panel">
     <h2>The plan, written</h2>
     <div class="prose">
-      <p><strong>1.</strong> Pass the <strong>$5k 1-Step Classic</strong> eval with <code>ASIAN_RSI_DIP_v1 @ 2% risk</code> (~$20 fee, ~57%, ~2mo open-equity).</p>
-      <p><strong>2.</strong> Get funded, bank ~$1k profit.</p>
-      <p><strong>3.</strong> Use that profit to buy a <strong>$200k 1-Step Classic</strong> eval directly (don't ladder) — same ~57%/2mo odds at any size.</p>
-      <p><strong>4.</strong> Funded $200k @1% → ~$1.7k/mo safe (or 2% for ~$3.4k, higher bust risk).</p>
-      <p><strong>5.</strong> Long game: a higher-WR setup is the only way past 57%/2mo — raise WR via the LENS discretionary edge (real flush WR ~60% vs 40% mechanical).</p>
-      <p style="color:var(--t3);margin-top:10px">AUTO mode = real open-equity sim (each trade's worst adverse excursion tested vs the live wall) · thin sample (44 trades/30mo) · $200k eval fee ≫ $20, confirm in dashboard.</p>
+      <p><strong>1.</strong> Pass the <strong>$5k Advanced</strong> eval with <code>ASIAN_RSI_DIP_v1 @ 0.5% risk</code> (€20 fee, ~89% one-shot, slow grind, no time limit).</p>
+      <p><strong>2.</strong> Get funded, bank profit toward the next tier.</p>
+      <p><strong>3.</strong> Buy a bigger Advanced eval from profit ($200k Advanced = $660) — same %-based odds at any size.</p>
+      <p><strong>4.</strong> Funded income scales with size; keep risk low for survival, lift it only once there's cushion.</p>
+      <p><strong>5.</strong> Long game: a <strong>higher-WR setup</strong> is the only way to raise the ceiling — mine it via the HEDGE edge (real flush WR ~60% vs 40% mechanical).</p>
+      <p style="color:var(--t3);margin-top:10px">AUTO mode = real open-equity sim (each trade's worst adverse excursion tested vs the live wall) · fees 0.04%/side · thin sample (44 trades/30mo) — treat 89% as "high", not gospel · forward-test on demo before paying.</p>
     </div>
   </div>
 </div>
 """
 
 _SCRIPT = r"""
-const MAXT = 30;            // cap trades drawn per path
-const FEE = 0.0015;         // per-side commission (matches prop_eval)
+const MAXT = 40;            // cap trades drawn per path
+const FEE = 0.0004;         // Kraken Prop per-side commission (matches prop_eval)
 let MODE = 'auto';
 let CFG = {strategies:[], evals:[]};
 let ST = {wr:0.40, win:0.074, loss:0.026, floor:0.06, target:0.10, daily:0.03,
@@ -211,7 +230,7 @@ async function loadConfigs(){
       const o = document.createElement('option');
       o.value = e.name;
       o.textContent = `${e.name.replace('BREAKOUT_','')}  (${e.target_pct}% tgt, ${e.dd_pct}% ${e.dd_type} DD)`;
-      if(e.name==='BREAKOUT_1STEP_CLASSIC') o.selected = true;
+      if(e.name==='BREAKOUT_1STEP_TURBO') o.selected = true;   // "Advanced" = the €20 plan
       sel.appendChild(o);
     });
   });
@@ -288,6 +307,9 @@ function fillConfig(c){
   $('cGeo').textContent = `${c.stop}% stop · ${c.tp}% TP (${c.r}R)`;
   $('cWr').textContent = c.wrPct+'%';
   $('cWL').textContent = `win +${c.win}% · loss ${c.loss}%`;
+  const wrF=(+c.wrPct)/100, expPct=wrF*(+c.win) + (1-wrF)*(+c.loss);  // loss is signed −
+  const expR = c.risk ? expPct/(+c.risk) : 0;
+  $('cExp').textContent = `+${expPct.toFixed(2)}% / trade  ·  ${expR.toFixed(2)}R`;
   $('cRisk').textContent = `${c.risk}% risk · ${c.lev}x lev`;
   $('cWalls').textContent = `${c.eval.replace('BREAKOUT_','')} — ${c.target}% target · ${c.dd}% ${c.ddtype} DD · ${c.daily}% daily`;
   $('cOdds').textContent = c.odds;
@@ -305,6 +327,58 @@ function walls(){
     <div class="card"><div class="lbl">Loss / trade</div><div class="val red">−$${Math.round(a*ST.loss).toLocaleString()}</div><div class="note">−${(ST.loss*100).toFixed(1)}%</div></div>`;
 }
 
+// ── Survival: loss-streak stress test (upgrade #2) ────────────────────────────
+function survival(){
+  const a = ST.account;
+  let bustK = null; let rows = '';
+  for(let k=1;k<=8;k++){
+    const eq = Math.pow(1-ST.loss, k);     // equity fraction after k straight losses
+    const dd = 1 - eq;
+    const p  = Math.pow(1-ST.wr, k)*100;   // odds of k losses in a row (fresh run)
+    const busted = dd >= ST.floor;
+    if(busted && bustK===null) bustK = k;
+    const cls = busted ? 'red' : (dd >= ST.floor*0.66 ? 'yellow':'green');
+    rows += `<tr class="${busted&&bustK===k?'hl':''}">`
+      + `<td>${k}</td>`
+      + `<td class="${cls}">$${Math.round(a*eq).toLocaleString()}</td>`
+      + `<td class="${cls}">−${(dd*100).toFixed(1)}%</td>`
+      + `<td>${p.toFixed(p<1?2:1)}%</td>`
+      + `<td class="${busted?'red':'green'}">${busted?'✗ BUST':'✓ safe'}</td></tr>`;
+  }
+  $('streakBody').innerHTML = rows;
+  const lossPct = (ST.loss*100).toFixed(2), floorPct = (ST.floor*100).toFixed(0);
+  const bustTxt = bustK ? `<strong>${bustK} losses in a row</strong>` : '<strong>more than 8 losses</strong>';
+  const bustP = bustK ? Math.pow(1-ST.wr,bustK)*100 : 0;
+  const dpt = ST.tpm ? (30.4/ST.tpm) : 0;   // ~days per trade
+  $('streakHead').innerHTML = `One loss ≈ <code>−${lossPct}%</code> of the account. The floor is `
+    + `<code>−${floorPct}%</code>. So it takes ${bustTxt} from a fresh start to bust — `
+    + `on a ${(ST.wr*100).toFixed(0)}% win-rate run that cold streak hits roughly `
+    + `<strong>${bustP.toFixed(bustP<1?2:1)}%</strong> of the time.`;
+  $('streakNote').innerHTML = bustK
+    ? `Worst-streak-to-breach = <b>${bustK} straight losses</b>`
+      + (dpt? ` ≈ <b>${(bustK*dpt).toFixed(0)} days</b> back-to-back at ${ST.tpm.toFixed(1)} trades/mo` : '')
+      + `. This is the loss-streak stress test that <b>replaces risk-of-ruin</b> — the MC pass/fail tally above is the same story rolled into one number.`
+    : `At this sizing no 8-loss streak can breach the floor — extremely robust. Lower risk only widens this cushion.`;
+}
+
+// ── Prop rules: the constraint layer (upgrade #3) ─────────────────────────────
+function rulesPanel(){
+  const a=ST.account, f=Math.round(a*(1-ST.floor)), t=Math.round(a*(1+ST.target)),
+        d=Math.round(a*ST.daily);
+  $('rulesGrid').innerHTML = `
+    <div class="card"><div class="lbl">Time limit</div><div class="val green">NONE</div><div class="note">take months if needed</div></div>
+    <div class="card"><div class="lbl">Consistency rule</div><div class="val green">NONE</div><div class="note">one big win is fine</div></div>
+    <div class="card"><div class="lbl">Min trading days</div><div class="val green">NONE</div><div class="note">pass in 1 trade</div></div>
+    <div class="card"><div class="lbl">Daily loss limit</div><div class="val yellow">${(ST.daily*100).toFixed(0)}%</div><div class="note">−$${d.toLocaleString()} · resets 00:30 UTC</div></div>
+    <div class="card"><div class="lbl">Max drawdown</div><div class="val red">${(ST.floor*100).toFixed(0)}% static</div><div class="note">floor $${f.toLocaleString()} · never trails</div></div>
+    <div class="card"><div class="lbl">Profit target</div><div class="val green">+${(ST.target*100).toFixed(0)}%</div><div class="note">pass at $${t.toLocaleString()}</div></div>
+    <div class="card"><div class="lbl">Fees</div><div class="val">0.04%</div><div class="note">per side (maker+taker)</div></div>
+    <div class="card"><div class="lbl">News / weekend</div><div class="val green">OK</div><div class="note">no holding restrictions</div></div>`;
+  $('rulesFree').innerHTML = 'Verified on <code>kraken.com/breakout</code> 2026-06-17. '
+    + 'Two kill conditions only: touch the static floor, or lose the daily limit in one day. '
+    + 'Both are <strong>live-equity</strong> checks (open trades count) — the AUTO sim models that.';
+}
+
 function simPath(){
   let eq = 1.0, pts = [1.0];
   const floor = 1-ST.floor, target = 1+ST.target;
@@ -318,7 +392,7 @@ function simPath(){
 }
 
 function drawPaths(){
-  walls();
+  walls(); survival(); rulesPanel();
   const cv = $('cv'), dpr = window.devicePixelRatio||1;
   const W = cv.clientWidth, H = cv.clientHeight;
   cv.width = W*dpr; cv.height = H*dpr;
