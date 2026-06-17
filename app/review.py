@@ -331,15 +331,12 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <div class="brand-page">Review</div>
   </div>
   <nav class="topnav">
+    <a href="/prop">◎&nbsp;PROP</a>
+    <a href="/dashboard">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
-    <a href="/">Dashboard</a>
     <a href="/review" class="cur">Review</a>
     <a href="/projection">Projection</a>
-    <a href="/backtest">Backtest</a>
-    <a href="/montecarlo">Monte Carlo</a>
-    <a href="/prop">Prop</a>
-    <a href="/style">Style</a>
   </nav>
   <div class="topbar-right">
     <div class="chips">

@@ -30,15 +30,17 @@ DESK_HTML = r"""<!DOCTYPE html>
     <div class="logo">LEN<span class="s">S</span> <span class="pg">DESK</span></div>
     <div class="live"><span class="dot" id="dot"></span><span id="livetxt">live</span></div>
   </div>
+  <div class="modesw">
+    <a href="/prop">◎ PROP</a>
+    <a href="/dashboard" class="on">▤ HEDGE</a>
+    <a href="/" class="home">⌂</a>
+  </div>
   <nav class="nav">
+    <a href="/dashboard">Dashboard</a>
     <a href="/desk" class="cur">Desk</a>
     <a href="/signals">Signals</a>
-    <a href="/">Dashboard</a>
     <a href="/review">Review</a>
     <a href="/projection">Projection</a>
-    <a href="/backtest">Backtest</a>
-    <a href="/montecarlo">Monte&nbsp;Carlo</a>
-    <a href="/prop">Prop</a>
   </nav>
 
   <div id="body"><div class="skeleton">reading market state…</div></div>
