@@ -17,6 +17,7 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 # Nav — one list drives every page's nav bar. Add a page here once.
 NAV_PROP = [
     ("/prop", "Cockpit"),
+    ("/regime", "Regime"),
     ("/montecarlo", "Survival"),
     ("/backtest", "Backtest"),
 ]
