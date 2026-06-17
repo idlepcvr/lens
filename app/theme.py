@@ -16,9 +16,13 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
 NAV_PROP = [
-    ("/prop", "Cockpit"),
+    ("/prop", "Goals"),
+    ("/strategy", "Strategy"),
+    ("/risk", "Risk"),
+    ("/survival", "Survival"),
+    ("/rules", "Rules"),
+    ("/equity", "Equity"),
     ("/regime", "Regime"),
-    ("/montecarlo", "Survival"),
     ("/backtest", "Backtest"),
 ]
 NAV_HEDGE = [

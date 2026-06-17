@@ -54,7 +54,6 @@ from .models import (
 from . import bybit_sync, kraken_sync
 from .review import REVIEW_HTML, get_enriched_trades, get_ohlcv_1h
 from .montecarlo import MONTECARLO_HTML
-from .prop_page import PROP_HTML
 
 
 app = FastAPI(title="LENS", version="1.0.0-dev")
@@ -2136,7 +2135,38 @@ def montecarlo_page():
 
 @app.get("/prop", response_class=HTMLResponse)
 def prop_page():
-    return PROP_HTML
+    from .prop_views import goals_page
+    return goals_page()
+
+
+@app.get("/strategy", response_class=HTMLResponse)
+def strategy_engine():
+    from .prop_views import strategy_page
+    return strategy_page()
+
+
+@app.get("/risk", response_class=HTMLResponse)
+def risk_engine():
+    from .prop_views import risk_page
+    return risk_page()
+
+
+@app.get("/survival", response_class=HTMLResponse)
+def survival_engine():
+    from .prop_views import survival_page
+    return survival_page()
+
+
+@app.get("/rules", response_class=HTMLResponse)
+def rules_engine():
+    from .prop_views import rules_page
+    return rules_page()
+
+
+@app.get("/equity", response_class=HTMLResponse)
+def equity_engine():
+    from .prop_views import equity_page
+    return equity_page()
 
 
 @app.get("/regime", response_class=HTMLResponse)
