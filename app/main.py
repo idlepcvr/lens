@@ -535,6 +535,22 @@ tr.cur-row td:first-child{border-left:2px solid var(--ac)}
 .live-use{font-size:10px;color:var(--ac);text-decoration:none;margin-left:6px;font-family:var(--ui)}
 .live-use:hover{text-decoration:underline}
 .live-item-wide{flex-basis:100%;border-bottom:1px solid var(--b1);padding-bottom:8px;margin-bottom:2px}
+/* ── collapsible sections: let a long body (My plans) expand past LENS's 5000px cap ── */
+.sec-body.tall:not(.closed){max-height:20000px}
+/* ── mobile: keep wide tables + plan cards inside the viewport ── */
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.plan-card{max-width:100%;overflow-x:auto}
+.param-form,.live-strip,.hero,.mc-grid,.chart-wrap,.two{max-width:100%}
+@media(max-width:680px){
+  .app{padding:0 10px 120px}
+  .param-form{padding:10px 12px;gap:7px}
+  .pf input{width:72px}
+  .plan-meta{font-size:10px;line-height:1.5}
+  .act-table{font-size:10.5px}
+  .add-act-inp[type=date]{width:112px}
+  .add-act-inp[type=number]{width:78px}
+  .add-act-inp[type=text]{width:120px}
+}
 """
 
     # ── JS ────────────────────────────────────────────────────────────────────────
@@ -873,6 +889,8 @@ document.addEventListener('DOMContentLoaded', loadPlans);
 <h4>a model, not a promise</h4>Assumes the win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. Validate the assumptions in <a href="/backtest">Backtest</a> and <a href="/review">Review</a>.
 </div></div>
 
+<div class="sect closed" id="h-strat" onclick="tog('strat')"><span class="caret">▾</span><span class="ttl">📋 the strategy — TREND_4R_v1</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-strat">
 <div class="strat">
   <span class="tl">"I trade BTC perps on Kraken — with-trend, 4H chart — risking a fixed 10% of my account to make 40%+. My entire edge is holding winners to the full target instead of bailing early."</span>
   <b>TREND_4R_v1 — locked rules:</b>
@@ -885,7 +903,10 @@ document.addEventListener('DOMContentLoaded', loadPlans);
     <li><b>Not chasing WR.</b> 44% is fine. <b>R is the lever</b> — see the tables below.</li>
   </ul>
 </div>
+</div>
 
+<div class="sect" id="h-params" onclick="tog('params')"><span class="caret">▾</span><span class="ttl">⚙ parameters</span><span class="line"></span></div>
+<div class="sec-body" id="s-params">
 <form class="param-form" method="get" action="/projection">
   <div class="pf"><label>Start €</label><input name="start" value="{start:g}"></div>
   <div class="pf"><label>Stop %</label><input name="stop" value="{stop:g}"></div>
@@ -902,15 +923,19 @@ document.addEventListener('DOMContentLoaded', loadPlans);
   <span class="saved-flash" id="plan-saved-flash">saved ✓</span>
   <span class="calc-hint">300*0.1 → ↵</span>
 </form>
+</div>
 <span id="proj-p50-val" data-val="{p50_final_val}" style="display:none"></span>
 <script id="proj-curve-data" type="application/json">{curve_json_val}</script>
 {live_stats_html}
 {err_html}
 
+<div class="sect" id="h-metrics" onclick="tog('metrics')"><span class="caret">▾</span><span class="ttl">📊 key metrics</span><span class="line"></span></div>
+<div class="sec-body" id="s-metrics">
 <div class="hero">{cards}</div>
+</div>
 
-<div class="sec-hd"><h2>Equity projection — percentile bands (log scale)</h2><button class="collapse-btn" id="chart-toggle" onclick="toggleChartSection()" title="Collapse">▼</button></div>
-<div id="chart-body">
+<div class="sect" id="h-chart" onclick="tog('chart')"><span class="caret">▾</span><span class="ttl">Equity projection — percentile bands (log scale)</span><span class="line"></span></div>
+<div class="sec-body" id="s-chart">
 <div class="chart-wrap">
   {sparkline}
   <div class="chart-legend">
@@ -930,40 +955,48 @@ document.addEventListener('DOMContentLoaded', loadPlans);
 
 <div class="two" style="margin-top:24px">
   <div>
-    <div class="sec-hd"><h2>R-target scenarios</h2><span>WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT</span></div>
+    <div class="sect" id="h-rtgt" onclick="tog('rtgt')"><span class="caret">▾</span><span class="ttl">R-target scenarios <span class="dim" style="font-weight:400">· WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT</span></span><span class="line"></span></div>
+    <div class="sec-body" id="s-rtgt">
     <p class="note">What TP% gives you each <b>actual R after fees</b>. R is the one lever you fully control — exit discipline, not a market outcome. ← = current params.</p>
     <table>
       <tr><th>Target R</th><th>Params</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
       {r_target_rows}
     </table>
+    </div>
   </div>
   <div>
-    <div class="sec-hd"><h2>Win-rate sensitivity</h2><span>R held at {wr_r_label}</span></div>
+    <div class="sect" id="h-wrs" onclick="tog('wrs')"><span class="caret">▾</span><span class="ttl">Win-rate sensitivity <span class="dim" style="font-weight:400">· R held at {wr_r_label}</span></span><span class="line"></span></div>
+    <div class="sec-body" id="s-wrs">
     <p class="note">WR is a <b>byproduct of entry quality</b> — hard to control directly. Below breakeven WR you lose money regardless of R.</p>
     <table>
       <tr><th>WR</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
       {wr_rows}
     </table>
+    </div>
   </div>
 </div>
 
-<div class="sec-hd" style="margin-top:24px"><h2>Monte Carlo — final distribution at {weeks:g} weeks</h2></div>
-{mc_html}
+<div class="sect" id="h-mc" onclick="tog('mc')"><span class="caret">▾</span><span class="ttl">Monte Carlo — final distribution at {weeks:g} weeks</span><span class="line"></span></div>
+<div class="sec-body" id="s-mc">{mc_html}</div>
 
-<div class="sec-hd" style="margin-top:24px"><h2>Backtest tracker</h2></div>
+<div class="sect closed" id="h-bt" onclick="tog('bt')"><span class="caret">▾</span><span class="ttl">Backtest tracker</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-bt">
 <div class="bt-empty">
   <b style="color:var(--t2)">No backtest data yet</b>
   <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H chart.</p>
   <p>Fields: date · direction · entry · SL hit / TP hit · hold time · R achieved</p>
 </div>
+</div>
 
-<div class="sec-hd" style="margin-top:24px"><h2>My plans</h2><span id="plans-count"></span></div>
+<div class="sect" id="h-plans" onclick="tog('plans')"><span class="caret">▾</span><span class="ttl">My plans <span id="plans-count" class="dim" style="font-weight:400"></span></span><span class="line"></span></div>
+<div class="sec-body tall" id="s-plans">
 <div id="plans-section">
   <div class="bt-empty" id="plans-empty" style="display:none">
     <b style="color:var(--t2)">No saved plans yet</b>
     <p>Click <b>Save Plan</b> above to snapshot the current projection and track actual results over time.</p>
   </div>
   <div id="plans-list"></div>
+</div>
 </div>
 
 <p class="note" style="margin-top:20px"><b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise.</p>
@@ -1054,8 +1087,15 @@ def landing():
 .sc-n{font-family:var(--mono);font-size:24px;font-weight:600;color:#fff;line-height:1}
 .sc-l{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-top:6px}
 .main{display:grid;grid-template-columns:248px 1fr;gap:14px;align-items:start;margin-top:18px}
-@media(max-width:820px){.main{grid-template-columns:1fr}}
 .sidebar{position:sticky;top:74px}
+/* mobile reset MUST come after the base rule or source-order overrides it */
+@media(max-width:820px){.main{grid-template-columns:1fr}.sidebar{position:static!important}}
+/* collapsible Parameters panel (esp. mobile, where it stacks on top) */
+.panel-hd{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.pcaret{font-size:11px;color:var(--t3);transition:transform .2s}
+.panel.col .pcaret{transform:rotate(-90deg)}
+.panel.col form{display:none}
+.metrics-hd{margin-top:0}
 .panel{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden;margin-bottom:0;padding:0}
 .panel-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--b1)}
 .panel-title{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t2)}
@@ -1133,9 +1173,12 @@ def landing():
 <div class="main">
   <div class="sidebar">
     <div class="panel">
-      <div class="panel-hd">
-        <span class="panel-title">Parameters</span>
-        <span class="saved" id="saved-pulse">saved ✓</span>
+      <div class="panel-hd" onclick="this.parentElement.classList.toggle('col')">
+        <span class="panel-title">⚙ Parameters</span>
+        <span style="display:flex;align-items:center;gap:9px">
+          <span class="saved" id="saved-pulse">saved ✓</span>
+          <span class="pcaret">▾</span>
+        </span>
       </div>
       <form id="goal-form" autocomplete="off">
         <div class="fsec">
@@ -1173,6 +1216,8 @@ def landing():
   </div>
 
   <div class="metrics">
+    <div class="sect metrics-hd" id="h-results" onclick="tog('results')"><span class="caret">▾</span><span class="ttl">Goal model — results</span><span class="line"></span></div>
+    <div class="sec-body" id="s-results">
     <div class="hero">
       <div class="hcard blue" id="hc-r">
         <div class="hbig" id="h-r">—</div>
@@ -1208,16 +1253,19 @@ def landing():
     </div>
 
     <div id="err" class="err hide"></div>
+    </div>
   </div>
 </div>
 
-<div class="sec">
-  <div class="sec-hd"><h2>Signals by strategy</h2><a href="/api/signals">/api/signals →</a></div>
+<div class="sect" id="h-sigstrat" onclick="tog('sigstrat')"><span class="caret">▾</span><span class="ttl">Signals by strategy</span><span class="line"></span></div>
+<div class="sec-body" id="s-sigstrat">
   <table class="sigt">{strat_rows}</table>
+  <a href="/api/signals" style="font-size:11px;color:var(--t3);display:inline-block;margin-top:8px" onclick="event.stopPropagation()">/api/signals →</a>
 </div>
 
-<div class="sec">
-  <div class="sec-hd"><h2>API</h2><a href="/docs">interactive docs →</a></div>
+<div class="sect closed" id="h-api" onclick="tog('api')"><span class="caret">▾</span><span class="ttl">API</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-api">
+  <a href="/docs" style="font-size:11px;color:var(--t3);display:inline-block;margin-bottom:8px" onclick="event.stopPropagation()">interactive docs →</a>
   <div style="display:flex;flex-direction:column;gap:1px">
     <div class="ep"><span class="m">GET</span><span class="path">/health</span><span class="desc">liveness</span></div>
     <div class="ep"><span class="m patch">PATCH</span><span class="path">/api/config</span><span class="desc">save goal inputs</span></div>
@@ -1229,8 +1277,6 @@ def landing():
     <div class="ep"><span class="m post">POST</span><span class="path">/api/signals</span><span class="desc">ingest Pine alert</span></div>
     <div class="ep"><span class="m post">POST</span><span class="path">/api/signals/&lt;id&gt;/decide</span><span class="desc">approve / reject</span></div>
   </div>
-</div>
-
 </div>
 """
 
@@ -2199,6 +2245,45 @@ def api_prop_eval(strategy: str = "ASIAN_RSI_DIP_v1",
     from .prop_eval import eval_summary
     return eval_summary(strategy, eval, account, risk, paths=paths,
                         open_equity=open_equity)
+
+
+@app.get("/api/prop/desk")
+def api_prop_desk():
+    """Live ENTER / STAND DOWN read for the prop hero on the latest closed 4H bar."""
+    from .prop_desk import prop_desk_state
+    return prop_desk_state()
+
+
+@app.get("/prop-desk", response_class=HTMLResponse)
+def prop_desk_page():
+    from .prop_desk import PROP_DESK_HTML
+    return PROP_DESK_HTML
+
+
+@app.get("/api/prop/ledger")
+def api_prop_ledger():
+    """Realised prop-book trades as an equity ledger vs the eval walls."""
+    from .prop_ledger import prop_ledger_data
+    return prop_ledger_data()
+
+
+@app.post("/api/prop/trades")
+def api_prop_trade(trade: TradeCreate):
+    """Log a trade onto the prop book (forces book='prop')."""
+    trade.book = "prop"
+    return create_trade(trade)
+
+
+@app.get("/prop-ledger", response_class=HTMLResponse)
+def prop_ledger_page():
+    from .prop_ledger import ledger_page
+    return ledger_page()
+
+
+@app.get("/prop-income", response_class=HTMLResponse)
+def prop_income_page():
+    from .prop_income import income_page
+    return income_page()
 
 
 @app.get("/api/review/trades")

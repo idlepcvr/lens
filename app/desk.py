@@ -1,55 +1,27 @@
 """LENS /desk — live entry cockpit. One screen that answers: can I enter RIGHT NOW?
 
-Mobile-first HUD / instrument-cluster design. Renders desk_state() from
-app.setups: per-direction verdict (ENTER / BLOCKED / STAND DOWN), the trade plan
-+ money ticket when clean, live S1-S5 condition checklists, active vetoes, and the
-realized per-setup scoreboard. NEW: pulls the live pending signal from
-/api/signals and lets you TAKE A+ / TAKE / SKIP it from the thumb zone — the
-decision POSTs straight to /api/signals/{id}/decide (same path as the ntfy
-buttons). Built phone-first: a single ~460px column, big glanceable numbers,
-sticky action bar.
+Mobile-first HUD / instrument-cluster design, built on the shared design system
+(app.theme.shell) like every other page. Renders desk_state() from app.setups:
+per-direction verdict (ENTER / BLOCKED / STAND DOWN), the trade plan + money
+ticket when clean, live S1-S5 condition checklists, active vetoes, and the
+realized per-setup scoreboard. Pulls the live pending signal from /api/signals
+and lets you TAKE A+ / TAKE / SKIP it from the thumb zone — the decision POSTs
+straight to /api/signals/{id}/decide (same path as the ntfy buttons). Built
+phone-first: a single ~460px column, big glanceable numbers, sticky action bar.
 """
 
-DESK_HTML = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#06080c">
-<title>LENS // Desk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-<link rel="apple-touch-icon" href="/assets/favicon.svg">
-<link rel="stylesheet" href="/assets/lens.css">
-</head>
-<body>
-<div class="app">
-  <div class="bar">
-    <div class="logo">LEN<span class="s">S</span> <span class="pg">DESK</span></div>
-    <div class="live"><span class="dot" id="dot"></span><span id="livetxt">live</span></div>
-  </div>
-  <div class="modesw">
-    <a href="/prop">◎ PROP</a>
-    <a href="/dashboard" class="on">▤ HEDGE</a>
-    <a href="/" class="home">⌂</a>
-  </div>
-  <nav class="nav">
-    <a href="/dashboard">Dashboard</a>
-    <a href="/desk" class="cur">Desk</a>
-    <a href="/signals">Signals</a>
-    <a href="/review">Review</a>
-    <a href="/projection">Projection</a>
-  </nav>
+from .theme import shell
 
-  <div id="body"><div class="skeleton">reading market state…</div></div>
+# Custom top-bar right slot: the live/stale dot + label the render JS updates.
+RIGHT = '<div class="live"><span class="dot" id="dot"></span><span id="livetxt">live</span></div>'
 
-  <div class="foot">
-    Patterns are mechanical coin-flips alone — realized WRs came from <i>your selection inside
-    these contexts</i> + fast exits. ENTER = "the context where you historically win is live",
-    not a guaranteed trade. Refreshes every 60s · <a href="#" id="refresh">refresh now</a>
-  </div>
+BODY = r"""
+<div id="body"><div class="skeleton">reading market state…</div></div>
+
+<div class="foot">
+  Patterns are mechanical coin-flips alone — realized WRs came from <i>your selection inside
+  these contexts</i> + fast exits. ENTER = "the context where you historically win is live",
+  not a guaranteed trade. Refreshes every 60s · <a href="#" id="refresh">refresh now</a>
 </div>
 
 <div class="actions" id="actions">
@@ -64,8 +36,9 @@ DESK_HTML = r"""<!DOCTYPE html>
 </div>
 
 <div class="toast" id="toast"></div>
+"""
 
-<script>
+SCRIPT = r"""
 const $ = id => document.getElementById(id);
 const VLAB = {long:"LONG", short:"SHORT"};
 const ARROW = {long:"▲", short:"▼"};
@@ -180,7 +153,7 @@ function render(){
 
   // context chips
   const c = d.context;
-  const kz = {london_kz:'London 07–10',ny_am_kz:'NY AM 13–16 ★',ny_pm_kz:'NY PM 18–21 ☠',none:'—'}[c.killzone];
+  const kz = {london_kz:'London 07–10',ny_am_kz:'NY AM 13–16 ★',ny_pm_kz:'NY PM 18–21 ☠',none:'—'}[c.killzone];
   html += secHead('ctx','context — why the verdict') + `<div class="sec-body" id="s-ctx"><div class="chips">`
     + chip('RSI', c.rsi===null?'—':c.rsi+' '+(c.rsi_zone==='dead'?'☠':c.rsi_zone), c.rsi_zone==='dead'?'bad':(c.rsi_zone?'good':''))
     + chip('killzone', kz, c.killzone==='ny_am_kz'?'good':c.killzone==='ny_pm_kz'?'bad':'')
@@ -284,6 +257,6 @@ async function load(){
 $('refresh').addEventListener('click', e=>{e.preventDefault(); load();});
 load();
 setInterval(load, 60000);
-</script>
-</body>
-</html>"""
+"""
+
+DESK_HTML = shell("/desk", "Desk", BODY, script=SCRIPT, right=RIGHT, meta="can I enter?")

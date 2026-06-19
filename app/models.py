@@ -197,6 +197,8 @@ class TradeCreate(BaseModel):
     linked_signal_id: Optional[str] = None
     # Setup classification
     setup_tag: Optional[str] = None
+    # Which book: 'hedge' (own money) | 'prop' (eval account). Default hedge.
+    book: Optional[str] = None
 
 
 class TradeUpdate(BaseModel):
@@ -223,6 +225,7 @@ class TradeUpdate(BaseModel):
     balance_after:     Optional[float] = None
     linked_signal_id:  Optional[str]   = None
     setup_tag:         Optional[str]   = None
+    book:              Optional[str]   = None
 
 
 class TradeResponse(TradeCreate):
