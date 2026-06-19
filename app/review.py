@@ -267,8 +267,12 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 #sidebar{width:300px;display:flex;flex-direction:column;border-right:1px solid var(--b1);flex-shrink:0;background:var(--bg)}
 
 /* ── filters ── */
-#filters{padding:8px;border-bottom:1px solid var(--b1);display:flex;flex-wrap:wrap;gap:5px;background:var(--s1)}
-#filters select{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:3px 6px;border-radius:4px;font-size:10px;font-family:var(--ui);cursor:pointer;min-width:0}
+#filters{padding:9px;border-bottom:1px solid var(--b1);display:flex;flex-direction:column;gap:7px;background:var(--s1)}
+#filters select{width:100%;background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 6px;border-radius:4px;font-size:11px;font-family:var(--ui);cursor:pointer;min-width:0}
+.fseg{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fseg b{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:42px;flex:0 0 auto;font-weight:600}
+.fseg button{padding:2px 9px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:10px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
+.fseg button.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
 
 /* ── trade list ── */
 #trade-list{flex:1;overflow-y:auto}
@@ -414,12 +418,12 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 <div id="content">
   <div id="sidebar">
     <div id="filters">
-      <select id="f-dir"    onchange="filter()"><option value="">All dirs</option><option>long</option><option>short</option></select>
-      <select id="f-tag"    onchange="filter()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
-      <select id="f-bar"    onchange="filter()"><option value="">Bar: all</option><option value="true">Bar ✓</option><option value="false">Bar ✗</option></select>
-      <select id="f-4h"     onchange="filter()"><option value="">4H: all</option><option value="true">4H ✓</option><option value="false">4H ✗</option></select>
-      <select id="f-rsi"    onchange="filter()"><option value="">RSI: all</option><option value="dip">Dip &lt;40</option><option value="momentum">Mom &gt;55</option><option value="neutral">Neutral</option></select>
-      <select id="f-result" onchange="filter()"><option value="">All results</option><option value="win">Wins</option><option value="loss">Losses</option></select>
+      <select id="f-tag" onchange="filter()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
+      <div class="fseg" data-k="dir"><b>Dir</b><button data-v="" class="on">All</button><button data-v="long">Long</button><button data-v="short">Short</button></div>
+      <div class="fseg" data-k="result"><b>Result</b><button data-v="" class="on">All</button><button data-v="win">Win</button><button data-v="loss">Loss</button></div>
+      <div class="fseg" data-k="bar"><b>Bar</b><button data-v="" class="on">All</button><button data-v="true">✓</button><button data-v="false">✗</button></div>
+      <div class="fseg" data-k="h4"><b>4H</b><button data-v="" class="on">All</button><button data-v="true">✓</button><button data-v="false">✗</button></div>
+      <div class="fseg" data-k="rsi"><b>RSI</b><button data-v="" class="on">All</button><button data-v="dip">Dip</button><button data-v="momentum">Mom</button><button data-v="neutral">Neut</button></div>
     </div>
     <div id="trade-list"><div style="padding:16px;color:var(--t3)">Loading…</div></div>
     <div id="edge-panel">
@@ -556,13 +560,26 @@ async function saveTag(val) {
 }
 
 // ── filters ────────────────────────────────────────────────────────────────────
+// Segmented filter state (chips), tag stays a select (dynamic values).
+const F = {dir:'', result:'', bar:'', h4:'', rsi:''};
+(function wireFilters(){
+  const box = document.getElementById('filters');
+  if (!box) return;
+  box.addEventListener('click', e => {
+    const b = e.target.closest('.fseg button'); if (!b) return;
+    const seg = b.closest('.fseg');
+    F[seg.dataset.k] = b.dataset.v;
+    seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    filter();
+  });
+})();
 function filter() {
-  const dir = document.getElementById('f-dir').value;
+  const dir = F.dir;
   const tag = document.getElementById('f-tag').value;
-  const bar = document.getElementById('f-bar').value;
-  const th  = document.getElementById('f-4h').value;
-  const rsi = document.getElementById('f-rsi').value;
-  const res = document.getElementById('f-result').value;
+  const bar = F.bar;
+  const th  = F.h4;
+  const rsi = F.rsi;
+  const res = F.result;
   visible = ALL_TRADES.filter(t => {
     if (dir && t.direction !== dir) return false;
     const tg = t.setup_tag || '';
