@@ -273,6 +273,9 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 .fseg b{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:42px;flex:0 0 auto;font-weight:600}
 .fseg button{padding:2px 9px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:10px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
 .fseg button.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
+.sec-hd{margin:0;font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;cursor:pointer;background:var(--s2);border-bottom:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center;user-select:none;flex-shrink:0}
+.sec-hd:hover{color:var(--t1)}
+.sec-hd .cv{color:var(--t3);font-size:11px}
 
 /* ── trade list ── */
 #trade-list{flex:1;overflow-y:auto}
@@ -428,6 +431,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 
 <div id="content">
   <div id="sidebar">
+    <div class="sec-hd" onclick="secToggle('filters','filters')">Filters <span class="cv" id="filters-car">▾</span></div>
     <div id="filters">
       <select id="f-tag" onchange="filter()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
       <div class="fseg" data-k="dir"><b>Dir</b><button data-v="" class="on">All</button><button data-v="long">Long</button><button data-v="short">Short</button></div>
@@ -438,15 +442,18 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     </div>
     <div id="trade-list"><div style="padding:16px;color:var(--t3)">Loading…</div></div>
     <div id="edge-panel">
-      <h3>Edge by Setup Tag</h3>
+      <h3 class="sec-hd" onclick="secToggle('edge','edge-bd')">Edge by Setup Tag <span class="cv" id="edge-car">▾</span></h3>
+      <div id="edge-bd">
       <table class="edge-tbl">
         <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>
         <tbody id="edge-body"></tbody>
       </table>
+      </div>
     </div>
   </div>
 
   <div id="main">
+    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart <span class="cv" id="chart-car">▾</span></div>
     <div id="chart-container"></div>
     <div id="detail">
       <button id="det-close" onclick="document.getElementById('detail').classList.remove('open')">▾ close</button>
@@ -796,6 +803,24 @@ function closeBig(){
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.getElementById('big-modal').classList.contains('open')) closeBig(); });
 
+// ── collapsible sections, persisted in localStorage ─────────────────────────────
+function secToggle(key, bdId){
+  const bd=document.getElementById(bdId);
+  const collapsing = bd.style.display!=='none';
+  bd.style.display = collapsing?'none':'';
+  const car=document.getElementById(key+'-car'); if(car) car.textContent=collapsing?'▸':'▾';
+  const s=JSON.parse(localStorage.getItem('rv-secs')||'{}'); s[key]=collapsing; localStorage.setItem('rv-secs',JSON.stringify(s));
+  if(key==='chart' && !collapsing) setTimeout(()=>chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight}),20);
+}
+function restoreSecs(){
+  const map={filters:'filters', edge:'edge-bd', chart:'chart-container'};
+  const s=JSON.parse(localStorage.getItem('rv-secs')||'{}');
+  Object.keys(map).forEach(key=>{
+    if(s[key]){ const bd=document.getElementById(map[key]); if(bd) bd.style.display='none';
+      const car=document.getElementById(key+'-car'); if(car) car.textContent='▸'; }
+  });
+}
+
 // ── edge table ─────────────────────────────────────────────────────────────────
 // Collapse a raw setup_tag into a readable family: S1..S5 stand alone, a
 // matched-but-vetoed setup → "Sx (vetoed)", a pure veto → "VETO", else as-is.
@@ -952,6 +977,7 @@ async function init() {
     series.setData(CANDLES);
     buildTagFilter();
     filter();
+    restoreSecs();
     const qid = new URLSearchParams(location.search).get('trade');
     if (qid && ALL_TRADES.some(t => String(t.id)===String(qid))) openTrade(parseInt(qid));
     else if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
