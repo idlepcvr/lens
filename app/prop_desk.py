@@ -303,6 +303,7 @@ function renderAssumptions(d){
     `<div class="panel" style="margin-bottom:10px">
       <div class="kv"><span class="k">current price</span><span class="v">$${money(price)}</span></div>
       <div class="kv"><span class="k">expected range · 1 ATR (4H)</span><span class="v">${a.range_low?('$'+money(a.range_low)+' – $'+money(a.range_high)+' <span class="dim">±'+a.atr_pct+'%</span>'):'—'}</span></div>
+      <div class="kv"><span class="k">expected hold · backtest</span><span class="v">~1 day <span class="dim">wins 1.3d · losses 0.9d · max 3d · ~1 swap</span></span></div>
       <div class="kv"><span class="k">notional · margin</span><span class="v">$${money(L.notional)} · $${money(L.margin)} <span class="dim">@ ${L.lev.toFixed(2)}x</span></span></div>
       <div class="kv"><span class="k">size · risk</span><span class="v">${L.size.toFixed(4)} ₿ · $${money(L.risk)} <span class="dim">(${rp}%)</span></span></div>
     </div>
