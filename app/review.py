@@ -315,15 +315,26 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 /* ── detail panel ── */
 #detail{min-height:130px;max-height:340px;border-top:1px solid var(--b1);background:var(--s1);padding:10px 16px;display:flex;flex-wrap:wrap;gap:16px;flex-shrink:0;overflow-y:auto}
 #det-review{flex-basis:100%;border-top:1px solid var(--b1);padding-top:8px;display:flex;flex-direction:column;gap:6px}
-#det-review .rv-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-#det-review .rv-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:78px;flex:0 0 auto}
-#det-review .rv-opt{padding:2px 8px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:11px;font-family:var(--mono);cursor:pointer}
-#det-review .rv-opt.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
-#det-review .rv-opt.miss.on{border-color:var(--re);background:rgba(255,84,104,.15);color:var(--re)}
-#det-review .rv-opt.grade.on{border-color:var(--am);background:transparent;color:var(--am)}
-#det-review .rv-refl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-#det-review .rv-refl textarea{background:var(--s2);border:1px solid var(--b2);border-radius:5px;color:var(--t1);font-size:11px;font-family:var(--mono);padding:5px 7px;min-height:42px;resize:vertical;outline:none}
-#det-review #rv-save{align-self:flex-start;margin-top:2px;padding:6px 16px;border:none;border-radius:5px;background:var(--ac);color:var(--bg);font-size:11px;font-weight:700;cursor:pointer}
+.rv-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.rv-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:78px;flex:0 0 auto}
+.rv-opt{padding:2px 8px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:11px;font-family:var(--mono);cursor:pointer}
+.rv-opt.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
+.rv-opt.miss.on{border-color:var(--re);background:rgba(255,84,104,.15);color:var(--re)}
+.rv-opt.grade.on{border-color:var(--am);background:transparent;color:var(--am)}
+.rv-refl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.rv-refl textarea{background:var(--s2);border:1px solid var(--b2);border-radius:5px;color:var(--t1);font-size:11px;font-family:var(--mono);padding:5px 7px;min-height:42px;resize:vertical;outline:none}
+.rv-save{align-self:flex-start;margin-top:2px;padding:6px 16px;border:none;border-radius:5px;background:var(--ac);color:var(--bg);font-size:11px;font-weight:700;cursor:pointer}
+/* big trade modal */
+.bm-bg{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px}
+.bm-bg.open{display:flex}
+.bm{width:min(1100px,96vw);max-height:92vh;overflow-y:auto;background:var(--s1);border:1px solid var(--b2);border-radius:12px;padding:16px 18px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.bm-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.bm-title{font-size:16px;font-weight:700;font-family:var(--mono)}
+.bm-x{font-size:18px;color:var(--t3);background:none;border:none;cursor:pointer}
+#bm-chart{height:46vh;min-height:260px;border:1px solid var(--b1);border-radius:8px;margin-bottom:12px}
+.bm-cols{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:12px}
+#bm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;align-content:start}
+#bm-review{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--b1);padding-top:10px}
 #det-left{flex:1;min-width:0}
 #det-right{width:220px;flex-shrink:0}
 .det-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -468,8 +479,32 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
           <textarea id="rv-wrong" placeholder="what went wrong…"></textarea>
           <textarea id="rv-lesson" placeholder="lesson / takeaway…"></textarea>
         </div>
-        <button id="rv-save" onclick="saveReview()">💾 Save review</button>
+        <button id="rv-save" class="rv-save" onclick="saveReview('rv')">💾 Save review</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Big trade review modal (chart + breakdown + context + review) -->
+<div class="bm-bg" id="big-modal" onclick="if(event.target===this)closeBig()">
+  <div class="bm">
+    <div class="bm-head"><div class="bm-title" id="bm-title">—</div><button class="bm-x" onclick="closeBig()">✕</button></div>
+    <div id="bm-chart"></div>
+    <div class="bm-cols">
+      <div class="det-grid" id="bm-grid"></div>
+      <div class="cond-grid" id="bm-cond"></div>
+    </div>
+    <div id="bm-review">
+      <div class="rv-row"><span class="rv-l">Grade</span><span class="rv-opts" id="bm-grade"></span></div>
+      <div class="rv-row"><span class="rv-l">Conviction</span><span class="rv-opts" id="bm-conv"></span></div>
+      <div class="rv-row"><span class="rv-l">Emotion</span><span class="rv-opts" id="bm-emo"></span></div>
+      <div class="rv-row"><span class="rv-l">Mistakes</span><span class="rv-opts" id="bm-miss"></span></div>
+      <div class="rv-refl">
+        <textarea id="bm-right" placeholder="what went right…"></textarea>
+        <textarea id="bm-wrong" placeholder="what went wrong…"></textarea>
+        <textarea id="bm-lesson" placeholder="lesson / takeaway…"></textarea>
+      </div>
+      <button id="bm-save" class="rv-save" onclick="saveReview('bm')">💾 Save review</button>
     </div>
   </div>
 </div>
@@ -611,7 +646,7 @@ function renderList() {
     if (t.rsi_zone==='momentum') bs.push('<span class="badge b-mom">MOM</span>');
     if (t.rsi_zone==='neutral')  bs.push('<span class="badge b-neu">NEU</span>');
     if (t.setup_tag) bs.push(`<span class="badge b-setup">${t.setup_tag}</span>`);
-    return `<div class="trade-row${sel?' selected':''}" onclick="pick(${t.id})">
+    return `<div class="trade-row${sel?' selected':''}" onclick="openTrade(${t.id})">
       <span class="tr-date">${t.opened_at.slice(0,16)}</span>
       <span class="tr-dir ${t.direction}">${t.direction==='long'?'L':'S'}</span>
       <span class="tr-pnl ${pnl>=0?'pos':'neg'}">${ps}${pnl.toFixed(0)}€</span>
@@ -673,37 +708,39 @@ const RV_MISTAKES=["chased","early","late","oversized","moved stop","no stop","r
 const RV_EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
 const RV_GRADES=["A","B","C","D","F"];
 let rev={};
-function renderReview(t){
-  document.getElementById('det-review').style.display='flex';
+// Render the review controls into a container prefixed `p` (rv = sidebar strip,
+// bm = big modal). Shares the `rev` state + `selected` trade (one open at a time).
+function renderReview(t, p='rv'){
+  const host=document.getElementById(p+'-review'); if(host) host.style.display='flex';
   rev={grade:t.grade||null,conviction:t.conviction||null,emotion:t.emotion||null,
        mistakes:new Set((t.mistakes||'').split(',').map(s=>s.trim()).filter(Boolean))};
   const opt=(v,on,cls)=>`<button class="rv-opt ${cls||''} ${on?'on':''}" data-v="${v}">${v}</button>`;
-  document.getElementById('rv-grade').innerHTML=RV_GRADES.map(g=>opt(g,rev.grade===g,'grade')).join('');
-  document.getElementById('rv-conv').innerHTML=[1,2,3,4,5].map(c=>opt(c,String(rev.conviction)===String(c),'')).join('');
-  document.getElementById('rv-emo').innerHTML=RV_EMOTIONS.map(e=>opt(e,rev.emotion===e,'')).join('');
-  document.getElementById('rv-miss').innerHTML=RV_MISTAKES.map(m=>`<button class="rv-opt miss ${rev.mistakes.has(m)?'on':''}" data-m="${m}">${m}</button>`).join('');
-  document.getElementById('rv-right').value=t.went_right||'';
-  document.getElementById('rv-wrong').value=t.went_wrong||'';
-  document.getElementById('rv-lesson').value=t.lesson||'';
+  document.getElementById(p+'-grade').innerHTML=RV_GRADES.map(g=>opt(g,rev.grade===g,'grade')).join('');
+  document.getElementById(p+'-conv').innerHTML=[1,2,3,4,5].map(c=>opt(c,String(rev.conviction)===String(c),'')).join('');
+  document.getElementById(p+'-emo').innerHTML=RV_EMOTIONS.map(e=>opt(e,rev.emotion===e,'')).join('');
+  document.getElementById(p+'-miss').innerHTML=RV_MISTAKES.map(m=>`<button class="rv-opt miss ${rev.mistakes.has(m)?'on':''}" data-m="${m}">${m}</button>`).join('');
+  document.getElementById(p+'-right').value=t.went_right||'';
+  document.getElementById(p+'-wrong').value=t.went_wrong||'';
+  document.getElementById(p+'-lesson').value=t.lesson||'';
   const single=(rowId,key)=>document.querySelectorAll('#'+rowId+' .rv-opt').forEach(b=>b.onclick=()=>{
     let v=b.dataset.v; if(key==='conviction')v=parseInt(v);
     rev[key]=(String(rev[key])===String(v))?null:v;
     document.querySelectorAll('#'+rowId+' .rv-opt').forEach(x=>x.classList.toggle('on',rev[key]!=null&&String(rev[key])===String(x.dataset.v)));
   });
-  single('rv-grade','grade'); single('rv-conv','conviction'); single('rv-emo','emotion');
-  document.querySelectorAll('#rv-miss .rv-opt').forEach(b=>b.onclick=()=>{
+  single(p+'-grade','grade'); single(p+'-conv','conviction'); single(p+'-emo','emotion');
+  document.querySelectorAll('#'+p+'-miss .rv-opt').forEach(b=>b.onclick=()=>{
     const m=b.dataset.m;
     if(rev.mistakes.has(m)){rev.mistakes.delete(m);b.classList.remove('on');}
     else{rev.mistakes.add(m);b.classList.add('on');}
   });
 }
-async function saveReview(){
+async function saveReview(p='rv'){
   if(!selected) return;
-  const btn=document.getElementById('rv-save'); btn.textContent='Saving…'; btn.disabled=true;
+  const btn=document.getElementById(p+'-save'); btn.textContent='Saving…'; btn.disabled=true;
   const payload={manually_edited:true,
-    went_right:document.getElementById('rv-right').value||undefined,
-    went_wrong:document.getElementById('rv-wrong').value||undefined,
-    lesson:document.getElementById('rv-lesson').value||undefined,
+    went_right:document.getElementById(p+'-right').value||undefined,
+    went_wrong:document.getElementById(p+'-wrong').value||undefined,
+    lesson:document.getElementById(p+'-lesson').value||undefined,
     mistakes:[...rev.mistakes].join(',')||undefined};
   if(rev.grade!=null) payload.grade=rev.grade;
   if(rev.conviction!=null) payload.conviction=rev.conviction;
@@ -719,6 +756,45 @@ async function saveReview(){
     renderEdge();
   }catch(e){console.error(e);btn.textContent='Error — retry';btn.disabled=false;}
 }
+
+// ── big trade modal (chart + breakdown + context + review) ──────────────────────
+let bmChart=null, bmSeries=null;
+function openTrade(id){ pick(id); if(selected) openBig(selected); }
+function openBig(t){
+  const dc=t.direction==='long'?'var(--gr)':'var(--re)', pc=(t.pnl||0)>=0?'var(--gr)':'var(--re)';
+  document.getElementById('bm-title').innerHTML=
+    `<span style="color:${dc}">${t.direction==='long'?'▲ LONG':'▼ SHORT'}</span> ${t.symbol||'BTC/USD'} · #${t.id} `+
+    `· <span style="color:${pc}">${(t.pnl||0)>=0?'+':''}${(t.pnl||0).toFixed(2)}€</span>${t.setup_tag?` · <span style="color:var(--ac)">${t.setup_tag}</span>`:''}`;
+  // reuse the already-rendered strip grids (pick → renderDetail ran first)
+  document.getElementById('bm-grid').innerHTML=document.getElementById('det-grid').innerHTML;
+  document.getElementById('bm-cond').innerHTML=document.getElementById('cond-grid').innerHTML;
+  renderReview(t,'bm');
+  document.getElementById('big-modal').classList.add('open');
+  // chart: fresh instance from the loaded candles, disposed on close
+  const el=document.getElementById('bm-chart'); el.innerHTML='';
+  bmChart=LightweightCharts.createChart(el,{layout:{background:{color:'#06080c'},textColor:'#465064'},
+    grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},
+    rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
+  bmSeries=bmChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'});
+  bmSeries.setData(CANDLES);
+  const isL=t.direction==='long', ec=isL?'#1fd989':'#ff5468', L=LightweightCharts.LineStyle;
+  if(t.entry) bmSeries.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
+  if(t.exit)  bmSeries.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
+  if(t.tp)    bmSeries.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'});
+  if(t.sl)    bmSeries.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'});
+  const ms=[];
+  if(t.ts_entry) ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
+  if(t.ts_exit)  ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
+  bmSeries.setMarkers(ms);
+  setTimeout(()=>{ if(!bmChart)return; bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});
+    if(t.ts_entry) bmChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}); },30);
+}
+function closeBig(){
+  document.getElementById('big-modal').classList.remove('open');
+  if(bmChart){ try{bmChart.remove();}catch(e){} bmChart=null; bmSeries=null; }
+  if(location.search.includes('trade=')) history.replaceState(null,'','/review');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.getElementById('big-modal').classList.contains('open')) closeBig(); });
 
 // ── edge table ─────────────────────────────────────────────────────────────────
 // Collapse a raw setup_tag into a readable family: S1..S5 stand alone, a
@@ -876,7 +952,9 @@ async function init() {
     series.setData(CANDLES);
     buildTagFilter();
     filter();
-    if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
+    const qid = new URLSearchParams(location.search).get('trade');
+    if (qid && ALL_TRADES.some(t => String(t.id)===String(qid))) openTrade(parseInt(qid));
+    else if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
   } catch(e) {
     document.getElementById('trade-list').innerHTML = `<div style="padding:16px;color:var(--re)">Load error: ${e.message}</div>`;
   }

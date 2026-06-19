@@ -191,7 +191,8 @@ function renderSide(){
   } else if(MONTH){ h+=`<div class="cal-empty">Hover or click a day to see its trades</div>`; }
   $('side').innerHTML=h;
   const up=$('unpin'); if(up) up.onclick=()=>{SELDAY=null;render();};
-  $('side').querySelectorAll('.cal-trow').forEach(el=>el.onclick=()=>openModal(+el.dataset.id));
+  // open the trade in the big review modal on /review (deep-link to that trade)
+  $('side').querySelectorAll('.cal-trow').forEach(el=>el.onclick=()=>{location.href='/review?trade='+el.dataset.id;});
 }
 
 function openModal(id){
