@@ -2310,6 +2310,12 @@ def api_review_trades():
     return get_enriched_trades()
 
 
+@app.get("/api/review/analytics")
+def api_review_analytics():
+    from .review import review_analytics
+    return review_analytics()
+
+
 @app.get("/api/review/ohlcv")
 def api_review_ohlcv():
     return get_ohlcv_1h()

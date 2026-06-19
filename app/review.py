@@ -192,6 +192,125 @@ def get_enriched_trades() -> list:
     return out
 
 
+def review_analytics() -> dict:
+    """Trade-log analytics for the /review dashboard: performance, risk-adjusted
+    ratios, duration breakdown (the key edge insight — long holds carry), and
+    actual-vs-model. Capital-independent where possible; cum/annual return need a
+    capital base (lens_config.start_balance, only used if it looks like a real
+    hedge balance, i.e. >= 100)."""
+    import math, datetime as _dt
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
+        "WHERE closed_at IS NOT NULL AND pnl IS NOT NULL ORDER BY closed_at"
+    ).fetchall()
+    cfg = conn.execute("SELECT start_balance, win_rate, rr_ratio FROM lens_config WHERE id=1").fetchone()
+    n_open = conn.execute("SELECT COUNT(*) FROM trades WHERE closed_at IS NULL").fetchone()[0]
+    conn.close()
+
+    n = len(rows)
+    if not n:
+        return {"n": 0, "open": n_open}
+
+    pnls = [r[0] for r in rows]
+    fees = [r[1] or 0.0 for r in rows]
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p <= 0]
+    nw, nl = len(wins), len(losses)
+    gw, gl = sum(wins), -sum(losses)
+    avg_win = gw / nw if nw else 0.0
+    avg_loss = gl / nl if nl else 0.0
+    total_pnl, total_fees = sum(pnls), sum(fees)
+
+    def _mins(o, c):
+        try:
+            a = _dt.datetime.fromisoformat(o.replace("Z", "+00:00"))
+            b = _dt.datetime.fromisoformat(c.replace("Z", "+00:00"))
+            return (b - a).total_seconds() / 60.0
+        except Exception:
+            return None
+    durs = [_mins(r[2 + 1], r[2 + 2]) for r in rows]  # opened_at idx3, closed_at idx4
+    vd = [d for d in durs if d is not None and d >= 0]
+    avg_dur_h = (sum(vd) / len(vd) / 60.0) if vd else None
+
+    longs = [r[0] for r in rows if r[2] == "long"]
+    shorts = [r[0] for r in rows if r[2] == "short"]
+    lwr = (sum(1 for p in longs if p > 0) / len(longs) * 100) if longs else None
+    swr = (sum(1 for p in shorts if p > 0) / len(shorts) * 100) if shorts else None
+
+    # equity curve on cumulative PnL → max drawdown (€) + streaks
+    eq = peak = 0.0
+    maxdd_eur = 0.0
+    cur_ws = cur_ls = max_ws = max_ls = 0
+    for p in pnls:
+        eq += p
+        peak = max(peak, eq)
+        maxdd_eur = max(maxdd_eur, peak - eq)
+        if p > 0:
+            cur_ws += 1; cur_ls = 0; max_ws = max(max_ws, cur_ws)
+        else:
+            cur_ls += 1; cur_ws = 0; max_ls = max(max_ls, cur_ls)
+
+    # per-trade Sharpe/Sortino (€ cancels: mean/stdev), annualised by trades/yr
+    mean_p = total_pnl / n
+    var = sum((p - mean_p) ** 2 for p in pnls) / n
+    sd = math.sqrt(var)
+    downs = [p for p in pnls if p < mean_p]
+    dvar = sum((p - mean_p) ** 2 for p in downs) / n if downs else 0.0
+    dsd = math.sqrt(dvar)
+    try:
+        t0 = _dt.datetime.fromisoformat(rows[0][4].replace("Z", "+00:00"))
+        t1 = _dt.datetime.fromisoformat(rows[-1][4].replace("Z", "+00:00"))
+        span_days = max(1, (t1 - t0).days)
+    except Exception:
+        span_days = 365
+    tpy = n / (span_days / 365.0)
+    sharpe = (mean_p / sd * math.sqrt(tpy)) if sd else 0.0
+    sortino = (mean_p / dsd * math.sqrt(tpy)) if dsd else 0.0
+
+    # capital-dependent (only if a real base exists)
+    capital = cfg[0] if (cfg and cfg[0] and cfg[0] >= 100) else None
+    cum_return = (total_pnl / capital * 100) if capital else None
+    ann_return = (cum_return / (span_days / 365.0)) if cum_return is not None else None
+    maxdd_pct = (maxdd_eur / capital * 100) if capital else None
+    calmar = (ann_return / maxdd_pct) if (ann_return is not None and maxdd_pct) else None
+
+    buckets = [("< 5m", 0, 5), ("5–15m", 5, 15), ("15–60m", 15, 60),
+               ("1–4h", 60, 240), ("4–24h", 240, 1440), ("> 24h", 1440, float("inf"))]
+    bd = []
+    for lbl, lo, hi in buckets:
+        idx = [i for i, d in enumerate(durs) if d is not None and lo <= d < hi]
+        cnt = len(idx)
+        w = sum(1 for i in idx if pnls[i] > 0)
+        tot = sum(pnls[i] for i in idx)
+        bd.append({"label": lbl, "n": cnt, "w": w, "l": cnt - w,
+                   "total": round(tot, 2), "avg": round(tot / cnt, 2) if cnt else 0.0})
+
+    return {
+        "n": n, "open": n_open,
+        "wr": round(nw / n * 100, 1),
+        "avg_win": round(avg_win, 2), "avg_loss": round(avg_loss, 2),
+        "rr": round(avg_win / avg_loss, 2) if avg_loss else None,
+        "expectancy": round(total_pnl / n, 2),
+        "total_pnl": round(total_pnl, 2), "total_fees": round(total_fees, 2),
+        "avg_dur_h": round(avg_dur_h, 1) if avg_dur_h else None,
+        "long_wr": round(lwr, 1) if lwr is not None else None,
+        "short_wr": round(swr, 1) if swr is not None else None,
+        "profit_factor": round(gw / gl, 3) if gl else None,
+        "max_dd_eur": round(maxdd_eur, 2), "max_dd_pct": round(maxdd_pct, 1) if maxdd_pct is not None else None,
+        "sharpe": round(sharpe, 3), "sortino": round(sortino, 3),
+        "win_streak": max_ws, "loss_streak": max_ls,
+        "cum_return": round(cum_return, 2) if cum_return is not None else None,
+        "ann_return": round(ann_return, 1) if ann_return is not None else None,
+        "calmar": round(calmar, 3) if calmar is not None else None,
+        "capital_base": capital,
+        "model_wr": round(cfg[1] * 100, 1) if (cfg and cfg[1]) else None,
+        "model_rr": cfg[2] if cfg else None,
+        "span_days": span_days,
+        "duration": bd,
+    }
+
+
 def get_ohlcv_1h() -> list:
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
@@ -276,6 +395,20 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 .sec-hd{margin:0;font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;cursor:pointer;background:var(--s2);border-bottom:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center;user-select:none;flex-shrink:0}
 .sec-hd:hover{color:var(--t1)}
 .sec-hd .cv{color:var(--t3);font-size:11px}
+#analytics{flex:1;min-height:0;overflow-y:auto;padding:14px}
+#chart-container{flex:none;height:34vh}
+.an-sec{margin-bottom:18px}
+.an-h{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
+.an-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.an-card{background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:8px 10px}
+.an-card .k{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.an-card .v{font-size:16px;font-weight:700;font-family:var(--mono)}
+.an-card .s{font-size:9px;color:var(--t3);margin-top:1px}
+.an-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.an-tbl th{text-align:right;color:var(--t3);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--b1);text-transform:uppercase;font-size:9px}
+.an-tbl th:first-child,.an-tbl td:first-child{text-align:left}
+.an-tbl td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono)}
+.an-tbl tr.hot td{background:rgba(31,217,137,.10)}
 
 /* ── trade list ── */
 #trade-list{flex:1;overflow-y:auto}
@@ -453,7 +586,9 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
   </div>
 
   <div id="main">
-    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart <span class="cv" id="chart-car">▾</span></div>
+    <div class="sec-hd" onclick="secToggle('analytics','analytics')">Analytics <span class="cv" id="analytics-car">▾</span></div>
+    <div id="analytics"><div style="padding:16px;color:var(--t3)">Loading analytics…</div></div>
+    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart (in modal too) <span class="cv" id="chart-car">▾</span></div>
     <div id="chart-container"></div>
     <div id="detail">
       <button id="det-close" onclick="document.getElementById('detail').classList.remove('open')">▾ close</button>
@@ -812,9 +947,53 @@ function secToggle(key, bdId){
   const s=JSON.parse(localStorage.getItem('rv-secs')||'{}'); s[key]=collapsing; localStorage.setItem('rv-secs',JSON.stringify(s));
   if(key==='chart' && !collapsing) setTimeout(()=>chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight}),20);
 }
+// ── analytics dashboard ─────────────────────────────────────────────────────────
+function renderAnalytics(a){
+  const host=document.getElementById('analytics'); if(!host) return;
+  if(!a || !a.n){ host.innerHTML='<div style="padding:16px;color:var(--t3)">No closed trades</div>'; return; }
+  const eur=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(2);
+  const pc=v=>v>=0?'var(--gr)':'var(--re)';
+  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--t1)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
+  const perf=`<div class="an-sec"><div class="an-h">Performance · live from trade log</div><div class="an-grid">`+
+    card('Trades',a.n,a.open?a.open+' open':'')+
+    card('Win Rate',a.wr+'%',a.long_wr!=null?`L ${a.long_wr}% · S ${a.short_wr}%`:'')+
+    card('Net P&L',eur(a.total_pnl),'',pc(a.total_pnl))+
+    card('Expectancy',eur(a.expectancy),'per trade',pc(a.expectancy))+
+    card('Avg Win',eur(a.avg_win),'','var(--gr)')+
+    card('Avg Loss',eur(-a.avg_loss),'','var(--re)')+
+    card('Actual R:R',a.rr!=null?a.rr+'×':'—','')+
+    card('Profit Factor',a.profit_factor!=null?a.profit_factor:'—','',a.profit_factor>=1?'var(--gr)':'var(--re)')+
+    card('Total Fees',eur(-a.total_fees),'','var(--re)')+
+    card('Avg Duration',a.avg_dur_h!=null?a.avg_dur_h+'h':'—','')+
+    `</div></div>`;
+  const risk=`<div class="an-sec"><div class="an-h">Risk-adjusted</div><div class="an-grid">`+
+    card('Sharpe',a.sharpe,'per-trade · ann.',a.sharpe>=0?'var(--gr)':'var(--re)')+
+    card('Sortino',a.sortino,'',a.sortino>=0?'var(--gr)':'var(--re)')+
+    card('Max DD',eur(-a.max_dd_eur)+(a.max_dd_pct!=null?` · ${a.max_dd_pct}%`:''),'peak→trough','var(--re)')+
+    card('Win Streak',a.win_streak,'','var(--gr)')+
+    card('Loss Streak',a.loss_streak,'','var(--re)')+
+    (a.cum_return!=null?card('Cum Return',a.cum_return+'%','',pc(a.cum_return)):card('Cum Return','—','set capital base'))+
+    (a.ann_return!=null?card('Ann Return',a.ann_return+'%','',pc(a.ann_return)):'')+
+    (a.calmar!=null?card('Calmar',a.calmar,''):'')+
+    `</div></div>`;
+  const dWR=a.wr-(a.model_wr||0), dRR=(a.rr||0)-(a.model_rr||0);
+  const avm=`<div class="an-sec"><div class="an-h">Actual vs Model</div><table class="an-tbl">
+    <tr><th>Metric</th><th>Model</th><th>Actual</th><th>Δ</th></tr>
+    <tr><td>Win Rate</td><td>${a.model_wr!=null?a.model_wr+'%':'—'}</td><td>${a.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
+    <tr><td>R:R</td><td>${a.model_rr!=null?a.model_rr+'×':'—'}</td><td>${a.rr!=null?a.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr>
+    </table></div>`;
+  const dur=`<div class="an-sec"><div class="an-h">Trade Duration Breakdown <span style="color:var(--t3);text-transform:none;font-weight:400">— where the edge lives</span></div><table class="an-tbl">
+    <tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>`+
+    a.duration.map(d=>`<tr class="${d.total>0&&d.n>=8?'hot':''}"><td>${d.label}</td><td>${d.n}</td><td>${d.w}</td><td>${d.l}</td>
+      <td style="color:${pc(d.total)}">${eur(d.total)}</td><td style="color:${pc(d.avg)}">${eur(d.avg)}</td></tr>`).join('')+
+    `</table></div>`;
+  host.innerHTML=perf+risk+avm+dur;
+}
+
 function restoreSecs(){
-  const map={filters:'filters', edge:'edge-bd', chart:'chart-container'};
+  const map={filters:'filters', edge:'edge-bd', chart:'chart-container', analytics:'analytics'};
   const s=JSON.parse(localStorage.getItem('rv-secs')||'{}');
+  if(s.chart===undefined) s.chart=true;   // charts live in the modal → collapse page chart by default
   Object.keys(map).forEach(key=>{
     if(s[key]){ const bd=document.getElementById(map[key]); if(bd) bd.style.display='none';
       const car=document.getElementById(key+'-car'); if(car) car.textContent='▸'; }
@@ -978,6 +1157,7 @@ async function init() {
     buildTagFilter();
     filter();
     restoreSecs();
+    fetch('/api/review/analytics').then(r=>r.json()).then(renderAnalytics).catch(e=>console.error('analytics',e));
     const qid = new URLSearchParams(location.search).get('trade');
     if (qid && ALL_TRADES.some(t => String(t.id)===String(qid))) openTrade(parseInt(qid));
     else if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
