@@ -88,7 +88,9 @@ _CSS = """
   color:var(--bg);font-size:12px;font-weight:700}
 .cal-acts .full{padding:9px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:transparent;
   color:var(--dim);font-size:12px;text-decoration:none;display:flex;align-items:center}
+#cal-chart{height:300px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
 </style>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 """
 
 BODY = """
@@ -106,7 +108,7 @@ BODY = """
 
 SCRIPT = r"""
 const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
-let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null;
+let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[];
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -117,11 +119,13 @@ async function load(){
   // /api/trades = full trade incl review fields + is_open + ISO dates (primary).
   // /api/review/trades = indicator context at entry (bar/4H trend/RSI/move) — merged
   // in by id so the modal matches the /review page's richness.
-  const [tr,er]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades')]);
+  const [tr,er,ca]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades'),fetch('/api/review/ohlcv')]);
   const j=await tr.json(); let ej=[]; try{ej=await er.json();}catch(e){}
+  try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
   const ctx={}; (Array.isArray(ej)?ej:(ej.trades||[])).forEach(t=>ctx[t.id]={
     bar_dir:t.bar_dir, bar_aligned:t.bar_aligned, trend_4h:t.trend_4h,
-    trend_aligned:t.trend_aligned, ctx_rsi:t.rsi, rsi_zone:t.rsi_zone, move_pct:t.move_pct});
+    trend_aligned:t.trend_aligned, ctx_rsi:t.rsi, rsi_zone:t.rsi_zone, move_pct:t.move_pct,
+    ts_entry:t.ts_entry, ts_exit:t.ts_exit});
   TRADES=(j.trades||[]).filter(t=>!t.is_open && t.pnl!=null && t.closed_at)
                        .map(t=>Object.assign(t,ctx[t.id]||{}));
   if(TRADES.length){ MONTH=TRADES.reduce((a,b)=>a.closed_at>b.closed_at?a:b).closed_at.slice(0,7); }
@@ -191,8 +195,7 @@ function renderSide(){
   } else if(MONTH){ h+=`<div class="cal-empty">Hover or click a day to see its trades</div>`; }
   $('side').innerHTML=h;
   const up=$('unpin'); if(up) up.onclick=()=>{SELDAY=null;render();};
-  // open the trade in the big review modal on /review (deep-link to that trade)
-  $('side').querySelectorAll('.cal-trow').forEach(el=>el.onclick=()=>{location.href='/review?trade='+el.dataset.id;});
+  $('side').querySelectorAll('.cal-trow').forEach(el=>el.onclick=()=>openModal(+el.dataset.id));
 }
 
 function openModal(id){
@@ -222,6 +225,8 @@ function openModal(id){
       <div class="cal-m-sym ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} ${t.symbol||''} ${t.setup_tag?`<span class="rb">${t.setup_tag}</span>`:''}</div>
       <div class="cal-m-pnl ${win?'g':'r'}">${win?'+':''}${eur(Math.abs(t.pnl))}</div>
     </div><button class="cal-m-x" id="mx">✕</button></div>
+
+    <div id="cal-chart"></div>
 
     <div class="cal-sec">Breakdown · editable</div>
     <div class="cal-m-grid">
@@ -267,7 +272,8 @@ function openModal(id){
     </div>
   </div></div>`;
 
-  const close=()=>{$('modal').innerHTML='';document.onkeydown=null;};
+  let calChart=null;
+  const close=()=>{if(calChart){try{calChart.remove();}catch(e){}calChart=null;}$('modal').innerHTML='';document.onkeydown=null;};
   $('mbg').onclick=e=>{if(e.target.id==='mbg')close();};
   $('mx').onclick=close;
   document.onkeydown=e=>{if(e.key==='Escape')close();};
@@ -326,6 +332,27 @@ function openModal(id){
       close(); render();
     }catch(e){console.error(e);$('msave').textContent='Error — retry';$('msave').disabled=false;}
   };
+
+  // price chart of the trade (ENTRY/EXIT lines, TP/SL dotted, E/X markers)
+  const chartEl=$('cal-chart');
+  if(chartEl && window.LightweightCharts && CANDLES.length){
+    calChart=LightweightCharts.createChart(chartEl,{layout:{background:{color:'#06080c'},textColor:'#465064'},
+      grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},
+      rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
+    const s=calChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'});
+    s.setData(CANDLES);
+    const L=LightweightCharts.LineStyle, ec=isL?'#1fd989':'#ff5468';
+    if(t.entry) s.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
+    if(t.exit)  s.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
+    if(t.tp)    s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'});
+    if(t.sl)    s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'});
+    const ms=[];
+    if(t.ts_entry) ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
+    if(t.ts_exit)  ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
+    s.setMarkers(ms);
+    setTimeout(()=>{ if(!calChart)return; calChart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
+      if(t.ts_entry) calChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}); },40);
+  }
 }
 load();
 """
