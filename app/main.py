@@ -2174,6 +2174,12 @@ def review_page():
     return REVIEW_HTML
 
 
+@app.get("/calendar", response_class=HTMLResponse)
+def calendar_page():
+    from .calendar_page import CALENDAR_HTML
+    return CALENDAR_HTML
+
+
 @app.get("/montecarlo", response_class=HTMLResponse)
 def montecarlo_page():
     return MONTECARLO_HTML

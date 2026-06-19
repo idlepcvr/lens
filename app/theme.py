@@ -32,6 +32,7 @@ NAV_HEDGE = [
     ("/dashboard", "Dashboard"),
     ("/desk", "Desk"),
     ("/signals", "Signals"),
+    ("/calendar", "Calendar"),
     ("/review", "Review"),
     ("/projection", "Projection"),
 ]
