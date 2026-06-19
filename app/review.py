@@ -545,16 +545,11 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/dashboard">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
+    <a href="/calendar">Calendar</a>
     <a href="/review" class="cur">Review</a>
     <a href="/projection">Projection</a>
   </nav>
   <div class="topbar-right">
-    <div class="chips">
-      <div class="chip">WR <b id="s-wr">—</b></div>
-      <div class="chip">Avg <b id="s-avg">—</b></div>
-      <div class="chip">n=<b id="s-n">—</b></div>
-      <div class="chip">Total <b id="s-total">—</b></div>
-    </div>
     <button class="tb-btn" onclick="openLogModal()">+ Log Trade</button>
     <button class="tb-btn primary" id="sync-btn" onclick="syncKraken()">Sync Kraken</button>
     <span class="sync-status" id="sync-status"></span>
@@ -573,6 +568,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
       <div class="fseg" data-k="h4"><b>4H</b><button data-v="" class="on">All</button><button data-v="true">✓</button><button data-v="false">✗</button></div>
       <div class="fseg" data-k="rsi"><b>RSI</b><button data-v="" class="on">All</button><button data-v="dip">Dip</button><button data-v="momentum">Mom</button><button data-v="neutral">Neut</button></div>
     </div>
+    <div class="sec-hd" onclick="secToggle('list','trade-list')">Trades <span class="cv" id="list-car">▾</span></div>
     <div id="trade-list"><div style="padding:16px;color:var(--t3)">Loading…</div></div>
     <div id="edge-panel">
       <h3 class="sec-hd" onclick="secToggle('edge','edge-bd')">Edge by Setup Tag <span class="cv" id="edge-car">▾</span></h3>
@@ -991,7 +987,7 @@ function renderAnalytics(a){
 }
 
 function restoreSecs(){
-  const map={filters:'filters', edge:'edge-bd', chart:'chart-container', analytics:'analytics'};
+  const map={filters:'filters', list:'trade-list', edge:'edge-bd', chart:'chart-container', analytics:'analytics'};
   const s=JSON.parse(localStorage.getItem('rv-secs')||'{}');
   if(s.chart===undefined) s.chart=true;   // charts live in the modal → collapse page chart by default
   Object.keys(map).forEach(key=>{
@@ -1047,15 +1043,18 @@ function renderEdge() {
 
 // ── header stats ───────────────────────────────────────────────────────────────
 function updateStats() {
+  // top chips removed — the Analytics section owns these now. Kept as a no-op
+  // (still called from filter()); guarded so absent elements don't throw.
+  const el = document.getElementById('s-wr');
+  if (!el) return;
   const n = visible.length;
   const wins  = visible.filter(t=>(t.pnl||0)>0).length;
   const total = visible.reduce((s,t)=>s+(t.pnl||0),0);
   const avg   = n ? total/n : 0;
-  document.getElementById('s-wr').textContent    = n ? (wins/n*100).toFixed(1)+'%' : '—';
+  el.textContent = n ? (wins/n*100).toFixed(1)+'%' : '—';
   document.getElementById('s-avg').textContent   = n ? (avg>=0?'+':'')+avg.toFixed(0)+'€' : '—';
   document.getElementById('s-n').textContent     = n;
   document.getElementById('s-total').textContent = n ? (total>=0?'+':'')+total.toFixed(0)+'€' : '—';
-  document.querySelector('#s-total').parentElement.className = 'chip '+(total>=0?'pos':'neg');
 }
 
 // ── tag filter ─────────────────────────────────────────────────────────────────

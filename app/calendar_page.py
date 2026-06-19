@@ -89,6 +89,18 @@ _CSS = """
 .cal-acts .full{padding:9px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:transparent;
   color:var(--dim);font-size:12px;text-decoration:none;display:flex;align-items:center}
 #cal-chart{height:300px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
+@media(max-width:600px){
+  /* portrait: stack the day panel under the calendar, and make the P&L legible
+     on the colored heatmap cells (was colored-on-colored → blended in) */
+  .cal-wrap{flex-direction:column}
+  .cal-side{width:100%;border-left:none;border-top:1px solid var(--line);margin-left:0;padding:12px 0 0;margin-top:14px}
+  .cal-cell{padding:3px}
+  .cal-cell .d{color:var(--ink);font-weight:600}
+  .cal-cell.sel .d{color:var(--accent)}
+  .cal-cell .p{color:var(--ink) !important;font-size:9px;text-shadow:0 1px 2px rgba(0,0,0,.75)}
+  .cal-modal{width:96vw;padding:14px 14px}
+  #cal-chart{height:240px}
+}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 """
