@@ -86,7 +86,10 @@ def _load_trades():
     cur  = conn.cursor()
     cur.execute("""
         SELECT id, direction, entry, exit, pnl, fees, size, leverage,
-               opened_at, closed_at, notes, balance_after, setup_tag
+               opened_at, closed_at, notes, balance_after, setup_tag,
+               tp, sl, funding_cost, followed_plan, followed_strategy,
+               market_type, order_type, fill_count,
+               grade, conviction, emotion, mistakes, went_right, went_wrong, lesson
         FROM trades WHERE closed_at IS NOT NULL ORDER BY opened_at
     """)
     rows = cur.fetchall()
@@ -113,7 +116,10 @@ def get_enriched_trades() -> list:
     out = []
     for row in trades_raw:
         (tid, direction, entry, exit_, pnl, fees, size, leverage,
-         opened_at, closed_at, notes, bal_after, setup_tag) = row
+         opened_at, closed_at, notes, bal_after, setup_tag,
+         tp, sl, funding_cost, followed_plan, followed_strategy,
+         market_type, order_type, fill_count,
+         grade, conviction, emotion, mistakes, went_right, went_wrong, lesson) = row
 
         ts_e = _parse_ms(opened_at)
         ts_x = _parse_ms(closed_at)
@@ -165,6 +171,23 @@ def get_enriched_trades() -> list:
             "trend_4h":       trend_4h,
             "trend_aligned":  trend_aligned,
             "move_pct":       move_pct,
+            # breakdown extras (for the editable modal, step B)
+            "tp":             tp,
+            "sl":             sl,
+            "funding_cost":   funding_cost,
+            "market_type":    market_type,
+            "order_type":     order_type,
+            "fill_count":     fill_count,
+            "followed_plan":     None if followed_plan     is None else bool(followed_plan),
+            "followed_strategy": None if followed_strategy is None else bool(followed_strategy),
+            # review layer
+            "grade":          grade,
+            "conviction":     conviction,
+            "emotion":        emotion,
+            "mistakes":       mistakes or "",
+            "went_right":     went_right or "",
+            "went_wrong":     went_wrong or "",
+            "lesson":         lesson or "",
         })
     return out
 
@@ -392,7 +415,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <div id="edge-panel">
       <h3>Edge by Setup Tag</h3>
       <table class="edge-tbl">
-        <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th></tr></thead>
+        <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>
         <tbody id="edge-body"></tbody>
       </table>
     </div>
@@ -606,21 +629,48 @@ function renderDetail(t) {
 }
 
 // ── edge table ─────────────────────────────────────────────────────────────────
+// Collapse a raw setup_tag into a readable family: S1..S5 stand alone, a
+// matched-but-vetoed setup → "Sx (vetoed)", a pure veto → "VETO", else as-is.
+function edgeFamily(tag){
+  if(!tag) return '(untagged)';
+  if(tag.startsWith('VETO:')) return 'VETO';
+  if(tag.includes('|VETO:')) return tag.split('|')[0]+' (vetoed)';
+  return tag;
+}
+// KEEP/CUT/SIZE-UP from realised expectancy + sample. Thin samples say so.
+function edgeVerdict(n,wr,exp){
+  if(n<8)              return ['THIN','var(--t3)'];
+  if(exp<=0)           return ['CUT','var(--re)'];
+  if(exp>=10&&n>=12&&wr>=45) return ['SIZE-UP','var(--gr)'];
+  return ['KEEP','var(--am)'];
+}
 function renderEdge() {
   const g = {};
   visible.forEach(t => {
-    const k = t.setup_tag || '(untagged)';
-    if (!g[k]) g[k]={n:0,wins:0,total:0};
+    const k = edgeFamily(t.setup_tag);
+    if (!g[k]) g[k]={n:0,wins:0,total:0,byGrade:{}};
     g[k].n++; if ((t.pnl||0)>0) g[k].wins++; g[k].total+=t.pnl||0;
+    const gr=t.grade||'—';
+    if(!g[k].byGrade[gr]) g[k].byGrade[gr]={n:0,wins:0,total:0};
+    g[k].byGrade[gr].n++; if((t.pnl||0)>0) g[k].byGrade[gr].wins++; g[k].byGrade[gr].total+=t.pnl||0;
   });
   const rows = Object.entries(g).sort((a,b)=>b[1].total-a[1].total);
-  document.getElementById('edge-body').innerHTML = rows.map(([k,g])=>`
-    <tr>
-      <td>${k}</td><td>${g.n}</td>
-      <td>${(g.wins/g.n*100).toFixed(0)}%</td>
-      <td style="color:${g.total/g.n>=0?'var(--gr)':'var(--re)'}">${(g.total/g.n>=0?'+':'')+(g.total/g.n).toFixed(0)}€</td>
-      <td style="color:${g.total>=0?'var(--gr)':'var(--re)'}">${(g.total>=0?'+':'')+(g.total).toFixed(0)}€</td>
-    </tr>`).join('');
+  document.getElementById('edge-body').innerHTML = rows.map(([k,d])=>{
+    const exp=d.total/d.n, wr=d.wins/d.n*100;
+    const [vlabel,vcol]=edgeVerdict(d.n,wr,exp);
+    const grades=Object.entries(d.byGrade).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+    const sub = grades.length>1 ? grades.map(([gr,gd])=>
+      `<span style="display:inline-block;font-size:9px;padding:1px 5px;margin:3px 4px 0 0;border:1px solid var(--b3);border-radius:3px;color:var(--t2)">`+
+      `${gr}: ${gd.n}·${(gd.wins/gd.n*100).toFixed(0)}%·<span style="color:${gd.total>=0?'var(--gr)':'var(--re)'}">${gd.total>=0?'+':''}${gd.total.toFixed(0)}€</span></span>`
+    ).join('') : '';
+    return `<tr>
+      <td>${k}</td><td>${d.n}</td>
+      <td>${wr.toFixed(0)}%</td>
+      <td style="color:${exp>=0?'var(--gr)':'var(--re)'}">${(exp>=0?'+':'')+exp.toFixed(0)}€</td>
+      <td style="color:${d.total>=0?'var(--gr)':'var(--re)'}">${(d.total>=0?'+':'')+d.total.toFixed(0)}€</td>
+      <td><b style="color:${vcol}">${vlabel}</b></td>
+    </tr>${sub?`<tr><td colspan="6" style="padding:0 0 4px 8px">${sub}</td></tr>`:''}`;
+  }).join('');
 }
 
 // ── header stats ───────────────────────────────────────────────────────────────
