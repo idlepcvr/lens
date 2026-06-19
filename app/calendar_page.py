@@ -114,8 +114,16 @@ const toLocal=s=>{if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const 
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 
 async function load(){
-  const r=await fetch('/api/trades?limit=2000'); const j=await r.json();
-  TRADES=(j.trades||[]).filter(t=>!t.is_open && t.pnl!=null && t.closed_at);
+  // /api/trades = full trade incl review fields + is_open + ISO dates (primary).
+  // /api/review/trades = indicator context at entry (bar/4H trend/RSI/move) — merged
+  // in by id so the modal matches the /review page's richness.
+  const [tr,er]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades')]);
+  const j=await tr.json(); let ej=[]; try{ej=await er.json();}catch(e){}
+  const ctx={}; (Array.isArray(ej)?ej:(ej.trades||[])).forEach(t=>ctx[t.id]={
+    bar_dir:t.bar_dir, bar_aligned:t.bar_aligned, trend_4h:t.trend_4h,
+    trend_aligned:t.trend_aligned, ctx_rsi:t.rsi, rsi_zone:t.rsi_zone, move_pct:t.move_pct});
+  TRADES=(j.trades||[]).filter(t=>!t.is_open && t.pnl!=null && t.closed_at)
+                       .map(t=>Object.assign(t,ctx[t.id]||{}));
   if(TRADES.length){ MONTH=TRADES.reduce((a,b)=>a.closed_at>b.closed_at?a:b).closed_at.slice(0,7); }
   render();
 }
@@ -150,8 +158,10 @@ function render(){
   $('grid').querySelectorAll('.cal-cell.has').forEach(el=>{
     const ds=el.dataset.d;
     el.onclick=()=>{SELDAY=SELDAY===ds?null:ds;render();};
+    // hover previews a day's trades; the list then STAYS (last-hovered) so you can
+    // move the cursor into the panel and click a trade. Clearing on mouseleave made
+    // the rows vanish under the cursor — only a pinned (clicked) day stayed usable.
     el.onmouseenter=()=>{HOVDAY=ds;renderSide();};
-    el.onmouseleave=()=>{HOVDAY=null;renderSide();};
   });
   renderSide();
 }
@@ -226,6 +236,15 @@ function openModal(id){
       ${fld('Closed',dtin('f-close',t.closed_at))}
     </div>
     <div class="cal-derived" id="derived"></div>
+
+    ${(t.bar_dir||t.trend_4h||t.ctx_rsi!=null||t.move_pct!=null)?`
+    <div class="cal-sec">Context · at entry</div>
+    <div class="cal-m-grid">
+      ${fld('Entry bar',`<div class="fv ${t.bar_dir?(t.bar_aligned?'g':'r'):''}">${t.bar_dir?t.bar_dir.toUpperCase()+' '+(t.bar_aligned?'✓':'✗'):'—'}</div>`)}
+      ${fld('4H trend',`<div class="fv ${t.trend_4h?(t.trend_aligned?'g':'r'):''}">${t.trend_4h?t.trend_4h.toUpperCase()+' '+(t.trend_aligned?'✓':'✗'):'—'}</div>`)}
+      ${fld('RSI @ entry',`<div class="fv">${t.ctx_rsi!=null?t.ctx_rsi+' '+(t.rsi_zone||''):'—'}</div>`)}
+      ${fld('Move %',`<div class="fv ${(t.move_pct||0)>=0?'g':'r'}">${t.move_pct!=null?t.move_pct+'%':'—'}</div>`)}
+    </div>`:''}
 
     <div class="cal-sec">Review</div>
     ${optrow('Grade','grade',GRADES,st.grade,'grade')}
