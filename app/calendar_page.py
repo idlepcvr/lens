@@ -1,12 +1,19 @@
-"""LENS /calendar — hedge-book trade calendar.
+"""LENS /calendar — hedge-book trade calendar + review.
 
 Monthly P&L heatmap of the hedge trades (book='hedge'). Hover a day for a
-transient breakdown, click to pin it, click a trade to open a modal with the
-full trade shape + inline review (followed plan/strategy + notes), saved via
-PATCH /api/trades/{id}. Native LENS page — reads /api/trades, no cross-app.
+transient breakdown, click to pin, click a trade to open the review modal:
+an EDITABLE trade breakdown plus a structured review layer — execution grade,
+recurring-mistake tags (Edgewonk-style), conviction, mental state, and
+right/wrong/lesson reflection. Saved via PATCH /api/trades/{id}. Native LENS
+page reading /api/trades — no cross-app.
 """
 
 from .theme import shell
+
+MISTAKES = ["chased", "early", "late", "oversized", "moved stop", "no stop",
+            "revenge", "FOMO", "overheld", "cut early", "no setup"]
+EMOTIONS = ["calm", "FOMO", "tilt", "fear", "greed", "bored"]
+GRADES   = ["A", "B", "C", "D", "F"]
 
 _CSS = """
 <style>
@@ -29,6 +36,7 @@ _CSS = """
 .cal-cell .d{font-size:11px;color:var(--dim)}
 .cal-cell.sel .d{color:var(--accent);font-weight:700}
 .cal-cell .p{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:2px}
+.cal-cell .gr{font-size:8px;color:var(--dim);margin-top:1px}
 .cal-sum .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
 .cal-sum .row .lbl{color:var(--dim)} .cal-sum .row .val{font-family:var(--mono);font-weight:600}
 .cal-day-h{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px}
@@ -41,41 +49,50 @@ _CSS = """
 .cal-trow .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
 .cal-trow .dir{font-weight:700} .cal-trow .pnl{font-family:var(--mono);font-weight:700}
 .cal-trow .sub{color:var(--dim);font-size:10px}
-.g{color:var(--long)} .r{color:var(--short)}
+.cal-trow .rb{display:inline-block;font-size:9px;padding:0 4px;border-radius:3px;border:1px solid var(--line2);margin-left:4px;color:var(--dim)}
+.g{color:var(--long)} .r{color:var(--short)} .amb{color:var(--amber)}
 .cal-empty{font-size:11px;color:var(--dim);text-align:center;margin-top:24px}
 /* modal */
 .cal-modal-bg{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);
   display:flex;align-items:center;justify-content:center;padding:16px}
-.cal-modal{width:min(520px,100%);max-height:90vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);
+.cal-modal{width:min(560px,100%);max-height:92vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);
   border-radius:12px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .cal-modal.long{border-left:4px solid var(--long)} .cal-modal.short{border-left:4px solid var(--short)}
 .cal-m-h{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .cal-m-sym{font-size:16px;font-weight:700} .cal-m-pnl{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:2px}
 .cal-m-x{font-size:16px;color:var(--dim);background:none;border:none;cursor:pointer}
-.cal-m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
-.cal-sec{grid-column:1/-1;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;
-  margin:6px 0 2px;border-bottom:1px solid var(--line);padding-bottom:4px}
-.cal-f .fk{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
-.cal-f .fv{font-size:12px;font-family:var(--mono);font-weight:600}
-.cal-tri{display:flex;align-items:center;gap:6px;margin-bottom:8px}
-.cal-tri .tl{font-size:11px;color:var(--dim);width:100px;flex:0 0 auto}
-.cal-tri button{padding:3px 8px;border-radius:4px;border:1px solid var(--line);font-size:11px;cursor:pointer;
-  background:transparent;color:var(--dim)}
+.cal-sec{font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;
+  margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.cal-m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+.cal-fld .fk{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.cal-fld .fv{font-size:12px;font-family:var(--mono);font-weight:600}
+.cal-in,.cal-notes{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:5px 7px;color:var(--ink);font-size:12px;font-family:var(--mono);outline:none}
+.cal-in:focus,.cal-notes:focus{border-color:var(--accent)}
+.cal-notes{min-height:48px;resize:vertical}
+.cal-derived{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
+.cal-derived b{font-family:var(--mono)}
+/* pick rows */
+.cal-pickrow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.cal-pickrow .pl{font-size:11px;color:var(--dim);width:92px;flex:0 0 auto}
+.cal-opt{padding:3px 9px;border-radius:5px;border:1px solid var(--line);font-size:11px;cursor:pointer;
+  background:transparent;color:var(--dim);font-family:var(--mono)}
+.cal-opt.on{border-color:var(--accent);background:var(--accent-d);color:var(--ink);font-weight:700}
+.cal-opt.grade.on{border-color:var(--amber);color:var(--amber)}
+.cal-opt.miss.on{border-color:var(--short);background:rgba(255,99,99,.12);color:var(--short)}
 .cal-tri button.on-y{border-color:var(--long);background:var(--accent-d);color:var(--long)}
 .cal-tri button.on-n{border-color:var(--short);background:var(--accent-d);color:var(--short)}
 .cal-tri button.on-x{border-color:var(--line2);background:var(--panel2);color:var(--ink)}
-.cal-notes{width:100%;min-height:64px;margin-top:4px;background:var(--panel2);border:1px solid var(--line);
-  border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12px;font-family:var(--mono);resize:vertical;outline:none}
-.cal-acts{display:flex;gap:8px;margin-top:14px}
-.cal-acts .save{flex:1;padding:8px 0;border-radius:6px;border:none;cursor:pointer;background:var(--accent);
+.cal-acts{display:flex;gap:8px;margin-top:16px}
+.cal-acts .save{flex:1;padding:9px 0;border-radius:6px;border:none;cursor:pointer;background:var(--accent);
   color:var(--bg);font-size:12px;font-weight:700}
-.cal-acts .full{padding:8px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:transparent;
+.cal-acts .full{padding:9px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:transparent;
   color:var(--dim);font-size:12px;text-decoration:none;display:flex;align-items:center}
 </style>
 """
 
 BODY = """
-<div class="cal-sub">Monthly hedge-book heatmap · hover a day, click to pin · click a trade for breakdown & review</div>
+<div class="cal-sub">Monthly hedge-book heatmap · hover a day, click to pin · click a trade to review</div>
 <div class="cal-wrap">
   <div class="cal-main">
     <div class="cal-pills" id="pills"></div>
@@ -88,11 +105,13 @@ BODY = """
 """
 
 SCRIPT = r"""
+const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
 let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null;
 const $=id=>document.getElementById(id);
-const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
-const usd=(v,d=0)=>v==null?'—':'$'+Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
-const num=(v,d=2)=>v==null?'—':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+const toLocal=s=>{if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 
 async function load(){
   const r=await fetch('/api/trades?limit=2000'); const j=await r.json();
@@ -100,7 +119,6 @@ async function load(){
   if(TRADES.length){ MONTH=TRADES.reduce((a,b)=>a.closed_at>b.closed_at?a:b).closed_at.slice(0,7); }
   render();
 }
-
 function dayMap(){
   const m={};
   TRADES.forEach(t=>{const d=t.closed_at.slice(0,10);
@@ -108,13 +126,11 @@ function dayMap(){
     m[d].pnl+=t.pnl; m[d].trades.push(t); (t.pnl>0?m[d].wins++:m[d].losses++);});
   return m;
 }
-
 function render(){
   const dm=dayMap();
   const months=[...new Set(TRADES.map(t=>t.closed_at.slice(0,7)))].sort().reverse();
   $('pills').innerHTML=months.map(m=>`<button class="cal-pill ${m===MONTH?'cur':''}" data-m="${m}">${new Date(m+'-01').toLocaleDateString('en',{month:'short',year:'numeric'})}</button>`).join('');
   $('pills').querySelectorAll('button').forEach(b=>b.onclick=()=>{MONTH=b.dataset.m;SELDAY=null;render();});
-
   const [y,mo]=MONTH.split('-').map(Number);
   const daysIn=new Date(y,mo,0).getDate();
   const off=(new Date(y,mo-1,1).getDay()+6)%7;
@@ -123,8 +139,7 @@ function render(){
   for(let i=0;i<off;i++) cells+='<div class="cal-cell empty"></div>';
   for(let d=1;d<=daysIn;d++){
     const ds=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const c=dm[ds];
-    const sel=SELDAY===ds?'sel':'';
+    const c=dm[ds]; const sel=SELDAY===ds?'sel':'';
     let bg='transparent';
     if(c){const inten=Math.min(Math.abs(c.pnl)/maxAbs,1);
       bg=c.pnl>0?`rgba(31,217,137,${0.1+inten*0.7})`:`rgba(255,99,99,${0.1+inten*0.7})`;}
@@ -140,7 +155,6 @@ function render(){
   });
   renderSide();
 }
-
 function renderSide(){
   const dm=dayMap();
   const cells=Object.values(dm).filter(d=>d.date.slice(0,7)===MONTH);
@@ -149,7 +163,6 @@ function renderSide(){
   h+=`<div class="row"><span class="lbl">Net P&L</span><span class="val ${mPnl>=0?'g':'r'}">${mPnl>=0?'+':''}${eur(mPnl)}</span></div>`;
   h+=`<div class="row"><span class="lbl">Trades</span><span class="val">${mT}</span></div>`;
   h+=`<div class="row"><span class="lbl">Win Rate</span><span class="val">${mT?(mW/mT*100).toFixed(1)+'%':'—'}</span></div></div>`;
-
   const pd=SELDAY?dm[SELDAY]:(HOVDAY?dm[HOVDAY]:null);
   if(pd&&pd.trades.length){
     h+=`<div class="cal-day-h"><span class="ttl">${new Date(pd.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</span>`;
@@ -161,8 +174,8 @@ function renderSide(){
       h+=`<div class="cal-trow" data-id="${t.id}">
         <div class="top"><span class="dir ${t.direction==='long'?'g':'r'}">${t.direction==='long'?'▲':'▼'} ${(t.direction||'').toUpperCase()}</span>
         <span class="pnl ${t.pnl>=0?'g':'r'}">${t.pnl>=0?'+':''}${eur(t.pnl)}</span></div>
-        <div class="sub">${tm}${t.leverage?` · ${t.leverage}×`:''}${t.setup_tag?` · ${t.setup_tag}`:''}</div>
-        ${t.notes?`<div class="sub" style="font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes}</div>`:''}
+        <div class="sub">${tm}${t.leverage?` · ${t.leverage}×`:''}${t.setup_tag?` · ${t.setup_tag}`:''}
+          ${t.grade?`<span class="rb amb">${t.grade}</span>`:''}${t.mistakes?`<span class="rb r">⚠ ${t.mistakes.split(',').length}</span>`:''}</div>
       </div>`;
     });
   } else if(MONTH){ h+=`<div class="cal-empty">Hover or click a day to see its trades</div>`; }
@@ -174,81 +187,136 @@ function renderSide(){
 function openModal(id){
   const t=TRADES.find(x=>x.id===id); if(!t) return;
   const isL=t.direction==='long', win=t.pnl>=0;
-  let R='—';
-  if(t.entry&&t.sl&&t.exit){const rp=Math.abs(t.entry-t.sl),mp=(t.exit-t.entry)*(isL?1:-1); if(rp>0)R=(mp/rp).toFixed(2)+'R';}
-  let hold='—';
-  if(t.opened_at&&t.closed_at){const ms=new Date(t.closed_at)-new Date(t.opened_at),hh=ms/3.6e6;
-    hold=hh>=24?(hh/24).toFixed(1)+'d':hh>=1?hh.toFixed(1)+'h':Math.round(ms/6e4)+'m';}
-  const dt=s=>s?new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-  const F=(k,v,cls='')=>`<div class="cal-f"><div class="fk">${k}</div><div class="fv ${cls}">${v}</div></div>`;
-  let fp=t.followed_plan??null, fs=t.followed_strategy??null;
-  const tri=(label,key,val)=>`<div class="cal-tri" data-key="${key}"><span class="tl">${label}</span>
-    <button data-v="null" class="${val===null?'on-x':''}">—</button>
-    <button data-v="true" class="${val===true?'on-y':''}">✓ Yes</button>
-    <button data-v="false" class="${val===false?'on-n':''}">✗ No</button></div>`;
+  // review state
+  let st={grade:t.grade||null, conviction:t.conviction||null, emotion:t.emotion||null,
+          mistakes:new Set((t.mistakes||'').split(',').map(s=>s.trim()).filter(Boolean)),
+          fp:t.followed_plan??null, fs:t.followed_strategy??null};
+  const num2=(v,d=2)=>v==null?'':v;
+  const inp=(id,val,ph='',step='any')=>`<input class="cal-in" id="${id}" type="number" step="${step}" value="${val??''}" placeholder="${ph}">`;
+  const dtin=(id,val)=>`<input class="cal-in" id="${id}" type="datetime-local" value="${toLocal(val)}" style="color-scheme:dark">`;
+  const fld=(k,inner)=>`<div class="cal-fld"><div class="fk">${k}</div>${inner}</div>`;
+  const optrow=(label,key,opts,cur,cls='')=>{
+    return `<div class="cal-pickrow" data-key="${key}"><span class="pl">${label}</span>`+
+      opts.map(o=>`<button class="cal-opt ${cls} ${String(cur)===String(o)?'on':''}" data-v="${o}">${o}</button>`).join('')+`</div>`;
+  };
+  const tri=(label,key,val)=>`<div class="cal-pickrow cal-tri" data-key="${key}"><span class="pl">${label}</span>
+    <button data-v="null" class="cal-opt ${val===null?'on-x':''}">—</button>
+    <button data-v="true" class="cal-opt ${val===true?'on-y':''}">✓ Yes</button>
+    <button data-v="false" class="cal-opt ${val===false?'on-n':''}">✗ No</button></div>`;
+  const misschips=`<div class="cal-pickrow" id="missrow"><span class="pl">Mistakes</span>`+
+    MISTAKES.map(m=>`<button class="cal-opt miss ${st.mistakes.has(m)?'on':''}" data-m="${m}">${m}</button>`).join('')+`</div>`;
 
-  $('modal').innerHTML=`<div class="cal-modal-bg" id="mbg"><div class="cal-modal ${isL?'long':'short'}" id="mbox">
+  $('modal').innerHTML=`<div class="cal-modal-bg" id="mbg"><div class="cal-modal ${isL?'long':'short'}">
     <div class="cal-m-h"><div>
-      <div class="cal-m-sym ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} ${t.symbol||''}</div>
+      <div class="cal-m-sym ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} ${t.symbol||''} ${t.setup_tag?`<span class="rb">${t.setup_tag}</span>`:''}</div>
       <div class="cal-m-pnl ${win?'g':'r'}">${win?'+':''}${eur(Math.abs(t.pnl))}</div>
     </div><button class="cal-m-x" id="mx">✕</button></div>
+
+    <div class="cal-sec">Breakdown · editable</div>
     <div class="cal-m-grid">
-      <div class="cal-sec">Trade Identity</div>
-      ${F('Direction',isL?'▲ Long':'▼ Short',isL?'g':'r')}
-      ${F('Venue',t.venue||'—')}
-      ${F('Setup',t.setup_tag||'—')}
-      ${F('Market · Order',`${t.market_type||'—'}${t.order_type?' · '+t.order_type:''}`)}
-      <div class="cal-sec">Prices & Sizing</div>
-      ${F('Entry → Exit',`${usd(t.entry)} → ${usd(t.exit)}`)}
-      ${F('R multiple',R,R.startsWith('-')?'r':(R==='—'?'':'g'))}
-      ${F('TP · SL (plan)',`${usd(t.tp)} · ${usd(t.sl)}`)}
-      ${F('Size · Lev',`${num(t.size,4)}${t.leverage?' · '+t.leverage+'×':''}`)}
-      ${F('P&L',eur(t.pnl),win?'g':'r')}
-      ${F('Fees · Funding',`${eur(t.fees||0)} · ${eur(t.funding_cost||0,4)}`,'r')}
-      ${F('Bal Before → After',`${eur(t.balance_before||0)} → ${eur(t.balance_after||0)}`)}
-      <div class="cal-sec">Timestamps</div>
-      ${F('Opened',dt(t.opened_at))}
-      ${F('Closed',dt(t.closed_at))}
-      ${F('Duration',hold)}
+      ${fld('Entry $',inp('f-entry',t.entry))}
+      ${fld('Exit $',inp('f-exit',t.exit))}
+      ${fld('TP $',inp('f-tp',t.tp))}
+      ${fld('SL $',inp('f-sl',t.sl))}
+      ${fld('Size',inp('f-size',t.size))}
+      ${fld('Leverage ×',inp('f-lev',t.leverage))}
+      ${fld('P&L €',inp('f-pnl',t.pnl))}
+      ${fld('Fees €',inp('f-fees',t.fees))}
+      ${fld('Opened',dtin('f-open',t.opened_at))}
+      ${fld('Closed',dtin('f-close',t.closed_at))}
     </div>
-    <div class="cal-sec" style="margin-top:14px">Journal & Adherence</div>
-    ${tri('Followed Plan?','fp',fp)}
-    ${tri('Followed Strat?','fs',fs)}
-    <textarea class="cal-notes" id="mnotes" placeholder="Trade notes…">${t.notes||''}</textarea>
+    <div class="cal-derived" id="derived"></div>
+
+    <div class="cal-sec">Review</div>
+    ${optrow('Grade','grade',GRADES,st.grade,'grade')}
+    ${optrow('Conviction','conviction',[1,2,3,4,5],st.conviction)}
+    ${optrow('Emotion','emotion',EMOTIONS,st.emotion)}
+    ${misschips}
+    ${tri('Followed plan?','fp',st.fp)}
+    ${tri('Followed strat?','fs',st.fs)}
+
+    <div class="cal-sec">Reflection</div>
+    <div class="cal-fld" style="margin-bottom:8px"><div class="fk">What went right</div><textarea class="cal-notes" id="f-right">${t.went_right||''}</textarea></div>
+    <div class="cal-fld" style="margin-bottom:8px"><div class="fk">What went wrong</div><textarea class="cal-notes" id="f-wrong">${t.went_wrong||''}</textarea></div>
+    <div class="cal-fld" style="margin-bottom:8px"><div class="fk">Lesson / takeaway</div><textarea class="cal-notes" id="f-lesson">${t.lesson||''}</textarea></div>
+    <div class="cal-fld"><div class="fk">Notes</div><textarea class="cal-notes" id="f-notes">${t.notes||''}</textarea></div>
+
     <div class="cal-acts">
       <button class="save" id="msave">💾 Save review</button>
-      <a class="full" href="/review">Review page →</a>
+      <a class="full" href="/review">Setup tagging →</a>
     </div>
   </div></div>`;
 
-  const close=()=>{$('modal').innerHTML='';};
+  const close=()=>{$('modal').innerHTML='';document.onkeydown=null;};
   $('mbg').onclick=e=>{if(e.target.id==='mbg')close();};
   $('mx').onclick=close;
   document.onkeydown=e=>{if(e.key==='Escape')close();};
-  $('modal').querySelectorAll('.cal-tri').forEach(row=>{
-    row.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-      const v=b.dataset.v==='null'?null:b.dataset.v==='true';
-      if(row.dataset.key==='fp')fp=v; else fs=v;
-      row.querySelectorAll('button').forEach(x=>x.className='');
-      b.className=v===null?'on-x':v?'on-y':'on-n';
+
+  // derived R + duration, recompute on input
+  const derive=()=>{
+    const e=parseFloat($('f-entry').value), x=parseFloat($('f-exit').value), s=parseFloat($('f-sl').value);
+    let R='—'; if(e&&x&&s){const rp=Math.abs(e-s),mp=(x-e)*(isL?1:-1); if(rp>0)R=(mp/rp).toFixed(2)+'R';}
+    const o=$('f-open').value,cl=$('f-close').value; let hold='—';
+    if(o&&cl){const ms=new Date(cl)-new Date(o),hh=ms/3.6e6; if(!isNaN(hh)&&hh>=0)hold=hh>=24?(hh/24).toFixed(1)+'d':hh>=1?hh.toFixed(1)+'h':Math.round(ms/6e4)+'m';}
+    $('derived').innerHTML=`<span>R: <b class="${R.startsWith('-')?'r':'g'}">${R}</b></span><span>Hold: <b>${hold}</b></span>`;
+  };
+  ['f-entry','f-exit','f-sl','f-open','f-close'].forEach(i=>$(i).oninput=derive); derive();
+
+  // option rows (single-select; re-click clears, except the always-set tri rows)
+  const parseV=s=>s==='null'?null:s==='true'?true:s==='false'?false:s;
+  $('modal').querySelectorAll('.cal-pickrow[data-key]').forEach(row=>{
+    const key=row.dataset.key, isTri=key==='fp'||key==='fs';
+    const paint=()=>row.querySelectorAll('.cal-opt[data-v]').forEach(x=>{
+      let cls=x.classList.contains('grade')?'cal-opt grade':'cal-opt';
+      const xv=parseV(x.dataset.v);
+      if(String(st[key])===String(xv)) cls+=isTri?(xv===null?' on-x':xv?' on-y':' on-n'):' on';
+      x.className=cls;
+    });
+    row.querySelectorAll('.cal-opt[data-v]').forEach(b=>b.onclick=()=>{
+      const v=parseV(b.dataset.v);
+      st[key]=(!isTri && String(st[key])===String(v)) ? null : v;   // re-click toggles off
+      paint();
     });
   });
+  // mistake multi-select
+  $('missrow').querySelectorAll('.cal-opt').forEach(b=>b.onclick=()=>{
+    const m=b.dataset.m; if(st.mistakes.has(m)){st.mistakes.delete(m);b.classList.remove('on');}
+    else{st.mistakes.add(m);b.classList.add('on');}
+  });
+
   $('msave').onclick=async()=>{
     $('msave').textContent='Saving…'; $('msave').disabled=true;
-    const payload={manually_edited:true,notes:$('mnotes').value||null};
-    if(fp!==null)payload.followed_plan=fp; if(fs!==null)payload.followed_strategy=fs;
+    const fv=id=>{const v=parseFloat($(id).value);return isNaN(v)?undefined:v;};
+    const dv=id=>{const v=$(id).value;return v?new Date(v).toISOString():undefined;};
+    const payload={
+      entry:fv('f-entry'), exit:fv('f-exit'), tp:fv('f-tp'), sl:fv('f-sl'),
+      size:fv('f-size'), leverage:fv('f-lev'), pnl:fv('f-pnl'), fees:fv('f-fees'),
+      opened_at:dv('f-open'), closed_at:dv('f-close'),
+      grade:st.grade??undefined, conviction:st.conviction??undefined, emotion:st.emotion??undefined,
+      mistakes:[...st.mistakes].join(',')||undefined,
+      went_right:$('f-right').value||undefined, went_wrong:$('f-wrong').value||undefined,
+      lesson:$('f-lesson').value||undefined, notes:$('f-notes').value||undefined,
+    };
+    if(st.fp!==null)payload.followed_plan=st.fp; if(st.fs!==null)payload.followed_strategy=st.fs;
+    Object.keys(payload).forEach(k=>payload[k]===undefined&&delete payload[k]);
     try{
       const r=await fetch('/api/trades/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const u=await r.json();
       const idx=TRADES.findIndex(x=>x.id===id); if(idx>=0)TRADES[idx]={...TRADES[idx],...u};
       close(); render();
-    }catch(e){console.error(e);$('msave').textContent='Error';$('msave').disabled=false;}
+    }catch(e){console.error(e);$('msave').textContent='Error — retry';$('msave').disabled=false;}
   };
 }
-
 load();
 """
 
-CALENDAR_HTML = shell("/calendar", "Calendar", BODY, script=SCRIPT,
-                      head_extra=_CSS, meta="when did I trade?")
-"""end"""
+import json as _json
+
+CALENDAR_HTML = shell(
+    "/calendar", "Calendar", BODY,
+    script=(SCRIPT
+            .replace("__MISTAKES__", _json.dumps(MISTAKES))
+            .replace("__EMOTIONS__", _json.dumps(EMOTIONS))
+            .replace("__GRADES__",   _json.dumps(GRADES))),
+    head_extra=_CSS, meta="review my trades",
+)
