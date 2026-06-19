@@ -309,7 +309,17 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 #chart-container{flex:1;min-height:0}
 
 /* ── detail panel ── */
-#detail{height:130px;border-top:1px solid var(--b1);background:var(--s1);padding:10px 16px;display:flex;gap:16px;flex-shrink:0;overflow:hidden}
+#detail{min-height:130px;max-height:340px;border-top:1px solid var(--b1);background:var(--s1);padding:10px 16px;display:flex;flex-wrap:wrap;gap:16px;flex-shrink:0;overflow-y:auto}
+#det-review{flex-basis:100%;border-top:1px solid var(--b1);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+#det-review .rv-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+#det-review .rv-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:78px;flex:0 0 auto}
+#det-review .rv-opt{padding:2px 8px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:11px;font-family:var(--mono);cursor:pointer}
+#det-review .rv-opt.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
+#det-review .rv-opt.miss.on{border-color:var(--re);background:rgba(255,84,104,.15);color:var(--re)}
+#det-review .rv-opt.grade.on{border-color:var(--am);background:transparent;color:var(--am)}
+#det-review .rv-refl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+#det-review .rv-refl textarea{background:var(--s2);border:1px solid var(--b2);border-radius:5px;color:var(--t1);font-size:11px;font-family:var(--mono);padding:5px 7px;min-height:42px;resize:vertical;outline:none}
+#det-review #rv-save{align-self:flex-start;margin-top:2px;padding:6px 16px;border:none;border-radius:5px;background:var(--ac);color:var(--bg);font-size:11px;font-weight:700;cursor:pointer}
 #det-left{flex:1;min-width:0}
 #det-right{width:220px;flex-shrink:0}
 .det-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -444,6 +454,18 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
         </div>
       </div>
       <div id="det-right"><div class="cond-grid" id="cond-grid"></div></div>
+      <div id="det-review" style="display:none">
+        <div class="rv-row"><span class="rv-l">Grade</span><span class="rv-opts" id="rv-grade"></span></div>
+        <div class="rv-row"><span class="rv-l">Conviction</span><span class="rv-opts" id="rv-conv"></span></div>
+        <div class="rv-row"><span class="rv-l">Emotion</span><span class="rv-opts" id="rv-emo"></span></div>
+        <div class="rv-row"><span class="rv-l">Mistakes</span><span class="rv-opts" id="rv-miss"></span></div>
+        <div class="rv-refl">
+          <textarea id="rv-right" placeholder="what went right…"></textarea>
+          <textarea id="rv-wrong" placeholder="what went wrong…"></textarea>
+          <textarea id="rv-lesson" placeholder="lesson / takeaway…"></textarea>
+        </div>
+        <button id="rv-save" onclick="saveReview()">💾 Save review</button>
+      </div>
     </div>
   </div>
 </div>
@@ -626,6 +648,59 @@ function renderDetail(t) {
     <div class="cond-item"><label>Bal After</label>
       <value>${t.balance_after!=null?t.balance_after.toFixed(2)+'€':'—'}</value></div>
   `;
+  renderReview(t);
+}
+
+// ── review layer (parity with the calendar modal) ───────────────────────────────
+const RV_MISTAKES=["chased","early","late","oversized","moved stop","no stop","revenge","FOMO","overheld","cut early","no setup"];
+const RV_EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
+const RV_GRADES=["A","B","C","D","F"];
+let rev={};
+function renderReview(t){
+  document.getElementById('det-review').style.display='flex';
+  rev={grade:t.grade||null,conviction:t.conviction||null,emotion:t.emotion||null,
+       mistakes:new Set((t.mistakes||'').split(',').map(s=>s.trim()).filter(Boolean))};
+  const opt=(v,on,cls)=>`<button class="rv-opt ${cls||''} ${on?'on':''}" data-v="${v}">${v}</button>`;
+  document.getElementById('rv-grade').innerHTML=RV_GRADES.map(g=>opt(g,rev.grade===g,'grade')).join('');
+  document.getElementById('rv-conv').innerHTML=[1,2,3,4,5].map(c=>opt(c,String(rev.conviction)===String(c),'')).join('');
+  document.getElementById('rv-emo').innerHTML=RV_EMOTIONS.map(e=>opt(e,rev.emotion===e,'')).join('');
+  document.getElementById('rv-miss').innerHTML=RV_MISTAKES.map(m=>`<button class="rv-opt miss ${rev.mistakes.has(m)?'on':''}" data-m="${m}">${m}</button>`).join('');
+  document.getElementById('rv-right').value=t.went_right||'';
+  document.getElementById('rv-wrong').value=t.went_wrong||'';
+  document.getElementById('rv-lesson').value=t.lesson||'';
+  const single=(rowId,key)=>document.querySelectorAll('#'+rowId+' .rv-opt').forEach(b=>b.onclick=()=>{
+    let v=b.dataset.v; if(key==='conviction')v=parseInt(v);
+    rev[key]=(String(rev[key])===String(v))?null:v;
+    document.querySelectorAll('#'+rowId+' .rv-opt').forEach(x=>x.classList.toggle('on',rev[key]!=null&&String(rev[key])===String(x.dataset.v)));
+  });
+  single('rv-grade','grade'); single('rv-conv','conviction'); single('rv-emo','emotion');
+  document.querySelectorAll('#rv-miss .rv-opt').forEach(b=>b.onclick=()=>{
+    const m=b.dataset.m;
+    if(rev.mistakes.has(m)){rev.mistakes.delete(m);b.classList.remove('on');}
+    else{rev.mistakes.add(m);b.classList.add('on');}
+  });
+}
+async function saveReview(){
+  if(!selected) return;
+  const btn=document.getElementById('rv-save'); btn.textContent='Saving…'; btn.disabled=true;
+  const payload={manually_edited:true,
+    went_right:document.getElementById('rv-right').value||undefined,
+    went_wrong:document.getElementById('rv-wrong').value||undefined,
+    lesson:document.getElementById('rv-lesson').value||undefined,
+    mistakes:[...rev.mistakes].join(',')||undefined};
+  if(rev.grade!=null) payload.grade=rev.grade;
+  if(rev.conviction!=null) payload.conviction=rev.conviction;
+  if(rev.emotion!=null) payload.emotion=rev.emotion;
+  Object.keys(payload).forEach(k=>payload[k]===undefined&&delete payload[k]);
+  try{
+    const r=await fetch('/api/trades/'+selected.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    await r.json();
+    Object.assign(selected,{grade:rev.grade,conviction:rev.conviction,emotion:rev.emotion,
+      mistakes:[...rev.mistakes].join(','),went_right:payload.went_right||'',went_wrong:payload.went_wrong||'',lesson:payload.lesson||''});
+    const idx=ALL_TRADES.findIndex(x=>x.id===selected.id); if(idx>=0) Object.assign(ALL_TRADES[idx],selected);
+    btn.textContent='✓ Saved'; setTimeout(()=>{btn.textContent='💾 Save review';btn.disabled=false;},1200);
+    renderEdge();
+  }catch(e){console.error(e);btn.textContent='Error — retry';btn.disabled=false;}
 }
 
 // ── edge table ─────────────────────────────────────────────────────────────────
