@@ -101,8 +101,8 @@ Start the server (below), then visit **http://localhost:8765**. The home page
 ("/") is a **two-door mode chooser** — the app is split into two systems that
 never share a nav (2026-06-17):
 
-- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Strategy · Risk ·
-  Survival · Rules · Equity · Regime · Backtest**.
+- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Live · Ledger · Income ·
+  Strategy · Risk · Survival · Rules · Equity · Regime · Backtest**.
 - **HEDGE** — discretionary own-money trading (the S1–S5 edge). Nav:
   **Dashboard · Desk · Signals · Review · Projection**.
 
@@ -137,13 +137,25 @@ source of truth for the whole app:
 - **`/style`** — **living style guide.** Renders every token + component straight
   from `lens.css`, so it's both the design docs and a visual regression check.
   See also **`BRAND.md`** (logo, voice, palette in one page).
-- **On `shell()`:** `/desk`, `/signals`, `/`, `/projection`, `/backtest`,
-  `/montecarlo`, `/prop`, `/style` — all share the bar/nav and carry a
-  collapsible "❔ how to read this …" explainer.
+- **On `shell()`:** `/desk`, `/signals`, `/dashboard`, `/projection`, `/backtest`,
+  `/montecarlo`, `/prop` (+ `/prop-desk`, `/prop-ledger`, `/prop-income`), `/style`
+  — all share the bar/nav and carry a collapsible "❔ how to read this …" explainer.
 - **Recolor exception:** `/review` keeps its bespoke full-viewport 3-pane chart
   workstation layout (doesn't fit the scrolling shell), but uses the shared
-  palette + fonts.
-- **Compare routes** (throwaway, delete on signoff): `/desk-old`, `/signals-classic`.
+  palette + fonts (sourced from `lens.css`, so it can't drift).
+
+**Mobile pass (2026-06-19):** real phone audit + fixes —
+- `/desk` migrated to a true `shell()` build (was hand-rolling its own head/nav).
+- `/review` got a **responsive stack** at ≤700px: the 3 panes restack vertically
+  (chart on top, then filters + trade list) and the detail panel becomes a
+  **slide-up sheet** on trade tap. Same JS/data, no second codebase.
+- `/dashboard` Parameters no longer pin on mobile; the panel + the results /
+  signals / API sections are all collapsible.
+- `/projection` every section is a consistent collapsible (incl. the hero cards
+  in a "key metrics" window); wide tables + the My-plans block scroll inside the
+  viewport instead of breaking width.
+- `/signals` "recent decisions" rows expand to the full plan as proposed
+  (entry/stop/target/R:R, strategy, proposed-vs-decided timing, conviction).
 
 Built phone-first — open it on the iPhone (Safari → Add to Home Screen for a
 fullscreen app feel), it reflows for iPad / desktop.
@@ -185,8 +197,28 @@ engines (all fed by one `prop_views.prop_metrics()` so no two views drift):
 position-size formula, leverage), **`/survival`** (DD limit · max historical DD ·
 loss-streak stress table · days-to-breach), **`/rules`** (the live constraint
 layer), **`/equity`** (Monte Carlo equity sim from WR+RR — paths, drawdown,
-failure frequency), **`/regime`** (BULL/SIDEWAYS/BEAR + hero WR per regime). See
-the **Prop track** section below.
+failure frequency), **`/regime`** (BULL/SIDEWAYS/BEAR + hero WR per regime).
+
+The **live + bookkeeping** trio (2026-06-19):
+- **`/prop-desk`** (Live) — the prop equivalent of `/desk`: evaluates the hero
+  **ASIAN_RSI_DIP_v1** on the freshest closed 4H bar → **ENTER / STAND DOWN**
+  (it only fires on the 00/04 UTC Asian closes; a countdown shows the next
+  window). Carries the full **trade assumptions** to actually place the order —
+  entry, breakeven (after fee), TP, SL, est. liquidation, expected range (ATR),
+  notional / margin / size, **long *and* short**, sized at legal prop leverage
+  (risk % + maintenance-margin inputs recompute live).
+- **`/prop-ledger`** (Ledger) — the prop trade book. Log eval trades by hand
+  (`book='prop'`, kept separate from the hedge book) → a running **equity ledger
+  vs the walls**: distance to the $4,850 floor, daily-loss used, progress to the
+  $5,450 target, plus realised analytics (peak/trough, max DD, current DD, time
+  under water, observed loss streak, WR, expectancy, total R). A
+  floor ── you ── target corridor moves with each logged trade.
+- **`/prop-income`** (Income) — the prop end-goal (separate from the hedge goal):
+  a chained **income / FIRE ladder** (rent → salary → company income → trading
+  capital/mo → FAT FIRE), anchor-driven (set one rung, the rest derive by fixed
+  ratios) with the required **Trading AUM** and a live BTC column.
+
+See the **Prop track** section below.
 
 ### `/style` — living style guide
 Every design token + component rendered straight from `lens.css` — the design
@@ -222,6 +254,19 @@ Sept 2025). Funds you up to **$200,000**. Rules verified live at
   (every eval) ranks strategy × risk by pass%.
 - **Engine pages** (see PROP mode above) — Goals hub + Strategy / Risk / Survival
   / Rules / Equity / Regime, all fed by `prop_views.prop_metrics()`.
+- **Live prop desk** (`app/prop_desk.py`, `/prop-desk`) — evaluates the hero on
+  the freshest closed 4H bar → ENTER / STAND DOWN, with the full long/short
+  **assumptions block** (entry / breakeven / TP / SL / est. liquidation / expected
+  range / notional·margin·size) at legal prop sizing. `GET /api/prop/desk`.
+- **Prop trade book** (`app/prop_ledger.py`, `/prop-ledger`) — trades now carry a
+  **`book` field** (`'hedge'` default / `'prop'`) so the eval account is separate
+  from own-money trades. Log prop fills by hand (`POST /api/prop/trades`) → a
+  realised equity ledger vs the walls + DD / streak / time-under-water analytics
+  (`GET /api/prop/ledger`). **API sync is a drop-in later** — if Breakout exposes
+  Kraken keys, add a 3rd account in `.env` and auto-tag synced fills `book='prop'`.
+- **Income / FIRE ladder** (`app/prop_income.py`, `/prop-income`) — the prop
+  end-goal: anchor-driven chained ladder (rent → salary → company → trading
+  capital → FAT FIRE) + required Trading AUM, EUR + live BTC.
 
 ### Verified rules — the constraint layer
 

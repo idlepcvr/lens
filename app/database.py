@@ -207,6 +207,9 @@ def init_db():
     trade_cols = {row[1] for row in c.execute("PRAGMA table_info(trades)").fetchall()}
     if "setup_tag" not in trade_cols:
         c.execute("ALTER TABLE trades ADD COLUMN setup_tag TEXT")
+    if "book" not in trade_cols:
+        # 'hedge' (own money, S1–S5) | 'prop' (Breakout eval). Existing rows = hedge.
+        c.execute("ALTER TABLE trades ADD COLUMN book TEXT DEFAULT 'hedge'")
     c.commit()
 
     # Seed default config row on first init
@@ -282,13 +285,13 @@ def create_trade(trade: TradeCreate) -> TradeResponse:
         INSERT INTO trades (symbol, direction, entry, size, leverage, tp, sl,
                             exit, pnl, fees, notes, opened_at, closed_at,
                             followed_plan, followed_strategy, balance_after,
-                            linked_signal_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            linked_signal_id, setup_tag, book)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         trade.symbol, trade.direction, trade.entry, trade.size, trade.leverage,
         trade.tp, trade.sl, trade.exit, trade.pnl, trade.fees, trade.notes,
         _iso(now), _iso(trade.closed_at), fp, fs, trade.balance_after,
-        trade.linked_signal_id,
+        trade.linked_signal_id, trade.setup_tag, trade.book or "hedge",
     ))
     c.commit()
     row = c.execute("SELECT * FROM trades WHERE id = ?", (cur.lastrowid,)).fetchone()
@@ -303,11 +306,14 @@ def get_trades(
     direction: Optional[str] = None,
     result: Optional[str] = None,
     period: Optional[int] = None,
+    book: Optional[str] = None,
 ) -> list[TradeResponse]:
     where = []
     params: list = []
     if venue:
         where.append("venue = ?"); params.append(venue)
+    if book:
+        where.append("book = ?"); params.append(book)
     if direction:
         where.append("direction = ?"); params.append(direction)
     if result == "win":

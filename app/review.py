@@ -195,29 +195,29 @@ REVIEW_HTML = r"""<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="apple-touch-icon" href="/assets/favicon.svg">
+<link rel="stylesheet" href="/assets/lens.css">
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  /* mapped onto the shared LENS palette (see app/theme.py LENS_CSS) */
-  --bg:#06080c;--s1:#0b0f16;--s2:#10151e;
-  --b1:#192232;--b2:#28344a;--b3:#313d52;
-  --t1:#e8eef8;--t2:#828ea6;--t3:#465064;--t4:#1c2636;
-  --ac:#5b9dff;--adim:#10203f;
-  --gr:#1fd989;--re:#ff5468;--am:#f6ad3c;
-  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
-  --ui:'Chakra Petch',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  /* Palette aliased onto the shared LENS tokens (app/theme.py LENS_CSS, served
+     via /assets/lens.css) — single source of truth, no hardcoded hex so the
+     review page can never drift from the design system. --bg/--mono inherit
+     straight from the LENS :root; --b3/--t4 have no LENS equivalent. */
+  --s1:var(--panel); --s2:var(--panel2);
+  --b1:var(--line);  --b2:var(--line2); --b3:#313d52;
+  --t1:var(--ink);   --t2:var(--dim);   --t3:var(--faint); --t4:#1c2636;
+  --ac:var(--accent);--adim:var(--accent-d);
+  --gr:var(--long);  --re:var(--short); --am:var(--amber);
+  --ui:var(--hud);
 }
+/* kill the LENS cockpit grid overlay — review is a full-bleed chart IDE */
+body::before{content:none}
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
 
 /* ── topbar ── */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--b1);background:var(--bg);flex-shrink:0;gap:12px;flex-wrap:wrap}
-.brand{display:flex;align-items:baseline;gap:10px}
-.brand-name{font-family:var(--mono);font-size:15px;font-weight:700;color:#fff;letter-spacing:.12em}
-.brand-name b{color:var(--ac)}
-.brand-sep{color:var(--t3)}
-.brand-page{font-family:var(--mono);font-size:12px;color:var(--t2);letter-spacing:.08em}
 .topnav{display:flex;gap:6px;flex-wrap:wrap}
 .topnav a{font-family:var(--mono);font-size:11px;color:var(--t2);text-decoration:none;padding:6px 12px;border:1px solid var(--b1);border-radius:999px;background:var(--s1);letter-spacing:.04em;transition:all .15s}
 .topnav a:hover{color:var(--t1);border-color:var(--b2);text-decoration:none}
@@ -320,18 +320,44 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+
+/* ── phone (<=700px): restack the 3-pane IDE vertically + detail as a slide-up sheet ── */
+#det-close{display:none}
+@media(max-width:700px){
+  html,body{height:auto;overflow:auto}
+  body{display:block}
+  .topbar{position:sticky;top:0;z-index:20}
+  #content{flex-direction:column;overflow:visible;min-height:0}
+  #main{order:-1;display:block;flex:none;min-width:0}
+  #chart-container{height:42vh;min-height:240px}
+  #sidebar{width:100%;border-right:none;border-top:1px solid var(--b1)}
+  #filters{position:sticky;top:52px;z-index:5}
+  #trade-list{flex:none;max-height:none}
+  #edge-panel{max-height:none}
+  /* detail panel → bottom sheet, revealed when a trade is picked */
+  #detail{position:fixed;left:0;right:0;bottom:0;height:auto;max-height:72vh;
+    flex-direction:column;gap:10px;overflow-y:auto;z-index:60;
+    transform:translateY(105%);transition:transform .25s ease;
+    box-shadow:0 -10px 30px rgba(0,0,0,.55);border-top:1px solid var(--b2)}
+  #detail.open{transform:translateY(0)}
+  #det-left,#det-right{width:100%}
+  .det-grid{grid-template-columns:repeat(2,1fr)}
+  #det-close{display:block;width:100%;background:var(--s2);border:none;
+    border-bottom:1px solid var(--b1);color:var(--t2);font-family:var(--ui);
+    font-size:12px;padding:10px;cursor:pointer;position:sticky;top:0}
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="brand">
-    <div class="brand-name">LEN<b>S</b></div>
-    <span class="brand-sep">·</span>
-    <div class="brand-page">Review</div>
+  <div class="logo">LEN<span class="s">S</span> <span class="pg">Review</span></div>
+  <div class="modesw">
+    <a href="/prop">◎ PROP</a>
+    <a href="/dashboard" class="on">▤ HEDGE</a>
+    <a href="/" class="home">⌂</a>
   </div>
   <nav class="topnav">
-    <a href="/prop">◎&nbsp;PROP</a>
     <a href="/dashboard">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
@@ -375,6 +401,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
   <div id="main">
     <div id="chart-container"></div>
     <div id="detail">
+      <button id="det-close" onclick="document.getElementById('detail').classList.remove('open')">▾ close</button>
       <div id="det-left">
         <div class="det-grid" id="det-grid"><div id="no-sel">← select a trade to review</div></div>
         <div id="setup-row" style="display:none">
@@ -544,6 +571,7 @@ function pick(id) {
   renderList();
   showTrade(selected);
   renderDetail(selected);
+  document.getElementById('detail').classList.add('open');  // reveal sheet on phone (no-op on desktop)
 }
 
 function renderDetail(t) {

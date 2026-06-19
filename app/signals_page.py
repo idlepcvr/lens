@@ -58,16 +58,47 @@ function pendingCard(s){
   </div>`;
 }
 
+function fmtTs(iso){
+  if(!iso) return '—';
+  const d = new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z');
+  return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function gap(a,b){
+  if(!a||!b) return '';
+  const ta=new Date(a.endsWith('Z')||a.includes('+')?a:a+'Z'), tb=new Date(b.endsWith('Z')||b.includes('+')?b:b+'Z');
+  const m=Math.round((tb-ta)/60000);
+  if(m<1) return '<1m'; if(m<60) return m+'m'; if(m<1440) return Math.round(m/60)+'h'; return Math.round(m/1440)+'d';
+}
+function toggleRow(id){
+  const r=document.getElementById('d-'+id); if(!r) return;
+  r.style.display = r.style.display==='none' ? '' : 'none';
+}
+
+// each decision row expands to the full plan as proposed + decision timing
 function historyRow(s){
-  const conv = s.your_conviction?(' · conv '+s.your_conviction):'';
-  const why = s.rejection_reason?(' · '+s.rejection_reason):'';
-  return `<tr>
+  const id = s.signal_id;
+  const conv = s.your_conviction!=null ? s.your_conviction : '—';
+  const g = gap(s.received_at, s.decided_at);
+  const detail = `
+    <div class="tg" style="margin:2px 0 8px">
+      <div class="cell"><div class="k">entry</div><div class="v">${money(s.entry_price)}</div></div>
+      <div class="cell"><div class="k">R : R</div><div class="v">${s.expected_rr??'—'}</div></div>
+      <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
+      <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
+    </div>
+    <div class="kv"><span class="k">strategy</span><span class="v">${s.strategy_name||'—'}${s.symbol?(' · '+s.symbol):''}</span></div>
+    <div class="kv"><span class="k">proposed</span><span class="v">${fmtTs(s.received_at)}</span></div>
+    <div class="kv"><span class="k">decided</span><span class="v">${fmtTs(s.decided_at)}${g?(' · '+g+' later'):''}</span></div>
+    <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
+    ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}`;
+  return `<tr class="hrow" onclick="toggleRow('${id}')" style="cursor:pointer">
     <td>${s.trigger_type||'?'}</td>
     <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>
     <td><span class="badge ${s.status}">${s.status}</span></td>
-    <td class="m">${(s.your_conviction||'—')}</td>
-    <td class="m">${ago(s.decided_at||s.received_at)}</td>
-  </tr>`;
+    <td class="m">${conv}</td>
+    <td class="m">${ago(s.decided_at||s.received_at)} ▾</td>
+  </tr>
+  <tr id="d-${id}" style="display:none"><td colspan="5" style="background:var(--panel);padding:10px 12px">${detail}</td></tr>`;
 }
 
 async function decide(id, status, conviction){
