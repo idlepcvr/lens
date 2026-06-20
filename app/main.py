@@ -1624,6 +1624,13 @@ def _run_kraken_sync(account: str, api_key: str, api_secret: str, last_fill_time
             last_fill_time=last_fill_time,
         )
         result.pop("eur_timeline", None)
+        # Auto-classify newly-synced closed trades (S1–S5 / VETO / NONE) so
+        # setup_tag stays current without a manual backfill call.
+        try:
+            from . import setups
+            result["tagged"] = setups.backfill_setup_tags(only_untagged=True).get("tagged", 0)
+        except Exception as e:
+            result["tag_error"] = str(e)
         result["running"] = False
         _kraken_sync_status[account] = result
     except Exception as e:
@@ -1673,6 +1680,12 @@ def sync_bybit(req: SyncRequest = SyncRequest()):
         db_transfer_fn=upsert_transfer,
         last_fill_time=req.last_fill_time,
     )
+    # Auto-classify newly-synced closed trades (S1–S5 / VETO / NONE).
+    try:
+        from . import setups
+        result["tagged"] = setups.backfill_setup_tags(only_untagged=True).get("tagged", 0)
+    except Exception as e:
+        result["tag_error"] = str(e)
     if result.get("errors"):
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=207, content=result)
@@ -2169,9 +2182,35 @@ def api_backtest_strategies():
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
 
+@app.get("/journal", response_class=HTMLResponse)
+def journal_page():
+    from .journal_page import JOURNAL_HTML
+    return JOURNAL_HTML
+
+
+@app.get("/analytics", response_class=HTMLResponse)
+def analytics_page():
+    from .analytics_page import ANALYTICS_HTML
+    return ANALYTICS_HTML
+
+
+@app.get("/edge", response_class=HTMLResponse)
+def edge_page():
+    from .edge_page import EDGE_HTML
+    return EDGE_HTML
+
+
+# Legacy aliases — kept working, hidden from nav.
+@app.get("/recap", response_class=HTMLResponse)
 @app.get("/review", response_class=HTMLResponse)
 def review_page():
     return REVIEW_HTML
+
+
+@app.get("/calendar", response_class=HTMLResponse)
+def calendar_page():
+    from .calendar_page import CALENDAR_HTML
+    return CALENDAR_HTML
 
 
 @app.get("/montecarlo", response_class=HTMLResponse)
@@ -2289,6 +2328,12 @@ def prop_income_page():
 @app.get("/api/review/trades")
 def api_review_trades():
     return get_enriched_trades()
+
+
+@app.get("/api/review/analytics")
+def api_review_analytics():
+    from .review import review_analytics
+    return review_analytics()
 
 
 @app.get("/api/review/ohlcv")

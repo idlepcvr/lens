@@ -210,6 +210,19 @@ def init_db():
     if "book" not in trade_cols:
         # 'hedge' (own money, S1–S5) | 'prop' (Breakout eval). Existing rows = hedge.
         c.execute("ALTER TABLE trades ADD COLUMN book TEXT DEFAULT 'hedge'")
+    # Review layer — execution grade, recurring-mistake tracking (Edgewonk-style),
+    # conviction, mental state, and structured reflection. All nullable.
+    for col, decl in (
+        ("grade",      "TEXT"),     # A/B/C/D/F execution quality
+        ("conviction", "INTEGER"),  # 1–5 confidence at entry
+        ("emotion",    "TEXT"),     # calm/fomo/tilt/fear/bored
+        ("mistakes",   "TEXT"),     # comma-separated mistake tags
+        ("went_right", "TEXT"),
+        ("went_wrong", "TEXT"),
+        ("lesson",     "TEXT"),
+    ):
+        if col not in trade_cols:
+            c.execute(f"ALTER TABLE trades ADD COLUMN {col} {decl}")
     c.commit()
 
     # Seed default config row on first init

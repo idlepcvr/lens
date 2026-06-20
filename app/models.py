@@ -197,6 +197,14 @@ class TradeCreate(BaseModel):
     linked_signal_id: Optional[str] = None
     # Setup classification
     setup_tag: Optional[str] = None
+    # Review layer
+    grade:      Optional[str] = None     # A/B/C/D/F execution grade
+    conviction: Optional[int] = None     # 1–5 confidence at entry
+    emotion:    Optional[str] = None     # calm/fomo/tilt/fear/bored
+    mistakes:   Optional[str] = None     # comma-separated mistake tags
+    went_right: Optional[str] = None
+    went_wrong: Optional[str] = None
+    lesson:     Optional[str] = None
     # Which book: 'hedge' (own money) | 'prop' (eval account). Default hedge.
     book: Optional[str] = None
 
@@ -226,6 +234,14 @@ class TradeUpdate(BaseModel):
     linked_signal_id:  Optional[str]   = None
     setup_tag:         Optional[str]   = None
     book:              Optional[str]   = None
+    # Review layer
+    grade:      Optional[str] = None
+    conviction: Optional[int] = None
+    emotion:    Optional[str] = None
+    mistakes:   Optional[str] = None
+    went_right: Optional[str] = None
+    went_wrong: Optional[str] = None
+    lesson:     Optional[str] = None
 
 
 class TradeResponse(TradeCreate):

@@ -86,7 +86,10 @@ def _load_trades():
     cur  = conn.cursor()
     cur.execute("""
         SELECT id, direction, entry, exit, pnl, fees, size, leverage,
-               opened_at, closed_at, notes, balance_after, setup_tag
+               opened_at, closed_at, notes, balance_after, setup_tag,
+               tp, sl, funding_cost, followed_plan, followed_strategy,
+               market_type, order_type, fill_count,
+               grade, conviction, emotion, mistakes, went_right, went_wrong, lesson
         FROM trades WHERE closed_at IS NOT NULL ORDER BY opened_at
     """)
     rows = cur.fetchall()
@@ -113,7 +116,10 @@ def get_enriched_trades() -> list:
     out = []
     for row in trades_raw:
         (tid, direction, entry, exit_, pnl, fees, size, leverage,
-         opened_at, closed_at, notes, bal_after, setup_tag) = row
+         opened_at, closed_at, notes, bal_after, setup_tag,
+         tp, sl, funding_cost, followed_plan, followed_strategy,
+         market_type, order_type, fill_count,
+         grade, conviction, emotion, mistakes, went_right, went_wrong, lesson) = row
 
         ts_e = _parse_ms(opened_at)
         ts_x = _parse_ms(closed_at)
@@ -165,8 +171,144 @@ def get_enriched_trades() -> list:
             "trend_4h":       trend_4h,
             "trend_aligned":  trend_aligned,
             "move_pct":       move_pct,
+            # breakdown extras (for the editable modal, step B)
+            "tp":             tp,
+            "sl":             sl,
+            "funding_cost":   funding_cost,
+            "market_type":    market_type,
+            "order_type":     order_type,
+            "fill_count":     fill_count,
+            "followed_plan":     None if followed_plan     is None else bool(followed_plan),
+            "followed_strategy": None if followed_strategy is None else bool(followed_strategy),
+            # review layer
+            "grade":          grade,
+            "conviction":     conviction,
+            "emotion":        emotion,
+            "mistakes":       mistakes or "",
+            "went_right":     went_right or "",
+            "went_wrong":     went_wrong or "",
+            "lesson":         lesson or "",
         })
     return out
+
+
+def review_analytics() -> dict:
+    """Trade-log analytics for the /review dashboard: performance, risk-adjusted
+    ratios, duration breakdown (the key edge insight — long holds carry), and
+    actual-vs-model. Capital-independent where possible; cum/annual return need a
+    capital base (lens_config.start_balance, only used if it looks like a real
+    hedge balance, i.e. >= 100)."""
+    import math, datetime as _dt
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
+        "WHERE closed_at IS NOT NULL AND pnl IS NOT NULL ORDER BY closed_at"
+    ).fetchall()
+    cfg = conn.execute("SELECT start_balance, win_rate, rr_ratio FROM lens_config WHERE id=1").fetchone()
+    n_open = conn.execute("SELECT COUNT(*) FROM trades WHERE closed_at IS NULL").fetchone()[0]
+    conn.close()
+
+    n = len(rows)
+    if not n:
+        return {"n": 0, "open": n_open}
+
+    pnls = [r[0] for r in rows]
+    fees = [r[1] or 0.0 for r in rows]
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p <= 0]
+    nw, nl = len(wins), len(losses)
+    gw, gl = sum(wins), -sum(losses)
+    avg_win = gw / nw if nw else 0.0
+    avg_loss = gl / nl if nl else 0.0
+    total_pnl, total_fees = sum(pnls), sum(fees)
+
+    def _mins(o, c):
+        try:
+            a = _dt.datetime.fromisoformat(o.replace("Z", "+00:00"))
+            b = _dt.datetime.fromisoformat(c.replace("Z", "+00:00"))
+            return (b - a).total_seconds() / 60.0
+        except Exception:
+            return None
+    durs = [_mins(r[2 + 1], r[2 + 2]) for r in rows]  # opened_at idx3, closed_at idx4
+    vd = [d for d in durs if d is not None and d >= 0]
+    avg_dur_h = (sum(vd) / len(vd) / 60.0) if vd else None
+
+    longs = [r[0] for r in rows if r[2] == "long"]
+    shorts = [r[0] for r in rows if r[2] == "short"]
+    lwr = (sum(1 for p in longs if p > 0) / len(longs) * 100) if longs else None
+    swr = (sum(1 for p in shorts if p > 0) / len(shorts) * 100) if shorts else None
+
+    # equity curve on cumulative PnL → max drawdown (€) + streaks
+    eq = peak = 0.0
+    maxdd_eur = 0.0
+    cur_ws = cur_ls = max_ws = max_ls = 0
+    for p in pnls:
+        eq += p
+        peak = max(peak, eq)
+        maxdd_eur = max(maxdd_eur, peak - eq)
+        if p > 0:
+            cur_ws += 1; cur_ls = 0; max_ws = max(max_ws, cur_ws)
+        else:
+            cur_ls += 1; cur_ws = 0; max_ls = max(max_ls, cur_ls)
+
+    # per-trade Sharpe/Sortino (€ cancels: mean/stdev), annualised by trades/yr
+    mean_p = total_pnl / n
+    var = sum((p - mean_p) ** 2 for p in pnls) / n
+    sd = math.sqrt(var)
+    downs = [p for p in pnls if p < mean_p]
+    dvar = sum((p - mean_p) ** 2 for p in downs) / n if downs else 0.0
+    dsd = math.sqrt(dvar)
+    try:
+        t0 = _dt.datetime.fromisoformat(rows[0][4].replace("Z", "+00:00"))
+        t1 = _dt.datetime.fromisoformat(rows[-1][4].replace("Z", "+00:00"))
+        span_days = max(1, (t1 - t0).days)
+    except Exception:
+        span_days = 365
+    tpy = n / (span_days / 365.0)
+    sharpe = (mean_p / sd * math.sqrt(tpy)) if sd else 0.0
+    sortino = (mean_p / dsd * math.sqrt(tpy)) if dsd else 0.0
+
+    # capital-dependent (only if a real base exists)
+    capital = cfg[0] if (cfg and cfg[0] and cfg[0] >= 100) else None
+    cum_return = (total_pnl / capital * 100) if capital else None
+    ann_return = (cum_return / (span_days / 365.0)) if cum_return is not None else None
+    maxdd_pct = (maxdd_eur / capital * 100) if capital else None
+    calmar = (ann_return / maxdd_pct) if (ann_return is not None and maxdd_pct) else None
+
+    buckets = [("< 5m", 0, 5), ("5–15m", 5, 15), ("15–60m", 15, 60),
+               ("1–4h", 60, 240), ("4–24h", 240, 1440), ("> 24h", 1440, float("inf"))]
+    bd = []
+    for lbl, lo, hi in buckets:
+        idx = [i for i, d in enumerate(durs) if d is not None and lo <= d < hi]
+        cnt = len(idx)
+        w = sum(1 for i in idx if pnls[i] > 0)
+        tot = sum(pnls[i] for i in idx)
+        bd.append({"label": lbl, "n": cnt, "w": w, "l": cnt - w,
+                   "total": round(tot, 2), "avg": round(tot / cnt, 2) if cnt else 0.0})
+
+    return {
+        "n": n, "open": n_open,
+        "wr": round(nw / n * 100, 1),
+        "avg_win": round(avg_win, 2), "avg_loss": round(avg_loss, 2),
+        "rr": round(avg_win / avg_loss, 2) if avg_loss else None,
+        "expectancy": round(total_pnl / n, 2),
+        "total_pnl": round(total_pnl, 2), "total_fees": round(total_fees, 2),
+        "avg_dur_h": round(avg_dur_h, 1) if avg_dur_h else None,
+        "long_wr": round(lwr, 1) if lwr is not None else None,
+        "short_wr": round(swr, 1) if swr is not None else None,
+        "profit_factor": round(gw / gl, 3) if gl else None,
+        "max_dd_eur": round(maxdd_eur, 2), "max_dd_pct": round(maxdd_pct, 1) if maxdd_pct is not None else None,
+        "sharpe": round(sharpe, 3), "sortino": round(sortino, 3),
+        "win_streak": max_ws, "loss_streak": max_ls,
+        "cum_return": round(cum_return, 2) if cum_return is not None else None,
+        "ann_return": round(ann_return, 1) if ann_return is not None else None,
+        "calmar": round(calmar, 3) if calmar is not None else None,
+        "capital_base": capital,
+        "model_wr": round(cfg[1] * 100, 1) if (cfg and cfg[1]) else None,
+        "model_rr": cfg[2] if cfg else None,
+        "span_days": span_days,
+        "duration": bd,
+    }
 
 
 def get_ohlcv_1h() -> list:
@@ -189,7 +331,7 @@ REVIEW_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LENS // Review</title>
+<title>LENS // Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -244,8 +386,29 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 #sidebar{width:300px;display:flex;flex-direction:column;border-right:1px solid var(--b1);flex-shrink:0;background:var(--bg)}
 
 /* ── filters ── */
-#filters{padding:8px;border-bottom:1px solid var(--b1);display:flex;flex-wrap:wrap;gap:5px;background:var(--s1)}
-#filters select{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:3px 6px;border-radius:4px;font-size:10px;font-family:var(--ui);cursor:pointer;min-width:0}
+#filters{padding:9px;border-bottom:1px solid var(--b1);display:flex;flex-direction:column;gap:7px;background:var(--s1)}
+#filters select{width:100%;background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 6px;border-radius:4px;font-size:11px;font-family:var(--ui);cursor:pointer;min-width:0}
+.fseg{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fseg b{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:42px;flex:0 0 auto;font-weight:600}
+.fseg button{padding:2px 9px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:10px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
+.fseg button.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
+.sec-hd{margin:0;font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;cursor:pointer;background:var(--s2);border-bottom:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center;user-select:none;flex-shrink:0}
+.sec-hd:hover{color:var(--t1)}
+.sec-hd .cv{color:var(--t3);font-size:11px}
+#analytics{flex:1;min-height:0;overflow-y:auto;padding:14px}
+#chart-container{flex:none;height:34vh}
+.an-sec{margin-bottom:18px}
+.an-h{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px}
+.an-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.an-card{background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:8px 10px}
+.an-card .k{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.an-card .v{font-size:16px;font-weight:700;font-family:var(--mono)}
+.an-card .s{font-size:9px;color:var(--t3);margin-top:1px}
+.an-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.an-tbl th{text-align:right;color:var(--t3);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--b1);text-transform:uppercase;font-size:9px}
+.an-tbl th:first-child,.an-tbl td:first-child{text-align:left}
+.an-tbl td{text-align:right;padding:4px 8px;border-bottom:1px solid var(--b1);font-family:var(--mono)}
+.an-tbl tr.hot td{background:rgba(31,217,137,.10)}
 
 /* ── trade list ── */
 #trade-list{flex:1;overflow-y:auto}
@@ -286,7 +449,28 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 #chart-container{flex:1;min-height:0}
 
 /* ── detail panel ── */
-#detail{height:130px;border-top:1px solid var(--b1);background:var(--s1);padding:10px 16px;display:flex;gap:16px;flex-shrink:0;overflow:hidden}
+#detail{min-height:130px;max-height:340px;border-top:1px solid var(--b1);background:var(--s1);padding:10px 16px;display:flex;flex-wrap:wrap;gap:16px;flex-shrink:0;overflow-y:auto}
+#det-review{flex-basis:100%;border-top:1px solid var(--b1);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.rv-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.rv-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;width:78px;flex:0 0 auto}
+.rv-opt{padding:2px 8px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:11px;font-family:var(--mono);cursor:pointer}
+.rv-opt.on{border-color:var(--ac);background:var(--ac);color:var(--bg);font-weight:700}
+.rv-opt.miss.on{border-color:var(--re);background:rgba(255,84,104,.15);color:var(--re)}
+.rv-opt.grade.on{border-color:var(--am);background:transparent;color:var(--am)}
+.rv-refl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.rv-refl textarea{background:var(--s2);border:1px solid var(--b2);border-radius:5px;color:var(--t1);font-size:11px;font-family:var(--mono);padding:5px 7px;min-height:42px;resize:vertical;outline:none}
+.rv-save{align-self:flex-start;margin-top:2px;padding:6px 16px;border:none;border-radius:5px;background:var(--ac);color:var(--bg);font-size:11px;font-weight:700;cursor:pointer}
+/* big trade modal */
+.bm-bg{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:20px}
+.bm-bg.open{display:flex}
+.bm{width:min(1100px,96vw);max-height:92vh;overflow-y:auto;background:var(--s1);border:1px solid var(--b2);border-radius:12px;padding:16px 18px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.bm-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.bm-title{font-size:16px;font-weight:700;font-family:var(--mono)}
+.bm-x{font-size:18px;color:var(--t3);background:none;border:none;cursor:pointer}
+#bm-chart{height:46vh;min-height:260px;border:1px solid var(--b1);border-radius:8px;margin-bottom:12px}
+.bm-cols{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:12px}
+#bm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;align-content:start}
+#bm-review{display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--b1);padding-top:10px}
 #det-left{flex:1;min-width:0}
 #det-right{width:220px;flex-shrink:0}
 .det-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -351,7 +535,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 <body>
 
 <div class="topbar">
-  <div class="logo">LEN<span class="s">S</span> <span class="pg">Review</span></div>
+  <div class="logo">LEN<span class="s">S</span> <span class="pg">Journal</span></div>
   <div class="modesw">
     <a href="/prop">◎ PROP</a>
     <a href="/dashboard" class="on">▤ HEDGE</a>
@@ -361,16 +545,13 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/dashboard">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
-    <a href="/review" class="cur">Review</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/journal" class="cur">Journal</a>
+    <a href="/edge">Edge</a>
     <a href="/projection">Projection</a>
   </nav>
   <div class="topbar-right">
-    <div class="chips">
-      <div class="chip">WR <b id="s-wr">—</b></div>
-      <div class="chip">Avg <b id="s-avg">—</b></div>
-      <div class="chip">n=<b id="s-n">—</b></div>
-      <div class="chip">Total <b id="s-total">—</b></div>
-    </div>
     <button class="tb-btn" onclick="openLogModal()">+ Log Trade</button>
     <button class="tb-btn primary" id="sync-btn" onclick="syncKraken()">Sync Kraken</button>
     <span class="sync-status" id="sync-status"></span>
@@ -380,25 +561,21 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 
 <div id="content">
   <div id="sidebar">
+    <div class="sec-hd" onclick="secToggle('filters','filters')">Filters <span class="cv" id="filters-car">▾</span></div>
     <div id="filters">
-      <select id="f-dir"    onchange="filter()"><option value="">All dirs</option><option>long</option><option>short</option></select>
-      <select id="f-tag"    onchange="filter()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
-      <select id="f-bar"    onchange="filter()"><option value="">Bar: all</option><option value="true">Bar ✓</option><option value="false">Bar ✗</option></select>
-      <select id="f-4h"     onchange="filter()"><option value="">4H: all</option><option value="true">4H ✓</option><option value="false">4H ✗</option></select>
-      <select id="f-rsi"    onchange="filter()"><option value="">RSI: all</option><option value="dip">Dip &lt;40</option><option value="momentum">Mom &gt;55</option><option value="neutral">Neutral</option></select>
-      <select id="f-result" onchange="filter()"><option value="">All results</option><option value="win">Wins</option><option value="loss">Losses</option></select>
+      <select id="f-tag" onchange="filter()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
+      <div class="fseg" data-k="dir"><b>Dir</b><button data-v="" class="on">All</button><button data-v="long">Long</button><button data-v="short">Short</button></div>
+      <div class="fseg" data-k="result"><b>Result</b><button data-v="" class="on">All</button><button data-v="win">Win</button><button data-v="loss">Loss</button></div>
+      <div class="fseg" data-k="bar"><b>Bar</b><button data-v="" class="on">All</button><button data-v="true">✓</button><button data-v="false">✗</button></div>
+      <div class="fseg" data-k="h4"><b>4H</b><button data-v="" class="on">All</button><button data-v="true">✓</button><button data-v="false">✗</button></div>
+      <div class="fseg" data-k="rsi"><b>RSI</b><button data-v="" class="on">All</button><button data-v="dip">Dip</button><button data-v="momentum">Mom</button><button data-v="neutral">Neut</button></div>
     </div>
+    <div class="sec-hd" onclick="secToggle('list','trade-list')">Trades <span class="cv" id="list-car">▾</span></div>
     <div id="trade-list"><div style="padding:16px;color:var(--t3)">Loading…</div></div>
-    <div id="edge-panel">
-      <h3>Edge by Setup Tag</h3>
-      <table class="edge-tbl">
-        <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th></tr></thead>
-        <tbody id="edge-body"></tbody>
-      </table>
-    </div>
   </div>
 
   <div id="main">
+    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart (also in trade modal) <span class="cv" id="chart-car">▾</span></div>
     <div id="chart-container"></div>
     <div id="detail">
       <button id="det-close" onclick="document.getElementById('detail').classList.remove('open')">▾ close</button>
@@ -421,6 +598,42 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
         </div>
       </div>
       <div id="det-right"><div class="cond-grid" id="cond-grid"></div></div>
+      <div id="det-review" style="display:none">
+        <div class="rv-row"><span class="rv-l">Grade</span><span class="rv-opts" id="rv-grade"></span></div>
+        <div class="rv-row"><span class="rv-l">Conviction</span><span class="rv-opts" id="rv-conv"></span></div>
+        <div class="rv-row"><span class="rv-l">Emotion</span><span class="rv-opts" id="rv-emo"></span></div>
+        <div class="rv-row"><span class="rv-l">Mistakes</span><span class="rv-opts" id="rv-miss"></span></div>
+        <div class="rv-refl">
+          <textarea id="rv-right" placeholder="what went right…"></textarea>
+          <textarea id="rv-wrong" placeholder="what went wrong…"></textarea>
+          <textarea id="rv-lesson" placeholder="lesson / takeaway…"></textarea>
+        </div>
+        <button id="rv-save" class="rv-save" onclick="saveReview('rv')">💾 Save review</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Big trade review modal (chart + breakdown + context + review) -->
+<div class="bm-bg" id="big-modal" onclick="if(event.target===this)closeBig()">
+  <div class="bm">
+    <div class="bm-head"><div class="bm-title" id="bm-title">—</div><button class="bm-x" onclick="closeBig()">✕</button></div>
+    <div id="bm-chart"></div>
+    <div class="bm-cols">
+      <div class="det-grid" id="bm-grid"></div>
+      <div class="cond-grid" id="bm-cond"></div>
+    </div>
+    <div id="bm-review">
+      <div class="rv-row"><span class="rv-l">Grade</span><span class="rv-opts" id="bm-grade"></span></div>
+      <div class="rv-row"><span class="rv-l">Conviction</span><span class="rv-opts" id="bm-conv"></span></div>
+      <div class="rv-row"><span class="rv-l">Emotion</span><span class="rv-opts" id="bm-emo"></span></div>
+      <div class="rv-row"><span class="rv-l">Mistakes</span><span class="rv-opts" id="bm-miss"></span></div>
+      <div class="rv-refl">
+        <textarea id="bm-right" placeholder="what went right…"></textarea>
+        <textarea id="bm-wrong" placeholder="what went wrong…"></textarea>
+        <textarea id="bm-lesson" placeholder="lesson / takeaway…"></textarea>
+      </div>
+      <button id="bm-save" class="rv-save" onclick="saveReview('bm')">💾 Save review</button>
     </div>
   </div>
 </div>
@@ -511,13 +724,26 @@ async function saveTag(val) {
 }
 
 // ── filters ────────────────────────────────────────────────────────────────────
+// Segmented filter state (chips), tag stays a select (dynamic values).
+const F = {dir:'', result:'', bar:'', h4:'', rsi:''};
+(function wireFilters(){
+  const box = document.getElementById('filters');
+  if (!box) return;
+  box.addEventListener('click', e => {
+    const b = e.target.closest('.fseg button'); if (!b) return;
+    const seg = b.closest('.fseg');
+    F[seg.dataset.k] = b.dataset.v;
+    seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    filter();
+  });
+})();
 function filter() {
-  const dir = document.getElementById('f-dir').value;
+  const dir = F.dir;
   const tag = document.getElementById('f-tag').value;
-  const bar = document.getElementById('f-bar').value;
-  const th  = document.getElementById('f-4h').value;
-  const rsi = document.getElementById('f-rsi').value;
-  const res = document.getElementById('f-result').value;
+  const bar = F.bar;
+  const th  = F.h4;
+  const rsi = F.rsi;
+  const res = F.result;
   visible = ALL_TRADES.filter(t => {
     if (dir && t.direction !== dir) return false;
     const tg = t.setup_tag || '';
@@ -549,7 +775,7 @@ function renderList() {
     if (t.rsi_zone==='momentum') bs.push('<span class="badge b-mom">MOM</span>');
     if (t.rsi_zone==='neutral')  bs.push('<span class="badge b-neu">NEU</span>');
     if (t.setup_tag) bs.push(`<span class="badge b-setup">${t.setup_tag}</span>`);
-    return `<div class="trade-row${sel?' selected':''}" onclick="pick(${t.id})">
+    return `<div class="trade-row${sel?' selected':''}" onclick="openTrade(${t.id})">
       <span class="tr-date">${t.opened_at.slice(0,16)}</span>
       <span class="tr-dir ${t.direction}">${t.direction==='long'?'L':'S'}</span>
       <span class="tr-pnl ${pnl>=0?'pos':'neg'}">${ps}${pnl.toFixed(0)}€</span>
@@ -603,37 +829,224 @@ function renderDetail(t) {
     <div class="cond-item"><label>Bal After</label>
       <value>${t.balance_after!=null?t.balance_after.toFixed(2)+'€':'—'}</value></div>
   `;
+  renderReview(t);
+}
+
+// ── review layer (parity with the calendar modal) ───────────────────────────────
+const RV_MISTAKES=["chased","early","late","oversized","moved stop","no stop","revenge","FOMO","overheld","cut early","no setup"];
+const RV_EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
+const RV_GRADES=["A","B","C","D","F"];
+let rev={};
+// Render the review controls into a container prefixed `p` (rv = sidebar strip,
+// bm = big modal). Shares the `rev` state + `selected` trade (one open at a time).
+function renderReview(t, p='rv'){
+  const host=document.getElementById(p+'-review'); if(host) host.style.display='flex';
+  rev={grade:t.grade||null,conviction:t.conviction||null,emotion:t.emotion||null,
+       mistakes:new Set((t.mistakes||'').split(',').map(s=>s.trim()).filter(Boolean))};
+  const opt=(v,on,cls)=>`<button class="rv-opt ${cls||''} ${on?'on':''}" data-v="${v}">${v}</button>`;
+  document.getElementById(p+'-grade').innerHTML=RV_GRADES.map(g=>opt(g,rev.grade===g,'grade')).join('');
+  document.getElementById(p+'-conv').innerHTML=[1,2,3,4,5].map(c=>opt(c,String(rev.conviction)===String(c),'')).join('');
+  document.getElementById(p+'-emo').innerHTML=RV_EMOTIONS.map(e=>opt(e,rev.emotion===e,'')).join('');
+  document.getElementById(p+'-miss').innerHTML=RV_MISTAKES.map(m=>`<button class="rv-opt miss ${rev.mistakes.has(m)?'on':''}" data-m="${m}">${m}</button>`).join('');
+  document.getElementById(p+'-right').value=t.went_right||'';
+  document.getElementById(p+'-wrong').value=t.went_wrong||'';
+  document.getElementById(p+'-lesson').value=t.lesson||'';
+  const single=(rowId,key)=>document.querySelectorAll('#'+rowId+' .rv-opt').forEach(b=>b.onclick=()=>{
+    let v=b.dataset.v; if(key==='conviction')v=parseInt(v);
+    rev[key]=(String(rev[key])===String(v))?null:v;
+    document.querySelectorAll('#'+rowId+' .rv-opt').forEach(x=>x.classList.toggle('on',rev[key]!=null&&String(rev[key])===String(x.dataset.v)));
+  });
+  single(p+'-grade','grade'); single(p+'-conv','conviction'); single(p+'-emo','emotion');
+  document.querySelectorAll('#'+p+'-miss .rv-opt').forEach(b=>b.onclick=()=>{
+    const m=b.dataset.m;
+    if(rev.mistakes.has(m)){rev.mistakes.delete(m);b.classList.remove('on');}
+    else{rev.mistakes.add(m);b.classList.add('on');}
+  });
+}
+async function saveReview(p='rv'){
+  if(!selected) return;
+  const btn=document.getElementById(p+'-save'); btn.textContent='Saving…'; btn.disabled=true;
+  const payload={manually_edited:true,
+    went_right:document.getElementById(p+'-right').value||undefined,
+    went_wrong:document.getElementById(p+'-wrong').value||undefined,
+    lesson:document.getElementById(p+'-lesson').value||undefined,
+    mistakes:[...rev.mistakes].join(',')||undefined};
+  if(rev.grade!=null) payload.grade=rev.grade;
+  if(rev.conviction!=null) payload.conviction=rev.conviction;
+  if(rev.emotion!=null) payload.emotion=rev.emotion;
+  Object.keys(payload).forEach(k=>payload[k]===undefined&&delete payload[k]);
+  try{
+    const r=await fetch('/api/trades/'+selected.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    await r.json();
+    Object.assign(selected,{grade:rev.grade,conviction:rev.conviction,emotion:rev.emotion,
+      mistakes:[...rev.mistakes].join(','),went_right:payload.went_right||'',went_wrong:payload.went_wrong||'',lesson:payload.lesson||''});
+    const idx=ALL_TRADES.findIndex(x=>x.id===selected.id); if(idx>=0) Object.assign(ALL_TRADES[idx],selected);
+    btn.textContent='✓ Saved'; setTimeout(()=>{btn.textContent='💾 Save review';btn.disabled=false;},1200);
+    renderEdge();
+  }catch(e){console.error(e);btn.textContent='Error — retry';btn.disabled=false;}
+}
+
+// ── big trade modal (chart + breakdown + context + review) ──────────────────────
+let bmChart=null, bmSeries=null;
+function openTrade(id){ pick(id); if(selected) openBig(selected); }
+function openBig(t){
+  const dc=t.direction==='long'?'var(--gr)':'var(--re)', pc=(t.pnl||0)>=0?'var(--gr)':'var(--re)';
+  document.getElementById('bm-title').innerHTML=
+    `<span style="color:${dc}">${t.direction==='long'?'▲ LONG':'▼ SHORT'}</span> ${t.symbol||'BTC/USD'} · #${t.id} `+
+    `· <span style="color:${pc}">${(t.pnl||0)>=0?'+':''}${(t.pnl||0).toFixed(2)}€</span>${t.setup_tag?` · <span style="color:var(--ac)">${t.setup_tag}</span>`:''}`;
+  // reuse the already-rendered strip grids (pick → renderDetail ran first)
+  document.getElementById('bm-grid').innerHTML=document.getElementById('det-grid').innerHTML;
+  document.getElementById('bm-cond').innerHTML=document.getElementById('cond-grid').innerHTML;
+  renderReview(t,'bm');
+  document.getElementById('big-modal').classList.add('open');
+  // chart: fresh instance from the loaded candles, disposed on close
+  const el=document.getElementById('bm-chart'); el.innerHTML='';
+  bmChart=LightweightCharts.createChart(el,{layout:{background:{color:'#06080c'},textColor:'#465064'},
+    grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},
+    rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
+  bmSeries=bmChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'});
+  bmSeries.setData(CANDLES);
+  const isL=t.direction==='long', ec=isL?'#1fd989':'#ff5468', L=LightweightCharts.LineStyle;
+  if(t.entry) bmSeries.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
+  if(t.exit)  bmSeries.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
+  if(t.tp)    bmSeries.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'});
+  if(t.sl)    bmSeries.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'});
+  const ms=[];
+  if(t.ts_entry) ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
+  if(t.ts_exit)  ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
+  bmSeries.setMarkers(ms);
+  setTimeout(()=>{ if(!bmChart)return; bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});
+    if(t.ts_entry) bmChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}); },30);
+}
+function closeBig(){
+  document.getElementById('big-modal').classList.remove('open');
+  if(bmChart){ try{bmChart.remove();}catch(e){} bmChart=null; bmSeries=null; }
+  if(location.search.includes('trade=')) history.replaceState(null,'','/review');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.getElementById('big-modal').classList.contains('open')) closeBig(); });
+
+// ── collapsible sections, persisted in localStorage ─────────────────────────────
+function secToggle(key, bdId){
+  const bd=document.getElementById(bdId);
+  const collapsing = bd.style.display!=='none';
+  bd.style.display = collapsing?'none':'';
+  const car=document.getElementById(key+'-car'); if(car) car.textContent=collapsing?'▸':'▾';
+  const s=JSON.parse(localStorage.getItem('rv-secs')||'{}'); s[key]=collapsing; localStorage.setItem('rv-secs',JSON.stringify(s));
+  if(key==='chart' && !collapsing) setTimeout(()=>chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight}),20);
+}
+// ── analytics dashboard ─────────────────────────────────────────────────────────
+function renderAnalytics(a){
+  const host=document.getElementById('analytics'); if(!host) return;
+  if(!a || !a.n){ host.innerHTML='<div style="padding:16px;color:var(--t3)">No closed trades</div>'; return; }
+  const eur=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(2);
+  const pc=v=>v>=0?'var(--gr)':'var(--re)';
+  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--t1)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
+  const perf=`<div class="an-sec"><div class="an-h">Performance · live from trade log</div><div class="an-grid">`+
+    card('Trades',a.n,a.open?a.open+' open':'')+
+    card('Win Rate',a.wr+'%',a.long_wr!=null?`L ${a.long_wr}% · S ${a.short_wr}%`:'')+
+    card('Net P&L',eur(a.total_pnl),'',pc(a.total_pnl))+
+    card('Expectancy',eur(a.expectancy),'per trade',pc(a.expectancy))+
+    card('Avg Win',eur(a.avg_win),'','var(--gr)')+
+    card('Avg Loss',eur(-a.avg_loss),'','var(--re)')+
+    card('Actual R:R',a.rr!=null?a.rr+'×':'—','')+
+    card('Profit Factor',a.profit_factor!=null?a.profit_factor:'—','',a.profit_factor>=1?'var(--gr)':'var(--re)')+
+    card('Total Fees',eur(-a.total_fees),'','var(--re)')+
+    card('Avg Duration',a.avg_dur_h!=null?a.avg_dur_h+'h':'—','')+
+    `</div></div>`;
+  const risk=`<div class="an-sec"><div class="an-h">Risk-adjusted</div><div class="an-grid">`+
+    card('Sharpe',a.sharpe,'per-trade · ann.',a.sharpe>=0?'var(--gr)':'var(--re)')+
+    card('Sortino',a.sortino,'',a.sortino>=0?'var(--gr)':'var(--re)')+
+    card('Max DD',eur(-a.max_dd_eur)+(a.max_dd_pct!=null?` · ${a.max_dd_pct}%`:''),'peak→trough','var(--re)')+
+    card('Win Streak',a.win_streak,'','var(--gr)')+
+    card('Loss Streak',a.loss_streak,'','var(--re)')+
+    (a.cum_return!=null?card('Cum Return',a.cum_return+'%','',pc(a.cum_return)):card('Cum Return','—','set capital base'))+
+    (a.ann_return!=null?card('Ann Return',a.ann_return+'%','',pc(a.ann_return)):'')+
+    (a.calmar!=null?card('Calmar',a.calmar,''):'')+
+    `</div></div>`;
+  const dWR=a.wr-(a.model_wr||0), dRR=(a.rr||0)-(a.model_rr||0);
+  const avm=`<div class="an-sec"><div class="an-h">Actual vs Model</div><table class="an-tbl">
+    <tr><th>Metric</th><th>Model</th><th>Actual</th><th>Δ</th></tr>
+    <tr><td>Win Rate</td><td>${a.model_wr!=null?a.model_wr+'%':'—'}</td><td>${a.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
+    <tr><td>R:R</td><td>${a.model_rr!=null?a.model_rr+'×':'—'}</td><td>${a.rr!=null?a.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr>
+    </table></div>`;
+  const dur=`<div class="an-sec"><div class="an-h">Trade Duration Breakdown <span style="color:var(--t3);text-transform:none;font-weight:400">— where the edge lives</span></div><table class="an-tbl">
+    <tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>`+
+    a.duration.map(d=>`<tr class="${d.total>0&&d.n>=8?'hot':''}"><td>${d.label}</td><td>${d.n}</td><td>${d.w}</td><td>${d.l}</td>
+      <td style="color:${pc(d.total)}">${eur(d.total)}</td><td style="color:${pc(d.avg)}">${eur(d.avg)}</td></tr>`).join('')+
+    `</table></div>`;
+  host.innerHTML=perf+risk+avm+dur;
+}
+
+function restoreSecs(){
+  const map={filters:'filters', list:'trade-list', chart:'chart-container'};
+  const s=JSON.parse(localStorage.getItem('rv-secs')||'{}');
+  if(s.chart===undefined) s.chart=true;   // charts live in the modal → collapse page chart by default
+  Object.keys(map).forEach(key=>{
+    if(s[key]){ const bd=document.getElementById(map[key]); if(bd) bd.style.display='none';
+      const car=document.getElementById(key+'-car'); if(car) car.textContent='▸'; }
+  });
 }
 
 // ── edge table ─────────────────────────────────────────────────────────────────
+// Collapse a raw setup_tag into a readable family: S1..S5 stand alone, a
+// matched-but-vetoed setup → "Sx (vetoed)", a pure veto → "VETO", else as-is.
+function edgeFamily(tag){
+  if(!tag) return '(untagged)';
+  if(tag.startsWith('VETO:')) return 'VETO';
+  if(tag.includes('|VETO:')) return tag.split('|')[0]+' (vetoed)';
+  return tag;
+}
+// KEEP/CUT/SIZE-UP from realised expectancy + sample. Thin samples say so.
+function edgeVerdict(n,wr,exp){
+  if(n<8)              return ['THIN','var(--t3)'];
+  if(exp<=0)           return ['CUT','var(--re)'];
+  if(exp>=10&&n>=12&&wr>=45) return ['SIZE-UP','var(--gr)'];
+  return ['KEEP','var(--am)'];
+}
 function renderEdge() {
+  if (!document.getElementById('edge-body')) return;  // edge moved to its own /edge page
   const g = {};
   visible.forEach(t => {
-    const k = t.setup_tag || '(untagged)';
-    if (!g[k]) g[k]={n:0,wins:0,total:0};
+    const k = edgeFamily(t.setup_tag);
+    if (!g[k]) g[k]={n:0,wins:0,total:0,byGrade:{}};
     g[k].n++; if ((t.pnl||0)>0) g[k].wins++; g[k].total+=t.pnl||0;
+    const gr=t.grade||'—';
+    if(!g[k].byGrade[gr]) g[k].byGrade[gr]={n:0,wins:0,total:0};
+    g[k].byGrade[gr].n++; if((t.pnl||0)>0) g[k].byGrade[gr].wins++; g[k].byGrade[gr].total+=t.pnl||0;
   });
   const rows = Object.entries(g).sort((a,b)=>b[1].total-a[1].total);
-  document.getElementById('edge-body').innerHTML = rows.map(([k,g])=>`
-    <tr>
-      <td>${k}</td><td>${g.n}</td>
-      <td>${(g.wins/g.n*100).toFixed(0)}%</td>
-      <td style="color:${g.total/g.n>=0?'var(--gr)':'var(--re)'}">${(g.total/g.n>=0?'+':'')+(g.total/g.n).toFixed(0)}€</td>
-      <td style="color:${g.total>=0?'var(--gr)':'var(--re)'}">${(g.total>=0?'+':'')+(g.total).toFixed(0)}€</td>
-    </tr>`).join('');
+  document.getElementById('edge-body').innerHTML = rows.map(([k,d])=>{
+    const exp=d.total/d.n, wr=d.wins/d.n*100;
+    const [vlabel,vcol]=edgeVerdict(d.n,wr,exp);
+    const grades=Object.entries(d.byGrade).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+    const sub = grades.length>1 ? grades.map(([gr,gd])=>
+      `<span style="display:inline-block;font-size:9px;padding:1px 5px;margin:3px 4px 0 0;border:1px solid var(--b3);border-radius:3px;color:var(--t2)">`+
+      `${gr}: ${gd.n}·${(gd.wins/gd.n*100).toFixed(0)}%·<span style="color:${gd.total>=0?'var(--gr)':'var(--re)'}">${gd.total>=0?'+':''}${gd.total.toFixed(0)}€</span></span>`
+    ).join('') : '';
+    return `<tr>
+      <td>${k}</td><td>${d.n}</td>
+      <td>${wr.toFixed(0)}%</td>
+      <td style="color:${exp>=0?'var(--gr)':'var(--re)'}">${(exp>=0?'+':'')+exp.toFixed(0)}€</td>
+      <td style="color:${d.total>=0?'var(--gr)':'var(--re)'}">${(d.total>=0?'+':'')+d.total.toFixed(0)}€</td>
+      <td><b style="color:${vcol}">${vlabel}</b></td>
+    </tr>${sub?`<tr><td colspan="6" style="padding:0 0 4px 8px">${sub}</td></tr>`:''}`;
+  }).join('');
 }
 
 // ── header stats ───────────────────────────────────────────────────────────────
 function updateStats() {
+  // top chips removed — the Analytics section owns these now. Kept as a no-op
+  // (still called from filter()); guarded so absent elements don't throw.
+  const el = document.getElementById('s-wr');
+  if (!el) return;
   const n = visible.length;
   const wins  = visible.filter(t=>(t.pnl||0)>0).length;
   const total = visible.reduce((s,t)=>s+(t.pnl||0),0);
   const avg   = n ? total/n : 0;
-  document.getElementById('s-wr').textContent    = n ? (wins/n*100).toFixed(1)+'%' : '—';
+  el.textContent = n ? (wins/n*100).toFixed(1)+'%' : '—';
   document.getElementById('s-avg').textContent   = n ? (avg>=0?'+':'')+avg.toFixed(0)+'€' : '—';
   document.getElementById('s-n').textContent     = n;
   document.getElementById('s-total').textContent = n ? (total>=0?'+':'')+total.toFixed(0)+'€' : '—';
-  document.querySelector('#s-total').parentElement.className = 'chip '+(total>=0?'pos':'neg');
 }
 
 // ── tag filter ─────────────────────────────────────────────────────────────────
@@ -734,7 +1147,10 @@ async function init() {
     series.setData(CANDLES);
     buildTagFilter();
     filter();
-    if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
+    restoreSecs();
+    const qid = new URLSearchParams(location.search).get('trade');
+    if (qid && ALL_TRADES.some(t => String(t.id)===String(qid))) openTrade(parseInt(qid));
+    else if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);
   } catch(e) {
     document.getElementById('trade-list').innerHTML = `<div style="padding:16px;color:var(--re)">Load error: ${e.message}</div>`;
   }
