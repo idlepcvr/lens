@@ -1712,6 +1712,12 @@ class ConfigUpdate(BaseModel):
     btc_growth_monthly:      Optional[float] = None
 
 
+@app.get("/goal", response_class=HTMLResponse)
+def goal_page():
+    from .goal_page import render
+    return render()
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()

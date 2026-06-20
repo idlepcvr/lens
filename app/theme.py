@@ -31,6 +31,7 @@ NAV_PROP = [
 ]
 NAV_HEDGE = [
     ("/dashboard", "Dashboard"),
+    ("/goal", "Goal"),
     ("/desk", "Desk"),
     ("/signals", "Signals"),
     ("/calendar", "Calendar"),
