@@ -33,7 +33,7 @@ NAV_HEDGE = [
     ("/desk", "Desk"),
     ("/signals", "Signals"),
     ("/calendar", "Calendar"),
-    ("/review", "Review"),
+    ("/recap", "Recap"),
     ("/projection", "Projection"),
 ]
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.

@@ -2182,6 +2182,12 @@ def api_backtest_strategies():
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
 
+@app.get("/recap", response_class=HTMLResponse)
+def recap_page():
+    return REVIEW_HTML
+
+
+# Legacy alias — kept working, hidden from nav.
 @app.get("/review", response_class=HTMLResponse)
 def review_page():
     return REVIEW_HTML

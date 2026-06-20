@@ -331,7 +331,7 @@ REVIEW_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LENS // Review</title>
+<title>LENS // Recap</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -535,7 +535,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 <body>
 
 <div class="topbar">
-  <div class="logo">LEN<span class="s">S</span> <span class="pg">Review</span></div>
+  <div class="logo">LEN<span class="s">S</span> <span class="pg">Recap</span></div>
   <div class="modesw">
     <a href="/prop">◎ PROP</a>
     <a href="/dashboard" class="on">▤ HEDGE</a>
@@ -546,7 +546,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/calendar">Calendar</a>
-    <a href="/review" class="cur">Review</a>
+    <a href="/recap" class="cur">Recap</a>
     <a href="/projection">Projection</a>
   </nav>
   <div class="topbar-right">
