@@ -2184,7 +2184,8 @@ def api_backtest_strategies():
 
 @app.get("/journal", response_class=HTMLResponse)
 def journal_page():
-    return REVIEW_HTML
+    from .journal_page import JOURNAL_HTML
+    return JOURNAL_HTML
 
 
 @app.get("/analytics", response_class=HTMLResponse)
