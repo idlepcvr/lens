@@ -74,6 +74,24 @@ function toggleRow(id){
   r.style.display = r.style.display==='none' ? '' : 'none';
 }
 
+// the full order ticket (sizing as the alert + desk compute it) — same numbers
+// you'd punch into Kraken. null when the signal predates ticket math.
+function ticketBlock(t){
+  if(!t) return '';
+  const winBal = t.account + t.reward_usd, loseBal = t.account - t.risk_usd;
+  return `<div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px">`
+    + `full ticket · acct $${money(t.account)} · ${t.leverage}× · fee ${t.fee_rt_pct.toFixed(2)}%</div>`
+    + `<div class="kv"><span class="k">notional</span><span class="v">$${money(t.notional)}</span></div>`
+    + `<div class="kv"><span class="k">size</span><span class="v">${t.size_btc.toFixed(4)} ₿</span></div>`
+    + `<div class="kv"><span class="k">margin</span><span class="v">$${money(t.margin_usd)} · ${t.cost_btc.toFixed(4)} ₿</span></div>`
+    + `<div class="kv"><span class="k">win balance</span><span class="v g">$${money(winBal)} (+$${money(t.reward_usd)})</span></div>`
+    + `<div class="kv"><span class="k">lose balance</span><span class="v r">$${money(loseBal)} (−$${money(t.risk_usd)})</span></div>`
+    + `<div class="kv"><span class="k">risk</span><span class="v r">$${money(t.risk_usd)} · ${t.loss_pct.toFixed(1)}%</span></div>`
+    + `<div class="kv"><span class="k">hurdle</span><span class="v">$${t.hurdle_usd.toFixed(2)} (${t.fee_rt_pct.toFixed(2)}% rt)</span></div>`
+    + `<div class="kv"><span class="k">breakeven</span><span class="v">${money(t.breakeven)}</span></div>`
+    + `<div class="kv"><span class="k">liquidation</span><span class="v">${money(t.liq)}</span></div>`;
+}
+
 // each decision row expands to the full plan as proposed + decision timing
 function historyRow(s){
   const id = s.signal_id;
@@ -86,7 +104,8 @@ function historyRow(s){
       <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
       <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
     </div>
-    <div class="kv"><span class="k">strategy</span><span class="v">${s.strategy_name||'—'}${s.symbol?(' · '+s.symbol):''}</span></div>
+    ${ticketBlock(s.ticket)}
+    <div class="kv" style="margin-top:8px"><span class="k">strategy</span><span class="v">${s.strategy_name||'—'}${s.symbol?(' · '+s.symbol):''}</span></div>
     <div class="kv"><span class="k">proposed</span><span class="v">${fmtTs(s.received_at)}</span></div>
     <div class="kv"><span class="k">decided</span><span class="v">${fmtTs(s.decided_at)}${g?(' · '+g+' later'):''}</span></div>
     <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
@@ -132,6 +151,15 @@ function render(all){
   html += `<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ what is this page</span><span class="line"></span></div>`
     + `<div class="sec-body closed" id="s-help"><div class="help-body">`
     + `<h4>the queue</h4>Signals the hourly scanner fired land here as <b class="a">pending</b>. Decide each one: <b class="g">TAKE A+</b> (high conviction, =5), <b class="g">TAKE</b> (=3), or <b class="r">SKIP</b>. Same buttons as the phone alert + the desk.`
+    + `<h4>proposed vs decided</h4><b>Proposed</b> = when LENS's hourly scanner spotted the setup (the machine, always automatic). <b>Decided</b> = when a verdict was recorded. Click any row in <b>recent decisions</b> to expand its full ticket + both timestamps.`
+    + `<h4>who decides</h4>Two deciders, and the <b>reason</b> field tells you which acted. <b>1) LENS itself</b> — the discipline filters auto-reject a signal the instant it's born if it breaks a rule (proposed = decided, conviction —). <b>2) You</b> — signals that pass the filters sit <b class="a">pending</b> until you TAKE/SKIP. I'm not in the loop. A <code>filter:*</code> reason = the machine skipped it; <code>skipped from…</code> = you did.`
+    + `<h4>the filters (auto-skips)</h4>Mined from the PRISM loss fingerprint — each one cost real money historically. A rejected signal is still stored so the dataset stays complete.`
+    + `<ul style="margin:6px 0 0 16px;padding:0">`
+    + `<li><code>filter:saturday</code> — no trading Saturday (UTC). Sat bled €2,606, PF 0.38. <i>(your weekend rejects)</i></li>`
+    + `<li><code>filter:bleed_hour_02utc</code> / <code>_11utc</code> — skip the two hours that bleed across every year (PF 0.26 / 0.38).</li>`
+    + `<li><code>filter:bad_venue_&lt;x&gt;</code> — Kraken only. Bybit cost €1,874 in 84 trades (PF 0.40), auto-rejected.</li>`
+    + `<li><code>filter:cooldown_&lt;n&gt;min</code> — anti-revenge: &lt;5 min since the last accepted signal on the same symbol. Overtrading cost €1,946.</li>`
+    + `</ul>`
     + `<h4>why skips matter</h4>A skip is recorded too — it trains the veto map (where you correctly stood down). Don't ignore them.`
     + `<h4>conviction</h4>The number feeds your conviction win-rate metric. Be honest: A+ only for genuine A+ context, not FOMO.`
     + `<h4>you still place the trade</h4>Approving here logs the decision — it does <b>not</b> place an order. Execute on Kraken yourself.`

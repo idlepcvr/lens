@@ -18,6 +18,7 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 NAV_PROP = [
     ("/prop", "Goals"),
     ("/prop-desk", "Live"),
+    ("/prop-signals", "Signals"),
     ("/prop-ledger", "Ledger"),
     ("/prop-income", "Income"),
     ("/strategy", "Strategy"),

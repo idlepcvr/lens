@@ -82,6 +82,16 @@ conviction 3), **SKIP** (reject) — that POST straight to
 LENS server must be reachable from the phone: works on home wifi (LAN), needs a
 public tunnel on mobile data. Target URL is `LENS_BASE_URL` (see *Running it*).
 
+**The alert is a lock-screen ticket (2026-06-21).** The push is deliberately
+lean — setup + direction, the three levels (entry / TP / SL with the underlying
+move), **win/lose balance**, notional, leverage and account risk — enough to
+decide and place the order. The deep breakdown (breakeven, liquidation, Kelly,
+geometric drift) lives on `/desk` and the review pages, not the lock screen.
+Sizing is tunable in `prism.env`: `LENS_ACCOUNT_USD`, `LENS_LEVERAGE`,
+`LENS_FEE_RT_PCT`. **Both modes alert now:** HEDGE fires hourly (`app.setups`),
+PROP fires on Asian-session 4H closes (`app.prop_scan`, 00/04 UTC) — see the
+prop track below.
+
 **The one manual step:** the hourly cron does **not** pull your fills from
 Kraken — `run_scan_cli` only scans, emits, notifies, and tags *already-synced*
 untagged trades. After you place a trade you must run a Kraken sync
@@ -101,8 +111,8 @@ Start the server (below), then visit **http://localhost:8765**. The home page
 ("/") is a **two-door mode chooser** — the app is split into two systems that
 never share a nav (2026-06-17):
 
-- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Live · Ledger · Income ·
-  Strategy · Risk · Survival · Rules · Equity · Regime · Backtest**.
+- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Live · Signals · Ledger ·
+  Income · Strategy · Risk · Survival · Rules · Equity · Regime · Backtest**.
 - **HEDGE** — discretionary own-money trading (the S1–S5 edge). Nav:
   **Dashboard · Desk · Signals · Review · Projection**.
 
@@ -174,7 +184,13 @@ Scanner-emitted (and Pine-webhook) signals land here as pending, each with
 inline **TAKE A+ (conv 5) / TAKE (conv 3) / SKIP** buttons (same decision path
 as the desk + the ntfy phone alert → `POST /api/signals/{id}/decide`).
 Decisions, conviction, and rejection reasons are stored — skipped signals are
-data too. Recent decisions listed below the queue.
+data too. Click any **recent decision** to expand its **full order ticket**
+(notional, size ₿, margin, win/lose balance, breakeven, liquidation — the same
+`_trade_shape` the alert and desk use). The **❔ what is this page** box now
+explains **proposed vs decided / who decides** (the scanner proposes; either the
+discipline filters auto-reject or *you* decide) and documents every auto-skip
+filter (`filter:saturday`, `filter:bleed_hour_*`, `filter:bad_venue_*`,
+`filter:cooldown_*`) with the historical loss each is based on.
 
 ### `/review` — replay real trades on an ICT-style chart
 Every closed fill with its entry context computed. Where v1→v3 came from.
@@ -199,7 +215,7 @@ loss-streak stress table · days-to-breach), **`/rules`** (the live constraint
 layer), **`/equity`** (Monte Carlo equity sim from WR+RR — paths, drawdown,
 failure frequency), **`/regime`** (BULL/SIDEWAYS/BEAR + hero WR per regime).
 
-The **live + bookkeeping** trio (2026-06-19):
+The **live + signals + bookkeeping** set (2026-06-19 / -21):
 - **`/prop-desk`** (Live) — the prop equivalent of `/desk`: evaluates the hero
   **ASIAN_RSI_DIP_v1** on the freshest closed 4H bar → **ENTER / STAND DOWN**
   (it only fires on the 00/04 UTC Asian closes; a countdown shows the next
@@ -207,6 +223,14 @@ The **live + bookkeeping** trio (2026-06-19):
   entry, breakeven (after fee), TP, SL, est. liquidation, expected range (ATR),
   notional / margin / size, **long *and* short**, sized at legal prop leverage
   (risk % + maintenance-margin inputs recompute live).
+- **`/prop-signals`** (Signals, **2026-06-21**) — the prop review queue, the
+  counterpart to `/signals`. The `app.prop_scan` cron reads the same hero on each
+  4H Asian close and, on ENTER, inserts a prop signal + pushes a phone alert
+  (TAKE/SKIP). Each card shows the prop-legal ticket and a **＋ Log fill to
+  ledger** button that writes an *open* `book='prop'` trade carrying
+  `linked_signal_id` back to the alert — you close it out (exit + pnl) on the
+  ledger. Signal (proposal) and ledger (the equity book of real fills) stay
+  separate records, linked; skips never touch the equity curve.
 - **`/prop-ledger`** (Ledger) — the prop trade book. Log eval trades by hand
   (`book='prop'`, kept separate from the hedge book) → a running **equity ledger
   vs the walls**: distance to the $4,850 floor, daily-loss used, progress to the

@@ -1902,7 +1902,15 @@ def list_signals(
     strategy: Optional[str] = Query(None),
     limit:    int           = Query(200, ge=1, le=2000),
 ):
-    return {"signals": get_signals(status=status, strategy=strategy, limit=limit)}
+    from .setups import _trade_shape
+    sigs = get_signals(status=status, strategy=strategy, limit=limit)
+    for sg in sigs:
+        try:
+            if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
+                sg["ticket"] = _trade_shape(sg)
+        except Exception:
+            pass
+    return {"signals": sigs}
 
 
 @app.get("/api/signals/{signal_id}", response_model=SignalResponse)
@@ -2311,6 +2319,28 @@ def api_prop_trade(trade: TradeCreate):
     """Log a trade onto the prop book (forces book='prop')."""
     trade.book = "prop"
     return create_trade(trade)
+
+
+@app.get("/api/prop/signals")
+def api_prop_signals(limit: int = Query(300, ge=1, le=2000)):
+    """Prop hero signals (ASIAN_RSI_DIP_v1), each with the prop-legal ticket."""
+    from .prop_scan import PROP_STRATEGY, prop_ticket
+    sigs = get_signals(strategy=PROP_STRATEGY, limit=limit)
+    for sg in sigs:
+        try:
+            if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
+                sg["ticket"] = prop_ticket(
+                    sg["entry_price"], sg["stop_price"], sg["target_price"],
+                    sg["direction"] == "long")
+        except Exception:
+            pass
+    return {"signals": sigs}
+
+
+@app.get("/prop-signals", response_class=HTMLResponse)
+def prop_signals_page():
+    from .prop_signals_page import render
+    return render()
 
 
 @app.get("/prop-ledger", response_class=HTMLResponse)

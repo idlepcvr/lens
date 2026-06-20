@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import bisect
 import datetime
+import os
 import sqlite3
 import uuid
 from typing import Optional
@@ -29,6 +30,17 @@ from .database import DB_PATH
 
 OHLCV_SYMBOL = "binance:BTC/USDT"
 SL_PCT, TP_PCT = 0.63, 0.95          # realized exit geometry (LIVE_SCALP_v1)
+
+# ── alert ticket sizing (tunable in prism.env; falls back to these defaults) ──
+MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%
+SETUP_NAMES = {
+    "S1": "NY AM flush · RSI<40, 13-16 UTC",
+    "S2": "Premium + bearish displacement",
+    "S3": "RSI>55 + buyside sweep (continuation)",
+    "S4": "RSI<40 in discount, no recent sweep",
+    "S5": "RSI>55 in London KZ 07-10 UTC",
+    "TEST": "test signal",
+}
 
 SWEEP_LOOKBACK = 24                   # swing = extreme of prior 24 bars
 SWEEP_RECENT = 3                      # raid counts if within last 3 bars
@@ -544,7 +556,117 @@ def desk_state(refresh: bool = True) -> dict:
     }
 
 
-def _notify(title: str, body: str, signal_id: str = None) -> bool:
+def _envcfg(key: str, default: str) -> str:
+    """Read a config value from the environment, falling back to prism.env, then
+    the supplied default. Mirrors how _notify resolves the ntfy creds so the
+    hourly cron (which doesn't source prism.env) still picks up overrides."""
+    v = os.environ.get(key)
+    if v is not None and v != "":
+        return v
+    try:
+        with open("prism.env") as f:
+            for line in f:
+                if line.startswith(key + "="):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return default
+
+
+def _trade_shape(sig: dict) -> dict:
+    """Turn a signal's entry/stop/target into a full order ticket: position size,
+    cost, breakeven, liquidation, and the leverage-amplified account swing. Sized
+    all-in (margin = full account) at LENS_LEVERAGE; tune via prism.env:
+    LENS_ACCOUNT_USD, LENS_LEVERAGE, LENS_FEE_RT_PCT."""
+    entry = float(sig["entry_price"])
+    stop = float(sig["stop_price"])
+    tgt = float(sig["target_price"])
+    long_ = sig["direction"] == "long"
+
+    acct = float(_envcfg("LENS_ACCOUNT_USD", "1000"))
+    lev = float(_envcfg("LENS_LEVERAGE", "10"))
+    fee_rt = float(_envcfg("LENS_FEE_RT_PCT", "0.30")) / 100.0   # round-trip fraction
+
+    win_move = abs(tgt - entry) / entry          # underlying move, fraction
+    loss_move = abs(entry - stop) / entry
+
+    margin = acct                                # all-in single position
+    notional = margin * lev
+    size_btc = notional / entry if entry else 0
+    cost_btc = margin / entry if entry else 0
+    fee_usd = notional * fee_rt                  # round-trip fee in $ ("hurdle")
+
+    breakeven = entry * (1 + fee_rt) if long_ else entry * (1 - fee_rt)
+    liq = entry * (1 - 1 / lev + MM_RATE) if long_ else entry * (1 + 1 / lev - MM_RATE)
+    liq = liq if liq and liq > 0 else None
+
+    reward_usd = notional * win_move - fee_usd
+    risk_usd = notional * loss_move + fee_usd
+
+    return {
+        "entry": entry, "stop": stop, "target": tgt, "long": long_,
+        "account": acct, "leverage": lev, "fee_rt_pct": fee_rt * 100,
+        "size_btc": size_btc, "cost_btc": cost_btc, "margin_usd": margin,
+        "notional": notional, "hurdle_usd": fee_usd,
+        "breakeven": breakeven, "liq": liq,
+        "win_move_pct": win_move * 100, "loss_move_pct": loss_move * 100,
+        "reward_usd": reward_usd, "risk_usd": risk_usd,
+        "gain_pct": reward_usd / acct * 100 if acct else 0,
+        "loss_pct": risk_usd / acct * 100 if acct else 0,
+        "rr": round(abs(tgt - entry) / abs(entry - stop), 2) if entry != stop else 0,
+    }
+
+
+def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
+    """Build (title, body, tag-emoji) for a setup push. A deliberately lean
+    lock-screen ticket: identity, the three levels, win/lose balance, notional,
+    leverage, risk — enough to decide TAKE/SKIP and place the order. The full
+    breakdown (breakeven, liquidation, Kelly, drift) lives on /desk. Title stays
+    ASCII (ntfy headers are latin-1); colour emoji rides the Tags header; the
+    UTF-8 body carries the per-line emoji and ₿/×/− glyphs."""
+    s = _trade_shape(sig)
+    setup = sig.get("trigger_type", "?")
+    name = SETUP_NAMES.get(setup, setup)
+    long_ = s["long"]
+    arrow = "▲" if long_ else "▼"
+    side = "LONG" if long_ else "SHORT"
+    tag = "green_circle" if long_ else "red_circle"
+    acct = s["account"]
+
+    def m(x):
+        return f"{x:,.0f}" if x is not None else "—"
+
+    MINUS = "−"
+    head_emoji = "\U0001F7E2" if long_ else "\U0001F534"   # 🟢 / 🔴
+    win_bal = acct + s["reward_usd"]
+    lose_bal = acct - s["risk_usd"]
+
+    W = 13   # label column width — values line up regardless of label length
+    def L(em, lab, val):
+        return f"{em} {lab:<{W}}{val}\n"
+
+    title = f"{setup} {side} BTC {m(s['entry'])}"
+    body = (
+        f"{head_emoji} {setup} · {side} · BTC/USD {arrow}\n"
+        f"\U0001F9E0 {name}\n"                                                               # 🧠
+        "\n"
+        + L("\U0001F4E5", "Entry (in)", m(s["entry"]))                                       # 📥
+        + L("\U0001F3AF", "TP  (out)", f"{m(s['target'])} · +{s['win_move_pct']:.2f}%")      # 🎯
+        + L("\U0001F6D1", "SL  (out)", f"{m(s['stop'])} · {MINUS}{s['loss_move_pct']:.2f}%")  # 🛑
+        + "\n"
+        + L("\U0001F4C8", "Win bal", f"${m(win_bal)}  (+${m(s['reward_usd'])})")             # 📈
+        + L("\U0001F4C9", "Lose bal", f"${m(lose_bal)}  ({MINUS}${m(s['risk_usd'])})")       # 📉
+        + "\n"
+        + L("\U0001F4E6", "Notional", f"${m(s['notional'])}")                                # 📦
+        + L("⚡", "Leverage", f"{s['leverage']:.0f}×")                              # ⚡
+        + L("\U0001F6A6", "Risk", f"${m(s['risk_usd'])} · {s['loss_pct']:.1f}%")             # 🚦
+        + "\n"
+        + "\U0001F4DD /desk for the full ticket"                                             # 📝
+    )
+    return title, body, tag
+
+
+def _notify(title: str, body: str, signal_id: str = None, tags: str = None) -> bool:
     """Push to phone via ntfy.sh if LENS_NTFY_TOPIC is set (env or prism.env).
 
     If signal_id is given, attach TAKE / SKIP action buttons that POST the
@@ -578,7 +700,8 @@ def _notify(title: str, body: str, signal_id: str = None) -> bool:
     safe_title = title.replace("—", "-").replace("–", "-")
     safe_title = safe_title.encode("ascii", "replace").decode("ascii")
     # notify.restedpc.com is behind Cloudflare; default urllib UA is 403'd (err 1010).
-    headers = {"Title": safe_title, "Priority": "high", "Tags": "chart_with_upwards_trend",
+    headers = {"Title": safe_title, "Priority": "high",
+               "Tags": tags or "chart_with_upwards_trend",
                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) LENS/3.0"}
     if signal_id:
         base_url = (cfg["LENS_BASE_URL"] or "http://192.168.1.47:8765").rstrip("/")
@@ -624,12 +747,8 @@ def run_scan_cli():
     emitted = emit_signals(scan)
     for s in emitted:
         if s["status"] == "pending":
-            _notify(
-                f"LENS {s['trigger_type']} — {s['direction'].upper()} setup live",
-                f"entry ~{s['entry_price']:.0f}  SL {s['stop_price']:.0f}  "
-                f"TP {s['target_price']:.0f}. Open /desk for the checklist, or "
-                f"TAKE / SKIP below.",
-                signal_id=s["signal_id"])
+            title, body, tag = _alert_message(s)
+            _notify(title, body, signal_id=s["signal_id"], tags=tag)
     tags = backfill_setup_tags(only_untagged=True)
     expired = expire_stale_signals(older_than_minutes=180)
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
