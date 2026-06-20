@@ -38,6 +38,9 @@ EVALS: dict = {
     # Kraken Prop / Breakout fee = 0.04%/side (maker+taker), confirmed
     # kraken.com/breakout 2026-06-17. The fee is a firm/venue property, so it
     # lives on the eval rule and overrides any per-strategy commission default.
+    # swap_per_day = 0.033%/day per open position (notional), charged at 00:00 UTC
+    # on positions open at that time. Confirmed Breakout Program Rules 2026-03-13.
+    # Applied per-trade as overnights * swap_per_day * leverage (account %).
     "BREAKOUT_1STEP_CLASSIC": {  # "Starter" on the live page
         "daily_loss_pct": 3.0,
         "max_dd_pct": 6.0,
@@ -46,6 +49,7 @@ EVALS: dict = {
         "max_leverage": 5.0,
         "reset_min_utc": 30,
         "commission_per_side": 0.0004,
+        "swap_per_day": 0.00033,
     },
     "BREAKOUT_1STEP_PRO": {  # "Intermediate": 12% target / 5% DD
         "daily_loss_pct": 3.0,
@@ -55,6 +59,7 @@ EVALS: dict = {
         "max_leverage": 5.0,
         "reset_min_utc": 30,
         "commission_per_side": 0.0004,
+        "swap_per_day": 0.00033,
     },
     "BREAKOUT_1STEP_TURBO": {  # "Advanced": 9% target / 3% DD / 3% daily
         "daily_loss_pct": 3.0,
@@ -64,6 +69,7 @@ EVALS: dict = {
         "max_leverage": 5.0,
         "reset_min_utc": 30,
         "commission_per_side": 0.0004,
+        "swap_per_day": 0.00033,
     },
     "BREAKOUT_2STEP_CLASSIC": {
         # Phase-1 target modelled (5%); trailing floor caps at the start balance.
@@ -74,6 +80,7 @@ EVALS: dict = {
         "max_leverage": 5.0,
         "reset_min_utc": 30,
         "commission_per_side": 0.0004,
+        "swap_per_day": 0.00033,
     },
 }
 
@@ -106,6 +113,9 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
     # Firm fee (eval rule) wins over the strategy's own default — the venue
     # sets commissions, not the setup. Breakout = 0.0004/side.
     commission = eval_rule.get("commission_per_side", params.get("commission", 0.0015))
+    # 0.033%/day per open position (notional), charged at 00:00 UTC. Cost in
+    # account terms scales with leverage: swap_per_day * lev per overnight held.
+    swap_per_day = eval_rule.get("swap_per_day", 0.0)
     skip_sat   = params.get("skip_sat", True)
     cooldown   = params.get("cooldown_bars", 4)
     once_per_day = params.get("once_per_day", True)
@@ -116,11 +126,13 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
 
     win_pct  =  tp_pct   * lev - commission * 2 * lev
     loss_pct = -(stop_pct * lev + commission * 2 * lev)
+    swap_lev = swap_per_day * lev   # cost per 00:00-UTC crossing, account fraction
 
     trades = []
     in_trade = False
     direction = None
     entry_price = 0.0
+    entry_ts = None
     last_entry_bar = -999
     last_trade_day = None
 
@@ -140,9 +152,14 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
                 if hi >= sl_short:  result = "loss"
                 elif lo <= tp_short: result = "win"
             if result:
+                # swap: one charge per 00:00-UTC boundary the position was open
+                # across (entry .date() -> exit .date(), both UTC).
+                overnights = (ts.date() - entry_ts.date()).days
+                swap_cost = overnights * swap_lev
+                base = win_pct if result == "win" else loss_pct
                 trades.append({
                     "eval_day": _eval_day(ts, reset),
-                    "pnl_pct": (win_pct if result == "win" else loss_pct) * 100,
+                    "pnl_pct": (base - swap_cost) * 100,
                     # worst adverse excursion before the trade resolves, in account
                     # %: a full move to the price stop (fees not yet paid intra-trade).
                     # Even eventual winners transiently dip ~this far → Breakout
@@ -166,6 +183,7 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
             in_trade = True
             direction = sig
             entry_price = df["close"].iloc[i]
+            entry_ts = ts
             last_entry_bar = i
             last_trade_day = trade_day
 
