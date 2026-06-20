@@ -331,7 +331,7 @@ REVIEW_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LENS // Recap</title>
+<title>LENS // Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -535,7 +535,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
 <body>
 
 <div class="topbar">
-  <div class="logo">LEN<span class="s">S</span> <span class="pg">Recap</span></div>
+  <div class="logo">LEN<span class="s">S</span> <span class="pg">Journal</span></div>
   <div class="modesw">
     <a href="/prop">◎ PROP</a>
     <a href="/dashboard" class="on">▤ HEDGE</a>
@@ -546,7 +546,9 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/calendar">Calendar</a>
-    <a href="/recap" class="cur">Recap</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/journal" class="cur">Journal</a>
+    <a href="/edge">Edge</a>
     <a href="/projection">Projection</a>
   </nav>
   <div class="topbar-right">
@@ -570,21 +572,10 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     </div>
     <div class="sec-hd" onclick="secToggle('list','trade-list')">Trades <span class="cv" id="list-car">▾</span></div>
     <div id="trade-list"><div style="padding:16px;color:var(--t3)">Loading…</div></div>
-    <div id="edge-panel">
-      <h3 class="sec-hd" onclick="secToggle('edge','edge-bd')">Edge by Setup Tag <span class="cv" id="edge-car">▾</span></h3>
-      <div id="edge-bd">
-      <table class="edge-tbl">
-        <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>
-        <tbody id="edge-body"></tbody>
-      </table>
-      </div>
-    </div>
   </div>
 
   <div id="main">
-    <div class="sec-hd" onclick="secToggle('analytics','analytics')">Analytics <span class="cv" id="analytics-car">▾</span></div>
-    <div id="analytics"><div style="padding:16px;color:var(--t3)">Loading analytics…</div></div>
-    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart (in modal too) <span class="cv" id="chart-car">▾</span></div>
+    <div class="sec-hd chart-hd" onclick="secToggle('chart','chart-container')">Chart (also in trade modal) <span class="cv" id="chart-car">▾</span></div>
     <div id="chart-container"></div>
     <div id="detail">
       <button id="det-close" onclick="document.getElementById('detail').classList.remove('open')">▾ close</button>
@@ -987,7 +978,7 @@ function renderAnalytics(a){
 }
 
 function restoreSecs(){
-  const map={filters:'filters', list:'trade-list', edge:'edge-bd', chart:'chart-container', analytics:'analytics'};
+  const map={filters:'filters', list:'trade-list', chart:'chart-container'};
   const s=JSON.parse(localStorage.getItem('rv-secs')||'{}');
   if(s.chart===undefined) s.chart=true;   // charts live in the modal → collapse page chart by default
   Object.keys(map).forEach(key=>{
@@ -1013,6 +1004,7 @@ function edgeVerdict(n,wr,exp){
   return ['KEEP','var(--am)'];
 }
 function renderEdge() {
+  if (!document.getElementById('edge-body')) return;  // edge moved to its own /edge page
   const g = {};
   visible.forEach(t => {
     const k = edgeFamily(t.setup_tag);
@@ -1156,7 +1148,6 @@ async function init() {
     buildTagFilter();
     filter();
     restoreSecs();
-    fetch('/api/review/analytics').then(r=>r.json()).then(renderAnalytics).catch(e=>console.error('analytics',e));
     const qid = new URLSearchParams(location.search).get('trade');
     if (qid && ALL_TRADES.some(t => String(t.id)===String(qid))) openTrade(parseInt(qid));
     else if (ALL_TRADES.length) pick(ALL_TRADES[ALL_TRADES.length-1].id);

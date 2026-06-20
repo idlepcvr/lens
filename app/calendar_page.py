@@ -280,7 +280,7 @@ function openModal(id){
 
     <div class="cal-acts">
       <button class="save" id="msave">💾 Save review</button>
-      <a class="full" href="/recap">Recap →</a>
+      <a class="full" href="/journal">Journal →</a>
     </div>
   </div></div>`;
 

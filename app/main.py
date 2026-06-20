@@ -2182,12 +2182,25 @@ def api_backtest_strategies():
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
 
-@app.get("/recap", response_class=HTMLResponse)
-def recap_page():
+@app.get("/journal", response_class=HTMLResponse)
+def journal_page():
     return REVIEW_HTML
 
 
-# Legacy alias — kept working, hidden from nav.
+@app.get("/analytics", response_class=HTMLResponse)
+def analytics_page():
+    from .analytics_page import ANALYTICS_HTML
+    return ANALYTICS_HTML
+
+
+@app.get("/edge", response_class=HTMLResponse)
+def edge_page():
+    from .edge_page import EDGE_HTML
+    return EDGE_HTML
+
+
+# Legacy aliases — kept working, hidden from nav.
+@app.get("/recap", response_class=HTMLResponse)
 @app.get("/review", response_class=HTMLResponse)
 def review_page():
     return REVIEW_HTML
