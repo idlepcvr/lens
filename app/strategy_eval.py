@@ -21,8 +21,8 @@ from .database import DB_PATH
 from .setups import SetupEngine, _load_candles
 
 FEE_PCT = 0.30                       # round-trip taker fee, % of notional
-R_LEVELS = [1.0, 1.5, 2.0, 2.5, 3.0]
-FORWARD_BARS = 48                    # generous window so high-R targets can fill
+R_LEVELS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
+FORWARD_BARS = 96                    # ~4 days, so even a 6R target gets a fair chance to fill
 MAE_WINDOW = 8                       # bars used to size the structural stop
 MIN_N = 40                           # below this a strategy is "thin", unranked
 
