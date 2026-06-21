@@ -262,6 +262,40 @@ def load_cache():
         return None
 
 
+# ── live wiring: let the scanners trade the board's top-3 ──────────────────────
+
+def tradeable(mode):
+    """The board's ranked top-3 for a mode, ready to trade:
+    [{name, dir, sl_pct, target_r, rank}] in rank order. Empty if no cache."""
+    d = load_cache()
+    if not d:
+        return []
+    top = sorted([o for o in d["results"]
+                  if o["mode"] == mode and o.get("top3") and o.get("best_r") and o.get("sl")],
+                 key=lambda x: x["rank"])
+    return [{"name": o["name"], "dir": o["dir"], "sl_pct": float(o["sl"]),
+             "target_r": float(o["best_r"]), "rank": o["rank"]} for o in top]
+
+
+def live_matches(eng, i, names):
+    """Of the given strategy names, which match on bar i — in the order given.
+    Returns [{name, dir}]. Lets a live scanner evaluate the same predicates the
+    board ranked, so what fires is exactly what was scored."""
+    atrs = [a for a in eng.atr14 if a]
+    if not atrs:
+        return []
+    _, atr_hi = st.quantiles(atrs, n=3)
+    reg = {s["name"]: s for s in _registry(atr_hi)}
+    ctx = eng.context(i)
+    a = eng.atr14[i]
+    out = []
+    for name in names:
+        s = reg.get(name)
+        if s and ctx.rsi is not None and s["pred"](ctx, a):
+            out.append({"name": name, "dir": s["dir"]})
+    return out
+
+
 if __name__ == "__main__":
     d = refresh_cache()
     print(f"scored {len(d['results'])} strategies over {d['candles']} candles "

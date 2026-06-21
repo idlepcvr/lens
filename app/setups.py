@@ -436,6 +436,77 @@ def emit_signals(scan: dict) -> list[dict]:
     return emitted
 
 
+def emit_board_signals() -> list[dict]:
+    """Board-driven hedge emit: trade the Strategy Board's top-3 HEDGE strategies,
+    each at its OWN derived geometry — stop = p65 of historical adverse excursion,
+    target = stop × the strategy's board-optimal R. Session/quality discipline
+    still applies. Highest-ranked match wins the bar (one signal), deduped per
+    bar+strategy. No global SL/TP — every level comes from what made money in
+    backtest. Falls back to the legacy S1–S5 emit only if the board has no cache."""
+    from . import discipline
+    from .backtest_engine import load_ohlcv
+    from .database import get_last_non_rejected_signal_for_symbol, insert_signal
+    from .strategy_eval import live_matches, tradeable
+
+    book = tradeable("hedge")
+    if not book:
+        return emit_signals(scan_latest())     # graceful fallback, never silent-dead
+
+    load_ohlcv(symbol="BTC/USDT", timeframe="1h", months=2, exchange_id="binance")
+    conn = sqlite3.connect(DB_PATH)
+    c1h = _load_candles(conn)
+    conn.close()
+    eng = SetupEngine(c1h)
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    i = len(c1h) - 1
+    if c1h[i][0] + 3_600_000 > now_ms:         # drop a still-forming bar
+        i -= 1
+
+    geo = {b["name"]: b for b in book}
+    matches = live_matches(eng, i, [b["name"] for b in book])
+    if not matches:
+        return []
+
+    price = c1h[i][4]
+    bar_ms = c1h[i][0]
+    bar_tag = datetime.datetime.fromtimestamp(
+        bar_ms / 1000, tz=datetime.timezone.utc).strftime("%Y%m%d%H")
+
+    emitted = []
+    for mtc in matches:                        # ranked order — first one wins the bar
+        name = mtc["name"]
+        long_ = mtc["dir"] == "long"
+        sl_pct = geo[name]["sl_pct"]
+        R = geo[name]["target_r"]
+        sl = price * (1 - sl_pct / 100) if long_ else price * (1 + sl_pct / 100)
+        tp = price * (1 + sl_pct * R / 100) if long_ else price * (1 - sl_pct * R / 100)
+        payload = {
+            "signal_id": f"hedge-{name.split(' ')[0]}-{bar_tag}",
+            "strategy_name": name,
+            "strategy_version": "board",
+            "symbol": "BTC/USD",
+            "venue": "kraken_futures",
+            "trigger_type": name,
+            "direction": mtc["dir"],
+            "entry_price": round(price, 1),
+            "stop_price": round(sl, 1),
+            "target_price": round(tp, 1),
+            "expected_rr": round(R, 2),
+            "mtf_confluence": [f"board top-{geo[name]['rank']} hedge",
+                               f"stop {sl_pct:.2f}% (p65 MAE)", f"{R:g}R target"],
+            "confluence_count": 2,
+        }
+        reason = discipline.evaluate(
+            payload, get_last_non_rejected_signal_for_symbol(payload["symbol"]))
+        try:
+            row = insert_signal(payload, auto_rejection_reason=reason)
+        except ValueError:
+            continue                            # already emitted this bar+strategy
+        emitted.append(row)
+        break                                   # one signal per bar, highest rank
+    return emitted
+
+
 VETO_LABELS = {
     "rsi_neutral":          "RSI 40–55 dead zone — 34.7% WR, −€1,243",
     "slope_against":        "1h EMA21 slope against trade — 38.1% WR, −€1,177",
@@ -485,6 +556,21 @@ def _setup_checklists(ctx: BarContext) -> list[dict]:
     ]
 
 
+def _board_geo(direction: str) -> tuple[float, float]:
+    """(sl_pct, tp_pct) for the /desk ticket of a direction — pulled from the
+    board's top hedge strategy of that direction, so the desk shows the same
+    money-derived geometry the scanner fires. Falls back to a tight 0.6%/1.2%
+    only if the board has no cache yet."""
+    try:
+        from .strategy_eval import tradeable
+        for b in tradeable("hedge"):
+            if b["dir"] == direction:
+                return b["sl_pct"], round(b["sl_pct"] * b["target_r"], 2)
+    except Exception:
+        pass
+    return 0.6, 1.2
+
+
 def desk_state(refresh: bool = True) -> dict:
     """Everything the /desk page needs to say ENTER / BLOCKED / STAND DOWN."""
     if refresh:
@@ -529,13 +615,13 @@ def desk_state(refresh: bool = True) -> dict:
                       else "veto" if v else "stand_down"),
             "setups": [c["id"] for c in active],
             "vetoes": [VETO_LABELS[k] for k in v],
-            "plan": {
+            "plan": (lambda slp, tpp: {
                 "entry": round(price, 1),
-                "stop": round(price * (1 - SL_PCT / 100) if long_ else price * (1 + SL_PCT / 100), 1),
-                "target": round(price * (1 + TP_PCT / 100) if long_ else price * (1 - TP_PCT / 100), 1),
-                "sl_pct": SL_PCT, "tp_pct": TP_PCT,
-                "rr": round(TP_PCT / SL_PCT, 2),
-            },
+                "stop": round(price * (1 - slp / 100) if long_ else price * (1 + slp / 100), 1),
+                "target": round(price * (1 + tpp / 100) if long_ else price * (1 - tpp / 100), 1),
+                "sl_pct": slp, "tp_pct": tpp,
+                "rr": round(tpp / slp, 2) if slp else 0,
+            })(*_board_geo(direction)),
         }
 
     bar_dt = datetime.datetime.fromtimestamp(ctx.ts_ms / 1000, tz=datetime.timezone.utc)
@@ -805,8 +891,8 @@ def run_scan_cli():
     """
     from .database import expire_stale_signals, init_db
     init_db()
-    scan = scan_latest()
-    emitted = emit_signals(scan)
+    scan = scan_latest()                       # still drives /desk checklists + scoreboard
+    emitted = emit_board_signals()             # board-driven emit (per-strategy geometry)
     for s in emitted:
         if s["status"] == "pending":
             title, body, tag = _alert_message(s)
@@ -815,8 +901,10 @@ def run_scan_cli():
     expired = expire_stale_signals(older_than_minutes=180)
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     names = [f"{s['signal_id']}:{s['status']}" for s in emitted] or ["none"]
+    from .strategy_eval import tradeable
+    book = [b["name"].split(" ")[0] for b in tradeable("hedge")]
     print(f"[{stamp}] bar={scan['bar_ts']} close={scan['close']} rsi={scan['rsi']} "
-          f"kz={scan['killzone']} matches={len(scan['matches'])} "
+          f"kz={scan['killzone']} book={book} "
           f"signals={','.join(names)} tagged={tags['tagged']} expired={expired}")
 
 
