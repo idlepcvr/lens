@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/mini/lens
-ExecStart=/home/mini/prism/.venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8765
+ExecStart=/home/mini/lens/.venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8765
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:/home/mini/lens/lens.log

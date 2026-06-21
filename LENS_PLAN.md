@@ -30,6 +30,7 @@ The mechanism: every trade decision in LENS originates from a Pine Script strate
 - Single-page dashboard on miniPC, accessed via LAN or tunnel
 - **Persisted goal config + interactive goal dashboard at `/`** *(pulled forward from Wk 4 sizing dependency; added Wk 1)*
 - **Server-side discipline filters in `/api/signals`** auto-reject Saturday / sub-5min cooldown / bleed hours / wrong venue *(added Wk 1 after PRISM fingerprint research showed bulk discretionary trading is break-even; selection discipline is the bottleneck)*
+- **`/glossary` ("Learn") reference page** plain-English explainer for every goal-model / ticket metric — EV, R:R, leverage, notional, fee drag, account risk, true R:R, Kelly + sixth-Kelly, DD constraint, optimal-vs-required, expectancy/PF + a worked example *(added 2026-06-21 — static page on the shared .help-body style, no compute; serves the "I don't understand the elements" gap)*. Inline `?` badges (`.qh`) on `/goal` (EV / Actual R cards + Risk & Kelly title) and the order ticket (R:R, risk, full-ticket header on `/desk` + `/signals`) deep-link to the matching `/glossary#anchor`.
 
 ### Out of v1 (defer to v2+)
 - ML prediction model — earn in at month 6 once dataset exists

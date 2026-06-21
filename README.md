@@ -434,9 +434,9 @@ Useful API: `POST /api/setups/scan` (scan now) ·
   occurrence of any setup is ~coin-flip — the edge is selection inside the
   context. Funding cost on multi-day holds is not modelled.
 
-Current progress snapshot: **`STATUS.md`** (read first). Full playbook:
-`strategies/LENS_EDGE_v3_ICT/FINDINGS.md`. Build plan history: `LENS_PLAN.md`,
-`PRISM-SYSTEM-SPEC (1).md`.
+Progress + roadmap live in **`LENS_PLAN.md`** (the single source of truth for
+where the build is). Full playbook: `strategies/LENS_EDGE_v3_ICT/FINDINGS.md`.
+Original system spec: `PRISM-SYSTEM-SPEC (1).md`.
 
 ## Working across machines
 

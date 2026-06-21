@@ -8,3 +8,4 @@ scipy
 pandas
 numpy
 ccxt
+requests

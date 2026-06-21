@@ -18,11 +18,34 @@ from .prop_eval import EVALS, _legal_leverage
 from .prop_views import ACCOUNT, EVAL, HERO, RISK
 from .setups import _notify
 
-PROP_STRATEGY = HERO            # "ASIAN_RSI_DIP_v1" — the prop signal discriminator
+PROP_STRATEGY = HERO            # default hero / fallback signal discriminator
 MM_RATE = 0.005                 # maintenance margin assumption (Kraken BTC perp ~0.5%)
 
+# Fallback tradeable set if the Strategy Board cache is missing — the top-3 prop
+# strategies and the R each one is traded at (its board-optimal "best R").
+PROP_FALLBACK = [("ASIAN_RSI_DIP_v1", 2.0), ("ASIAN_PULLBACK_v2", 3.0), ("ASIAN_PULLBACK_v1", 3.0)]
 
-def prop_ticket(entry: float, stop: float, target: float, long_: bool) -> dict:
+
+def prop_tradeable() -> list[tuple[str, float]]:
+    """The live prop tradeable set: the Strategy Board's top-3 prop strategies,
+    each paired with its board-optimal target R. Auto-syncs with the weekly board
+    refresh; falls back to PROP_FALLBACK if the cache isn't there yet."""
+    try:
+        from .strategy_eval import load_cache
+        d = load_cache()
+        if d:
+            top = sorted([o for o in d["results"]
+                          if o["mode"] == "prop" and o.get("top3") and o.get("best_r")],
+                         key=lambda x: x["rank"])
+            if top:
+                return [(o["name"], float(o["best_r"])) for o in top]
+    except Exception:
+        pass
+    return list(PROP_FALLBACK)
+
+
+def prop_ticket(entry: float, stop: float, target: float, long_: bool,
+                strategy: str = PROP_STRATEGY) -> dict:
     """Prop-legal order ticket from a signal's levels — same sizing math as
     prop_desk_state (risk% of the $5k eval account, leverage capped at the firm's
     5x). Deterministic from entry/stop/target, so it recomputes identically for a
@@ -52,7 +75,7 @@ def prop_ticket(entry: float, stop: float, target: float, long_: bool) -> dict:
         "stop_pct": round(stop_pct, 2), "tp_pct": round(tp_pct, 2),
         "rr": round(tp_pct / stop_pct, 2) if stop_pct else 0.0,
         "max_leverage": rule["max_leverage"],
-        "eval": EVAL, "strategy": PROP_STRATEGY,
+        "eval": EVAL, "strategy": strategy,
     }
 
 
@@ -60,7 +83,7 @@ def _prop_alert_message(sig: dict) -> tuple[str, str, str]:
     """Slim prop ticket for the lock screen — full detail lives on /prop-signals."""
     entry, stop, target = sig["entry_price"], sig["stop_price"], sig["target_price"]
     long_ = sig["direction"] == "long"
-    t = prop_ticket(entry, stop, target, long_)
+    t = prop_ticket(entry, stop, target, long_, strategy=sig.get("strategy_name", PROP_STRATEGY))
     side = "LONG" if long_ else "SHORT"
     arrow = "▲" if long_ else "▼"
     head = "\U0001F7E2" if long_ else "\U0001F534"     # 🟢 / 🔴
@@ -75,9 +98,10 @@ def _prop_alert_message(sig: dict) -> tuple[str, str, str]:
         return f"{em} {lab:<{W}}{val}\n"
 
     title = f"PROP {side} BTC {m(entry)}"
+    strat_name = sig.get("strategy_name", PROP_STRATEGY)
     body = (
         f"{head} PROP · {side} · BTC/USD {arrow}\n"
-        f"\U0001F9E0 Asian-session RSI reclaim (4H eval)\n"               # 🧠
+        f"\U0001F9E0 {strat_name} (4H eval · {t['rr']:g}R)\n"             # 🧠
         "\n"
         + L("\U0001F4E5", "Entry (in)", m(entry))                         # 📥
         + L("\U0001F3AF", "TP  (out)", f"{m(target)} · +{t['tp_pct']:.2f}%")   # 🎯
@@ -98,57 +122,70 @@ def _prop_alert_message(sig: dict) -> tuple[str, str, str]:
 
 
 def run_prop_scan_cli(emit: bool = True) -> dict:
-    """Cron entry point: read the hero on the freshest closed 4H bar; on an ENTER
-    at an Asian close, insert one deduped prop signal and push the alert."""
+    """Cron entry point: evaluate the Strategy Board's top-3 prop strategies on the
+    freshest closed 4H Asian bar. The highest-ranked one saying ENTER wins the bar
+    (one alert max); it's traded at that strategy's board-optimal target R. Signal
+    is deduped per bar+strategy so re-scanning the same bar is a no-op."""
     from .database import init_db, insert_signal
     from .prop_desk import prop_desk_state
 
     init_db()
-    state = prop_desk_state(refresh=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    tradeable = prop_tradeable()
 
-    if state.get("error"):
-        print(f"[{stamp}] prop-scan error: {state['error']}")
-        return state
-
-    verdict = state.get("verdict")
-    direction = state.get("direction")
-    bar_ts = state.get("bar_ts")
+    last_state = None
     emitted = "none"
+    fired = None
+    for rank, (name, target_r) in enumerate(tradeable, 1):
+        state = prop_desk_state(refresh=(rank == 1), strategy=name)
+        last_state = state
+        if state.get("error"):
+            continue
+        verdict, direction = state.get("verdict"), state.get("direction")
+        if not (emit and verdict == "enter" and direction and state.get("is_asian")):
+            continue
 
-    if emit and verdict == "enter" and direction and state.get("is_asian"):
-        plan = state["plan"][direction]
-        # deterministic id per bar → a second scan of the same bar is a no-op
-        sig_id = f"prop-{bar_ts.replace(':', '').replace('-', '')}"
+        # trade at the strategy's board-optimal R: target = entry ± stop_dist × R
+        entry = state["close"]
+        stop = state["plan"][direction]["stop"]
+        stop_dist = abs(entry - stop)
+        target = round(entry + stop_dist * target_r if direction == "long"
+                       else entry - stop_dist * target_r, 1)
+        bar_ts = state.get("bar_ts")
+        sig_id = f"prop-{name}-{bar_ts.replace(':', '').replace('-', '')}"
         payload = {
             "signal_id": sig_id,
-            "strategy_name": PROP_STRATEGY,
+            "strategy_name": name,
             "strategy_version": "1.0",
             "symbol": "BTC/USD",
             "venue": "kraken_futures",
-            "trigger_type": "ASIAN_RSI_DIP",
+            "trigger_type": name,
             "direction": direction,
-            "entry_price": state["close"],
-            "stop_price": plan["stop"],
-            "target_price": plan["target"],
-            "expected_rr": plan["rr"],
+            "entry_price": entry,
+            "stop_price": stop,
+            "target_price": target,
+            "expected_rr": round(target_r, 2),
             "suggested_leverage": state["sizing"]["leverage"],
             "suggested_size_pct": state["sizing"]["actual_risk_pct"],
-            "mtf_confluence": ["Asian-session RSI reclaim", f"4H {state['trend']}-trend"],
+            "mtf_confluence": [f"board top-{rank} prop", f"4H {state['trend']}-trend", f"{target_r:g}R target"],
             "confluence_count": 2,
         }
         try:
             row = insert_signal(payload)
+            row["strategy_name"] = name
             title, body, tag = _prop_alert_message(row)
             _notify(title, body, signal_id=sig_id, tags=tag)
             emitted = f"{sig_id}:pushed"
         except ValueError:
             emitted = f"{sig_id}:already-emitted"
+        fired = name
+        break   # highest-ranked ENTER wins the bar
 
-    print(f"[{stamp}] bar={bar_ts} close={state.get('close')} "
-          f"asian={state.get('is_asian')} verdict={verdict} dir={direction} "
-          f"signal={emitted}")
-    return state
+    s = last_state or {}
+    print(f"[{stamp}] bar={s.get('bar_ts')} close={s.get('close')} "
+          f"asian={s.get('is_asian')} set={[n for n, _ in tradeable]} "
+          f"fired={fired} signal={emitted}")
+    return last_state or {"error": "no strategies evaluated"}
 
 
 if __name__ == "__main__":

@@ -57,8 +57,8 @@ def _checklist(is_asian, up, down, dbull, dbear, rsi, rsi_prv):
     return {"long": long_conds, "short": short_conds}
 
 
-def prop_desk_state(refresh: bool = True) -> dict:
-    strat = STRATEGIES[HERO]
+def prop_desk_state(refresh: bool = True, strategy: str = HERO) -> dict:
+    strat = STRATEGIES[strategy]
     params = strat["params"]
     tf = strat.get("timeframe") or "4h"
     rule = EVALS[EVAL]
@@ -146,7 +146,7 @@ def prop_desk_state(refresh: bool = True) -> dict:
 
     nxt = _next_asian_close(now)
     return {
-        "strategy": HERO, "eval": EVAL,
+        "strategy": strategy, "eval": EVAL,
         "bar_ts": ts.isoformat(),
         "bar_age_min": max(0, int((now_ms - (bar_ms + _TF_MS)) / 60000)),
         "close": round(price, 1),

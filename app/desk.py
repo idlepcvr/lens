@@ -74,11 +74,11 @@ function ticketHTML(dir,v,d){
     ${live?'':'<div class="ticket-ref">reference only — context says no. if price gets here clean, this is the shape:</div>'}
     <div class="tg">
       <div class="cell"><div class="k">entry</div><div class="v">${money(p.entry)}</div></div>
-      <div class="cell"><div class="k">R : R</div><div class="v">${p.rr}<span class="sub" style="display:inline"> reward/risk</span></div></div>
+      <div class="cell"><div class="k">R : R<a class="qh" href="/glossary#rr" target="_blank" rel="noopener">?</a></div><div class="v">${p.rr}<span class="sub" style="display:inline"> reward/risk</span></div></div>
       <div class="cell"><div class="k">stop</div><div class="v r">${money(p.stop)}</div><div class="sub">−${p.sl_pct}% risk</div></div>
       <div class="cell"><div class="k">target</div><div class="v g">${money(p.target)}</div><div class="sub">+${p.tp_pct}% reward</div></div>
     </div>
-    <div class="sizer"><label>risk €</label>
+    <div class="sizer"><label>risk €<a class="qh" href="/glossary#risk" target="_blank" rel="noopener">?</a></label>
       <input type="number" id="risk-${dir}" value="${risk0}" inputmode="numeric">
       <span class="size-out" id="size-${dir}"></span></div>
     <div class="outcome" id="out-${dir}"></div>

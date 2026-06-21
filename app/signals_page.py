@@ -46,7 +46,7 @@ function pendingCard(s){
     <div class="sname">${s.strategy_name||''} ${s.symbol?('· '+s.symbol):''}</div>
     <div class="tg" style="margin-bottom:12px">
       <div class="cell"><div class="k">entry</div><div class="v">${money(s.entry_price)}</div></div>
-      <div class="cell"><div class="k">R : R</div><div class="v">${s.expected_rr??'—'}</div></div>
+      <div class="cell"><div class="k">R : R<a class="qh" href="/glossary#rr" target="_blank" rel="noopener">?</a></div><div class="v">${s.expected_rr??'—'}</div></div>
       <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
       <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
     </div>
@@ -80,7 +80,8 @@ function ticketBlock(t){
   if(!t) return '';
   const winBal = t.account + t.reward_usd, loseBal = t.account - t.risk_usd;
   return `<div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px">`
-    + `full ticket · acct $${money(t.account)} · ${t.leverage}× · fee ${t.fee_rt_pct.toFixed(2)}%</div>`
+    + `full ticket · acct $${money(t.account)} · ${t.leverage}× · fee ${t.fee_rt_pct.toFixed(2)}%`
+    + `<a class="qh" href="/glossary#notional" target="_blank" rel="noopener" title="notional, margin, risk, fees explained">?</a></div>`
     + `<div class="kv"><span class="k">notional</span><span class="v">$${money(t.notional)}</span></div>`
     + `<div class="kv"><span class="k">size</span><span class="v">${t.size_btc.toFixed(4)} ₿</span></div>`
     + `<div class="kv"><span class="k">margin</span><span class="v">$${money(t.margin_usd)} · ${t.cost_btc.toFixed(4)} ₿</span></div>`
@@ -100,7 +101,7 @@ function historyRow(s){
   const detail = `
     <div class="tg" style="margin:2px 0 8px">
       <div class="cell"><div class="k">entry</div><div class="v">${money(s.entry_price)}</div></div>
-      <div class="cell"><div class="k">R : R</div><div class="v">${s.expected_rr??'—'}</div></div>
+      <div class="cell"><div class="k">R : R<a class="qh" href="/glossary#rr" target="_blank" rel="noopener">?</a></div><div class="v">${s.expected_rr??'—'}</div></div>
       <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
       <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
     </div>

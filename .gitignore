@@ -35,3 +35,6 @@ node_modules/
 
 # Screenshots (Week 6 deliverable)
 data/screenshots/
+
+# Generated strategy-board cache (refreshed by app.strategy_eval cron)
+strategy_scores.json

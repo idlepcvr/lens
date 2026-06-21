@@ -187,30 +187,90 @@ def goals_page():
 
 
 # ── /strategy — Strategy Engine ───────────────────────────────────────────────
+def _r_cols(rows, r_levels):
+    """Cells for each R level: net R, green if profitable. The 'let winners run'
+    sweep made visible — you can read straight across which R each one wins at."""
+    by_r = {row["r"]: row for row in rows}
+    out = ""
+    for R in r_levels:
+        row = by_r.get(R)
+        if not row:
+            out += "<td>·</td>"
+            continue
+        cls = "green" if row["net"] > 0 else "red"
+        out += (f'<td class="{cls}" title="WR {row["wr"]}%">'
+                f'{row["net"]:+.2f}</td>')
+    return out
+
+
+def _board(results, mode, r_levels):
+    ranked = sorted([o for o in results if o["mode"] == mode and not o["thin"]],
+                    key=lambda x: x["rank"])
+    thin = [o for o in results if o["mode"] == mode and o["thin"]]
+    rcols_head = "".join(f"<th>{R:g}R</th>" for R in r_levels)
+    body_rows = ""
+    for o in ranked:
+        hl = " class=\"hl\"" if o["top3"] else ""
+        star = " ★" if o["top3"] else ""
+        best = (f'<span class="green">{o["best_net"]:+.2f}R</span> @ {o["best_r"]:g}R'
+                if o["best_net"] and o["best_net"] > 0
+                else f'<span class="red">{o["best_net"]:+.2f}R</span>')
+        body_rows += (
+            f"<tr{hl}><td>{o['rank']}{star}</td>"
+            f"<td>{o['name']}</td>"
+            f"<td>{o['dir']}</td>"
+            f"<td>{o['n']}</td>"
+            f"<td>{o['sl']:.2f}%</td>"
+            f"{_r_cols(o['rows'], r_levels)}"
+            f"<td>{best}</td>"
+            f"<td><b>{o['score']:.2f}</b></td></tr>")
+    thin_note = ""
+    if thin:
+        thin_note = ('<div class="prose" style="margin-top:8px">thin (n&lt;40, not ranked): '
+                     + ", ".join(f"{o['name']} (n={o['n']})" for o in thin) + "</div>")
+    return f"""
+  <div class="panel">
+    <h2>{mode.upper()} ranking — net R/trade by target, after fees</h2>
+    <div style="overflow-x:auto"><table>
+      <tr><th>#</th><th>strategy</th><th>dir</th><th>n</th><th>stop</th>
+          {rcols_head}<th>best</th><th>score</th></tr>
+      {body_rows}
+    </table></div>
+    {thin_note}
+  </div>"""
+
+
 def strategy_page():
-    m = prop_metrics()
-    if "error" in m:
-        return _err("/strategy", "Strategy", m)
-    cards = "".join([
-        _card("Win rate", f"{m['win_rate_pct']:.1f}%", f"measured · n={m['trades_total']}"),
-        _card("R:R (actual)", f"{m['r_multiple']}R", f"{m['stop_pct']}% stop · {m['tp_pct']}% TP, after 0.04% fees", "ac"),
-        _card("Expectancy (R)", f"{m['expectancy_r']}R", "per trade, risk-units", "green" if m['expectancy_r'] > 0 else "red"),
-        _card("Expectancy (%)", f"+{m['expectancy_pct']:.2f}%", "of account per trade", "green" if m['expectancy_pct'] > 0 else "red"),
-        _card("Trades / week", f"{m['trades_per_week']}", f"{m['trades_per_month']}/mo · thin, by design"),
-        _card("Win / loss", f"+{m['avg_win_pct']:.1f}% / {m['avg_loss_pct']:.1f}%", "per trade, account %"),
-    ])
+    from .strategy_eval import load_cache
+    d = load_cache()
+    if not d:
+        return shell("/strategy", "Strategy",
+                     '<div class="pv"><h1>Strategy Board</h1><div class="panel">'
+                     'No rankings cached yet. Run <code>python3 -m app.strategy_eval</code> '
+                     'to score every strategy.</div></div>',
+                     head_extra=_CSS, meta="strategy board")
+    rl = d["r_levels"]
+    gen = d["generated_at"][:16].replace("T", " ")
+    sub = (f'Every strategy run through R = {rl[0]:g}–{rl[-1]:g}, first-touch, '
+           f'net of {d["fee_pct"]}% round-trip fee · {d["span"][0]} → {d["span"][1]} · '
+           f'scored to reward profit at higher R ("let winners run") · '
+           f'<span style="color:var(--faint)">refreshed {gen}</span>')
     body = f"""
 <div class="pv">
-  <h1>Strategy Engine</h1>
-  <div class="sub">{HERO} — what the edge actually is, measured on {m['months']}mo of bars.</div>
-  <div class="panel"><h2>Edge</h2><div class="grid">{cards}</div></div>
+  <h1>Strategy Board</h1>
+  <div class="sub">{sub}</div>
+  {_board(d['results'], 'prop', rl)}
+  {_board(d['results'], 'hedge', rl)}
   <div class="panel"><h2>Read</h2><div class="prose">
-    Low WR ({m['win_rate_pct']:.0f}%), high payoff ({m['r_multiple']}R) — a <strong>positive-expectancy</strong> mean-reversion edge:
-    each trade is worth <code>+{m['expectancy_pct']:.2f}%</code> ({m['expectancy_r']}R). At ~{m['trades_per_week']} trades/week it's a
-    <strong>slow grind</strong>, which is fine — the eval has no time limit. The ceiling on pass-rate moves only by raising WR,
-    not by tuning R (tested). That's the HEDGE miner's job.</div></div>
+    Each cell is <strong>net R per trade</strong> at that target multiple — green = profitable after fees.
+    <strong>score</strong> sums the profitable cells weighted by R, so a strategy that still pays at 3R outranks
+    one that only pays at 1R. Top 3 per mode are highlighted.<br><br>
+    <strong>PROP</strong> (real 4H/1H backtest) vs <strong>HEDGE</strong> (1h bar-context first-touch) are scored
+    under the same fee model so they're comparable. The headline: the <strong>Asian-dip prop family carries a real
+    post-fee edge</strong>, while the 1h hedge scalps barely clear the fee hurdle — fees are the tax that decides it.
+    Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>
 </div>"""
-    return shell("/strategy", "Strategy", body, head_extra=_CSS, meta="strategy engine")
+    return shell("/strategy", "Strategy", body, head_extra=_CSS, meta="strategy board")
 
 
 # ── /risk — Risk Engine ───────────────────────────────────────────────────────

@@ -29,9 +29,16 @@ from typing import Optional
 from .database import DB_PATH
 
 OHLCV_SYMBOL = "binance:BTC/USDT"
-SL_PCT, TP_PCT = 0.63, 0.95          # realized exit geometry (LIVE_SCALP_v1)
 
-# ── alert ticket sizing (tunable in prism.env; falls back to these defaults) ──
+# LENS's own config file (no prism dependency). Holds API keys + LENS_* settings;
+# also loaded by the systemd unit as EnvironmentFile, so env vars win at runtime.
+ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+
+# ⚠️ PLACEHOLDER exit geometry — NOT a validated edge. Pending decision on the
+# real stop/target source (ATR vs env-config vs per-setup). Do not cite as fact.
+SL_PCT, TP_PCT = 0.63, 0.95
+
+# ── alert ticket sizing (tunable in .env; falls back to these defaults) ──
 MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%
 SETUP_NAMES = {
     "S1": "NY AM flush · RSI<40, 13-16 UTC",
@@ -557,14 +564,14 @@ def desk_state(refresh: bool = True) -> dict:
 
 
 def _envcfg(key: str, default: str) -> str:
-    """Read a config value from the environment, falling back to prism.env, then
-    the supplied default. Mirrors how _notify resolves the ntfy creds so the
-    hourly cron (which doesn't source prism.env) still picks up overrides."""
+    """Read a config value from the environment, falling back to LENS's own .env,
+    then the supplied default. Mirrors how _notify resolves the ntfy creds so the
+    hourly cron (which doesn't source .env) still picks up overrides."""
     v = os.environ.get(key)
     if v is not None and v != "":
         return v
     try:
-        with open("prism.env") as f:
+        with open(ENV_FILE) as f:
             for line in f:
                 if line.startswith(key + "="):
                     return line.split("=", 1)[1].strip()
@@ -573,17 +580,72 @@ def _envcfg(key: str, default: str) -> str:
     return default
 
 
+_BAL_CACHE: dict = {"v": None, "ts": 0.0}
+_BAL_TTL = 60.0  # seconds — don't hammer the Kraken API on every render
+
+
+def _live_account() -> Optional[float]:
+    """Real account size for ticket sizing (EUR). Tries true live Kraken equity
+    first (flex portfolioValue, includes unrealized PnL), cached for 60s; falls
+    back to the balance after the most recent closed trade — the same source the
+    /desk page uses. Returns None only when there's neither live equity nor a
+    synced trade balance (fresh DB / no keys / offline)."""
+    now = datetime.datetime.now().timestamp()
+    if _BAL_CACHE["v"] is not None and now - _BAL_CACHE["ts"] < _BAL_TTL:
+        return _BAL_CACHE["v"]
+
+    bal: Optional[float] = None
+
+    # 1) true live equity from Kraken Futures
+    try:
+        from .kraken_sync import get_api_keys, fetch_live_balance
+        key, secret = get_api_keys("personal")
+        res = fetch_live_balance(key, secret)
+        if res.get("eur_balance"):
+            bal = float(res["eur_balance"])
+    except Exception:
+        bal = None
+
+    # 2) fall back to the last closed-trade balance (offline-safe, local)
+    if bal is None:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            row = conn.execute(
+                "SELECT balance_after FROM trades WHERE balance_after IS NOT NULL "
+                "AND balance_after > 0 ORDER BY closed_at DESC LIMIT 1").fetchone()
+            conn.close()
+            if row and row[0]:
+                bal = float(row[0])
+        except Exception:
+            pass
+
+    if bal is not None:
+        _BAL_CACHE["v"] = bal
+        _BAL_CACHE["ts"] = now
+    return bal
+
+
 def _trade_shape(sig: dict) -> dict:
     """Turn a signal's entry/stop/target into a full order ticket: position size,
     cost, breakeven, liquidation, and the leverage-amplified account swing. Sized
-    all-in (margin = full account) at LENS_LEVERAGE; tune via prism.env:
-    LENS_ACCOUNT_USD, LENS_LEVERAGE, LENS_FEE_RT_PCT."""
+    all-in (margin = full account) at LENS_LEVERAGE; tune via .env:
+    LENS_ACCOUNT_USD, LENS_LEVERAGE, LENS_FEE_RT_PCT.
+
+    Account size = your real synced balance. LENS_ACCOUNT_USD, if explicitly set,
+    is an override for what-if sizing; the $1000 default is only used when there
+    is no real balance and no override."""
     entry = float(sig["entry_price"])
     stop = float(sig["stop_price"])
     tgt = float(sig["target_price"])
     long_ = sig["direction"] == "long"
 
-    acct = float(_envcfg("LENS_ACCOUNT_USD", "1000"))
+    override = _envcfg("LENS_ACCOUNT_USD", "")
+    if override:
+        acct = float(override)
+    else:
+        acct = _live_account()
+        if acct is None:
+            acct = 1000.0
     lev = float(_envcfg("LENS_LEVERAGE", "10"))
     fee_rt = float(_envcfg("LENS_FEE_RT_PCT", "0.30")) / 100.0   # round-trip fraction
 
@@ -667,7 +729,7 @@ def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
 
 
 def _notify(title: str, body: str, signal_id: str = None, tags: str = None) -> bool:
-    """Push to phone via ntfy.sh if LENS_NTFY_TOPIC is set (env or prism.env).
+    """Push to phone via ntfy.sh if LENS_NTFY_TOPIC is set (env or .env).
 
     If signal_id is given, attach TAKE / SKIP action buttons that POST the
     approve/reject decision straight to the LENS server. The phone's ntfy app
@@ -685,7 +747,7 @@ def _notify(title: str, body: str, signal_id: str = None, tags: str = None) -> b
            "LENS_BASE_URL": os.environ.get("LENS_BASE_URL")}
     if not all(cfg.values()):
         try:
-            with open("prism.env") as f:
+            with open(ENV_FILE) as f:
                 for line in f:
                     for k in cfg:
                         if not cfg[k] and line.startswith(k + "="):

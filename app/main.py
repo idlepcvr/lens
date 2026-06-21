@@ -1718,6 +1718,12 @@ def goal_page():
     return render()
 
 
+@app.get("/glossary", response_class=HTMLResponse)
+def glossary_page():
+    from .glossary_page import render
+    return render()
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()

@@ -134,8 +134,8 @@ BODY = r"""
     <div id="verdict" class="verdict"><div class="vi">…</div><div><h3>computing…</h3><p>enter your parameters</p></div></div>
     <div class="hero">
       <div class="hcard blue"><div class="hbig" id="h-ttg">—</div><div class="hlbl">Time to goal</div><div class="hsub" id="h-ttg-sub">—</div></div>
-      <div class="hcard" id="hc-r"><div class="hbig" id="h-r">—</div><div class="hlbl">Actual R</div><div class="hsub" id="h-r-sub">after fees</div></div>
-      <div class="hcard" id="hc-ev"><div class="hbig" id="h-ev">—</div><div class="hlbl">EV / trade</div><div class="hsub" id="h-ev-sub">geo drift</div></div>
+      <div class="hcard" id="hc-r"><div class="hbig" id="h-r">—</div><div class="hlbl">Actual R<a class="qh" href="/glossary#truerr" target="_blank" rel="noopener" title="what is this?">?</a></div><div class="hsub" id="h-r-sub">after fees</div></div>
+      <div class="hcard" id="hc-ev"><div class="hbig" id="h-ev">—</div><div class="hlbl">EV / trade<a class="qh" href="/glossary#ev" target="_blank" rel="noopener" title="what is this?">?</a></div><div class="hsub" id="h-ev-sub">geo drift</div></div>
       <div class="hcard" id="hc-ror"><div class="hbig" id="h-ror">—</div><div class="hlbl">Risk of ruin</div><div class="hsub" id="h-ror-sub">—</div></div>
     </div>
     <div class="grid2">
@@ -143,7 +143,7 @@ BODY = r"""
       <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
     </div>
     <div class="rk">
-      <div class="rk-title">Risk &amp; Kelly — the core mismatch</div>
+      <div class="rk-title">Risk &amp; Kelly — the core mismatch<a class="qh" href="/glossary#kelly" target="_blank" rel="noopener" title="Kelly, DD constraint & optimal risk explained">?</a></div>
       <div class="rk-row" id="rk-row"></div>
       <div class="explain" id="rk-explain"></div>
     </div>

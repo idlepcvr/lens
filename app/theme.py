@@ -39,10 +39,15 @@ NAV_HEDGE = [
     ("/journal", "Journal"),
     ("/edge", "Edge"),
     ("/projection", "Projection"),
+    ("/strategy", "Board"),
+    ("/glossary", "Learn"),
 ]
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
 _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
+# /strategy is a shared prop+hedge board; keep it anchored to the PROP nav even
+# though it's also linked from HEDGE (so prop users aren't bounced out of it).
+_PAGE_MODE["/strategy"] = "prop"
 
 
 def page_mode(path: str) -> str:
@@ -118,6 +123,14 @@ a{color:var(--accent);text-decoration:none}
 .help-body .g{color:var(--long)} .help-body .r{color:var(--short)} .help-body .a{color:var(--amber)}
 .help-body code{font-family:var(--mono);font-size:11.5px;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink)}
 .help-body ol{margin:4px 0 0 18px} .help-body ol li{margin:3px 0}
+
+/* ── inline glossary help badge (?) — links to /glossary#anchor ── */
+.qh{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;
+  border-radius:50%;border:1px solid var(--line2);color:var(--dim);font-family:var(--mono);
+  font-size:9px;font-weight:700;text-decoration:none;margin-left:5px;vertical-align:baseline;
+  line-height:1;flex:0 0 auto}
+.qh:active{transform:scale(.9)}
+@media (hover:hover){ .qh:hover{color:var(--accent);border-color:var(--accent)} }
 
 /* ── top bar ── */
 .bar{display:flex;align-items:center;justify-content:space-between;
