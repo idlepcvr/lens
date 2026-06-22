@@ -369,7 +369,8 @@ proptradingvibes.com/blog/breakout-faq · **verify on the Breakout dashboard bef
   fired but was vetoed, live checklist table, per-setup alerts.
 - `LENS_EDGE_v2/` — the flush short + the mechanical-validation failure that
   taught us setups are contexts, not triggers. Kept for the paper trail.
-- `TREND_4R_v1/` — the 4H/4R thesis strategy. Still not validated.
+- `TREND_4R_v1/` — the 4H/4R thesis strategy. ❌ **Backtested 2026-06-22 →
+  20.9% WR, below breakeven, account to zero. Retired** (see its BASELINE.md).
 - Older experiments (`PULLBACK_*`, `MOM_BREAK_v1`, …) — see `strategies/README.md`.
 
 ---
@@ -429,7 +430,10 @@ Useful API: `POST /api/setups/scan` (scan now) ·
   at a public tunnel.
 - ⏳ v4 needs ~3 months of tagged trades; candidate new features: order-flow
   data (CVD, delta, funding, OI).
-- 🧪 `TREND_4R_v1` (4H/4R thesis) — still not backtested; separate track.
+- ❌ `TREND_4R_v1` (4H/4R thesis) — **backtested 2026-06-22 → 20.9% WR over 182
+  trades, below the 26% fee-adjusted breakeven, PF 0.75, account to zero. RETIRED.**
+  The "risk 10% to make 40%" compounding plan rested on a 44–48% WR at 4R that
+  the data says doesn't exist. See `strategies/TREND_4R_v1/BASELINE.md`.
 - ⚠️ Setup WRs are realized-history numbers, not promises. Mechanical
   occurrence of any setup is ~coin-flip — the edge is selection inside the
   context. Funding cost on multi-day holds is not modelled.

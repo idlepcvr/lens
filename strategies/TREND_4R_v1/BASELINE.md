@@ -1,7 +1,37 @@
-# TREND_4R_v1 — Baseline (TBD)
+# TREND_4R_v1 — Baseline ❌ KILLED (2026-06-22)
 
-*Run TradingView's Strategy Tester and fill this in. This is the experiment that
-decides whether the whole compounding plan is real or a fantasy.*
+*This was the experiment that decides whether the whole compounding plan is real
+or a fantasy. **Verdict: fantasy.** The data is in (two independent runs below),
+the entry premise does not survive a 1% stop, and this track is retired.*
+
+## VERDICT — retired 2026-06-22
+
+> **20.9% win rate over 182 trades — below the 26% fee-adjusted breakeven.**
+> Profit factor 0.75, max drawdown 100% (account → $0.20), 16 losses in a row.
+> A 1% stop on 4H BTC gets wicked out by normal noise exactly as the honest prior
+> below predicted. The 44–48% WR the compounding plan assumed does not exist at
+> this geometry. **Do not trade this. Do not lift leverage to "fix" it — the
+> problem is entry quality (WR), not sizing.** The surviving edges are the HEDGE
+> S1–S5 discretionary contexts and the PROP `ASIAN_RSI_DIP_v1` grind, not this.
+
+### Engine backtest — 2026-06-22 (the confirming run, n=182)
+
+`app.backtest_engine run_strategy('TREND_4R_v1', months=30)` over 30 months of
+4H BTC, fee-honest:
+
+| Metric | Value | Read |
+|---|---|---|
+| Total trades (n) | 182 | 5.7× the TV sample — confidence is high |
+| **Win rate %** | **20.9%** (38W / 144L) | confirms the 18.8% below; nowhere near 44% |
+| Breakeven WR @4R (after fees) | 26.0% | **WR sits BELOW breakeven → structurally negative** |
+| Avg R (per win) | 2.85 | <4 — TP rarely reached before reversal |
+| Profit factor | 0.75 | < 1.0 floor: loses €0.25 per €1 risked |
+| **Max drawdown %** | **100%** ($637 → $0.20) | total ruin at the locked 10x |
+| Max consecutive losses | 16 | the kill streak |
+| Avg hold | 24.4h | a 1–3 day swing, not a scalp (as expected) |
+| Trades/week | 1.4 | as planned — cadence was never the problem |
+
+Both samples agree: ~19–21% WR, PF < 1, account to zero. The premise is dead.
 
 ## The question this strategy exists to answer
 
@@ -40,7 +70,7 @@ no matter the leverage. That's the bar to clear. (The plan's 44% is the *hope*,
 pays funding (~the 1.5% you flagged). Mentally haircut the result, or subtract
 funding when the real fills land in PRISM Core.
 
-## Baseline results
+## Baseline results — earlier TradingView run (n=32, smaller sample, same conclusion)
 
 | Metric | Value | Read |
 |---|---|---|

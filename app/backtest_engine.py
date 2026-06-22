@@ -970,9 +970,120 @@ def _compute_metrics(result: dict, initial_capital: float, months: int) -> dict:
     }
 
 
+def _signal_smc_lux_v1(df, i, params):
+    """The LuxAlgo SMC chart stack, codified mechanically as the two setups the
+    user extracted from TradingView:
+
+      S1_DISCOUNT_LONG : zone_discount AND bias_bull AND sweep_low  AND macd_bull
+      S2_PREMIUM_SHORT : zone_premium  AND bias_bear AND sweep_high AND macd_bear (+ MA stack down)
+
+    Built from the SAME primitives already mined into app/setups.py — premium/
+    discount of the 7d dealing range, liquidity sweep + reclaim, MACD momentum,
+    EMA21/50 stack. This is the mechanical-occurrence version: take EVERY time
+    the conditions print, no discretion.
+    """
+    if i < 200:
+        return None
+
+    c   = df["close"].iloc[i]
+    e21 = df["ema21"].iloc[i]
+    e50 = df["ema50"].iloc[i]
+    hist = df["macd_hist"].iloc[i]
+
+    # MA stack / bias (LuxAlgo CHoCH proxy)
+    bias_bull = e21 > e50
+    bias_bear = e21 < e50
+
+    # 7-day dealing range → premium / discount (168 1H bars)
+    win_hi = df["high"].iloc[i - 168:i + 1].max()
+    win_lo = df["low"].iloc[i - 168:i + 1].min()
+    rng = win_hi - win_lo
+    if rng <= 0:
+        return None
+    pos = (c - win_lo) / rng
+    zone_premium  = pos > 0.55
+    zone_discount = pos < 0.45
+
+    # Liquidity sweep + reclaim, last 3 bars vs the prior 24-bar swing
+    prior_hi = df["high"].iloc[i - 27:i - 3].max()
+    prior_lo = df["low"].iloc[i - 27:i - 3].min()
+    last3_hi = df["high"].iloc[i - 2:i + 1].max()
+    last3_lo = df["low"].iloc[i - 2:i + 1].min()
+    sweep_low  = last3_lo < prior_lo and c > prior_lo   # buyside sweep, reclaimed up
+    sweep_high = last3_hi > prior_hi and c < prior_hi   # sellside sweep, reclaimed down
+
+    # MACD momentum (trig_macd_bull / bear)
+    macd_bull = hist > 0
+    macd_bear = hist < 0
+
+    long_sig  = zone_discount and bias_bull and sweep_low  and macd_bull
+    short_sig = zone_premium  and bias_bear and sweep_high and macd_bear
+
+    if long_sig:  return "long"
+    if short_sig: return "short"
+    return None
+
+
+def _signal_smc_sweep_v1(df, i, params):
+    """The part of the SMC stack that actually carries edge: zone + liquidity
+    sweep + reclaim, WITHOUT the MACD / MA-trend confluence (which backtested
+    neutral-to-ruinous). Decomposition of SMC_LUX showed the sweep is the
+    signal; momentum-chasing is the bleed — matching the mined S3/S4 + the
+    'trade WITH the sweep' finding in FINDINGS.md.
+
+      long  : EMA21>EMA50 (bias) AND discount of 7d range AND buyside sweep reclaimed up
+      short : EMA21<EMA50 (bias) AND premium  of 7d range AND sellside sweep reclaimed down
+
+    The EMA trend gate is load-bearing: dropping it flips +125% → ruin. MACD is
+    not (dropping it is neutral-to-better). So: trend + zone + sweep, no momentum.
+    """
+    if i < 200:
+        return None
+    c = df["close"].iloc[i]
+    e21 = df["ema21"].iloc[i]
+    e50 = df["ema50"].iloc[i]
+    bias_bull = e21 > e50
+    bias_bear = e21 < e50
+    win_hi = df["high"].iloc[i - 168:i + 1].max()
+    win_lo = df["low"].iloc[i - 168:i + 1].min()
+    rng = win_hi - win_lo
+    if rng <= 0:
+        return None
+    pos = (c - win_lo) / rng
+    prior_hi = df["high"].iloc[i - 27:i - 3].max()
+    prior_lo = df["low"].iloc[i - 27:i - 3].min()
+    last3_hi = df["high"].iloc[i - 2:i + 1].max()
+    last3_lo = df["low"].iloc[i - 2:i + 1].min()
+    if bias_bull and pos < 0.45 and last3_lo < prior_lo and c > prior_lo:
+        return "long"
+    if bias_bear and pos > 0.55 and last3_hi > prior_hi and c < prior_hi:
+        return "short"
+    return None
+
+
 # ─── Strategy registry ────────────────────────────────────────────────────────
 
 STRATEGIES: dict = {
+    "SMC_LUX_4R_v1": {
+        "description": "LuxAlgo SMC chart stack, mechanical: premium/discount + sweep+reclaim + MACD + EMA stack. 1% stop / 4% TP (4R).",
+        "signal_fn": _signal_smc_lux_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0004, "skip_sat": True, "cooldown_bars": 4,
+            "once_per_day": True,
+        },
+    },
+    "SMC_SWEEP_v1": {
+        "description": "The edge-carrying part of the SMC stack: zone + liquidity sweep + reclaim, NO MACD/MA confluence. n=63, WR 28.6%, PF 1.45, +125% over 30mo at 4R. The keeper.",
+        "signal_fn": _signal_smc_sweep_v1,
+        "timeframe": "1h",
+        "params": {
+            "stop_pct": 1.0, "tp_pct": 4.0, "leverage": 10.0,
+            "commission": 0.0004, "skip_sat": True, "cooldown_bars": 4,
+            "once_per_day": True,
+        },
+    },
     "TREND_4R_v1": {
         "description": "Breakout above 20-bar high in EMA trend + MACD. The original failed strategy (expected ~19% WR).",
         "signal_fn": _signal_trend_4r_v1,
