@@ -439,6 +439,26 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
     return _row_to_response(row)
 
 
+def clear_synced_open_positions(venue: Optional[str] = None) -> int:
+    """Delete auto-synced open-position rows so each sync can re-insert the
+    current live positions cleanly. Open positions carry no exchange order_id,
+    so they can't be deduped on insert; instead we wipe-and-replace them every
+    sync. Real closed trades (exit IS NOT NULL, with an order_id) are untouched,
+    and so are manually-entered trades (different notes). Returns rows deleted."""
+    c = _conn()
+    sql = ("DELETE FROM trades WHERE notes = 'auto-synced open position' "
+           "AND exit IS NULL AND kraken_order_id IS NULL")
+    params: tuple = ()
+    if venue:
+        sql += " AND venue = ?"
+        params = (venue,)
+    cur = c.execute(sql, params)
+    c.commit()
+    n = cur.rowcount
+    c.close()
+    return n
+
+
 # ─── Transfers ────────────────────────────────────────────────────────────────
 
 def get_transfers(limit: int = 200) -> list[dict]:

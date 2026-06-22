@@ -268,6 +268,7 @@ def sync_account(
     db_upsert_fn,
     db_close_fn=None,
     db_transfer_fn=None,
+    db_clear_open_fn=None,    # optional: clear_synced_open_positions — wipe-and-replace open rows
     last_fill_time: Optional[str] = None,
 ) -> dict:
     """
@@ -333,6 +334,15 @@ def sync_account(
         except Exception as e:
             errors.append(f"upsert {item.get('orderId')}: {e}")
             skipped += 1
+
+    # Open positions carry no exchange order_id and can't be deduped on insert,
+    # so wipe the previous sync's auto-synced open rows then re-insert the live
+    # ones → exactly one row per open position, none left behind when closed.
+    if db_clear_open_fn:
+        try:
+            db_clear_open_fn("bybit_futures")
+        except Exception as e:
+            errors.append(f"clear_open: {e}")
 
     for pos, cat in open_positions:
         t = _open_position_to_trade(pos, cat)

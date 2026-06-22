@@ -32,7 +32,7 @@ from .calculator import CalcError, compute_goal, compute_position, compute_proje
 from .database import (
     init_db,
     create_trade, get_trades, get_trade, update_trade, delete_trade,
-    upsert_exchange_trade,
+    upsert_exchange_trade, clear_synced_open_positions,
     get_transfers, upsert_transfer,
     get_daily_snapshots, upsert_daily_snapshot,
     insert_signal, get_signals, get_signal, decide_signal, expire_stale_signals,
@@ -1657,6 +1657,7 @@ def _run_kraken_sync(account: str, api_key: str, api_secret: str, last_fill_time
             api_key, api_secret,
             db_upsert_fn=upsert_exchange_trade,
             db_transfer_fn=upsert_transfer,
+            db_clear_open_fn=clear_synced_open_positions,
             last_fill_time=last_fill_time,
         )
         result.pop("eur_timeline", None)
@@ -1714,6 +1715,7 @@ def sync_bybit(req: SyncRequest = SyncRequest()):
         api_key, api_secret,
         db_upsert_fn=upsert_exchange_trade,
         db_transfer_fn=upsert_transfer,
+        db_clear_open_fn=clear_synced_open_positions,
         last_fill_time=req.last_fill_time,
     )
     # Auto-classify newly-synced closed trades (S1–S5 / VETO / NONE).

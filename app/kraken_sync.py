@@ -418,12 +418,14 @@ def sync_account(
     db_upsert_fn,
     db_close_fn=None,         # kept for API compatibility, unused
     db_transfer_fn=None,      # optional: upsert_transfer from supabase_database
+    db_clear_open_fn=None,    # optional: clear_synced_open_positions — wipe-and-replace open rows
     last_fill_time: Optional[str] = None,
 ) -> dict:
     """
     Pull fills + open positions + transfers from Kraken and persist into DB.
     db_upsert_fn(trade_dict)     → TradeResponse | None  (None = duplicate)
     db_transfer_fn(transfer_dict) → bool  (False = duplicate)
+    db_clear_open_fn(venue)       → int   (auto-synced open rows deleted)
     Returns a summary dict.
     """
     errors             = []
@@ -462,6 +464,16 @@ def sync_account(
         except Exception as e:
             errors.append(f"upsert {t.get('kraken_order_id')}: {e}")
             skipped += 1
+
+    # Open positions carry no exchange order_id, so they can't be deduped on
+    # insert. Wipe the previous sync's auto-synced open rows, then re-insert
+    # whatever is currently open → exactly one row per live position, and a
+    # closed position simply leaves no phantom behind.
+    if db_clear_open_fn:
+        try:
+            db_clear_open_fn("kraken_futures")
+        except Exception as e:
+            errors.append(f"clear_open: {e}")
 
     for pos in open_positions:
         t = _open_position_to_trade(pos)
