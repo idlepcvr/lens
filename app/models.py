@@ -17,6 +17,7 @@ class GoalRequest(BaseModel):
     losses_allowed:        int            = 20
     fractional_kelly:      float          = 1.0 / 6.0
     execution_fill_factor: float          = 1.0
+    slippage_pct:          float          = 0.0
     risk_per_trade:          Optional[float] = None
     btc_price_eur:           Optional[float] = None
     btc_growth_monthly:      float          = 0.04
@@ -76,6 +77,8 @@ class GoalResponse(BaseModel):
     required_leverage:     Optional[float]
     weeks_to_goal_actual:  Optional[float]
     execution_fill_factor: float
+    slippage_pct:          float = 0.0
+    friction_pct:          float = 0.0
     # Account impacts
     acct_gain_win:    float
     acct_loss_loss:   float
@@ -131,6 +134,7 @@ class PositionRequest(BaseModel):
     losses_allowed:        int            = 20
     fractional_kelly:      float          = 1.0 / 6.0
     execution_fill_factor: float          = 1.0
+    slippage_pct:          float          = 0.0
     risk_per_trade:        Optional[float] = None
     # Position inputs
     entry_price:    float

@@ -26,6 +26,7 @@ _CSS = r"""<style>
 .pi .ctl label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .pi .ctl input,.pi .ctl select{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);padding:7px 10px;border-radius:6px;font-family:var(--mono);font-size:13px}
 .pi .ctl input:focus,.pi .ctl select:focus{outline:none;border-color:var(--accent)}
+.pi .ctl input.calc-on{border-color:var(--amber)!important;color:var(--amber)}
 .pi .sb-wrap{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:4px 12px;overflow-x:auto}
 .pi table{width:100%;border-collapse:collapse;font-size:13px}
 .pi th,.pi td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);font-family:var(--mono)}
@@ -38,6 +39,9 @@ _CSS = r"""<style>
 .pi tr.aum td:first-child{color:var(--amber)}
 .pi .note{color:var(--dim);font-size:12px;margin-top:12px;line-height:1.6}
 .pi .note b{color:var(--ink)}
+.pi .save{background:var(--accent-d);border:1px solid var(--accent);color:var(--accent);padding:7px 10px;border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;transition:all .12s}
+.pi .save:hover{background:var(--accent);color:#06080c}
+.pi .save.ok{background:var(--long);border-color:var(--long);color:#06080c}
 .pi .bdg{font-family:var(--mono);font-size:10px;color:var(--accent)}
 </style>"""
 
@@ -59,9 +63,10 @@ def income_page() -> str:
         <option value="5">Trading capital / mo</option>
         <option value="6">FAT FIRE / mo</option>
       </select></div>
-    <div class="ctl"><label>Anchor € / mo</label><input id="aval" type="number" step="any" value="1786"></div>
-    <div class="ctl"><label>BTCEUR price</label><input id="btceur" type="number" step="any" value="54875"></div>
-    <div class="ctl"><label>AUM annual return %</label><input id="ret" type="number" step="0.1" value="4"></div>
+    <div class="ctl"><label>Anchor € / mo</label><input id="aval" class="calc" type="text" inputmode="decimal" value="1786"></div>
+    <div class="ctl"><label>BTCEUR price</label><input id="btceur" class="calc" type="text" inputmode="decimal" value="54875"></div>
+    <div class="ctl"><label>AUM annual return %</label><input id="ret" class="calc" type="text" inputmode="decimal" value="4"></div>
+    <div class="ctl"><label>&nbsp;</label><button id="save" class="save">Save ✓</button></div>
   </div>
 
   <div class="sb-wrap"><table id="ladder"></table></div>
@@ -102,17 +107,39 @@ function render(){
       <td class="lbl">${R.label}${i===a?' <span class="bdg">anchor</span>':''}</td>
       <td class="eur">${eur(v[i])}</td>
       <td class="dim">${btc(v[i],price)}</td>
-      <td class="dim">${pct(R.r)}</td></tr>`;
+      <td class="dim">${R.r==null?Math.round(1/RUNGS[5].r)+'× trad cap':pct(R.r)}</td></tr>`;
   });
   const cap=v[5];                       // trading capital / mo
   const aum= ret>0 ? cap*12/ret : 0;
+  const aumMult= ret>0 ? `×12÷${$('ret').value||0}% = ${Math.round(12/ret)}×` : '∞';
   rows+=`<tr class="aum"><td class="lbl">Trading AUM <span class="bdg">@ ${($('ret').value||0)}%/yr</span></td>
-      <td class="eur">${eur(aum)}</td><td class="dim">${btc(aum,price)}</td><td class="dim">—</td></tr>`;
+      <td class="eur">${eur(aum)}</td><td class="dim">${btc(aum,price)}</td><td class="dim">${aumMult}</td></tr>`;
   $('ladder').innerHTML=rows;
   $('aum-note').innerHTML = `To draw <b>${eur(cap)}/mo</b> of trading capital at <b>${$('ret').value||0}%</b> annual you need <b>${eur(aum)}</b> (${btc(aum,price)}) under management — that's the prop end-goal the eval scales toward.`;
 }
 
-['anchor','aval','btceur','ret'].forEach(id=>$(id).addEventListener('input',render));
+// ── persistence (localStorage — personal tool, no backend round-trip needed) ──
+const KEYS=['anchor','aval','btceur','ret'];
+(function restore(){ try{ const o=JSON.parse(localStorage.getItem('lens_prop_income')||'{}');
+  KEYS.forEach(k=>{ if(o[k]!=null&&o[k]!=='') $(k).value=o[k]; }); }catch(e){} })();
+$('save').addEventListener('click',()=>{
+  const o={}; KEYS.forEach(k=>o[k]=$(k).value); localStorage.setItem('lens_prop_income',JSON.stringify(o));
+  const b=$('save'); b.classList.add('ok'); b.textContent='Saved ✓';
+  setTimeout(()=>{ b.classList.remove('ok'); b.textContent='Save ✓'; },1400);
+});
+KEYS.forEach(id=>$(id).addEventListener('input',render));
+
+// calculator — type 300*0.1 → Enter → 30
+document.querySelectorAll('.pi input.calc').forEach(inp=>{
+  function tryCalc(){
+    const v=inp.value.trim(); if(!v) return;
+    try{ const r=Function('"use strict";return('+v.replace(/[^0-9+\-*/.() \t]/g,'')+')')();
+      if(isFinite(r)){ inp.value=parseFloat(r.toFixed(8)); inp.classList.remove('calc-on'); render(); } }catch(e){}
+  }
+  inp.addEventListener('input',()=>inp.classList.toggle('calc-on', /[+*\/]/.test(inp.value)));
+  inp.addEventListener('blur',tryCalc);
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ tryCalc(); e.preventDefault(); } });
+});
 render();
 """
     return shell("/prop-income", "Income", body, script=script, head_extra=_CSS, meta="prop goal")

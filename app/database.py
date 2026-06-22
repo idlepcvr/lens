@@ -189,6 +189,7 @@ def init_db():
             losses_allowed          INTEGER,
             fractional_kelly        REAL,
             execution_fill_factor   REAL,
+            slippage_pct            REAL,
             risk_per_trade          REAL,
             min_underlying_stop_pct REAL,
             btc_price_eur           REAL,
@@ -223,6 +224,10 @@ def init_db():
     ):
         if col not in trade_cols:
             c.execute(f"ALTER TABLE trades ADD COLUMN {col} {decl}")
+
+    cfg_cols = {row[1] for row in c.execute("PRAGMA table_info(lens_config)").fetchall()}
+    if "slippage_pct" not in cfg_cols:
+        c.execute("ALTER TABLE lens_config ADD COLUMN slippage_pct REAL")
     c.commit()
 
     # Seed default config row on first init
@@ -233,12 +238,12 @@ def init_db():
                 id, start_balance, target_balance, target_date,
                 trades_per_week, win_rate, rr_ratio, leverage,
                 max_drawdown_allowed, losses_allowed, fractional_kelly,
-                execution_fill_factor, btc_growth_monthly, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                execution_fill_factor, slippage_pct, btc_growth_monthly, updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (1000.0, 250000.0, "2028-12-31",
              14.0, 0.55, 3.0, 10.0,
              0.50, 20, 1.0 / 6.0,
-             1.0, 0.04, datetime.utcnow().isoformat()),
+             1.0, 0.0, 0.04, datetime.utcnow().isoformat()),
         )
 
     c.commit()
@@ -646,7 +651,7 @@ _CFG_COLS = (
     "start_balance", "target_balance", "target_date",
     "trades_per_week", "win_rate", "rr_ratio", "leverage",
     "max_drawdown_allowed", "losses_allowed", "fractional_kelly",
-    "execution_fill_factor", "risk_per_trade", "min_underlying_stop_pct",
+    "execution_fill_factor", "slippage_pct", "risk_per_trade", "min_underlying_stop_pct",
     "btc_price_eur", "btc_growth_monthly",
 )
 

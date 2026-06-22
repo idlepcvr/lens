@@ -31,10 +31,16 @@ CSS = r"""<style>
 .fsec-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.22em;color:var(--t3);margin-bottom:7px}
 .frow{display:grid;grid-template-columns:1fr 90px;gap:3px 6px;align-items:center;margin-bottom:4px}
 .frow label{font-size:11px;color:var(--t2)}
-.frow input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;width:100%}
+.frow label .hint{font-size:8.5px;color:var(--t4);font-weight:600}
+.frow input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;width:100%;min-width:0;box-sizing:border-box}
 .frow input:focus{outline:none;border-color:var(--ac)}
 .frow input.cx{border-color:var(--am)!important;color:var(--am)}
-.frow input[type=date]{font-family:inherit;font-size:11px}
+.frow input[type=date]{font-family:inherit;font-size:11.5px}
+/* date needs more room than the 90px value column — give it a full-width row */
+.frow.frow-date{grid-template-columns:1fr}
+.frow.frow-date label{margin-bottom:1px}
+/* iOS date inputs overflow their box & drop right padding — normalise on mobile only (keeps desktop's native calendar icon) */
+@media(max-width:820px){.frow.frow-date input[type=date]{-webkit-appearance:none;appearance:none;max-width:100%}}
 .factns{padding:10px 14px;display:flex;gap:7px;align-items:center}
 .btn{padding:6px 13px;border-radius:5px;border:1px solid var(--b2);background:var(--s2);color:var(--t2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;font-family:inherit}
 .btn:hover{color:var(--t1);border-color:var(--b3)}
@@ -103,7 +109,8 @@ BODY = r"""
         <div class="fsec"><div class="fsec-lbl">Account</div>
           <div class="frow"><label>Start €</label><input type="text" inputmode="decimal" name="start_balance"></div>
           <div class="frow"><label>Target €</label><input type="text" inputmode="decimal" name="target_balance"></div>
-          <div class="frow"><label>Target date</label><input type="date" name="target_date"></div>
+          <div class="frow"><label>Target BTC <span class="hint">@ today →€</span></label><input type="text" inputmode="decimal" id="target_btc" placeholder="e.g. 50"></div>
+          <div class="frow frow-date"><label>Target date</label><input type="date" name="target_date"></div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Trading</div>
           <div class="frow"><label>Win rate (0–1)</label><input type="text" inputmode="decimal" name="win_rate"></div>
@@ -116,6 +123,10 @@ BODY = r"""
           <div class="frow"><label>Losses allowed</label><input type="text" inputmode="decimal" name="losses_allowed"></div>
           <div class="frow"><label>Frac. Kelly</label><input type="text" inputmode="decimal" name="fractional_kelly"></div>
           <div class="frow"><label>ATR floor</label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+        </div>
+        <div class="fsec"><div class="fsec-lbl">Execution</div>
+          <div class="frow"><label>Fill factor <span class="hint">0–1, size</span></label><input type="text" inputmode="decimal" name="execution_fill_factor" placeholder="1.0"></div>
+          <div class="frow"><label>Slippage <span class="hint">frac, 0.001=0.1%</span></label><input type="text" inputmode="decimal" name="slippage_pct" placeholder="0"></div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Optional</div>
           <div class="frow"><label>BTC price €</label><input type="text" inputmode="decimal" name="btc_price_eur" placeholder="—"></div>
@@ -161,7 +172,7 @@ SCRIPT = r"""
 function tog(id){ document.getElementById('h-'+id).classList.toggle('closed'); document.getElementById('s-'+id).classList.toggle('closed'); }
 const FORM=document.getElementById("goal-form"), ERR=document.getElementById("err");
 const SAVED=document.getElementById("saved-pulse"), SAVE_BTN=document.getElementById("save-btn"), RESET=document.getElementById("reset-btn");
-const NUM_FIELDS=["start_balance","target_balance","trades_per_week","win_rate","rr_ratio","leverage","max_drawdown_allowed","losses_allowed","fractional_kelly","execution_fill_factor","min_underlying_stop_pct","btc_price_eur","btc_growth_monthly"];
+const NUM_FIELDS=["start_balance","target_balance","trades_per_week","win_rate","rr_ratio","leverage","max_drawdown_allowed","losses_allowed","fractional_kelly","execution_fill_factor","slippage_pct","min_underlying_stop_pct","btc_price_eur","btc_growth_monthly"];
 
 function readForm(){ const fd=new FormData(FORM),out={}; for(const[k,v]of fd.entries()){ if(v===""||v===null){out[k]=null;continue;} out[k]=NUM_FIELDS.includes(k)?(Number.isFinite(Number(v))?Number(v):null):v; } return out; }
 function populate(cfg){ for(const k in cfg){ const el=FORM.elements.namedItem(k); if(el&&cfg[k]!=null) el.value=cfg[k]; } }
@@ -242,6 +253,9 @@ function render(g){
       row("Gain / win","+"+fmtPct(g.acct_gain_win),"pos")
     + row("Loss / loss","−"+fmtPct(g.acct_loss_loss),"neg")
     + row("Geom drift",(g.geometric_drift>=0?"+":"")+fmtPct(g.geometric_drift), g.geometric_drift>0?"pos":"neg")
+    + row("Fill factor",g.execution_fill_factor!=null?g.execution_fill_factor.toFixed(1)+"%":"—",(g.execution_fill_factor??100)<100?"warn":"dim")
+    + row("Slippage / trade",fmtPct4(g.slippage_pct),(g.slippage_pct??0)>0?"warn":"dim")
+    + row("Friction (fee+slip)",fmtPct4(g.friction_pct),"neg")
     + row("Typical win (log)","+"+fmtPct(g.typical_win),"pos")
     + row("Typical loss (log)",fmtPct(g.typical_loss),"neg");
 
@@ -279,13 +293,25 @@ SAVE_BTN.addEventListener("click",async()=>{ await fetch("/api/config",{method:"
 RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config").then(r=>r.json())); recompute(); });
 (async()=>{ populate(await fetch("/api/config").then(r=>r.json())); recompute(); })();
 
-document.querySelectorAll('#goal-form input').forEach(function(inp){
+document.querySelectorAll('#goal-form input:not([type=date])').forEach(function(inp){
   function tryCalc(){ var v=inp.value.trim(); if(!v) return;
     try{ var r=Function('"use strict";return('+v.replace(/[^0-9+\-*/.() \t]/g,'')+')')(); if(isFinite(r)){ inp.value=parseFloat(r.toFixed(8)); inp.classList.remove('cx'); recompute(); } }catch(e){} }
   inp.addEventListener('input',function(e){ if(/[+*\/]/.test(inp.value)){ e.stopPropagation(); inp.classList.add('cx'); } else inp.classList.remove('cx'); });
   inp.addEventListener('blur',tryCalc);
   inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ tryCalc(); e.preventDefault(); } });
 });
+
+// Target BTC helper — type a BTC count → fills Target € at TODAY's price (price cancels).
+const TBTC=document.getElementById("target_btc");
+function tbtcApply(){
+  const n=parseFloat(TBTC.value);
+  const pxEl=FORM.elements.namedItem("btc_price_eur");
+  const px=pxEl?parseFloat(pxEl.value):NaN;
+  const TBAL=FORM.elements.namedItem("target_balance");
+  if(Number.isFinite(n)&&Number.isFinite(px)&&px>0){ TBAL.value=Math.round(n*px); recompute(); }
+}
+TBTC.addEventListener("input",tbtcApply);
+TBTC.addEventListener("keydown",function(e){ if(e.key==="Enter"){ tbtcApply(); e.preventDefault(); } });
 """
 
 

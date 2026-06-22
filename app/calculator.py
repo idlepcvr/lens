@@ -47,6 +47,7 @@ def compute_goal(
     losses_allowed:          int   = 20,
     fractional_kelly:        float = 1.0 / 6.0,  # sixth-Kelly default
     execution_fill_factor:   float = 1.0,
+    slippage_pct:            float = 0.0,         # adverse price slip per round-trip (0.001 = 0.10%)
     risk_per_trade:          float = None,        # optional override of acct_loss_loss
     min_underlying_stop_pct: float = None,        # ATR noise floor: SL price move floor (Layer 2)
     # BTC projections
@@ -80,6 +81,8 @@ def compute_goal(
         raise CalcError("fractional_kelly must be between 0 and 1")
     if not (0 < execution_fill_factor <= 1):
         raise CalcError("execution_fill_factor must be between 0 and 1")
+    if slippage_pct < 0:
+        raise CalcError("slippage_pct must be non-negative")
     if risk_per_trade is not None and not (0 < risk_per_trade < 1):
         raise CalcError("risk_per_trade must be between 0 and 1 if provided")
 
@@ -88,6 +91,11 @@ def compute_goal(
         raise CalcError("target_date must be in the future")
 
     loss_rate = 1.0 - win_rate
+
+    # Total per-trade frictional cost: exchange fees + adverse slippage.
+    # Slippage degrades fills on both legs — modelled as extra round-trip cost,
+    # so it widens losses AND raises the TP move needed to net the goal.
+    friction = FEE_ROUNDTRIP + slippage_pct
 
     # ─── 1. Time rates ────────────────────────────────────────────────────
     total_interest   = target_balance / start_balance - 1
@@ -114,8 +122,8 @@ def compute_goal(
     # goal by target_date given the number of trades per week.
     per_trade_ev_required = (1 + weekly_rate) ** (1.0 / trades_per_week) - 1
 
-    # Gross account % target per winning trade (net EV + round-trip fee drag)
-    goal_pct = per_trade_ev_required + FEE_ROUNDTRIP * leverage
+    # Gross account % target per winning trade (net EV + round-trip fee + slippage drag)
+    goal_pct = per_trade_ev_required + friction * leverage
 
     # ATR adjustment tracking (populated only in primary path when noise floor triggered)
     atr_adjusted    = False
@@ -126,16 +134,16 @@ def compute_goal(
         # User specifies the total account % loss on a losing trade (incl. fees)
         acct_loss_loss      = risk_per_trade
         underlying_loss_pct = (risk_per_trade / execution_fill_factor
-                                / leverage - FEE_ROUNDTRIP)
+                                / leverage - friction)
         if underlying_loss_pct <= 0:
             raise CalcError(
-                "risk_per_trade override is too small to cover fees at this leverage."
+                "risk_per_trade override is too small to cover fees+slippage at this leverage."
             )
         underlying_win_pct = underlying_loss_pct * rr_ratio
         acct_gain_win      = underlying_win_pct * leverage * execution_fill_factor
         # What EV-first would have said (advisory comparison)
         ev_underlying_loss = goal_pct / (leverage * rr_ratio)
-        required_risk_pct  = ((ev_underlying_loss + FEE_ROUNDTRIP)
+        required_risk_pct  = ((ev_underlying_loss + friction)
                                * leverage * execution_fill_factor)
     else:
         # ── Primary EV-first path ─────────────────────────────────────────
@@ -156,8 +164,8 @@ def compute_goal(
 
         # 6. Account gain on a WIN (gross — fee embedded in TP placement)
         acct_gain_win  = underlying_win_pct * leverage * execution_fill_factor
-        # 7. Account loss on a LOSS (SL P&L + exit fee)
-        acct_loss_loss = ((underlying_loss_pct + FEE_ROUNDTRIP)
+        # 7. Account loss on a LOSS (SL P&L + exit fee + slippage)
+        acct_loss_loss = ((underlying_loss_pct + friction)
                            * leverage * execution_fill_factor)
         required_risk_pct = acct_loss_loss   # same as derived risk in primary path
 
@@ -334,6 +342,8 @@ def compute_goal(
         "required_leverage":     None,   # n/a in EV-first model (leverage is the input)
         "weeks_to_goal_actual":  round(weeks_to_goal_actual, 1) if weeks_to_goal_actual != float('inf') else None,
         "execution_fill_factor": round(execution_fill_factor * 100, 1),
+        "slippage_pct":          round(slippage_pct * 100, 4),
+        "friction_pct":          round(friction * 100, 4),
         "max_drawdown_allowed":  round(max_drawdown_allowed * 100, 1),
         "losses_allowed":        losses_allowed,
 
