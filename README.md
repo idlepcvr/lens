@@ -419,6 +419,12 @@ Useful API: `POST /api/setups/scan` (scan now) ·
 
 ## TODO — next session (2026-06-23)
 
+0. **Actually run the loop.** This is the real bottleneck, not code. The scanner
+   is live but **0 trades have been taken since go-live** — the build is ahead of
+   the usage. Before adding any surface area: take the next valid S1–S5 alert on
+   Kraken, let it auto-tag on sync, and start accumulating tagged live trades
+   toward the v4 re-mine (~3 months needed). No new features until the loop has
+   real reps.
 1. **Fix the leverage + balance pipeline** (the data layer is unreliable — found
    2026-06-22). Two faces of one bug:
    - `leverage` is *derived* (`notional / balance_before`), not read from the
