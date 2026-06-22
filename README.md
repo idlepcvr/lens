@@ -417,6 +417,27 @@ Useful API: `POST /api/setups/scan` (scan now) ·
 
 ---
 
+## TODO — next session (2026-06-23)
+
+1. **Fix the leverage + balance pipeline** (the data layer is unreliable — found
+   2026-06-22). Two faces of one bug:
+   - `leverage` is *derived* (`notional / balance_before`), not read from the
+     fill → 454/470 closed trades show `1`, ~16 show garbage (97×–159×). Read it
+     straight from the Kraken fill/position payload instead.
+   - `balance_after` is NULL on 450/470 trades because `_build_eur_timeline`
+     only keeps `asset == 'eur'` ledger rows, but the flex account is
+     **USD-settled** → timeline is near-empty. Rebuild it off the real settle
+     currency so the equity curve / goal model / snapshots run on live data.
+   - Knock-ons: 1 closed trade with NULL pnl; Bybit clear-path wired but
+     untested (no live position).
+2. **Get the navbar in order.** 24 page routes exist but the two navs surface
+   only ~17. Orphans reachable by URL only: `analytics`, `calendar`, `edge`,
+   `glossary`, `journal`, `recap`, `style`, `health`. Decide: promote to nav,
+   or cut.
+3. **Over-engineering audit** — have we built too many pages / `.notes`? Hunt
+   for redundant or never-opened pages and collapse/delete. The bottleneck is
+   *running* the loop, not adding surface area; trim accordingly.
+
 ## Status / honesty
 
 - ✅ v3 edge mapped and live: setup engine, /desk, phone alerts with one-tap
