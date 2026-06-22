@@ -1065,7 +1065,7 @@ def _signal_smc_sweep_v1(df, i, params):
 
 STRATEGIES: dict = {
     "SMC_LUX_4R_v1": {
-        "description": "LuxAlgo SMC chart stack, mechanical: premium/discount + sweep+reclaim + MACD + EMA stack. 1% stop / 4% TP (4R).",
+        "description": "LuxAlgo SMC full stack (zone + sweep + MACD + EMA), mechanical, 1%/4% (4R). ❌ RETIRED 2026-06-22: too thin to trust (n=6 @30mo, n=13 @84mo) and negative deep (-14%). Kept as the full-stack comparison to SMC_SWEEP_v1.",
         "signal_fn": _signal_smc_lux_v1,
         "timeframe": "1h",
         "params": {
@@ -1075,7 +1075,7 @@ STRATEGIES: dict = {
         },
     },
     "SMC_SWEEP_v1": {
-        "description": "The edge-carrying part of the SMC stack: zone + liquidity sweep + reclaim, NO MACD/MA confluence. n=63, WR 28.6%, PF 1.45, +125% over 30mo at 4R. The keeper.",
+        "description": "SMC zone + liquidity sweep + reclaim, no MACD/MA. ❌ RETIRED 2026-06-22: the +125%/n=63 was a 30mo-recency artifact. Deep window (binance spot, n=158/84mo) → WR 22.8%, PF 1.07, -87%, 99.8% DD. Decays to ruin like TREND_4R. Do not trade.",
         "signal_fn": _signal_smc_sweep_v1,
         "timeframe": "1h",
         "params": {
@@ -1331,14 +1331,24 @@ STRATEGIES: dict = {
 # ─── Public entry point ───────────────────────────────────────────────────────
 
 def run_strategy(name: str, months: int = 30,
-                 initial_capital: float = 637.0) -> dict:
-    """Run a full backtest for the named strategy. Returns metrics + equity curve + trades."""
+                 initial_capital: float = 637.0,
+                 exchange_id: str | None = None,
+                 symbol: str | None = None) -> dict:
+    """Run a full backtest for the named strategy. Returns metrics + equity curve + trades.
+
+    exchange_id / symbol override the data source. Defaults (None) fall back to
+    the strategy's own params, then to bybit perp BTC/USDT:USDT — so existing
+    callers behave identically. Set exchange_id='binance', symbol='BTC/USDT' for
+    the deep spot history (back to 2017) when 30mo of perp isn't enough sample.
+    """
     if name not in STRATEGIES:
         return {"error": f"unknown strategy: {name}"}
 
     strat = STRATEGIES[name]
     tf = strat.get("timeframe", "4h")
-    df = load_ohlcv(months=months, timeframe=tf)
+    ex = exchange_id or strat["params"].get("exchange") or "bybit"
+    sym = symbol or strat["params"].get("symbol") or "BTC/USDT:USDT"
+    df = load_ohlcv(symbol=sym, months=months, timeframe=tf, exchange_id=ex)
     df = add_indicators(df)
 
     result  = _run_backtest(df, strat["signal_fn"], strat["params"], initial_capital)
