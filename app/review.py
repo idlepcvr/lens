@@ -192,20 +192,27 @@ def get_enriched_trades() -> list:
     return out
 
 
-def review_analytics() -> dict:
+def review_analytics(book: str = None) -> dict:
     """Trade-log analytics for the /review dashboard: performance, risk-adjusted
     ratios, duration breakdown (the key edge insight — long holds carry), and
     actual-vs-model. Capital-independent where possible; cum/annual return need a
     capital base (lens_config.start_balance, only used if it looks like a real
-    hedge balance, i.e. >= 100)."""
+    hedge balance, i.e. >= 100). Pass book='hedge'|'prop' to scope to one book."""
     import math, datetime as _dt
     conn = sqlite3.connect(DB_PATH)
+    where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
+    params: list = []
+    if book:
+        where += " AND book = ?"; params.append(book)
     rows = conn.execute(
-        "SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
-        "WHERE closed_at IS NOT NULL AND pnl IS NOT NULL ORDER BY closed_at"
+        f"SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
+        f"WHERE {where} ORDER BY closed_at", params
     ).fetchall()
     cfg = conn.execute("SELECT start_balance, win_rate, rr_ratio FROM lens_config WHERE id=1").fetchone()
-    n_open = conn.execute("SELECT COUNT(*) FROM trades WHERE closed_at IS NULL").fetchone()[0]
+    n_open = conn.execute(
+        "SELECT COUNT(*) FROM trades WHERE closed_at IS NULL" + (" AND book = ?" if book else ""),
+        ([book] if book else [])
+    ).fetchone()[0]
     conn.close()
 
     n = len(rows)

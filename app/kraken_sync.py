@@ -538,9 +538,12 @@ def fetch_live_balance(api_key: str, api_secret: str) -> dict:
         flex = wallets.get("accounts", {}).get("flex", {})
         portfolio_usd = float(flex.get("portfolioValue") or 0)
         pnl_usd       = float(flex.get("pnl") or flex.get("totalUnrealized") or 0)
+        avail_usd     = float(flex.get("availableMargin") or flex.get("availableFunds") or 0)
         eur_balance   = round(portfolio_usd / eur_usd, 2) if eur_usd else 0.0
         unrealized    = round(pnl_usd / eur_usd, 2)      if eur_usd else 0.0
-        return {"eur_balance": eur_balance, "unrealized_pnl": unrealized, "eur_usd": round(eur_usd, 4)}
+        avail_margin  = round(avail_usd / eur_usd, 2)    if eur_usd else 0.0
+        return {"eur_balance": eur_balance, "unrealized_pnl": unrealized,
+                "available_margin": avail_margin, "eur_usd": round(eur_usd, 4)}
     except Exception as e:
         return {"eur_balance": 0.0, "unrealized_pnl": 0.0, "error": str(e)}
 

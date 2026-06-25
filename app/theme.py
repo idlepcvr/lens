@@ -16,6 +16,7 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
 NAV_PROP = [
+    ("/overview", "Overview"),
     ("/prop", "Goals"),
     ("/prop-desk", "Live"),
     ("/prop-signals", "Signals"),
@@ -30,8 +31,10 @@ NAV_PROP = [
     ("/backtest", "Backtest"),
 ]
 NAV_HEDGE = [
+    ("/overview", "Overview"),
     ("/dashboard", "Dashboard"),
     ("/goal", "Goal"),
+    ("/position", "Position"),
     ("/desk", "Desk"),
     ("/signals", "Signals"),
     ("/calendar", "Calendar"),
@@ -366,6 +369,7 @@ def nav_html(current_path: str) -> str:
         '<div class="modesw">'
         '<a href="/prop" class="%s">◎ PROP</a>'
         '<a href="/dashboard" class="%s">▤ HEDGE</a>'
+        '<a href="/sitemap" class="home">☰</a>'
         '<a href="/" class="home">⌂</a>'
         '</div>'
     ) % ("on" if mode == "prop" else "", "on" if mode == "hedge" else "")

@@ -1,0 +1,202 @@
+"""LENS /position — full port of Prism's Position page.
+
+Entry + direction → the whole trade laid out, long AND short side-by-side:
+sizing levels, account-impact calculations, Kelly/risk rules, ruin math, the
+8h expected range and the risk read. Goal params come from saved config; the
+"Override risk inputs" panel (and the Hedge/Prop preset) let you size for either
+book without touching the dashboard — that's the hedge↔prop differentiation.
+
+Backend: POSTs the merged payload to BOTH /api/goal (model outputs) and
+/api/position (sizing). Long/short columns are derived client-side from the
+goal's underlying move %, exactly like Prism did.
+"""
+
+from .theme import shell
+
+_CSS = r"""<style>
+.pz{max-width:1040px;margin:0 auto;padding:6px 14px 60px}
+.pz h1{font-family:var(--mono);font-size:13px;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:3px}
+.pz .sub{color:var(--dim);font-size:13px;margin-bottom:16px}
+.pz form{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px 17px;margin-bottom:18px}
+.pz .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:11px}
+.pz .lf{display:flex;flex-direction:column;gap:4px}
+.pz .lf label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.pz .lf input{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);padding:7px 10px;border-radius:6px;font-family:var(--mono);font-size:13px}
+.pz .lf input:focus{outline:none;border-color:var(--accent)}
+.pz .seg{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.pz .seg button{flex:1;background:var(--panel2);color:var(--dim);border:0;padding:7px 0;font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;cursor:pointer}
+.pz .seg button.on.long{background:rgba(31,217,137,.16);color:var(--long)}
+.pz .seg button.on.short{background:rgba(255,84,104,.16);color:var(--short)}
+.pz .seg button.on.book{background:var(--accent-d);color:var(--accent)}
+.pz .advtog{background:none;border:0;color:var(--dim);font-size:11px;cursor:pointer;padding:4px 0;font-family:var(--mono)}
+.pz .adv{border-top:1px dashed var(--line2);margin-top:6px;padding-top:11px}
+.pz .adv.hide{display:none}
+.pz .hint{font-size:9px;color:var(--faint);font-weight:600}
+.pz .err{margin:0 0 14px;padding:10px 14px;border:1px solid var(--short);background:rgba(255,84,104,.08);color:var(--short);border-radius:8px;font-size:12px}
+.pz .err.hide{display:none}
+.pz .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.pz .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 17px}
+.pz .ct{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--dim);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.pz .r3{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:6px;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px;align-items:baseline}
+.pz .r3:last-child{border-bottom:0}
+.pz .rl{color:var(--dim)}
+.pz .rv{font-family:var(--mono);font-weight:600;color:var(--ink);text-align:right}
+.pz .rv2{font-family:var(--mono);color:var(--dim);text-align:right}
+.pz .g{color:var(--long)!important} .pz .r{color:var(--short)!important} .pz .a{color:var(--amber)!important} .pz .ac{color:var(--accent)!important} .pz .dim{color:var(--faint)!important}
+.pz .empty{text-align:center;padding:30px;color:var(--dim);border:1px dashed var(--line2);border-radius:11px}
+</style>"""
+
+
+def position_page() -> str:
+    body = r"""
+<div class="pz">
+  <h1>Position</h1>
+  <div class="sub">Entry → full trade: levels, sizing, risk — long &amp; short. Params from your <a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.</div>
+
+  <form id="pf" onsubmit="return false">
+    <div class="frow">
+      <div class="lf"><label>Entry $</label><input id="p-entry" type="number" step="any" placeholder="61900" autofocus></div>
+      <div class="lf"><label>Direction</label>
+        <div class="seg"><button type="button" id="d-long" class="on long" onclick="setDir('long')">▲ long</button><button type="button" id="d-short" class="short" onclick="setDir('short')">▼ short</button></div>
+      </div>
+      <div class="lf"><label>Balance €</label><input id="p-bal" type="number" step="any" placeholder="—"></div>
+      <div class="lf"><label>BTC price €</label><input id="p-btc" type="number" step="any" placeholder="—"></div>
+    </div>
+    <div class="frow" style="margin-bottom:0">
+      <div class="lf"><label>Book preset</label>
+        <div class="seg"><button type="button" id="b-hedge" class="on book" onclick="setBook('hedge')">Hedge</button><button type="button" id="b-prop" class="book" onclick="setBook('prop')">Prop</button></div>
+      </div>
+    </div>
+    <button type="button" class="advtog" id="advtog" onclick="toggleAdv()">▸ override risk inputs</button>
+    <div class="adv hide" id="adv">
+      <div class="frow" style="margin-bottom:0">
+        <div class="lf"><label>Win rate <span class="hint">0–1</span></label><input id="o-wr" type="number" step="any" placeholder="from config"></div>
+        <div class="lf"><label>R:R ratio</label><input id="o-rr" type="number" step="any" placeholder="from config"></div>
+        <div class="lf"><label>Leverage</label><input id="o-lev" type="number" step="any" placeholder="from config"></div>
+        <div class="lf"><label>Risk/trade <span class="hint">0–1 dec</span></label><input id="o-risk" type="number" step="any" placeholder="auto (EV)"></div>
+        <div class="lf"><label>Daily σ</label><input id="o-std" type="number" step="any" placeholder="0.0356"></div>
+      </div>
+    </div>
+  </form>
+
+  <div id="err" class="err hide"></div>
+  <div id="out"><div class="empty">Enter an entry price to size the trade.</div></div>
+</div>"""
+
+    script = r"""
+const $=id=>document.getElementById(id);
+let dir='long', book='hedge', CFG=null, deb;
+const fP=n=>n==null?'—':'$'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
+const pc=n=>n==null?'—':Number(n).toFixed(2)+'%';
+
+async function ensureCfg(){ if(!CFG) CFG=await fetch('/api/config').then(r=>r.json()); return CFG; }
+function setDir(d){ dir=d; $('d-long').classList.toggle('on',d==='long'); $('d-short').classList.toggle('on',d==='short'); calc(); }
+function toggleAdv(){ const a=$('adv'); a.classList.toggle('hide'); $('advtog').textContent=(a.classList.contains('hide')?'▸':'▾')+' override risk inputs'; }
+function setBook(b){
+  book=b; $('b-hedge').classList.toggle('on',b==='hedge'); $('b-prop').classList.toggle('on',b==='prop');
+  if(b==='prop'){ $('o-lev').value=5; $('o-risk').value=0.005; if($('adv').classList.contains('hide')) toggleAdv(); }
+  else { $('o-lev').value=''; $('o-risk').value=''; }
+  calc();
+}
+
+async function calc(){
+  const entry=parseFloat($('p-entry').value);
+  if(!entry){ $('out').innerHTML='<div class="empty">Enter an entry price to size the trade.</div>'; $('err').classList.add('hide'); return; }
+  const cfg=await ensureCfg();
+  const bal=parseFloat($('p-bal').value)||cfg.start_balance;
+  const btc=parseFloat($('p-btc').value)||cfg.btc_price_eur;
+  const ov=(id,lo,hi)=>{ const v=parseFloat($(id).value); return (isFinite(v)&&(lo==null||v>lo)&&(hi==null||v<hi))?v:undefined; };
+  const payload={
+    start_balance:cfg.start_balance, target_balance:cfg.target_balance, target_date:cfg.target_date,
+    trades_per_week:cfg.trades_per_week, win_rate:cfg.win_rate, rr_ratio:cfg.rr_ratio, leverage:cfg.leverage,
+    max_drawdown_allowed:cfg.max_drawdown_allowed, losses_allowed:cfg.losses_allowed,
+    fractional_kelly:cfg.fractional_kelly, execution_fill_factor:cfg.execution_fill_factor, slippage_pct:cfg.slippage_pct,
+    entry_price:entry, direction:dir, balance_eur:bal, btc_price_eur:btc, btc_std_dev:ov('o-std',0)||0.0356,
+  };
+  const wr=ov('o-wr',0,1), rr=ov('o-rr',0), lev=ov('o-lev',0.99), rk=ov('o-risk',0,1);
+  if(wr!=null)payload.win_rate=wr; if(rr!=null)payload.rr_ratio=rr; if(lev!=null)payload.leverage=lev; if(rk!=null)payload.risk_per_trade=rk;
+  Object.keys(payload).forEach(k=>payload[k]==null&&delete payload[k]);
+  const opt={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)};
+  try{
+    const [gr,pr]=await Promise.all([fetch('/api/goal',opt),fetch('/api/position',opt)]);
+    if(!gr.ok){ throw new Error((await gr.json()).detail||'goal error'); }
+    if(!pr.ok){ throw new Error((await pr.json()).detail||'position error'); }
+    $('err').classList.add('hide'); render(await gr.json(), await pr.json(), payload, bal, btc);
+  }catch(e){ $('err').textContent=String(e.message||e); $('err').classList.remove('hide'); }
+}
+
+function sec(title, rows){
+  return `<div class="card"><div class="ct">${title}</div>`+rows.map(r=>
+    `<div class="r3"><span class="rl">${r[0]}</span><span class="rv ${r[3]||''}">${r[1]}</span><span class="rv2 ${r[4]||''}">${r[2]!=null?r[2]:''}</span></div>`).join('')+`</div>`;
+}
+
+function render(g, p, pl, bal, btcE){
+  const e=p.entry, uw=g.underlying_win_pct/100, ul=g.underlying_loss_pct/100, lev=g.leverage;
+  const tpL=e*(1+uw), slL=e*(1-ul), tpS=e*(1-uw), slS=e*(1+ul);
+  const liqL=e*(1-0.5/lev), liqS=e*(1+0.5/lev);
+  const beL=e*(1+p.hurdle_cost_pct/100), beS=e*(1-p.hurdle_cost_pct/100);
+  const gainE=bal*g.acct_gain_win/100, lossE=p.risk_eur;
+  const out =
+    sec('Position sizing', [
+      ['', 'Long', 'Short', 'dim', 'dim'],
+      ['Take profit', fP(tpL), fP(tpS), 'g', 'g'],
+      ['Stop loss',   fP(slL), fP(slS), 'r', 'r'],
+      ['Entry',       fP(e),   fP(e),   'ac'],
+      ['Breakeven',   fP(beL), fP(beS)],
+      ['Liquidation', fP(liqL),fP(liqS),'a','a'],
+      ['Cost ₿ / $',  p.cost_btc.toFixed(6)+' ₿', fP(p.cost_usd)],
+      ['Hurdle (fees)', pc(p.hurdle_cost_pct), 'fee drag', 'dim','dim'],
+    ])
+  + sec('Calculations', [
+      ['Win / loss rate', pc(pl.win_rate*100), pc((1-pl.win_rate)*100), 'g','r'],
+      ['Acct gain (win)', '+'+pc(g.acct_gain_win), '+'+(gainE/btcE).toFixed(8)+' ₿', 'g'],
+      ['Acct loss (loss)','−'+pc(g.acct_loss_loss), '−'+(lossE/btcE).toFixed(8)+' ₿', 'r'],
+      ['€ if win',  '+'+fE(gainE), fE(bal+gainE), 'g'],
+      ['€ if loss', '−'+fE(lossE), fE(bal-lossE), 'r'],
+    ])
+  + sec('Rules', [
+      ['Optimal bet (Kelly)', fE(bal*g.optimal_risk_pct/100), pc(g.optimal_risk_pct)],
+      ['Actual risk (EV)',    fE(lossE), pc(g.risk_per_trade), 'r'],
+      ['Leverage', lev.toFixed(2)+'×', ''],
+      ['Trading size', fE(p.position_size_eur), p.position_size_btc.toFixed(4)+' ₿'],
+      ['R multiple', pl.rr_ratio.toFixed(1)+'× nom', g.actual_rr.toFixed(2)+'× net', 'dim','dim'],
+    ])
+  + sec('Risk budget', [
+      ['Max DD allowed', pc(g.max_drawdown_allowed), fE(bal*g.max_drawdown_allowed/100)],
+      ['Losses allowed', g.losses_allowed+' losses', ''],
+      ['DD risk / trade', pc(g.dd_risk_constraint), pc(g.risk_per_trade)],
+      ['Losses to ruin', g.losses_to_ruin+' losses', '', 'r'],
+      ['Wins to breakeven', g.wins_to_breakeven+' wins', ''],
+    ])
+  + sec('Trade size & range', [
+      ['Current trade size', p.current_trade_size_btc.toFixed(4)+' ₿', lev.toFixed(2)+'×'],
+      ['Current size €', fE(p.current_trade_size_eur), ''],
+      ['Expected 8h range', fP(p.expected_8hr_high), fP(p.expected_8hr_low), 'g','r'],
+      ['1σ move', fP(p.std_8hr_usd), '', 'dim'],
+    ])
+  + sec('Risk read', [
+      ['Typical win', '+'+pc(g.typical_win), (g.typical_win>=7?'GOOD':g.typical_win>=3?'OK':'WEAK'), 'g', (g.typical_win>=7?'g':g.typical_win>=3?'a':'r')],
+      ['Typical loss', pc(g.typical_loss), '', 'r'],
+      ['Avg growth/trade μ', (g.avg_growth_per_trade>=0?'+':'')+g.avg_growth_per_trade.toFixed(4)+'%', '', g.avg_growth_per_trade>=0?'g':'r'],
+      ['Trade volatility σ', g.trade_volatility.toFixed(4)+'%', ''],
+    ]);
+  $('out').innerHTML='<div class="grid">'+out+'</div>';
+}
+
+['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std'].forEach(id=>
+  $(id).addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(calc, 250); }));
+
+(async ()=>{ const c=await ensureCfg();
+  if(c.start_balance!=null) $('p-bal').placeholder=c.start_balance;
+  if(c.btc_price_eur!=null) $('p-btc').placeholder=c.btc_price_eur;
+  // live balance + BTC price (best-effort)
+  try{ const a=await fetch('/api/account/live').then(r=>r.json());
+    if(a.total_eur) $('p-bal').value=a.total_eur.toFixed(2);
+    const v=await fetch('/api/volatility').then(r=>r.json());
+    if(v.btc_usd && a.eur_usd) $('p-btc').value=(v.btc_usd/a.eur_usd).toFixed(2);
+  }catch(e){}
+})();
+"""
+    return shell("/position", "Position", body, script=script, head_extra=_CSS, meta="size the trade")

@@ -1124,7 +1124,7 @@ def landing():
 .btn.p{background:var(--adim);color:var(--ac);border-color:var(--b2)}
 .btn.p:hover{filter:brightness(1.3)}
 .calc-tip{font-size:9px;color:var(--t4);font-family:var(--mono)}
-.metrics{display:flex;flex-direction:column;gap:10px}
+.metrics{display:flex;flex-direction:column;gap:14px}
 .hero{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media(max-width:960px){.hero{grid-template-columns:repeat(2,1fr)}}
 .hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
@@ -1136,14 +1136,18 @@ def landing():
 .hbig{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}
 .hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
 .hsub{font-size:10px;color:var(--t3);margin-top:3px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:640px){.grid2{grid-template-columns:1fr}}
-.card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}
-.card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--t2);padding-bottom:8px;border-bottom:1px solid var(--b1);margin-bottom:9px}
-.kv{display:grid;grid-template-columns:1fr auto;row-gap:1px}
-.kv .k{font-size:11.5px;color:var(--t2);padding:2.5px 0;border:none}
-.kv .v{font-family:var(--mono);font-size:11.5px;color:var(--t1);text-align:right;padding:2.5px 0}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:15px 17px}
+.card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.18em;color:var(--t2);padding-bottom:9px;border-bottom:1px solid var(--b1);margin-bottom:11px}
+.kv{display:grid;grid-template-columns:1fr auto;row-gap:3px;column-gap:14px}
+.kv .k{font-size:11.5px;color:var(--t2);padding:4px 0;border:none}
+.kv .v{font-family:var(--mono);font-size:11.5px;color:var(--t1);text-align:right;padding:4px 0}
 .kv .v.pos{color:var(--gr)}.kv .v.neg{color:var(--re)}.kv .v.warn{color:var(--am)}.kv .v.dim{color:var(--t3)}
+.volcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 17px;margin:14px 0;display:flex;gap:20px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--t2)}
+.volcard b{color:var(--t1);font-weight:600}
+.volcard .pos{color:var(--gr)}.volcard .neg{color:var(--re)}.volcard .warn{color:var(--am)}.volcard .dim{color:var(--t3)}
+.volcard.hide{display:none}
 .err{background:var(--short-d);border:1px solid var(--short);color:var(--re);padding:10px 14px;border-radius:8px;font-size:12px}
 .err.hide{display:none}
 .sec{margin-top:28px}
@@ -1208,7 +1212,8 @@ def landing():
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
           <div class="frow"><label>Losses allowed</label><input type="text" inputmode="decimal" name="losses_allowed"></div>
           <div class="frow"><label>Frac. Kelly</label><input type="text" inputmode="decimal" name="fractional_kelly"></div>
-          <div class="frow"><label>ATR floor</label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+          <div class="frow"><label>ATR floor <input type="checkbox" id="atr-auto" style="vertical-align:-1px"> <span class="hint">auto, decimal</span></label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="0.015"></div>
+          <div class="frow"><label>Noise × <span class="hint">ATR mult</span></label><input type="text" inputmode="decimal" id="atr-mult" value="0.5"></div>
         </div>
         <div class="fsec">
           <div class="fsec-lbl">Execution</div>
@@ -1254,6 +1259,8 @@ def landing():
         <div class="hsub" id="h-ttg-sub">—</div>
       </div>
     </div>
+
+    <div id="vol-card" class="volcard hide"></div>
 
     <div class="grid2">
       <div class="card"><div class="card-title">Time to goal</div><div class="kv" id="r-time"></div></div>
@@ -1339,6 +1346,11 @@ function row(k, v, cls="") {{
 }}
 
 function render(g) {{
+  // euro impact on the current balance — every % also shown as what it costs/makes
+  const _bal = parseFloat(FORM.elements.namedItem("start_balance").value) || 0;
+  const eurOf = p => (_bal && p != null) ? "€" + (_bal * p / 100).toLocaleString("en-US",{{maximumFractionDigits:2}}) : "—";
+  const balAfter = p => (_bal && p != null) ? "€" + (_bal * (1 + p / 100)).toLocaleString("en-US",{{maximumFractionDigits:0}}) : "—";
+
   const ar = g.actual_rr;
   const rCls = ar >= 3.5 ? 'pos' : ar >= 2.5 ? 'warn' : 'neg';
   document.getElementById('hc-r').className = 'hcard ' + rCls;
@@ -1387,17 +1399,19 @@ function render(g) {{
 
   document.getElementById("r-risk").innerHTML =
       row("Leverage",          fmtNum(g.leverage) + "×")
-    + row("Full Kelly",        fmtPct(g.full_kelly))
-    + row("Fractional Kelly",  fmtPct(g.fractional_kelly))
-    + row("Kelly risk",        fmtPct(g.kelly_risk))
-    + row("DD constraint",     fmtPct(g.dd_risk_constraint))
-    + row("Optimal risk",      fmtPct(g.optimal_risk_pct))
-    + row("Used risk / trade", fmtPct(g.risk_per_trade), "warn")
+    + row("Full Kelly",        fmtPct(g.full_kelly) + " · " + eurOf(g.full_kelly))
+    + row("Fractional Kelly",  fmtPct(g.fractional_kelly) + " · " + eurOf(g.fractional_kelly))
+    + row("Kelly risk",        fmtPct(g.kelly_risk) + " · " + eurOf(g.kelly_risk))
+    + row("DD constraint",     fmtPct(g.dd_risk_constraint) + " · " + eurOf(g.dd_risk_constraint))
+    + row("Optimal risk",      fmtPct(g.optimal_risk_pct) + " · " + eurOf(g.optimal_risk_pct))
+    + row("Used risk / trade", fmtPct(g.risk_per_trade) + " · " + eurOf(g.risk_per_trade), "warn")
     + row("DD-implied lev",    g.dd_implied_leverage != null ? fmtNum(g.dd_implied_leverage) + "×" : "—");
 
   document.getElementById("r-acct").innerHTML =
-      row("Gain / win",         fmtPct(g.acct_gain_win),  "pos")
-    + row("Loss / loss",        fmtPct(g.acct_loss_loss), "neg")
+      row("Gain / win",         fmtPct(g.acct_gain_win) + " · +" + eurOf(g.acct_gain_win),  "pos")
+    + row("Balance if win",     balAfter(g.acct_gain_win), "pos")
+    + row("Loss / loss",        fmtPct(g.acct_loss_loss) + " · −" + eurOf(g.acct_loss_loss), "neg")
+    + row("Balance if loss",    balAfter(-g.acct_loss_loss), "neg")
     + row("Geom drift",         fmtPct4(g.geometric_drift), g.geometric_drift > 0 ? "pos" : "neg")
     + row("Fill factor",        g.execution_fill_factor != null ? g.execution_fill_factor.toFixed(1) + "%" : "—",
         (g.execution_fill_factor ?? 100) < 100 ? "warn" : "dim")
@@ -1428,6 +1442,7 @@ function render(g) {{
     + row("MC P50", fmtEur(g.mc_p50))
     + row("MC P95", fmtEur(g.mc_p95), "pos");
 
+  renderVol(g);
   ERR.classList.add("hide");
 }}
 
@@ -1502,6 +1517,51 @@ function tbtcApply() {{
 }}
 TBTC.addEventListener("input", tbtcApply);
 TBTC.addEventListener("keydown", function(e) {{ if (e.key === "Enter") {{ tbtcApply(); e.preventDefault(); }} }});
+
+// ── ATR noise-floor checker — live ATR vs your SL; toggle auto-fills the floor ──
+let lastVol = null, volDeb;
+const ATR_AUTO = document.getElementById("atr-auto");
+const ATR_MULT = document.getElementById("atr-mult");
+
+function applyAtrAuto() {{
+  const fld = FORM.elements.namedItem("min_underlying_stop_pct");
+  if (ATR_AUTO.checked && lastVol && lastVol.noise_floor_pct != null) {{
+    // calc compares this to the price-move fraction → store decimal, not percent
+    fld.value = (lastVol.noise_floor_pct / 100).toFixed(5); fld.readOnly = true; fld.style.opacity = 0.6;
+  }} else {{
+    fld.readOnly = false; fld.style.opacity = 1;
+  }}
+  recompute();
+}}
+
+async function refreshVol() {{
+  const m = parseFloat(ATR_MULT.value) || 0.5;
+  try {{ lastVol = await fetch("/api/volatility?mult=" + m).then(r => r.json()); }}
+  catch (e) {{ lastVol = null; }}
+  applyAtrAuto();
+}}
+
+function renderVol(g) {{
+  const c = document.getElementById("vol-card");
+  if (!lastVol || lastVol.atr_14d_pct == null) {{ c.classList.add("hide"); return; }}
+  const sl = g.underlying_loss_pct, floor = lastVol.noise_floor_pct;
+  const verdict = sl == null
+    ? "<span class='v dim'>set inputs for an SL</span>"
+    : (sl + 0.005 >= floor)
+      ? "<span class='v pos'>✅ clears noise floor</span>"
+      : "<span class='v neg'>⚠️ INSIDE NOISE — variance will stop you out</span>";
+  c.classList.remove("hide");
+  c.innerHTML =
+      "<span><b>ATR 14d</b> " + lastVol.atr_14d_pct.toFixed(2) + "%</span>"
+    + "<span><b>Noise floor</b> " + floor.toFixed(2) + "% <span class='v dim'>(×" + lastVol.noise_mult + ")</span></span>"
+    + "<span><b>Your SL</b> " + (sl != null ? sl.toFixed(2) + "%" : "—")
+        + (g.atr_adjusted ? " <span class='v warn'>(ATR ↑)</span>" : "") + "</span>"
+    + "<span style='margin-left:auto'>" + verdict + "</span>";
+}}
+
+ATR_AUTO.addEventListener("change", applyAtrAuto);
+ATR_MULT.addEventListener("input", () => {{ clearTimeout(volDeb); volDeb = setTimeout(refreshVol, 350); }});
+refreshVol();
 """
 
     return shell("/dashboard", "Dashboard", body, script=script, head_extra=css, meta="goal model")
@@ -1821,6 +1881,40 @@ def _fetch_all_balances() -> dict:
 def snapshot_balance():
     """Fetch live equity from all configured accounts and upsert today's daily_snapshot."""
     return _fetch_all_balances()
+
+
+@app.get("/api/volatility")
+def api_volatility(mult: float = 0.5):
+    """Live BTC ATR(14d) + the noise floor a stop must clear (ATR × mult).
+    Feeds the dashboard's ATR auto-floor toggle."""
+    from .volatility import fetch_volatility
+    return fetch_volatility(noise_mult=mult)
+
+
+@app.get("/api/account/live")
+def account_live():
+    """Read-only live equity / available margin / unrealised PnL across Kraken
+    accounts — no snapshot write. Powers /overview. LENS never trades it."""
+    results: dict = {}
+    total_eur = total_avail = total_unrl = 0.0
+    eur_usd = None
+    for account in ("personal", "biz"):
+        try:
+            key, secret = kraken_sync.get_api_keys(account)
+            b = kraken_sync.fetch_live_balance(key, secret)
+            results[f"kraken_{account}"] = b
+            if "error" not in b:
+                total_eur   += b.get("eur_balance", 0.0)
+                total_avail += b.get("available_margin", 0.0)
+                total_unrl  += b.get("unrealized_pnl", 0.0)
+                eur_usd = b.get("eur_usd", eur_usd)
+        except Exception as e:
+            results[f"kraken_{account}"] = {"error": str(e)}
+    results["total_eur"]        = round(total_eur, 2)
+    results["available_margin"] = round(total_avail, 2)
+    results["unrealized_pnl"]   = round(total_unrl, 2)
+    results["eur_usd"]          = eur_usd
+    return results
 
 
 # ─── Projection plans ─────────────────────────────────────────────────────────
@@ -2240,6 +2334,34 @@ def api_backtest_strategies():
 
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
+
+@app.get("/overview", response_class=HTMLResponse)
+def overview_page():
+    """One snapshot for both books — live account, performance, market."""
+    from .overview_page import render
+    return render()
+
+
+@app.get("/position", response_class=HTMLResponse)
+def position_page_route():
+    """Entry + direction → SL/TP/liq levels and size in ₿/€ (uses /api/position)."""
+    from .position_page import position_page
+    return position_page()
+
+
+@app.get("/sitemap", response_class=HTMLResponse)
+def sitemap_route():
+    """Every HTML page in one map — built live from the route table."""
+    from .sitemap_page import render
+    skip = {"/health", "/sitemap", "/style", "/openapi.json", "/docs", "/redoc"}
+    paths = sorted({
+        r.path for r in app.routes
+        if "GET" in getattr(r, "methods", set())
+        and not r.path.startswith(("/api", "/assets"))
+        and "{" not in r.path and r.path not in skip
+    })
+    return render(paths)
+
 
 @app.get("/journal", response_class=HTMLResponse)
 def journal_page():
