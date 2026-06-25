@@ -62,11 +62,20 @@ def fetch_volatility(noise_mult: float = 0.5) -> dict:
     today = daily[-1]
     today_pct = (today["h"] - today["l"]) / today["o"] * 100 if today["o"] else None
     atr_14d = round(atr_pct, 4) if atr_pct is not None else None
+
+    # daily-return σ (stddev of last ~30 daily % returns) — the vol input the
+    # position page feeds compute_position for its expected-range math
+    import statistics
+    closes = [d["c"] for d in daily]
+    rets = [(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))]
+    daily_sigma = round(statistics.pstdev(rets[-30:]), 4) if len(rets) >= 2 else None
+
     return {
         "btc_usd":         round(price, 2),
         "atr_14d_pct":     atr_14d,
         "noise_floor_pct": round(atr_14d * noise_mult, 4) if atr_14d is not None else None,
         "today_range_pct": round(today_pct, 4) if today_pct is not None else None,
+        "daily_sigma":     daily_sigma,
         "noise_mult":      noise_mult,
     }
 

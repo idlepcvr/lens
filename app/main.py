@@ -1617,6 +1617,40 @@ def api_position(req: PositionRequest):
         raise HTTPException(status_code=422, detail=str(e))
 
 
+_PROP_MOVES_CACHE: dict = {}
+
+def _prop_moves() -> tuple:
+    """(avg_win_pct, avg_loss_pct_abs, win_rate_pct) for the prop hero strategy.
+    Cached per-process — a backtest, so don't recompute on every keystroke.
+    ponytail: process-lifetime cache; add a TTL if the strategy stats drift."""
+    if "v" not in _PROP_MOVES_CACHE:
+        from .prop_views import prop_metrics
+        m = prop_metrics()
+        _PROP_MOVES_CACHE["v"] = (m.get("avg_win_pct") or 0.0,
+                                  abs(m.get("avg_loss_pct") or 0.0),
+                                  m.get("win_rate_pct") or 0.0)
+    return _PROP_MOVES_CACHE["v"]
+
+
+@app.get("/api/prop/position")
+def api_prop_position(entry: float, direction: str = "long"):
+    """Prop-rule sizing for a manual entry: risk RISK% of the $5k eval ÷ stop,
+    leverage capped at the firm's max. Stop/target derived from the prop hero
+    strategy's measured average move, then run through prop_ticket (same math as
+    the signal ticket and the eval ledger)."""
+    from .prop_scan import prop_ticket
+    win_pct, loss_pct, wr = _prop_moves()
+    if not loss_pct:
+        raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
+    long_ = direction == "long"
+    stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
+    target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
+    t = prop_ticket(entry, stop, target, long_)
+    t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
+             win_rate_pct=round(wr, 1), direction=direction)
+    return t
+
+
 # ─── Trades ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/trades")

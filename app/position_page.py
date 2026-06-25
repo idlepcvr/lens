@@ -11,6 +11,8 @@ Backend: POSTs the merged payload to BOTH /api/goal (model outputs) and
 goal's underlying move %, exactly like Prism did.
 """
 
+import json
+
 from .theme import shell
 
 _CSS = r"""<style>
@@ -74,7 +76,7 @@ def position_page() -> str:
         <div class="lf"><label>R:R ratio</label><input id="o-rr" type="number" step="any" placeholder="from config"></div>
         <div class="lf"><label>Leverage</label><input id="o-lev" type="number" step="any" placeholder="from config"></div>
         <div class="lf"><label>Risk/trade <span class="hint">0–1 dec</span></label><input id="o-risk" type="number" step="any" placeholder="auto (EV)"></div>
-        <div class="lf"><label>Daily σ</label><input id="o-std" type="number" step="any" placeholder="0.0356"></div>
+        <div class="lf"><label>Daily vol σ <span class="hint">auto from ATR feed</span></label><input id="o-std" type="number" step="any" placeholder="0.0356"></div>
       </div>
     </div>
   </form>
@@ -85,7 +87,7 @@ def position_page() -> str:
 
     script = r"""
 const $=id=>document.getElementById(id);
-let dir='long', book='hedge', CFG=null, deb;
+let dir='long', book='hedge', CFG=null, deb, EURUSD=null, HEDGE_BAL=null;
 const fP=n=>n==null?'—':'$'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
@@ -96,7 +98,12 @@ function setDir(d){ dir=d; $('d-long').classList.toggle('on',d==='long'); $('d-s
 function toggleAdv(){ const a=$('adv'); a.classList.toggle('hide'); $('advtog').textContent=(a.classList.contains('hide')?'▸':'▾')+' override risk inputs'; }
 function setBook(b){
   book=b; $('b-hedge').classList.toggle('on',b==='hedge'); $('b-prop').classList.toggle('on',b==='prop');
-  if(b==='prop'){ $('o-lev').value=5; $('o-risk').value=0.005; if($('adv').classList.contains('hide')) toggleAdv(); }
+  // Prop sizes by the firm's rule server-side ($5k eval, 0.5% risk, 5x cap) — the
+  // override panel + balance are hedge-only, so grey them out in prop mode.
+  const hedgeOnly = b==='hedge';
+  $('o-wr').disabled=$('o-rr').disabled=$('o-lev').disabled=$('o-risk').disabled=$('p-bal').disabled=!hedgeOnly;
+  $('pf').style.opacity=1;
+  if(hedgeOnly){ if(HEDGE_BAL!=null) $('p-bal').value=HEDGE_BAL; }
   else { $('o-lev').value=''; $('o-risk').value=''; }
   calc();
 }
@@ -104,6 +111,7 @@ function setBook(b){
 async function calc(){
   const entry=parseFloat($('p-entry').value);
   if(!entry){ $('out').innerHTML='<div class="empty">Enter an entry price to size the trade.</div>'; $('err').classList.add('hide'); return; }
+  if(book==='prop'){ return calcProp(entry); }
   const cfg=await ensureCfg();
   const bal=parseFloat($('p-bal').value)||cfg.start_balance;
   const btc=parseFloat($('p-btc').value)||cfg.btc_price_eur;
@@ -185,18 +193,67 @@ function render(g, p, pl, bal, btcE){
   $('out').innerHTML='<div class="grid">'+out+'</div>';
 }
 
+async function calcProp(entry){
+  try{
+    const r=await fetch('/api/prop/position?entry='+entry+'&direction='+dir);
+    if(!r.ok){ throw new Error((await r.json()).detail||'prop error'); }
+    $('err').classList.add('hide'); renderProp(await r.json());
+  }catch(e){ $('err').textContent=String(e.message||e); $('err').classList.remove('hide'); }
+}
+
+function renderProp(t){
+  const e=t.entry, sp=t.stop_pct/100, tpp=t.tp_pct/100, lev=t.leverage;
+  const tpL=e*(1+tpp), slL=e*(1-sp), tpS=e*(1-tpp), slS=e*(1+sp);
+  const liqL=lev>1?e*(1-1/lev):null, liqS=lev>1?e*(1+1/lev):null;
+  const beL=e*(1+t.fee_rt_pct/100), beS=e*(1-t.fee_rt_pct/100);
+  const btcE=parseFloat($('p-btc').value)||1, marginE=EURUSD?t.margin_usd/EURUSD:t.margin_usd;
+  const out =
+    sec('Position sizing · PROP', [
+      ['', 'Long', 'Short', 'dim', 'dim'],
+      ['Take profit', fP(tpL), fP(tpS), 'g','g'],
+      ['Stop loss',   fP(slL), fP(slS), 'r','r'],
+      ['Entry',       fP(e),   fP(e),   'ac'],
+      ['Breakeven',   fP(beL), fP(beS)],
+      ['Liquidation', liqL?fP(liqL):'none', liqS?fP(liqS):'none', 'a','a'],
+      ['Stop / TP move', pc(t.stop_pct), pc(t.tp_pct), 'r','g'],
+    ])
+  + sec('Prop rule sizing', [
+      ['Eval account', fP(t.account), '', 'ac'],
+      ['Risk / trade', pc(t.risk_pct), fP(t.risk_usd), 'r','r'],
+      ['Notional', fP(t.notional), t.size_btc.toFixed(4)+' ₿'],
+      ['Margin', fP(t.margin_usd), fE(marginE)],
+      ['Leverage', lev.toFixed(2)+'×', 'cap '+t.max_leverage+'×', lev>t.max_leverage?'r':''],
+      ['R:R (net)', t.rr.toFixed(2)+'×', ''],
+    ])
+  + sec('Outcome', [
+      ['Win',  '+'+fP(t.win_usd),  fP(t.account+t.win_usd),  'g','g'],
+      ['Loss', '−'+fP(t.loss_usd), fP(t.account-t.loss_usd), 'r','r'],
+      ['Win rate (hist)', pc(t.win_rate_pct), ''],
+      ['Strategy', t.strategy, t.eval, 'dim','dim'],
+    ]);
+  $('out').innerHTML='<div class="grid">'+out+'</div>';
+}
+
 ['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std'].forEach(id=>
   $(id).addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(calc, 250); }));
 
 (async ()=>{ const c=await ensureCfg();
+  HEDGE_BAL = c.start_balance!=null ? c.start_balance : null;
   if(c.start_balance!=null) $('p-bal').placeholder=c.start_balance;
   if(c.btc_price_eur!=null) $('p-btc').placeholder=c.btc_price_eur;
-  // live balance + BTC price (best-effort)
+  // live balance + BTC price + auto daily σ (best-effort)
   try{ const a=await fetch('/api/account/live').then(r=>r.json());
-    if(a.total_eur) $('p-bal').value=a.total_eur.toFixed(2);
+    if(a.eur_usd) EURUSD=a.eur_usd;
+    if(a.total_eur){ HEDGE_BAL=a.total_eur.toFixed(2); if(book==='hedge') $('p-bal').value=HEDGE_BAL; }
     const v=await fetch('/api/volatility').then(r=>r.json());
     if(v.btc_usd && a.eur_usd) $('p-btc').value=(v.btc_usd/a.eur_usd).toFixed(2);
+    if(v.daily_sigma){ $('o-std').placeholder=v.daily_sigma; if(!$('o-std').value) $('o-std').value=v.daily_sigma; }
   }catch(e){}
 })();
 """
+    from .prop_views import ACCOUNT, RISK, EVAL
+    from .prop_eval import EVALS
+    prop_def = {"account": ACCOUNT, "risk": round(RISK / 100, 4),
+                "leverage": EVALS[EVAL]["max_leverage"]}
+    script = f"const PROP={json.dumps(prop_def)};\n" + script
     return shell("/position", "Position", body, script=script, head_extra=_CSS, meta="size the trade")
