@@ -45,17 +45,18 @@ def prop_tradeable() -> list[tuple[str, float]]:
 
 
 def prop_ticket(entry: float, stop: float, target: float, long_: bool,
-                strategy: str = PROP_STRATEGY) -> dict:
+                strategy: str = PROP_STRATEGY, account: float = ACCOUNT) -> dict:
     """Prop-legal order ticket from a signal's levels — same sizing math as
-    prop_desk_state (risk% of the $5k eval account, leverage capped at the firm's
+    prop_desk_state (risk% of the eval account, leverage capped at the firm's
     5x). Deterministic from entry/stop/target, so it recomputes identically for a
-    live pending signal or a historical one on the review page."""
+    live pending signal or a historical one on the review page. `account` defaults
+    to the $5k nominal; pass the live eval equity to size off current balance."""
     rule = EVALS[EVAL]
     fee_rt = rule.get("commission_per_side", 0.0004) * 2
     stop_pct = abs(entry - stop) / entry * 100 if entry else 0.0
     tp_pct = abs(target - entry) / entry * 100 if entry else 0.0
     lev, actual_risk = _legal_leverage(stop_pct, RISK, rule["max_leverage"])
-    risk_usd = ACCOUNT * RISK / 100.0
+    risk_usd = account * RISK / 100.0
     notional = risk_usd / (stop_pct / 100.0) if stop_pct else 0.0
     size_btc = notional / entry if entry else 0.0
     margin = notional / lev if lev else 0.0
@@ -66,7 +67,7 @@ def prop_ticket(entry: float, stop: float, target: float, long_: bool,
     liq = entry * (1 - 1 / lev + MM_RATE) if long_ else entry * (1 + 1 / lev - MM_RATE)
     liq = liq if liq and liq > 0 else None
     return {
-        "account": ACCOUNT, "risk_pct": RISK, "leverage": round(lev, 2),
+        "account": account, "risk_pct": RISK, "leverage": round(lev, 2),
         "actual_risk_pct": round(actual_risk, 2), "notional": round(notional, 2),
         "size_btc": size_btc, "margin_usd": round(margin, 2),
         "win_usd": round(win_usd, 2), "loss_usd": round(loss_usd, 2),

@@ -1639,15 +1639,20 @@ def api_prop_position(entry: float, direction: str = "long"):
     strategy's measured average move, then run through prop_ticket (same math as
     the signal ticket and the eval ledger)."""
     from .prop_scan import prop_ticket
+    from .prop_ledger import prop_ledger_data
+    from .prop_views import ACCOUNT as PROP_NOMINAL
     win_pct, loss_pct, wr = _prop_moves()
     if not loss_pct:
         raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
+    # size off the CURRENT eval equity (realized ledger), not the $5k nominal
+    equity = prop_ledger_data().get("equity") or PROP_NOMINAL
     long_ = direction == "long"
     stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
     target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
-    t = prop_ticket(entry, stop, target, long_)
+    t = prop_ticket(entry, stop, target, long_, account=equity)
     t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
-             win_rate_pct=round(wr, 1), direction=direction)
+             win_rate_pct=round(wr, 1), direction=direction,
+             account_nominal=PROP_NOMINAL)
     return t
 
 

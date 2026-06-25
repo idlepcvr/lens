@@ -218,7 +218,7 @@ function renderProp(t){
       ['Stop / TP move', pc(t.stop_pct), pc(t.tp_pct), 'r','g'],
     ])
   + sec('Prop rule sizing', [
-      ['Eval account', fP(t.account), '', 'ac'],
+      ['Eval equity', fP(t.account), 'nominal '+fP(t.account_nominal), 'ac', 'dim'],
       ['Risk / trade', pc(t.risk_pct), fP(t.risk_usd), 'r','r'],
       ['Notional', fP(t.notional), t.size_btc.toFixed(4)+' ₿'],
       ['Margin', fP(t.margin_usd), fE(marginE)],
