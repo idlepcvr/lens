@@ -296,6 +296,10 @@ def _row_to_dict(row: sqlite3.Row, json_cols: tuple = ()) -> dict:
 
 def create_trade(trade: TradeCreate) -> TradeResponse:
     now = trade.opened_at or datetime.utcnow()
+    # Manual forms enter GROSS pnl + fees separately; store pnl NET so the column
+    # means the same thing as synced trades (kraken_sync already bakes fees in).
+    if trade.pnl is not None and trade.fees:
+        trade.pnl = round(trade.pnl - trade.fees, 6)
     fp = int(trade.followed_plan)     if trade.followed_plan     is not None else None
     fs = int(trade.followed_strategy) if trade.followed_strategy is not None else None
     c = _conn()
