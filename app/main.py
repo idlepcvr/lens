@@ -52,8 +52,7 @@ from .models import (
     SignalIngest, SignalDecision, SignalResponse,
 )
 from . import bybit_sync, kraken_sync
-from .review import REVIEW_HTML, get_enriched_trades, get_ohlcv_1h
-from .montecarlo import MONTECARLO_HTML
+from .review import get_enriched_trades, get_ohlcv_1h
 
 
 app = FastAPI(title="LENS", version="1.0.0-dev")
@@ -69,943 +68,6 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
-
-
-# ─── Projection (parameter-first "new method") ────────────────────────────────
-
-@app.get("/projection", response_class=HTMLResponse)
-def projection_page(
-    start:      float = Query(360,   description="Start balance €"),
-    stop:       float = Query(1.0,   description="Stop — % price move"),
-    tp:         float = Query(5.5,   description="Take profit — % price move (5.5% → actual 4R after 0.30% fee)"),
-    lev:        float = Query(10.0,  description="Leverage"),
-    wr:         float = Query(44.0,  description="Win rate %"),
-    tpw:        float = Query(5.0,   description="Trades / week"),
-    weeks:      float = Query(26.0,  description="Horizon (weeks)"),
-    btc:        float = Query(60000, description="BTC price € (for BTC equivalent)"),
-    fee:        float = Query(0.30,  description="Fee % round trip (0.15%/side)"),
-    start_date: str   = Query("",    description="Plan start date (YYYY-MM-DD)"),
-):
-    import math
-    from datetime import date as _date, timedelta as _td
-
-    # ── start date handling ───────────────────────────────────────────────────────
-    try:
-        _sd = _date.fromisoformat(start_date) if start_date else None
-    except ValueError:
-        _sd = None
-    sd_default = _date.today().isoformat()
-    start_date_val = start_date or sd_default
-
-    def week_date(w):
-        if _sd is None: return ""
-        return (_sd + _td(weeks=int(w))).strftime("%-d %b %Y")
-
-    # ── live account stats (feedback loop) ───────────────────────────────────────
-    actual = get_actual_stats()
-
-    # ── helpers ──────────────────────────────────────────────────────────────────
-    def fmt_eur(v):
-        if v is None: return "—"
-        if abs(v) >= 1_000_000: return f"€{v/1_000_000:.2f}M"
-        if abs(v) >= 10_000: return f"€{v/1000:.1f}k"
-        return f"€{v:,.0f}"
-
-    # ── compute ──────────────────────────────────────────────────────────────────
-    try:
-        p = compute_projection(
-            start_balance=start, stop_pct=stop/100, tp_pct=tp/100, leverage=lev,
-            win_rate=wr/100, trades_per_week=tpw, weeks=weeks, btc_price_eur=btc,
-            fee_roundtrip=fee/100,
-        )
-        err_html = ""
-    except CalcError as e:
-        p = None
-        err_html = f"<div class='err'>{e}</div>"
-
-    # ── SVG sparkline (log-scale equity bands) ───────────────────────────────────
-    def make_sparkline(curve):
-        if not curve or len(curve) < 2: return ""
-        min_v = max(1.0, min(r["p05"] for r in curve if r["p05"] > 0))
-        max_v = max(r["p95"] for r in curve)
-        lmin = math.log(min_v); lmax = math.log(max_v); lr = lmax - lmin or 1
-        mw = curve[-1]["week"]
-        W, H, gx, gy = 880, 148, 6, 8
-        def xc(w): return round(gx + w / mw * (W - 2 * gx), 1)
-        def yc(v): return round(H - gy - (math.log(max(1.0, v)) - lmin) / lr * (H - 2 * gy), 1)
-        def pd(k): return "M " + " L ".join(f"{xc(r['week'])} {yc(r[k])}" for r in curve)
-        fwd = " L ".join(f"{xc(r['week'])} {yc(r['p95'])}" for r in curve)
-        bwd = " L ".join(f"{xc(r['week'])} {yc(r['p05'])}" for r in reversed(curve))
-        lbls = ""
-        for i, r in enumerate(curve):
-            if i in (0, len(curve) // 2, len(curve) - 1):
-                lbls += f'<text x="{xc(r["week"])}" y="{yc(r["p50"]) - 7}" text-anchor="middle" fill="#444" font-size="9">{fmt_eur(r["p50"])}</text>'
-        return (
-            f'<svg viewBox="0 0 {W} {H}" style="width:100%;height:128px;display:block">'
-            f'<path id="sband" d="M {fwd} L {bwd} Z" fill="#7aa2f7" opacity="0.07" style="display:none"/>'
-            f'<path id="sp05" d="{pd("p05")}" stroke="#f7768e" stroke-width="1" fill="none" stroke-dasharray="5 3" opacity="0.65" style="display:none"/>'
-            f'<path id="sp25" d="{pd("p25")}" stroke="#e0af68" stroke-width="1" fill="none" opacity="0.4" style="display:none"/>'
-            f'<path id="sp75" d="{pd("p75")}" stroke="#9ad68a" stroke-width="1" fill="none" opacity="0.4" style="display:none"/>'
-            f'<path id="sp95" d="{pd("p95")}" stroke="#9ece6a" stroke-width="1" fill="none" stroke-dasharray="5 3" opacity="0.65" style="display:none"/>'
-            f'<path id="sp50" d="{pd("p50")}" stroke="#fff" stroke-width="2.5" fill="none"/>'
-            f'{lbls}</svg>'
-        )
-
-    sparkline = make_sparkline(p["curve"]) if p else ""
-
-    # ── Curve rows ───────────────────────────────────────────────────────────────
-    curve_rows = ""
-    if p:
-        for i, r in enumerate(p["curve"]):
-            btc_c = f"<td class='btc'>{r['btc_p50']:.4f}</td>" if r["btc_p50"] else "<td class='dim'>—</td>"
-            rc = " class='alt'" if i % 2 else ""
-            wd = week_date(r["week"])
-            date_col = f"<td class='dim' style='font-size:10px'>{wd}</td>" if wd else "<td class='dim'>—</td>"
-            curve_rows += (
-                f"<tr{rc}><td>{r['week']}w</td>{date_col}<td class='dim'>{r['trades']}</td>"
-                f"<td class='p05'>{fmt_eur(r['p05'])}</td>"
-                f"<td class='p25'>{fmt_eur(r['p25'])}</td>"
-                f"<td class='p50'>{fmt_eur(r['p50'])}</td>"
-                f"<td class='p75'>{fmt_eur(r['p75'])}</td>"
-                f"<td class='p95'>{fmt_eur(r['p95'])}</td>"
-                f"{btc_c}</tr>"
-            )
-
-    # ── R-target sensitivity (actual R after fees) ───────────────────────────────
-    r_target_rows = ""
-    cur_ar = p["actual_r"] if p else 0.0
-    for tgt_r in [2.0, 3.0, 4.0, 5.0, 6.0]:
-        tp_f = tgt_r * (stop / 100 + fee / 100) + fee / 100
-        tp_pct_v = tp_f * 100
-        nom_r_v = tp_pct_v / stop
-        is_cur = abs(tgt_r - cur_ar) < 0.3
-        mark = " ←" if is_cur else ""
-        hl = " class='cur-row'" if is_cur else ""
-        try:
-            s = compute_projection(
-                start_balance=start, stop_pct=stop / 100, tp_pct=tp_f,
-                leverage=lev, win_rate=wr / 100, trades_per_week=tpw,
-                weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee / 100,
-            )
-            dbl = f"{s['weeks_to_double']:.0f}w" if s["weeks_to_double"] else "never"
-            ec = "pos" if s["is_positive_ev"] else "neg"
-            rc2 = "pos" if s["risk_of_ruin"] <= 10 else "neg"
-            r_target_rows += (
-                f"<tr{hl}><td><b>{tgt_r:.0f}R actual</b>{mark}</td>"
-                f"<td class='dim'>{nom_r_v:.1f}R nom · {tp_pct_v:.1f}% TP</td>"
-                f"<td class='{ec}'>{s['per_trade_ev']:+.2f}%</td>"
-                f"<td>{s['geometric_drift']:+.2f}%</td>"
-                f"<td>{dbl}</td>"
-                f"<td>{fmt_eur(s['curve'][-1]['p50'])}</td>"
-                f"<td class='{rc2}'>{s['risk_of_ruin']}%</td></tr>"
-            )
-        except CalcError:
-            r_target_rows += f"<tr><td>{tgt_r:.0f}R actual</td><td colspan='6' class='dim'>invalid</td></tr>"
-
-    # ── Win-rate sensitivity ──────────────────────────────────────────────────────
-    wr_rows = ""
-    for w in [30, 40, 44, 50, 55, 60]:
-        is_here = abs(w - wr) < 0.5
-        mark = " ←" if is_here else ""
-        hl = " class='cur-row'" if is_here else ""
-        try:
-            s = compute_projection(
-                start_balance=start, stop_pct=stop / 100, tp_pct=tp / 100,
-                leverage=lev, win_rate=w / 100, trades_per_week=tpw,
-                weeks=weeks, btc_price_eur=btc, fee_roundtrip=fee / 100,
-            )
-            dbl = f"{s['weeks_to_double']:.0f}w" if s["weeks_to_double"] else "never"
-            ec = "pos" if s["is_positive_ev"] else "neg"
-            rc2 = "pos" if s["risk_of_ruin"] <= 10 else "neg"
-            wr_rows += (
-                f"<tr{hl}><td>{w}%{mark}</td>"
-                f"<td class='{ec}'>{s['per_trade_ev']:+.2f}%</td>"
-                f"<td>{s['geometric_drift']:+.2f}%</td>"
-                f"<td>{dbl}</td>"
-                f"<td>{fmt_eur(s['curve'][-1]['p50'])}</td>"
-                f"<td class='{rc2}'>{s['risk_of_ruin']}%</td></tr>"
-            )
-        except CalcError:
-            wr_rows += f"<tr><td>{w}%</td><td colspan='5' class='dim'>invalid</td></tr>"
-
-    # ── Hero metric cards ─────────────────────────────────────────────────────────
-    if p:
-        ar = p["actual_r"]
-        r_cls   = "pos"  if ar >= 3.5 else ("warn" if ar >= 2.5 else "neg")
-        ev_cls  = "pos"  if p["is_positive_ev"] else "neg"
-        ror_cls = "pos"  if p["risk_of_ruin"] <= 5 else ("warn" if p["risk_of_ruin"] <= 20 else "neg")
-        bwrm    = round(wr - p["breakeven_wr"], 1)
-        bwr_cls = "pos"  if bwrm > 0 else "neg"
-        wtd     = f"{p['weeks_to_double']:.0f}w" if p["weeks_to_double"] else "∞"
-        ttd     = f"{p['trades_to_double']:.0f}" if p["trades_to_double"] else "∞"
-        cards = (
-            f'<div class="hcard {r_cls}">'
-            f'<div class="hbig">{ar}R</div>'
-            f'<div class="hlbl">Actual R (after fees)</div>'
-            f'<div class="hsub">Nom {p["nominal_r"]:.1f}R · TP {tp:g}% · SL {stop:g}%</div></div>'
-
-            f'<div class="hcard {ev_cls}">'
-            f'<div class="hbig">{p["per_trade_ev"]:+.2f}%</div>'
-            f'<div class="hlbl">EV / trade</div>'
-            f'<div class="hsub">Geo drift {p["geometric_drift"]:+.2f}% per trade</div></div>'
-
-            f'<div class="hcard neutral">'
-            f'<div class="hbig">+{p["acct_gain_win"]:.0f}% / −{p["acct_loss_loss"]:.0f}%</div>'
-            f'<div class="hlbl">Win / Loss on account</div>'
-            f'<div class="hsub">{lev:g}× lev · breakeven {p["breakeven_wr"]}% WR</div></div>'
-
-            f'<div class="hcard neutral">'
-            f'<div class="hbig">{wtd}</div>'
-            f'<div class="hlbl">Weeks to double</div>'
-            f'<div class="hsub">{ttd} trades to 2×</div></div>'
-
-            f'<div class="hcard {ror_cls}">'
-            f'<div class="hbig">{p["risk_of_ruin"]}%</div>'
-            f'<div class="hlbl">Ruin risk (−{int(p["max_drawdown"])}% DD)</div>'
-            f'<div class="hsub">{round(tpw * weeks)} trades · {weeks:g} weeks</div></div>'
-
-            f'<div class="hcard {bwr_cls}">'
-            f'<div class="hbig">{p["breakeven_wr"]}%</div>'
-            f'<div class="hlbl">Breakeven win rate</div>'
-            f'<div class="hsub">You\'re at {wr:g}% · margin {bwrm:+.1f}pp</div></div>'
-        )
-    else:
-        cards = ""
-
-    # ── Monte Carlo final percentiles ─────────────────────────────────────────────
-    mc_html = ""
-    if p and p["curve"]:
-        final = p["curve"][-1]
-        mc_items = [
-            ("P05 · worst 5%", fmt_eur(final["p05"]), "neg"),
-            ("P25",             fmt_eur(final["p25"]), "warn"),
-            ("P50 · median",   fmt_eur(final["p50"]), ""),
-            ("P75",             fmt_eur(final["p75"]), "mc75"),
-            ("P95 · best 5%",  fmt_eur(final["p95"]), "mc95"),
-        ]
-        mc_cards_html = "".join(
-            f'<div class="mc-card"><div class="mc-n {c}">{v}</div><div class="mc-l">{l}</div></div>'
-            for l, v, c in mc_items
-        )
-        mc_html = (
-            f'<p class="note">Log-normal simulation · {round(tpw * weeks)} trades · {weeks:g}w horizon. '
-            f'WR {wr:g}% · {lev:g}× · {p["actual_r"]}R actual.</p>'
-            f'<div class="mc-grid">{mc_cards_html}</div>'
-        )
-
-    wr_r_label = f"{p['actual_r']}R actual" if p else f"{tp:g}% TP"
-    p50_final_val = round(p["curve"][-1]["p50"], 2) if (p and p.get("curve")) else 0
-    import json as _json
-
-    # ── Live stats widget ─────────────────────────────────────────────────────────
-    def _live_stats_html():
-        items = []
-        live_bal  = actual.get("current_balance")
-        live_date = actual.get("balance_date", "")
-        live_wr   = actual.get("actual_wr")
-        n_trades  = actual.get("total_trades", 0)
-        wins      = actual.get("wins", 0)
-        losses    = actual.get("losses", 0)
-        total_pnl = actual.get("total_pnl")
-        avg_win   = actual.get("avg_win_eur")
-        avg_loss  = actual.get("avg_loss_eur")
-
-        # Actual R — THE key metric (is the exit discipline holding?)
-        if avg_win and avg_loss and n_trades >= 10:
-            real_r = avg_win / abs(avg_loss)
-            model_r = p["actual_r"] if p else None
-            r_cls = "live-pos" if (model_r and real_r >= model_r * 0.85) else "live-neg"
-            model_hint = f' <span class="live-dim">(model {model_r}R)</span>' if model_r else ""
-            items.append(
-                f'<div class="live-item live-item-wide">'
-                f'<div class="live-lbl">Actual R achieved — exit discipline</div>'
-                f'<div class="live-val {r_cls}" style="font-size:16px;font-weight:700">'
-                f'{real_r:.2f}R{model_hint}'
-                f'</div>'
-                f'<div class="live-dim" style="font-size:10px;margin-top:2px">'
-                f'avg win {fmt_eur(avg_win)} · avg loss {fmt_eur(avg_loss)} · {n_trades} closed trades'
-                f'</div>'
-                f'</div>'
-            )
-
-        # Balance item
-        if live_bal is not None:
-            bal_str = fmt_eur(live_bal)
-            use_link = ""
-            if abs(live_bal - start) > 0.5:
-                import urllib.parse as _up
-                params = dict(start=live_bal, stop=stop, tp=tp, lev=lev, wr=wr,
-                              tpw=tpw, weeks=weeks, btc=btc, fee=fee,
-                              start_date=start_date_val)
-                qs = _up.urlencode({k: v for k, v in params.items() if v != ""})
-                use_link = f' <a href="/projection?{qs}" class="live-use">use →</a>'
-            date_hint = f' <span class="live-dim">({live_date})</span>' if live_date else ""
-            items.append(
-                f'<div class="live-item">'
-                f'<div class="live-lbl">Account balance</div>'
-                f'<div class="live-val">{bal_str}{date_hint}{use_link}</div>'
-                f'</div>'
-            )
-
-        # Win rate item
-        if live_wr is not None:
-            wr_diff = live_wr - wr
-            diff_cls = "live-pos" if wr_diff >= 0 else "live-neg"
-            diff_str = f' <span class="{diff_cls}">({wr_diff:+.1f}pp vs model)</span>' if n_trades >= 10 else \
-                       f' <span class="live-dim">(need ≥10 trades)</span>'
-
-            # "use live →": seed model with realized WR, trade freq, and R-target
-            seed_link = ""
-            live_rr  = actual.get("actual_rr")
-            live_tpw = actual.get("trades_per_week")
-            if n_trades >= 10:
-                import urllib.parse as _up
-                seed = dict(start=start, stop=stop, tp=tp, lev=lev, wr=live_wr,
-                            tpw=tpw, weeks=weeks, btc=btc, fee=fee,
-                            start_date=start_date_val)
-                seed["wr"] = live_wr
-                if live_tpw is not None:
-                    seed["tpw"] = round(live_tpw)
-                if live_rr is not None:
-                    # map realized R → TP% via same formula as the R-target table
-                    seed["tp"] = round((live_rr * (stop / 100 + fee / 100) + fee / 100) * 100, 2)
-                qs = _up.urlencode({k: v for k, v in seed.items() if v != ""})
-                seed_link = f' <a href="/projection?{qs}" class="live-use">use live →</a>'
-
-            items.append(
-                f'<div class="live-item">'
-                f'<div class="live-lbl">Actual win rate</div>'
-                f'<div class="live-val">{live_wr}% — {wins}W / {losses}L{diff_str}{seed_link}</div>'
-                f'</div>'
-            )
-
-        # Total PnL
-        if total_pnl is not None:
-            pnl_cls = "live-pos" if total_pnl >= 0 else "live-neg"
-            items.append(
-                f'<div class="live-item">'
-                f'<div class="live-lbl">Realised PnL ({n_trades} trades)</div>'
-                f'<div class="live-val {pnl_cls}">{fmt_eur(total_pnl)}</div>'
-                f'</div>'
-            )
-
-        if not items:
-            return ""
-        return '<div class="live-strip">' + "".join(items) + "</div>"
-
-    live_stats_html = _live_stats_html()
-    import json as _json
-    curve_json_val = _json.dumps(
-        [{"week": r["week"], "p50": round(r["p50"], 2)} for r in p["curve"]]
-    ) if (p and p.get("curve")) else "[]"
-
-    # ── CSS ───────────────────────────────────────────────────────────────────────
-    CSS = """
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  /* mapped onto the shared LENS palette (see app/theme.py LENS_CSS) */
-  --bg:#06080c;--s1:#0b0f16;--s2:#10151e;
-  --b1:#192232;--b2:#28344a;--b3:#313d52;
-  --t1:#e8eef8;--t2:#828ea6;--t3:#465064;--t4:#1c2636;
-  --ac:#5b9dff;--adim:#10203f;
-  --gr:#1fd989;--re:#ff5468;--am:#f6ad3c;
-  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
-  --ui:'Chakra Petch',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
-}
-/* page-local container width override (shell provides bar/nav/.app + cockpit bg) */
-.app{max-width:1180px}
-a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
-/* strategy block */
-.strat{background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--ac);border-radius:10px;padding:14px 18px;margin:0 0 16px}
-.strat .tl{color:#a6c1ff;font-style:italic;font-size:12.5px;display:block;margin-bottom:10px;line-height:1.6}
-.strat ul{padding-left:18px;list-style:disc}
-.strat li{margin:3px 0;color:var(--t2);font-size:12px}
-.strat b{color:var(--t1)}
-/* param form */
-.param-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px 16px;margin:0 0 16px}
-.pf{display:flex;flex-direction:column;gap:3px}
-.pf label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--t3)}
-.pf input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:12px;width:80px;transition:border-color .12s}
-.pf input:focus{outline:none;border-color:var(--ac)}
-.pf input.calc-on{border-color:var(--am)!important;color:var(--am)}
-.proj-btn{background:var(--adim);color:var(--ac);border:1px solid #28344a;padding:7px 16px;border-radius:5px;cursor:pointer;font-family:var(--ui);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;transition:all .12s;align-self:flex-end}
-.proj-btn:hover{background:#10203f;color:#8fbaff}
-.calc-hint{font-size:9px;color:var(--t4);align-self:flex-end;padding-bottom:8px;font-family:var(--mono)}
-/* hero cards */
-.hero{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
-@media(max-width:800px){.hero{grid-template-columns:repeat(2,1fr)}}
-.hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
-.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.hcard.pos::after{background:linear-gradient(90deg,var(--gr),#73daca)}
-.hcard.neg::after{background:linear-gradient(90deg,var(--re),#c04060)}
-.hcard.warn::after{background:linear-gradient(90deg,var(--am),#ff9e64)}
-.hcard.neutral::after{background:linear-gradient(90deg,var(--ac),#bb9af7)}
-.hbig{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff;line-height:1;margin-top:4px}
-.hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
-.hsub{font-size:10px;color:var(--t3);margin-top:3px}
-/* section heads */
-.sec-hd{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);padding-bottom:7px;margin:24px 0 10px}
-.sec-hd h2{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--t3)}
-.sec-hd span{font-size:11px;color:var(--t3)}
-/* chart */
-.chart-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;margin:0 0 8px}
-.chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
-.dot{display:inline-block;width:14px;height:2px}
-.leg-btn{background:none;border:none;cursor:pointer;font-family:var(--ui);font-size:10px;display:flex;align-items:center;gap:5px;padding:2px 5px;border-radius:3px;transition:opacity .12s}
-.leg-btn:hover{opacity:1 !important}
-/* tables */
-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
-th{text-align:right;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:6px 8px;border-bottom:1px solid var(--b1)}
-th:first-child,td:first-child{text-align:left}
-td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--b1);color:var(--t1)}
-tr.alt td{background:#0b0b0d}
-tr.cur-row td{background:#121624}
-tr.cur-row td:first-child{border-left:2px solid var(--ac)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:780px){.two{grid-template-columns:1fr}}
-/* text styles */
-.dim{color:var(--t3)}
-.p05{color:var(--re)}.p25{color:var(--am)}.p50{color:#fff;font-weight:600}.p75{color:#9ad68a}.p95{color:var(--gr)}
-.btc{color:#f0a000}
-.pos{color:var(--gr)}.neg{color:var(--re)}.warn{color:var(--am)}
-/* mc grid */
-.mc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:8px 0 0}
-@media(max-width:780px){.mc-grid{grid-template-columns:repeat(3,1fr)}}
-.mc-card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:12px 12px;text-align:center}
-.mc-n{font-family:var(--mono);font-size:14px;font-weight:600;color:#fff}
-.mc-n.neg{color:var(--re)}.mc-n.warn{color:var(--am)}.mc-n.mc75{color:#9ad68a}.mc-n.mc95{color:var(--gr)}
-.mc-l{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-top:5px}
-/* misc */
-.bt-empty{text-align:center;padding:32px 20px;color:var(--t3);border:1px dashed var(--b2);border-radius:10px;margin:8px 0}
-.bt-empty p{font-size:11px;margin-top:5px;line-height:1.7;color:var(--t3)}
-.note{color:var(--t3);font-size:11px;margin:5px 0 10px;line-height:1.6}
-.note b{color:var(--t2)}
-.note code{background:var(--s2);padding:1px 5px;border-radius:3px;color:var(--t2)}
-.err{background:#140910;border:1px solid #3e1a24;color:var(--re);padding:10px 14px;border-radius:8px;margin:8px 0}
-/* collapse toggle */
-.collapse-btn{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:11px;padding:3px 7px;border-radius:4px;transition:all .12s;line-height:1}
-.collapse-btn:hover{color:var(--t1);background:var(--s2)}
-/* save plan */
-.save-plan-btn{background:#0e1f10;color:var(--gr);border-color:#1a3d1e}
-.save-plan-btn:hover{background:#132518;color:#5de08a}
-.saved-flash{font-size:10px;color:var(--gr);opacity:0;transition:opacity .3s;align-self:flex-end;padding-bottom:8px;font-family:var(--mono)}
-.saved-flash.show{opacity:1}
-/* plan cards */
-.plan-card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 16px;margin:8px 0}
-.plan-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
-.plan-label-inp{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--t1);font-size:13px;font-weight:600;font-family:var(--ui);padding:2px 4px;border-radius:3px;flex:1;min-width:120px;transition:border-color .15s}
-.plan-label-inp:hover{border-bottom-color:var(--b3)}
-.plan-label-inp:focus{outline:none;border-bottom-color:var(--ac);background:var(--s2)}
-.plan-meta{font-size:11px;color:var(--t3);margin-bottom:10px;font-family:var(--mono)}
-.plan-target{font-size:11px;color:var(--t2);margin-bottom:10px}
-.plan-target b{color:var(--t1)}
-.status-chip{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;padding:2px 7px;border-radius:20px;cursor:pointer;border:none;font-family:var(--ui);transition:all .12s}
-.status-active{background:#0e1f10;color:var(--gr)}
-.status-paused{background:#1e1a0a;color:var(--am)}
-.status-completed{background:#0a1220;color:var(--ac)}
-.sync-btn{background:transparent;border:1px solid var(--b2);color:var(--t3);cursor:pointer;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 8px;border-radius:4px;font-family:var(--ui);transition:all .12s}
-.sync-btn:hover{color:var(--ac);border-color:var(--ac)}
-.sync-btn:disabled{opacity:.4;cursor:default}
-.plan-del-btn{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;margin-left:auto;line-height:1;transition:color .12s}
-.plan-del-btn:hover{color:var(--re)}
-.act-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
-.act-table th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:4px 8px;border-bottom:1px solid var(--b1);text-align:left}
-.act-table th:not(:first-child){text-align:right}
-.act-table td{padding:5px 8px;border-bottom:1px solid var(--b1);color:var(--t1);text-align:right}
-.act-table td:first-child{text-align:left;color:var(--t2);font-family:var(--mono)}
-.act-table td.act-note{color:var(--t3);font-size:10px;text-align:left;max-width:200px}
-.act-del{background:transparent;border:none;color:var(--t3);cursor:pointer;font-size:12px;padding:1px 5px;border-radius:3px;transition:color .12s}
-.act-del:hover{color:var(--re)}
-.add-act-row td{padding:6px 8px;border-bottom:none}
-.add-act-inp{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 7px;border-radius:4px;font-family:var(--mono);font-size:11px;transition:border-color .12s}
-.add-act-inp:focus{outline:none;border-color:var(--ac)}
-.add-act-inp[type=date]{width:120px}
-.add-act-inp[type=number]{width:90px}
-.add-act-inp[type=text]{width:140px}
-.add-act-btn{background:var(--adim);color:var(--ac);border:1px solid #28344a;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;font-family:var(--ui);letter-spacing:.08em;transition:all .12s}
-.add-act-btn:hover{background:#10203f;color:#8fbaff}
-/* live stats strip */
-.live-strip{display:flex;flex-wrap:wrap;gap:6px;background:var(--s1);border:1px solid var(--b1);border-left:3px solid var(--gr);border-radius:10px;padding:10px 16px;margin:0 0 12px}
-.live-item{flex:1;min-width:160px}
-.live-lbl{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-bottom:2px}
-.live-val{font-family:var(--mono);font-size:12px;color:var(--t1)}
-.live-dim{color:var(--t3);font-size:10px;font-family:var(--ui)}
-.live-pos{color:var(--gr)}
-.live-neg{color:var(--re)}
-.live-use{font-size:10px;color:var(--ac);text-decoration:none;margin-left:6px;font-family:var(--ui)}
-.live-use:hover{text-decoration:underline}
-.live-item-wide{flex-basis:100%;border-bottom:1px solid var(--b1);padding-bottom:8px;margin-bottom:2px}
-/* ── collapsible sections: let a long body (My plans) expand past LENS's 5000px cap ── */
-.sec-body.tall:not(.closed){max-height:20000px}
-/* ── mobile: keep wide tables + plan cards inside the viewport ── */
-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.plan-card{max-width:100%;overflow-x:auto}
-.param-form,.live-strip,.hero,.mc-grid,.chart-wrap,.two{max-width:100%}
-@media(max-width:680px){
-  .app{padding:0 10px 120px}
-  .param-form{padding:10px 12px;gap:7px}
-  .pf input{width:72px}
-  .plan-meta{font-size:10px;line-height:1.5}
-  .act-table{font-size:10.5px}
-  .add-act-inp[type=date]{width:112px}
-  .add-act-inp[type=number]{width:78px}
-  .add-act-inp[type=text]{width:120px}
-}
-"""
-
-    # ── JS ────────────────────────────────────────────────────────────────────────
-    JS = r"""
-// persist projection params in localStorage — restore on bare /projection visit
-(function() {
-  var LS_KEY = 'lens_proj_params';
-  var qs = window.location.search;
-  if (qs && qs.length > 1) {
-    try { localStorage.setItem(LS_KEY, qs); } catch(e) {}
-  } else {
-    try {
-      var saved = localStorage.getItem(LS_KEY);
-      if (saved) { window.location.replace('/projection' + saved); }
-    } catch(e) {}
-  }
-})();
-
-// calculator — type 300*0.1 → Enter → 30
-document.querySelectorAll('.pf input').forEach(function(inp) {
-  function tryCalc() {
-    var v = inp.value.trim();
-    if (!v) return;
-    try {
-      var r = Function('"use strict";return(' + v.replace(/[^0-9+\-*/.() \t]/g,'') + ')')();
-      if (isFinite(r)) { inp.value = parseFloat(r.toFixed(8)); inp.classList.remove('calc-on'); }
-    } catch(e) {}
-  }
-  inp.addEventListener('input', function() { inp.classList.toggle('calc-on', /[+*\/]/.test(inp.value)); });
-  inp.addEventListener('blur', tryCalc);
-  inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') { tryCalc(); e.preventDefault(); } });
-});
-
-// percentile band toggle
-function toggleBand(id, btn) {
-  var el = document.getElementById(id);
-  if (!el) return;
-  var show = el.style.display === 'none';
-  el.style.display = show ? '' : 'none';
-  btn.style.opacity = show ? '1' : '0.35';
-  var p05 = document.getElementById('sp05'), p95 = document.getElementById('sp95'), fill = document.getElementById('sband');
-  if (fill && p05 && p95) fill.style.display = (p05.style.display !== 'none' || p95.style.display !== 'none') ? '' : 'none';
-}
-
-// ── My Plans ──────────────────────────────────────────────────────────────────
-
-function fmtEur(v) {
-  if (v == null) return '—';
-  var n = parseFloat(v);
-  if (isNaN(n)) return '—';
-  if (Math.abs(n) >= 1000000) return '€' + (n/1000000).toFixed(2) + 'M';
-  if (Math.abs(n) >= 10000)   return '€' + (n/1000).toFixed(1) + 'k';
-  return '€' + n.toFixed(0);
-}
-
-function fmtPct(v) {
-  return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
-}
-
-function savePlan() {
-  var params = new URLSearchParams(window.location.search);
-  var p50 = parseFloat(document.getElementById('proj-p50-val').dataset.val) || 0;
-  var curveEl = document.getElementById('proj-curve-data');
-  var curveJson = curveEl ? curveEl.textContent.trim() : '[]';
-  var today = new Date().toISOString().slice(0, 10);
-  var payload = {
-    label: 'Plan ' + today,
-    start_bal: parseFloat(params.get('start') || 360),
-    stop_pct:  parseFloat(params.get('stop')  || 1.0),
-    tp_pct:    parseFloat(params.get('tp')    || 5.5),
-    leverage:  parseFloat(params.get('lev')   || 10),
-    win_rate:  parseFloat(params.get('wr')    || 44),
-    tpw:       parseFloat(params.get('tpw')   || 5),
-    weeks:     parseFloat(params.get('weeks') || 26),
-    btc_price: parseFloat(params.get('btc')   || 60000),
-    fee_rt:          parseFloat(params.get('fee')   || 0.30),
-    p50_final:       p50,
-    plan_start_date: params.get('start_date') || today,
-    curve_json: curveJson,
-  };
-  fetch('/api/projections', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
-  }).then(function(r) {
-    if (!r.ok) throw new Error('save failed');
-    var flash = document.getElementById('plan-saved-flash');
-    flash.classList.add('show');
-    setTimeout(function() { flash.classList.remove('show'); }, 2000);
-    loadPlans();
-  }).catch(function(e) { alert('Save failed: ' + e.message); });
-}
-
-function loadPlans() {
-  fetch('/api/projections').then(function(r) { return r.json(); }).then(function(data) {
-    var plans = data.plans || [];
-    var countEl = document.getElementById('plans-count');
-    var emptyEl = document.getElementById('plans-empty');
-    var listEl  = document.getElementById('plans-list');
-    if (countEl) countEl.textContent = plans.length ? plans.length + ' saved' : '';
-    if (emptyEl) emptyEl.style.display = plans.length ? 'none' : '';
-    if (!listEl) return;
-    listEl.innerHTML = plans.map(renderPlanCard).join('');
-    // Sync form start_date to active plan's start date
-    var activePlan = plans.find(function(p) { return p.status === 'active' && p.plan_start_date; });
-    if (activePlan) {
-      var sdInput = document.querySelector('input[name="start_date"]');
-      if (sdInput) sdInput.value = activePlan.plan_start_date;
-    }
-  });
-}
-
-function renderPlanCard(plan) {
-  var created = plan.created_at ? plan.created_at.slice(0, 10) : '';
-  var statusMap = {active:'status-active', paused:'status-paused', completed:'status-completed'};
-  var statusCls = statusMap[plan.status] || 'status-active';
-  var nextStatus = {active:'paused', paused:'completed', completed:'active'}[plan.status] || 'active';
-  var meta = [
-    '€' + plan.start_bal,
-    plan.stop_pct + '% SL',
-    plan.tp_pct + '% TP',
-    plan.leverage + '×',
-    plan.win_rate + '% WR',
-    plan.tpw + '/wk',
-    plan.weeks + 'w',
-    plan.btc_price ? 'BTC €' + Number(plan.btc_price).toLocaleString('en') : '',
-  ].filter(Boolean).join(' · ');
-  var targetLine = plan.p50_final
-    ? '<span class="plan-target">P50 target: <b>' + fmtEur(plan.p50_final) + '</b> in ' + plan.weeks + 'w · projected gain <b>' + fmtPct((plan.p50_final - plan.start_bal) / plan.start_bal * 100) + '</b></span>'
-    : '';
-  var startDateField =
-    '<span style="font-size:10px;color:var(--t3)">start </span>' +
-    '<input class="plan-label-inp" style="width:100px;font-size:11px" ' +
-      'value="' + escHtml(plan.plan_start_date || '') + '" ' +
-      'type="date" ' +
-      'onblur="updatePlanStartDate(' + plan.id + ', this.value)" ' +
-      'onkeydown="if(event.key===\'Enter\')this.blur()">';
-  var actualsHtml = renderActualsTable(plan);
-  return (
-    '<div class="plan-card" id="plan-' + plan.id + '">' +
-    '<div class="plan-hdr">' +
-    '<input class="plan-label-inp" value="' + escHtml(plan.label || 'Plan ' + created) + '" ' +
-      'onblur="updatePlanLabel(' + plan.id + ', this.value)" ' +
-      'onkeydown="if(event.key===\'Enter\')this.blur()">' +
-    '<button class="status-chip ' + statusCls + '" onclick="cycleStatus(' + plan.id + ',\'' + nextStatus + '\')">' + plan.status + '</button>' +
-    startDateField +
-    '<button class="plan-del-btn" onclick="deletePlan(' + plan.id + ')" title="Delete plan">×</button>' +
-    '</div>' +
-    '<div class="plan-meta">' + meta + '</div>' +
-    targetLine +
-    actualsHtml +
-    '</div>'
-  );
-}
-
-function projectedAtDate(plan, dateStr) {
-  if (!plan.plan_start_date) return null;
-  var startMs   = new Date(plan.plan_start_date).getTime();
-  var checkMs   = new Date(dateStr).getTime();
-  var weeksFrac = (checkMs - startMs) / (7 * 24 * 3600 * 1000);
-  if (weeksFrac < 0) return null;
-
-  // Use stored curve if available — exact Monte Carlo P50 values
-  var curve = null;
-  try { curve = plan.curve_json ? JSON.parse(plan.curve_json) : null; } catch(e) {}
-  if (curve && curve.length) {
-    // Find the two surrounding week points and linearly interpolate
-    var prev = curve[0], next = curve[curve.length - 1];
-    for (var i = 0; i < curve.length; i++) {
-      if (curve[i].week <= weeksFrac) prev = curve[i];
-      if (curve[i].week >= weeksFrac) { next = curve[i]; break; }
-    }
-    if (prev.week === next.week) return prev.p50;
-    var t = (weeksFrac - prev.week) / (next.week - prev.week);
-    return prev.p50 + t * (next.p50 - prev.p50);
-  }
-
-  // Fallback: geometric interpolation
-  if (!plan.p50_final) return null;
-  var ratio = plan.p50_final / plan.start_bal;
-  return plan.start_bal * Math.pow(ratio, weeksFrac / plan.weeks);
-}
-
-function renderActualsTable(plan) {
-  var hasActuals = (plan.actuals || []).length > 0;
-  var syncNote = '';
-  if (!hasActuals) {
-    syncNote = '<p style="font-size:10px;color:var(--t3);margin:6px 0 4px">No checkpoints yet — daily balances auto-fill at 00:05. Add manually below.</p>';
-  }
-
-  var addRow =
-    '<tr class="add-act-row">' +
-    '<td><input class="add-act-inp" type="date" id="act-date-' + plan.id + '" value="' + new Date().toISOString().slice(0,10) + '"></td>' +
-    '<td><input class="add-act-inp" type="number" id="act-bal-' + plan.id + '" placeholder="actual €" step="0.01"></td>' +
-    '<td colspan="2"><input class="add-act-inp" type="text" id="act-note-' + plan.id + '" placeholder="note (optional)" style="width:180px"></td>' +
-    '<td><button class="add-act-btn" onclick="addActual(' + plan.id + ')">+ Add</button></td>' +
-    '</tr>';
-
-  var rows = (plan.actuals || []).map(function(a) {
-    var proj = projectedAtDate(plan, a.date);
-    var diff = (proj != null) ? (a.balance - proj) : null;
-    var diffCls = diff == null ? '' : (diff >= 0 ? 'pos' : 'neg');
-    var projCell = proj != null ? fmtEur(proj) : '<span class="dim">—</span>';
-    var diffCell = diff != null ? ('<span class="' + diffCls + '">' + fmtPct(diff / proj * 100) + '</span>') : '<span class="dim">—</span>';
-    var autoNote = a.note === 'auto: daily snapshot' ? '<span style="color:var(--ac);font-size:9px">auto</span>' : escHtml(a.note || '');
-    return '<tr>' +
-      '<td>' + (a.date || '') + '</td>' +
-      '<td style="font-weight:600">' + fmtEur(a.balance) + '</td>' +
-      '<td class="dim">' + projCell + '</td>' +
-      '<td>' + diffCell + '</td>' +
-      '<td class="act-note">' + autoNote + '</td>' +
-      '<td><button class="act-del" onclick="deleteActual(' + plan.id + ',' + a.id + ')" title="Delete">×</button></td>' +
-      '</tr>';
-  }).join('');
-
-  return (
-    syncNote +
-    '<table class="act-table">' +
-    '<tr><th>Date</th><th>Actual €</th><th>Proj P50</th><th>vs Plan</th><th>Note</th><th></th></tr>' +
-    rows + addRow +
-    '</table>'
-  );
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function addActual(planId) {
-  var date  = document.getElementById('act-date-' + planId).value;
-  var bal   = parseFloat(document.getElementById('act-bal-' + planId).value);
-  var note  = document.getElementById('act-note-' + planId).value;
-  if (!date || isNaN(bal)) { alert('Date and balance required'); return; }
-  fetch('/api/projections/' + planId + '/actuals', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({date: date, balance: bal, note: note || null}),
-  }).then(function(r) {
-    if (!r.ok) throw new Error('add failed');
-    loadPlans();
-  }).catch(function(e) { alert('Failed: ' + e.message); });
-}
-
-function deleteActual(planId, actualId) {
-  fetch('/api/projections/' + planId + '/actuals/' + actualId, {method:'DELETE'})
-    .then(function() { loadPlans(); });
-}
-
-function deletePlan(planId) {
-  if (!confirm('Delete this plan and all its checkpoints?')) return;
-  fetch('/api/projections/' + planId, {method:'DELETE'})
-    .then(function() { loadPlans(); });
-}
-
-function cycleStatus(planId, newStatus) {
-  fetch('/api/projections/' + planId, {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({status: newStatus}),
-  }).then(function() { loadPlans(); });
-}
-
-function updatePlanLabel(planId, label) {
-  fetch('/api/projections/' + planId, {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({label: label}),
-  });
-}
-
-function updatePlanStartDate(planId, date) {
-  if (!date) return;
-  fetch('/api/projections/' + planId, {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({plan_start_date: date}),
-  }).then(function() { loadPlans(); });
-}
-
-function syncActuals(planId) {
-  var btn = event.target;
-  var orig = btn.textContent;
-  btn.textContent = 'syncing…';
-  btn.disabled = true;
-  fetch('/api/projections/' + planId + '/actuals/autofill', {method: 'POST'})
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      btn.disabled = false;
-      if (d.added > 0) {
-        btn.textContent = '✓ +' + d.added + ' added';
-        setTimeout(function() { btn.textContent = orig; }, 2500);
-      } else {
-        btn.textContent = 'no new snapshots';
-        btn.title = 'No daily_snapshots found for this plan\'s date range. Run a Kraken sync first via /api/sync/kraken.';
-        setTimeout(function() { btn.textContent = orig; btn.title = 'Auto-fill from Kraken daily balance snapshots'; }, 3500);
-      }
-      loadPlans();
-    })
-    .catch(function() { btn.textContent = orig; btn.disabled = false; });
-}
-
-// ── Collapse chart section ────────────────────────────────────────────────────
-(function() {
-  var LS_KEY = 'lens_chart_collapsed';
-  try { if (localStorage.getItem(LS_KEY) === '1') applyChartCollapse(true); } catch(e) {}
-})();
-
-function applyChartCollapse(collapsed) {
-  var body = document.getElementById('chart-body');
-  var btn  = document.getElementById('chart-toggle');
-  if (!body || !btn) return;
-  body.style.display = collapsed ? 'none' : '';
-  btn.textContent    = collapsed ? '▶' : '▼';
-}
-
-function toggleChartSection() {
-  var body = document.getElementById('chart-body');
-  if (!body) return;
-  var collapsed = body.style.display === 'none';
-  applyChartCollapse(!collapsed);
-  try { localStorage.setItem('lens_chart_collapsed', !collapsed ? '1' : '0'); } catch(e) {}
-}
-
-document.addEventListener('DOMContentLoaded', loadPlans);
-"""
-
-    from .theme import shell
-
-    body = f"""
-<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this projection</span><span class="line"></span></div>
-<div class="sec-body closed" id="s-help"><div class="help-body">
-<h4>what this page is</h4>A <b>forward projection</b> of the locked TREND_4R_v1 plan: plug in your parameters and it Monte-Carlos thousands of equity paths, then shows the <b>percentile bands</b> — not one line, a cone of outcomes. It answers: <b>where could this account realistically be in N weeks?</b>
-<h4>the parameters drive everything</h4>Start €, stop %, TP %, leverage, win rate, trades/week, horizon. Edit any field and hit <b>Project →</b>. Every field is a calculator (type <code>300*0.1</code> → ↵). <b>Save Plan</b> snapshots the current params to track actual results against later.
-<h4>read the bands, not the totals</h4><b>P50</b> = median path, <b class="r">P05</b> = unlucky worst 5%, <b class="g">P95</b> = best 5%. The spread is <b>variance, not a forecast</b>. Compounding makes far-out totals absurd — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>.
-<h4>the tables</h4><b>R-target scenarios</b> = what each TP% yields as actual R after fees (the lever you control). <b>Win-rate sensitivity</b> = how fragile the edge is to WR slipping. Below breakeven WR you lose regardless of R.
-<h4>a model, not a promise</h4>Assumes the win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. Validate the assumptions in <a href="/backtest">Backtest</a> and <a href="/review">Review</a>.
-</div></div>
-
-<div class="sect closed" id="h-strat" onclick="tog('strat')"><span class="caret">▾</span><span class="ttl">📋 the strategy — TREND_4R_v1</span><span class="line"></span></div>
-<div class="sec-body closed" id="s-strat">
-<div class="strat">
-  <span class="tl">"I trade BTC perps on Kraken — with-trend, 4H chart — risking a fixed 10% of my account to make 40%+. My entire edge is holding winners to the full target instead of bailing early."</span>
-  <b>TREND_4R_v1 — locked rules:</b>
-  <ul>
-    <li><b>Market / TF:</b> BTC perpetual futures, Kraken. 4H chart. Holds 1–3 days.</li>
-    <li><b>Direction:</b> long or short — <b>only with the trend.</b> Never counter-trend.</li>
-    <li><b>Risk (fixed):</b> 1% price stop = <b>10% of account</b> at 10×. Same risk every trade.</li>
-    <li><b>Exit (this IS the edge):</b> 5.5% TP → <b>+52% account → 4R actual</b> after 0.30% round-trip fee. Set it and walk away.</li>
-    <li><b>Frequency:</b> ~2–5 trades/week. Most of the time, <em>no trade</em>.</li>
-    <li><b>Not chasing WR.</b> 44% is fine. <b>R is the lever</b> — see the tables below.</li>
-  </ul>
-</div>
-</div>
-
-<div class="sect" id="h-params" onclick="tog('params')"><span class="caret">▾</span><span class="ttl">⚙ parameters</span><span class="line"></span></div>
-<div class="sec-body" id="s-params">
-<form class="param-form" method="get" action="/projection">
-  <div class="pf"><label>Start €</label><input name="start" value="{start:g}"></div>
-  <div class="pf"><label>Stop %</label><input name="stop" value="{stop:g}"></div>
-  <div class="pf"><label>TP %</label><input name="tp" value="{tp:g}"></div>
-  <div class="pf"><label>Leverage</label><input name="lev" value="{lev:g}"></div>
-  <div class="pf"><label>Win rate %</label><input name="wr" value="{wr:g}"></div>
-  <div class="pf"><label>Trades / wk</label><input name="tpw" value="{tpw:g}"></div>
-  <div class="pf"><label>Weeks</label><input name="weeks" value="{weeks:g}"></div>
-  <div class="pf"><label>BTC €</label><input name="btc" value="{btc:g}"></div>
-  <div class="pf"><label>Fee % RT</label><input name="fee" value="{fee:g}"></div>
-  <div class="pf"><label>Start date</label><input name="start_date" type="date" value="{start_date_val}" style="width:110px"></div>
-  <button class="proj-btn" type="submit">Project →</button>
-  <button class="proj-btn save-plan-btn" type="button" id="save-plan-btn" onclick="savePlan()">Save Plan</button>
-  <span class="saved-flash" id="plan-saved-flash">saved ✓</span>
-  <span class="calc-hint">300*0.1 → ↵</span>
-</form>
-</div>
-<span id="proj-p50-val" data-val="{p50_final_val}" style="display:none"></span>
-<script id="proj-curve-data" type="application/json">{curve_json_val}</script>
-{live_stats_html}
-{err_html}
-
-<div class="sect" id="h-metrics" onclick="tog('metrics')"><span class="caret">▾</span><span class="ttl">📊 key metrics</span><span class="line"></span></div>
-<div class="sec-body" id="s-metrics">
-<div class="hero">{cards}</div>
-</div>
-
-<div class="sect" id="h-chart" onclick="tog('chart')"><span class="caret">▾</span><span class="ttl">Equity projection — percentile bands (log scale)</span><span class="line"></span></div>
-<div class="sec-body" id="s-chart">
-<div class="chart-wrap">
-  {sparkline}
-  <div class="chart-legend">
-    <button class="leg-btn" onclick="toggleBand('sp05',this)" style="color:var(--re);opacity:0.35"><span class="dot" style="background:var(--re)"></span>P05 worst</button>
-    <button class="leg-btn" onclick="toggleBand('sp25',this)" style="color:var(--am);opacity:0.35"><span class="dot" style="background:var(--am)"></span>P25</button>
-    <button class="leg-btn" onclick="toggleBand('sp50',this)" style="color:#fff"><span class="dot" style="background:#fff;height:2.5px"></span>P50 median</button>
-    <button class="leg-btn" onclick="toggleBand('sp75',this)" style="color:#9ad68a;opacity:0.35"><span class="dot" style="background:#9ad68a"></span>P75</button>
-    <button class="leg-btn" onclick="toggleBand('sp95',this)" style="color:var(--gr);opacity:0.35"><span class="dot" style="background:var(--gr)"></span>P95 best</button>
-  </div>
-</div>
-<p class="note"><b>P50</b> = expected median path · <b>P05</b> = worst 5% · <b>P95</b> = best 5%. Spread is variance, not a forecast.</p>
-<table>
-  <tr><th>Week</th><th>Date</th><th>Trades</th><th class="p05">P05</th><th class="p25">P25</th><th class="p50">Median</th><th class="p75">P75</th><th class="p95">P95</th><th>BTC (P50)</th></tr>
-  {curve_rows}
-</table>
-</div>
-
-<div class="two" style="margin-top:24px">
-  <div>
-    <div class="sect" id="h-rtgt" onclick="tog('rtgt')"><span class="caret">▾</span><span class="ttl">R-target scenarios <span class="dim" style="font-weight:400">· WR {wr:g}% · SL {stop:g}% · fee {fee:g}% RT</span></span><span class="line"></span></div>
-    <div class="sec-body" id="s-rtgt">
-    <p class="note">What TP% gives you each <b>actual R after fees</b>. R is the one lever you fully control — exit discipline, not a market outcome. ← = current params.</p>
-    <table>
-      <tr><th>Target R</th><th>Params</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
-      {r_target_rows}
-    </table>
-    </div>
-  </div>
-  <div>
-    <div class="sect" id="h-wrs" onclick="tog('wrs')"><span class="caret">▾</span><span class="ttl">Win-rate sensitivity <span class="dim" style="font-weight:400">· R held at {wr_r_label}</span></span><span class="line"></span></div>
-    <div class="sec-body" id="s-wrs">
-    <p class="note">WR is a <b>byproduct of entry quality</b> — hard to control directly. Below breakeven WR you lose money regardless of R.</p>
-    <table>
-      <tr><th>WR</th><th>EV/trade</th><th>Geo drift</th><th>To 2×</th><th>Final P50</th><th>Ruin</th></tr>
-      {wr_rows}
-    </table>
-    </div>
-  </div>
-</div>
-
-<div class="sect" id="h-mc" onclick="tog('mc')"><span class="caret">▾</span><span class="ttl">Monte Carlo — final distribution at {weeks:g} weeks</span><span class="line"></span></div>
-<div class="sec-body" id="s-mc">{mc_html}</div>
-
-<div class="sect closed" id="h-bt" onclick="tog('bt')"><span class="caret">▾</span><span class="ttl">Backtest tracker</span><span class="line"></span></div>
-<div class="sec-body closed" id="s-bt">
-<div class="bt-empty">
-  <b style="color:var(--t2)">No backtest data yet</b>
-  <p>Run <code>TREND_4R_v1</code> on TradingView → export CSV → paste results here to validate the 44% WR assumption at a 1% stop / 5.5% TP on the 4H chart.</p>
-  <p>Fields: date · direction · entry · SL hit / TP hit · hold time · R achieved</p>
-</div>
-</div>
-
-<div class="sect" id="h-plans" onclick="tog('plans')"><span class="caret">▾</span><span class="ttl">My plans <span id="plans-count" class="dim" style="font-weight:400"></span></span><span class="line"></span></div>
-<div class="sec-body tall" id="s-plans">
-<div id="plans-section">
-  <div class="bt-empty" id="plans-empty" style="display:none">
-    <b style="color:var(--t2)">No saved plans yet</b>
-    <p>Click <b>Save Plan</b> above to snapshot the current projection and track actual results over time.</p>
-  </div>
-  <div id="plans-list"></div>
-</div>
-</div>
-
-<p class="note" style="margin-top:20px"><b>Read the shape, not the raw totals.</b> Compounding over many trades produces absurd numbers — trust the <b>early weeks, EV/trade, breakeven WR, and ruin %</b>. Assumes win rate holds at a 1% stop (unproven) and ignores funding on multi-day holds. A model, not a promise.</p>
-"""
-
-    script = ("function tog(id){ document.getElementById('h-'+id).classList.toggle('closed');"
-              " document.getElementById('s-'+id).classList.toggle('closed'); }\n") + JS
-    return shell("/projection", "Projection", body, script=script,
-                 head_extra=f"<style>{CSS}</style>", meta="parameter-first")
 
 
 # ─── Landing + health ─────────────────────────────────────────────────────────
@@ -1179,7 +241,7 @@ def landing():
 <h4>the only inputs are the parameters</h4>Start €, target €, target date, win rate, R:R, leverage, trades/week, drawdown limits. Every field is a calculator — type <code>300*0.1</code> and hit <b>↵</b> to get <code>30</code>. <b>Apply</b> saves them as your defaults; <b>Reload</b> pulls the last saved set.
 <h4>the four hero cards</h4><b class="a">Actual R</b> = reward ÷ risk after fees — the one lever you fully control. <b>EV / trade</b> = expected geometric drift per trade; must be <b class="g">positive</b> or the account bleeds. <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Days to goal</b> = time at this pace.
 <h4>the metric cards</h4>Break the model down: time-to-goal, required growth rates, the per-trade EV model, Kelly sizing, account impact per win/loss, risk analytics (Sharpe, profit factor, ruin), €-growth projections, and a BTC / Monte-Carlo band (P05 / P50 / P95 outcomes).
-<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/projection">Projection</a> (equity curve over time).
+<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/goal">Goal</a> (equity curve + projection over time).
 </div></div>
 
 <div class="main">
@@ -1856,6 +918,13 @@ def goal_page():
     return render()
 
 
+@app.get("/projection")
+def projection_removed():
+    """Projection page removed — redirect any old links/bookmarks to Goal."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/goal", status_code=307)
+
+
 @app.get("/glossary", response_class=HTMLResponse)
 def glossary_page():
     from .glossary_page import render
@@ -1930,12 +999,27 @@ def api_volatility(mult: float = 0.5):
     return fetch_volatility(noise_mult=mult)
 
 
+@app.get("/api/positions/live")
+def positions_live():
+    """Live open positions across Kraken accounts, Kraken-style detail (mark,
+    value, UP&L€/%, RoE, est. liquidation, margin, leverage). Read-only."""
+    out = []
+    for account in ("personal", "biz"):
+        try:
+            key, secret = kraken_sync.get_api_keys(account)
+            out.extend(kraken_sync.fetch_open_positions_enriched(key, secret, account))
+        except Exception:
+            pass
+    return {"positions": out}
+
+
 @app.get("/api/account/live")
 def account_live():
-    """Read-only live equity / available margin / unrealised PnL across Kraken
-    accounts — no snapshot write. Powers /overview. LENS never trades it."""
+    """Read-only live balances — no snapshot write. Powers /overview.
+    personal = the hedge book you actually trade → drives the hedge equity card.
+    biz = separate business funds, shown as its own readout (NOT summed in).
+    LENS never trades either."""
     results: dict = {}
-    total_eur = total_avail = total_unrl = 0.0
     eur_usd = None
     for account in ("personal", "biz"):
         try:
@@ -1943,15 +1027,17 @@ def account_live():
             b = kraken_sync.fetch_live_balance(key, secret)
             results[f"kraken_{account}"] = b
             if "error" not in b:
-                total_eur   += b.get("eur_balance", 0.0)
-                total_avail += b.get("available_margin", 0.0)
-                total_unrl  += b.get("unrealized_pnl", 0.0)
                 eur_usd = b.get("eur_usd", eur_usd)
         except Exception as e:
             results[f"kraken_{account}"] = {"error": str(e)}
-    results["total_eur"]        = round(total_eur, 2)
-    results["available_margin"] = round(total_avail, 2)
-    results["unrealized_pnl"]   = round(total_unrl, 2)
+
+    personal = results.get("kraken_personal", {})
+    biz      = results.get("kraken_biz", {})
+    # Hedge = personal only. biz funds are business, not trading equity.
+    results["total_eur"]        = round(personal.get("eur_balance", 0.0), 2)
+    results["available_margin"] = round(personal.get("available_margin", 0.0), 2)
+    results["unrealized_pnl"]   = round(personal.get("unrealized_pnl", 0.0), 2)
+    results["biz_eur"]          = round(biz.get("eur_balance"), 2) if "error" not in biz else None
     results["eur_usd"]          = eur_usd
     return results
 
@@ -2150,10 +1236,35 @@ _bt_running: dict = {}     # name → True/False
 @app.get("/backtest", response_class=HTMLResponse)
 def backtest_page():
     from .theme import shell
-    strat_opts = "".join(
-        f'<option value="{k}">{k} — {v["description"][:70]}</option>'
-        for k, v in BT_STRATEGIES.items()
-    )
+    # Order the dropdown by the cached strategy ranking (strategy_scores.json,
+    # the same R-sweep that powers the /strategy board) so the best-scoring
+    # backtestable edges surface first instead of raw registry order. Ranking
+    # also contains hedge setups (S1/H8…) that aren't in the backtest registry —
+    # filter to names we can actually run.
+    try:
+        import json as _json, os as _os
+        _sp = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "strategy_scores.json")
+        _ranked = _json.load(open(_sp)).get("results", [])
+    except Exception:
+        _ranked = []
+    _rank = {r["name"]: r for r in _ranked
+             if r.get("name") in BT_STRATEGIES and not r.get("thin")}
+    _order = [r["name"] for r in sorted(_rank.values(),
+                                        key=lambda r: r.get("score", -99), reverse=True)]
+    _rest = [k for k in BT_STRATEGIES if k not in _rank]
+
+    def _bt_opt(k, i=None):
+        r = _rank.get(k)
+        if r and r.get("best_wr") is not None:
+            lbl = f'#{i} · {k} · {r["best_wr"]}% WR @ {r["best_r"]}R · n={r.get("n","?")} (score {r["score"]})'
+        else:
+            lbl = f'{k} — {BT_STRATEGIES[k]["description"][:60]}'
+        return f'<option value="{k}">{lbl}</option>'
+
+    strat_opts = "".join(_bt_opt(k, i + 1) for i, k in enumerate(_order))
+    if _rest:
+        strat_opts += '<option disabled>──────── unranked / thin ────────</option>'
+        strat_opts += "".join(_bt_opt(k) for k in _rest)
     css = r"""<style>
 :root{
   --s1:var(--panel);--s2:var(--panel2);--b1:var(--line);--b2:var(--line2);
@@ -2183,18 +1294,25 @@ canvas{width:100%;height:200px;display:block}
 
     body = f"""
 <h1>Strategy Backtest</h1>
-<div class="sub">BTC/USDT 4H · Bybit perpetuals · 30 months · €637 initial · 0.15%/side fee</div>
+<div class="sub">BTC perps · Bybit USDT data (= same price action as Kraken USD, arbitraged tick-for-tick — Kraken's public API only serves ~4mo of candles) · each strategy on its own timeframe · starting balance editable (defaults to your live equity) · 0.15%/side fee</div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this backtest</span><span class="line"></span></div>
 <div class="sec-body closed" id="s-help"><div class="help-body">
 <h4>what this page is</h4>Runs a <b>locked, mechanical strategy</b> over ~30 months of BTC/USDT 4H history and reports exactly how it would have done — no discretion, no curve-fitting. Pick a strategy, hit <b>Run</b>, read the scorecard.
 <h4>the metrics that matter</h4><b class="g">Win rate</b> ≥48% = goal-grade. <b>Profit factor</b> ≥1.5 (gross win ÷ gross loss). <b class="a">Avg R</b> ≥3.5 — the real lever. <b class="r">Max DD</b> &lt;40% survivable, and <b>max consecutive losses</b> = your risk-of-ruin reality check.
 <h4>equity curve + trade log</h4>The curve is account €over the window; the log lists every entry/exit with PnL% and hold time. Look for <b>smooth-ish</b> growth, not one lucky spike.
-<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. These metrics <b>seed Monte Carlo</b>: pick a backtest there to stress-test the same edge forward. Compare against your real results in <a href="/review">Review</a>.
+<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/journal">Journal</a>.
 </div></div>
 
 <div class="row">
   <select id="strat">{strat_opts}</select>
+  <select id="months" title="Lookback window — longer = bigger sample (more reliable WR), shorter = more recent regime">
+    <option value="12">12 mo (recent)</option>
+    <option value="24" selected>24 mo</option>
+    <option value="36">36 mo (max sample)</option>
+  </select>
+  <input id="capital" type="number" step="any" value="637" title="Starting balance for the sim — defaults to your live hedge equity"
+         style="width:96px;background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--ui)">
   <button class="run" id="run-btn" onclick="runBacktest()">▶ Run</button>
   <span id="status"></span>
 </div>
@@ -2229,10 +1347,12 @@ function runBacktest() {{
   stat.textContent = 'Fetching data + running backtest…';
   document.getElementById('results').style.display = 'none';
 
+  var months = parseInt(document.getElementById('months').value) || 24;
+  var capital = parseFloat(document.getElementById('capital').value) || 637;
   fetch('/api/backtest/run', {{
     method: 'POST',
     headers: {{'Content-Type': 'application/json'}},
-    body: JSON.stringify({{name: name}})
+    body: JSON.stringify({{name: name, months: months, initial_capital: capital}})
   }})
   .then(function(r) {{ return r.json(); }})
   .then(function(d) {{
@@ -2277,9 +1397,6 @@ function renderResults(d) {{
            '<div style="font-size:9px;color:#465064;margin-top:2px">' + f[3] + '</div></div>';
   }}).join('');
 
-  // Equity curve
-  drawChart(d.equity_curve);
-
   // Trades
   var tbody = document.getElementById('trade-tbody');
   tbody.innerHTML = d.trades.slice().reverse().map(function(t) {{
@@ -2298,6 +1415,9 @@ function renderResults(d) {{
   }}).join('');
 
   document.getElementById('results').style.display = '';
+  // Draw the equity curve AFTER results is visible — drawing while display:none
+  // gives the canvas offsetWidth 0 → a flat/empty chart (the old visual bug).
+  drawChart(d.equity_curve);
 }}
 
 function drawChart(curve) {{
@@ -2340,6 +1460,13 @@ function drawChart(curve) {{
   ctx.fillText(curve[0].date.slice(0,7), 10, H-20);
   ctx.fillText(curve[curve.length-1].date.slice(0,7), W-60, H-20);
 }}
+
+// default the starting balance to your live hedge equity (falls back to 637)
+(async function() {{
+  try {{ var a = await fetch('/api/account/live').then(function(r){{return r.json();}});
+    if (a && a.total_eur) document.getElementById('capital').value = Math.round(a.total_eur);
+  }} catch(e) {{}}
+}})();
 """
 
     return HTMLResponse(shell("/backtest", "Backtest", body, script=script, head_extra=css, meta="30mo history"))
@@ -2420,22 +1547,13 @@ def edge_page():
     return EDGE_HTML
 
 
-# Legacy aliases — kept working, hidden from nav.
-@app.get("/recap", response_class=HTMLResponse)
-@app.get("/review", response_class=HTMLResponse)
-def review_page():
-    return REVIEW_HTML
+# /review + /recap deleted — the Journal is the single trade-history surface.
 
 
 @app.get("/calendar", response_class=HTMLResponse)
 def calendar_page():
     from .calendar_page import CALENDAR_HTML
     return CALENDAR_HTML
-
-
-@app.get("/montecarlo", response_class=HTMLResponse)
-def montecarlo_page():
-    return MONTECARLO_HTML
 
 
 @app.get("/prop", response_class=HTMLResponse)

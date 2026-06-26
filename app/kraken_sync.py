@@ -11,13 +11,36 @@ as one trade dict that maps directly to the SQLite trades table.
 """
 
 import os
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+
+
+def _retry(fn, tries: int = 3, delay: float = 2.0):
+    """Call fn(), retrying on any error (Kraken read-timeouts are intermittent).
+    A full sync makes ~20+ sequential calls; without this, one hung request
+    fails the whole run. Endpoints normally answer in ~1s, so retries are rare."""
+    last = None
+    for _ in range(tries):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001 — transient network, retry all
+            last = e
+            time.sleep(delay)
+    raise last
 
 from dotenv import load_dotenv
 from kraken.futures import User, Market
 
 load_dotenv()
+
+# The SDK defaults to a 10s read timeout. The fill-history endpoints
+# (get_execution_events / get_account_log) occasionally exceed it on a cold
+# connection — which silently fails the WHOLE hourly sync, so trades stop
+# importing even though the (fast) balance call still works. The call itself
+# returns in ~1s; 30s just absorbs transient network blips.
+User.TIMEOUT = 30
+Market.TIMEOUT = 30
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,7 +100,7 @@ def _balance_at(timeline: list[tuple], target_ts: datetime) -> Optional[float]:
 
 def _get_eur_usd(market_client: Market) -> float:
     try:
-        for tk in market_client.get_tickers().get("tickers", []):
+        for tk in _retry(lambda: market_client.get_tickers()).get("tickers", []):
             if tk.get("symbol") == "PF_EURUSD":
                 rate = tk.get("last") or tk.get("markPrice")
                 if rate:
@@ -148,7 +171,7 @@ def _build_eur_timeline(user_client: User) -> tuple[list[tuple], list[dict]]:
             if before is not None:
                 kwargs["before"] = before
 
-            log      = user_client.get_account_log(**kwargs)
+            log      = _retry(lambda: user_client.get_account_log(**kwargs))
             raw_logs = log.get("logs", [])
             if not raw_logs:
                 break
@@ -194,7 +217,7 @@ def _pull_fills(user_client: User, since_dt: datetime) -> list[dict]:
         if cont:
             kwargs["continuation_token"] = cont
 
-        resp     = user_client.get_execution_events(**kwargs)
+        resp     = _retry(lambda: user_client.get_execution_events(**kwargs))
         elements = resp.get("elements", [])
 
         if not elements:
@@ -213,9 +236,10 @@ def _pull_fills(user_client: User, since_dt: datetime) -> list[dict]:
                 order    = exec_data["order"]
                 fee_info = (exec_data.get("orderData") or {}).get("feeCalculationInfo") or {}
 
-                # Fee rate — "percentageFee" is expressed as basis points (e.g. "5" = 0.05%)
+                # Fee rate — "percentageFee" is a PERCENT (verified live: "0.05000000"
+                # = 0.05%), so → fraction is /100. (Was /100/100 = 100× too small.)
                 raw_fee_pct = fee_info.get("percentageFee")
-                fee_pct = float(raw_fee_pct) / 100 / 100 if raw_fee_pct is not None else 0.0005
+                fee_pct = float(raw_fee_pct) / 100 if raw_fee_pct is not None else 0.0005
 
                 # Maker vs taker: taker fee ~0.05%, maker ~0.02% (or rebate)
                 fill_type = "maker" if fee_pct <= 0.0002 else "taker"
@@ -324,6 +348,7 @@ def _build_trades(
             "opened_at":       open_time,
             "closed_at":       close_ts,
             "balance_after":   round(balance_after, 2) if balance_after is not None else None,
+            "balance_before":  round(balance_before, 2) if balance_before is not None else None,
             "notes":           None,
         })
 
@@ -449,7 +474,7 @@ def sync_account(
         eur_timeline, raw_logs   = _build_eur_timeline(user_client)
         fills                    = _pull_fills(user_client, since_dt)
         trades                   = _build_trades(fills, eur_timeline, eur_usd)
-        open_positions           = user_client.get_open_positions().get("openPositions", [])
+        open_positions           = _retry(lambda: user_client.get_open_positions()).get("openPositions", [])
     except Exception as e:
         return {"imported": 0, "closed": 0, "skipped": 0, "errors": [str(e)],
                 "fills_fetched": 0, "trades_processed": 0, "transfers_imported": 0}
@@ -552,6 +577,76 @@ def fetch_open_positions(api_key: str, api_secret: str) -> list[dict]:
     """Used by /api/sync/kraken/status endpoint."""
     client = User(key=api_key, secret=api_secret)
     return client.get_open_positions().get("openPositions", [])
+
+
+def fetch_open_positions_enriched(api_key: str, api_secret: str, account: str = "") -> list[dict]:
+    """Live open positions with the Kraken-style detail: mark price, value,
+    unrealised P&L (€ + %), RoE, initial margin, est. liquidation, leverage.
+    Prices in USD (BTC), money in EUR (the account's pnlCurrency). Liquidation
+    is an ESTIMATE (entry ± 1/lev) — Kraken's true liq depends on wallet margin."""
+    user   = User(key=api_key, secret=api_secret)
+    market = Market(key=api_key, secret=api_secret)
+    eur_usd = _get_eur_usd(market)
+
+    marks: dict[str, float] = {}
+    try:
+        for tk in _retry(lambda: market.get_tickers()).get("tickers", []):
+            mp = tk.get("markPrice") or tk.get("last")
+            if mp:
+                marks[tk.get("symbol")] = float(mp)
+    except Exception:
+        pass
+
+    out: list[dict] = []
+    for p in _retry(lambda: user.get_open_positions()).get("openPositions", []):
+        sym   = p.get("symbol", "PF_XBTUSD")
+        entry = float(p.get("price", 0) or 0)
+        size  = abs(float(p.get("size", 0) or 0))
+        side  = str(p.get("side", "long")).lower()
+        if size == 0 or entry == 0:
+            continue
+        mark  = marks.get(sym, entry)
+        lev   = float(p.get("maxFixedLeverage", 10) or 10)
+        upnl  = float(p.get("unrealizedPnl", 0) or 0)        # EUR
+        is_short = side in ("short", "sell")
+
+        notional_usd = size * mark             # quote-qty / position value, USD
+        cost_usd     = size * entry            # opening value, USD
+        value_eur    = notional_usd / eur_usd if eur_usd else 0.0
+        margin_usd   = notional_usd / lev if lev else notional_usd
+        margin_eur   = margin_usd / eur_usd if eur_usd else 0.0
+        upnl_usd     = upnl * eur_usd          # Kraken reports pnl in EUR; → USD
+        roe          = (upnl / margin_eur * 100) if margin_eur else None
+        upnl_pct     = (upnl_usd / cost_usd * 100) if cost_usd else None
+        move_pct     = ((mark - entry) / entry * 100) * (-1 if is_short else 1) if entry else None
+        liq          = entry * (1 + 1 / lev) if is_short else entry * (1 - 1 / lev)
+        venue_label  = "Business Futures" if account == "biz" else "Kraken Futures"
+
+        out.append({
+            "account":       account,
+            "venue":         venue_label,
+            "symbol":        _symbol(sym),
+            "contract":      sym,
+            "direction":     "short" if is_short else "long",
+            "size":          round(size, 6),            # base qty (BTC)
+            "quote_qty":     round(notional_usd, 2),    # quote qty / value (USD)
+            "entry":         round(entry, 2),
+            "mark":          round(mark, 2),
+            "move_pct":      round(move_pct, 3) if move_pct is not None else None,
+            "value_eur":     round(value_eur, 2),
+            "cost_usd":      round(cost_usd, 2),
+            "margin_usd":    round(margin_usd, 2),
+            "margin_eur":    round(margin_eur, 2),
+            "upnl_usd":      round(upnl_usd, 2),
+            "upnl_eur":      round(upnl, 2),
+            "upnl_pct":      round(upnl_pct, 2) if upnl_pct is not None else None,
+            "roe_pct":       round(roe, 2) if roe is not None else None,
+            "liquidation":   round(liq, 2),
+            "leverage":      round(lev, 1),
+            "funding":       round(float(p.get("unrealizedFunding", 0) or 0), 4),
+            "eur_usd":       round(eur_usd, 4),
+        })
+    return out
 
 
 # ─── Spot API Ledger Sync ──────────────────────────────────────────────────────

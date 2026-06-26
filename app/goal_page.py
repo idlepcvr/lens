@@ -88,6 +88,14 @@ CSS = r"""<style>
 .flagcard p{font-size:11.5px;color:var(--am);line-height:1.55;margin:0}
 .err{background:var(--short-d);border:1px solid var(--short);color:var(--re);padding:10px 14px;border-radius:8px;font-size:12px}
 .err.hide{display:none}
+/* sensitivity tables (win-rate / R-target) */
+.st{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;gap:1px 10px;font-family:var(--mono);font-size:11px}
+.st span{padding:2px 0;text-align:right;color:var(--t1)}
+.st .lc{text-align:left;color:var(--t2)}
+.st .sh{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);border-bottom:1px solid var(--b1);padding-bottom:3px;margin-bottom:2px}
+.st .pos{color:var(--gr)}.st .neg{color:var(--re)}.st .warn{color:var(--am)}
+.st .cur{font-weight:800}
+.st-note{font-size:10px;color:var(--t3);margin-top:7px;line-height:1.4}
 </style>"""
 
 BODY = r"""
@@ -163,6 +171,12 @@ BODY = r"""
       <div class="card"><div class="card-title">Account impact / trade</div><div class="kv" id="r-acct"></div></div>
     </div>
     <div id="r-mc"></div>
+    <div class="grid2">
+      <div class="card"><div class="card-title">Win-rate sensitivity</div><div class="st" id="r-wrs"></div>
+        <div class="st-note">How EV &amp; ruin move as WR slips/improves around your current rate (R held). Below breakeven WR the edge dies regardless of R.</div></div>
+      <div class="card"><div class="card-title">R-target scenarios</div><div class="st" id="r-rtgt"></div>
+        <div class="st-note">What each reward:risk target yields after fees (WR held). R is the lever you control — exit discipline. ← = your current R:R.</div></div>
+    </div>
     <div id="err" class="err hide"></div>
   </div>
 </div>
@@ -283,8 +297,40 @@ async function recompute(){
   try{
     const r=await fetch("/api/goal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     if(!r.ok){ const d=await r.json(); ERR.textContent=typeof d.detail==="string"?d.detail:JSON.stringify(d.detail); ERR.classList.remove("hide"); return; }
-    render(await r.json());
+    const g=await r.json(); render(g); renderSensitivity(payload);
   }catch(e){ ERR.textContent="Network: "+e.message; ERR.classList.remove("hide"); }
+}
+
+// ── Win-rate & R-target sensitivity — reuses /api/goal with one field varied ──
+async function goalAt(payload, ov){
+  try{ const r=await fetch("/api/goal",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({},payload,ov))});
+    return r.ok? await r.json(): null; }catch(e){ return null; }
+}
+const evCls=x=>x>=0?"pos":"neg";
+const ruinCls=x=>x<=5?"pos":x<=15?"warn":"neg";
+const sgn=x=>(x>=0?"+":"")+x.toFixed(2)+"%";
+async function renderSensitivity(payload){
+  const baseWr=payload.win_rate, baseRr=payload.rr_ratio;
+  let wrs=[-0.10,-0.05,0,0.05,0.10].map(d=>+(baseWr+d).toFixed(3)).filter(w=>w>0.02&&w<0.98);
+  wrs=[...new Set(wrs)].sort((a,b)=>a-b);
+  const rrs=[2,3,4,5,6];
+  const [wrG,rrG]=await Promise.all([
+    Promise.all(wrs.map(w=>goalAt(payload,{win_rate:w}))),
+    Promise.all(rrs.map(rr=>goalAt(payload,{rr_ratio:rr}))),
+  ]);
+  let h='<span class="sh lc">WR</span><span class="sh">EV/tr</span><span class="sh">Drift</span><span class="sh">Ruin</span>';
+  wrs.forEach((w,i)=>{ const g=wrG[i]; if(!g)return; const c=Math.abs(w-baseWr)<1e-6?" cur":"";
+    h+=`<span class="lc${c}">${(w*100).toFixed(0)}%</span><span class="${evCls(g.per_trade_ev)}${c}">${sgn(g.per_trade_ev)}</span>`
+     +`<span class="${c}">${sgn(g.geometric_drift)}</span><span class="${ruinCls(g.risk_of_ruin)}${c}">${g.risk_of_ruin.toFixed(0)}%</span>`;
+  });
+  document.getElementById("r-wrs").innerHTML=h;
+  let h2='<span class="sh lc">R:R</span><span class="sh">Act R</span><span class="sh">EV/tr</span><span class="sh">Ruin</span>';
+  rrs.forEach((rr,i)=>{ const g=rrG[i]; if(!g)return; const c=Math.abs(rr-baseRr)<0.5?" cur":"";
+    h2+=`<span class="lc${c}">${rr.toFixed(1)}${c?" ←":""}</span><span class="${c}">${g.actual_rr!=null?g.actual_rr.toFixed(2):"—"}</span>`
+      +`<span class="${evCls(g.per_trade_ev)}${c}">${sgn(g.per_trade_ev)}</span><span class="${ruinCls(g.risk_of_ruin)}${c}">${g.risk_of_ruin.toFixed(0)}%</span>`;
+  });
+  document.getElementById("r-rtgt").innerHTML=h2;
 }
 
 let debounce;

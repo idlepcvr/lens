@@ -211,6 +211,13 @@ def init_db():
     if "book" not in trade_cols:
         # 'hedge' (own money, S1–S5) | 'prop' (Breakout eval). Existing rows = hedge.
         c.execute("ALTER TABLE trades ADD COLUMN book TEXT DEFAULT 'hedge'")
+    if "balance_before" not in trade_cols:
+        # EUR balance just before the trade closed; sync already computes it.
+        c.execute("ALTER TABLE trades ADD COLUMN balance_before REAL")
+    if "merged_manual" not in trade_cols:
+        # 1 = a manual entry the sync later matched to its exchange fill and
+        # reconciled into this single row (review kept, numbers = exchange truth).
+        c.execute("ALTER TABLE trades ADD COLUMN merged_manual INTEGER")
     # Review layer — execution grade, recurring-mistake tracking (Edgewonk-style),
     # conviction, mental state, and structured reflection. All nullable.
     for col, decl in (
@@ -405,13 +412,53 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
             c.close()
             return None
 
+    # Manual-twin merge: a manual entry with no exchange id, same direction &
+    # symbol, entry within 1%, opened within ±2 days → reconcile into that row
+    # rather than inserting a duplicate. Exchange numbers become truth; the
+    # manual row's notes/setup/review are left untouched; flag merged_manual.
+    if order_id and trade_dict.get("exit") is not None:
+        opened_iso = _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat()
+        twin = c.execute("""
+            SELECT id FROM trades
+            WHERE kraken_order_id IS NULL
+              AND (venue IS NULL OR venue = 'manual')
+              AND direction = ? AND symbol = ?
+              AND exit IS NOT NULL AND entry > 0
+              AND ABS(entry - ?) / entry < 0.01
+              AND ABS(julianday(opened_at) - julianday(?)) < 2
+            ORDER BY ABS(julianday(opened_at) - julianday(?)) LIMIT 1
+        """, (trade_dict["direction"], trade_dict.get("symbol", "BTC/USD"),
+              trade_dict["entry"], opened_iso, opened_iso)).fetchone()
+        if twin:
+            c.execute("""
+                UPDATE trades SET
+                    entry=?, exit=?, size=?, leverage=?, pnl=?, fees=?,
+                    closed_at=?, kraken_order_id=?, balance_after=?, balance_before=?,
+                    venue=?, contract=?, market_type=?, fill_type=?, order_type=?,
+                    funding_cost=?, fill_uuid=?, fill_count=?, merged_manual=1
+                WHERE id=?
+            """, (
+                trade_dict["entry"], trade_dict.get("exit"), trade_dict["size"],
+                trade_dict.get("leverage", 1.0), trade_dict.get("pnl"), trade_dict.get("fees"),
+                _iso(trade_dict.get("closed_at")), order_id,
+                trade_dict.get("balance_after"), trade_dict.get("balance_before"),
+                trade_dict.get("venue", "kraken_futures"), trade_dict.get("contract"),
+                trade_dict.get("market_type"), trade_dict.get("fill_type"),
+                trade_dict.get("order_type"), trade_dict.get("funding_cost"),
+                trade_dict.get("fill_uuid"), trade_dict.get("fill_count"), twin["id"],
+            ))
+            c.commit()
+            row = c.execute("SELECT * FROM trades WHERE id = ?", (twin["id"],)).fetchone()
+            c.close()
+            return _row_to_response(row)
+
     cur = c.execute("""
         INSERT INTO trades (symbol, direction, entry, size, leverage, tp, sl,
                             exit, pnl, fees, notes, opened_at, closed_at,
-                            kraken_order_id, balance_after,
+                            kraken_order_id, balance_after, balance_before,
                             venue, contract, market_type, fill_type, order_type,
                             funding_cost, fill_uuid, fill_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         trade_dict.get("symbol", "BTC/USD"),
         trade_dict["direction"],
@@ -428,6 +475,7 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
         _iso(trade_dict.get("closed_at")),
         order_id,
         trade_dict.get("balance_after"),
+        trade_dict.get("balance_before"),
         trade_dict.get("venue", "kraken_futures"),
         trade_dict.get("contract"),
         trade_dict.get("market_type"),

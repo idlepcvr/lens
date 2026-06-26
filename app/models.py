@@ -188,6 +188,8 @@ class TradeCreate(BaseModel):
     followed_plan:     Optional[bool]  = None
     followed_strategy: Optional[bool]  = None
     balance_after:     Optional[float] = None
+    balance_before:    Optional[float] = None
+    merged_manual:     Optional[int]   = None   # 1 = manual entry reconciled with its exchange fill
     # Exchange metadata (None for manual trades)
     venue:        Optional[str] = None
     contract:     Optional[str] = None

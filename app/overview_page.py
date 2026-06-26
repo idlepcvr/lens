@@ -102,7 +102,8 @@ function paintHedgeLive(a){
       card('Equity', '€'+money(a.total_eur), 'futures wallet', a.total_eur>=0?'g':'b')
     + card('Available margin', a.available_margin!=null?'€'+money(a.available_margin):'—', 'free to deploy', 'b')
     + card('Unrealised P&L', signed(u)+'€', a.kraken_personal&&a.kraken_personal.error?'(partial)':'open positions', u>0?'g':(u<0?'r':''))
-    + card('EUR/USD', a.eur_usd!=null?a.eur_usd:'—', 'fx', 'b');
+    + card('EUR/USD', a.eur_usd!=null?a.eur_usd:'—', 'fx', 'b')
+    + card('Business acct', a.biz_eur!=null?'€'+money(a.biz_eur):'—', 'biz funds · not traded', 'b');
 }
 
 function setBook(b){

@@ -41,7 +41,6 @@ NAV_HEDGE = [
     ("/analytics", "Analytics"),
     ("/journal", "Journal"),
     ("/edge", "Edge"),
-    ("/projection", "Projection"),
     ("/strategy", "Board"),
     ("/glossary", "Learn"),
 ]

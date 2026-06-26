@@ -86,10 +86,11 @@ def _load_trades():
     cur  = conn.cursor()
     cur.execute("""
         SELECT id, direction, entry, exit, pnl, fees, size, leverage,
-               opened_at, closed_at, notes, balance_after, setup_tag,
+               opened_at, closed_at, notes, balance_after, balance_before, merged_manual, setup_tag,
                tp, sl, funding_cost, followed_plan, followed_strategy,
                market_type, order_type, fill_count,
-               grade, conviction, emotion, mistakes, went_right, went_wrong, lesson
+               grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
+               book, venue, symbol
         FROM trades WHERE closed_at IS NOT NULL ORDER BY opened_at
     """)
     rows = cur.fetchall()
@@ -116,10 +117,11 @@ def get_enriched_trades() -> list:
     out = []
     for row in trades_raw:
         (tid, direction, entry, exit_, pnl, fees, size, leverage,
-         opened_at, closed_at, notes, bal_after, setup_tag,
+         opened_at, closed_at, notes, bal_after, bal_before, merged_manual, setup_tag,
          tp, sl, funding_cost, followed_plan, followed_strategy,
          market_type, order_type, fill_count,
-         grade, conviction, emotion, mistakes, went_right, went_wrong, lesson) = row
+         grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
+         book, venue, symbol) = row
 
         ts_e = _parse_ms(opened_at)
         ts_x = _parse_ms(closed_at)
@@ -161,6 +163,11 @@ def get_enriched_trades() -> list:
             "closed_at":      closed_at[:19].replace("T", " "),
             "notes":          notes or "",
             "balance_after":  bal_after,
+            "balance_before": bal_before,
+            "merged_manual":  merged_manual,
+            "book":           book or "hedge",
+            "venue":          venue or "",
+            "symbol":         symbol or "BTC/USD",
             "setup_tag":      setup_tag or "",
             "ts_entry":       ts_e // 1000,
             "ts_exit":        ts_x // 1000,
@@ -556,7 +563,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/analytics">Analytics</a>
     <a href="/journal" class="cur">Journal</a>
     <a href="/edge">Edge</a>
-    <a href="/projection">Projection</a>
+    <a href="/goal">Goal</a>
   </nav>
   <div class="topbar-right">
     <button class="tb-btn" onclick="openLogModal()">+ Log Trade</button>

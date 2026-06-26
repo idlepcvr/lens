@@ -57,12 +57,12 @@ def position_page() -> str:
 
   <form id="pf" onsubmit="return false">
     <div class="frow">
-      <div class="lf"><label>Entry $</label><input id="p-entry" type="number" step="any" placeholder="61900" autofocus></div>
+      <div class="lf"><label>Entry $</label><input id="p-entry" type="text" inputmode="decimal" placeholder="61900" autofocus></div>
       <div class="lf"><label>Direction</label>
         <div class="seg"><button type="button" id="d-long" class="on long" onclick="setDir('long')">▲ long</button><button type="button" id="d-short" class="short" onclick="setDir('short')">▼ short</button></div>
       </div>
-      <div class="lf"><label>Balance €</label><input id="p-bal" type="number" step="any" placeholder="—"></div>
-      <div class="lf"><label>BTC price €</label><input id="p-btc" type="number" step="any" placeholder="—"></div>
+      <div class="lf"><label>Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
+      <div class="lf"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
     </div>
     <div class="frow" style="margin-bottom:0">
       <div class="lf"><label>Book preset</label>
@@ -72,22 +72,26 @@ def position_page() -> str:
     <button type="button" class="advtog" id="advtog" onclick="toggleAdv()">▸ override risk inputs</button>
     <div class="adv hide" id="adv">
       <div class="frow" style="margin-bottom:0">
-        <div class="lf"><label>Win rate <span class="hint">0–1</span></label><input id="o-wr" type="number" step="any" placeholder="from config"></div>
-        <div class="lf"><label>R:R ratio</label><input id="o-rr" type="number" step="any" placeholder="from config"></div>
-        <div class="lf"><label>Leverage</label><input id="o-lev" type="number" step="any" placeholder="from config"></div>
-        <div class="lf"><label>Risk/trade <span class="hint">0–1 dec</span></label><input id="o-risk" type="number" step="any" placeholder="auto (EV)"></div>
-        <div class="lf"><label>Daily vol σ <span class="hint">auto from ATR feed</span></label><input id="o-std" type="number" step="any" placeholder="0.0356"></div>
+        <div class="lf"><label>Win rate <span class="hint">0–1</span></label><input id="o-wr" type="text" inputmode="decimal" placeholder="from config"></div>
+        <div class="lf"><label>R:R ratio</label><input id="o-rr" type="text" inputmode="decimal" placeholder="from config"></div>
+        <div class="lf"><label>Leverage</label><input id="o-lev" type="text" inputmode="decimal" placeholder="from config"></div>
+        <div class="lf"><label>Risk/trade <span class="hint">0–1 dec</span></label><input id="o-risk" type="text" inputmode="decimal" placeholder="auto (EV)"></div>
+        <div class="lf"><label>Daily vol σ <span class="hint">auto from ATR feed</span></label><input id="o-std" type="text" inputmode="decimal" placeholder="0.0356"></div>
       </div>
     </div>
   </form>
 
   <div id="err" class="err hide"></div>
+  <div id="logbar" style="display:none;margin:0 0 14px;display:flex;gap:10px;align-items:center">
+    <button type="button" id="logbtn" onclick="logTrade()" style="background:var(--accent);color:var(--bg);border:0;border-radius:7px;padding:9px 18px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">＋ Log as open trade</button>
+    <span id="logmsg" style="font-size:12px;color:var(--dim)"></span>
+  </div>
   <div id="out"><div class="empty">Enter an entry price to size the trade.</div></div>
 </div>"""
 
     script = r"""
 const $=id=>document.getElementById(id);
-let dir='long', book='hedge', CFG=null, deb, EURUSD=null, HEDGE_BAL=null;
+let dir='long', book='hedge', CFG=null, deb, EURUSD=null, HEDGE_BAL=null, LAST=null;
 const fP=n=>n==null?'—':'$'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
@@ -191,6 +195,8 @@ function render(g, p, pl, bal, btcE){
       ['Trade volatility σ', g.trade_volatility.toFixed(4)+'%', ''],
     ]);
   $('out').innerHTML='<div class="grid">'+out+'</div>';
+  LAST={book:'hedge',direction:dir,entry:e,size:p.current_trade_size_btc,leverage:lev};
+  $('logbar').style.display='flex'; $('logmsg').textContent='';
 }
 
 async function calcProp(entry){
@@ -232,10 +238,34 @@ function renderProp(t){
       ['Strategy', t.strategy, t.eval, 'dim','dim'],
     ]);
   $('out').innerHTML='<div class="grid">'+out+'</div>';
+  LAST={book:'prop',direction:dir,entry:e,size:t.size_btc,leverage:lev};
+  $('logbar').style.display='flex'; $('logmsg').textContent='';
 }
 
-['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std'].forEach(id=>
-  $(id).addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(calc, 250); }));
+async function logTrade(){
+  if(!LAST||!LAST.entry){ return; }
+  $('logbtn').disabled=true; $('logmsg').textContent='logging…';
+  try{
+    const r=await fetch('/api/trades',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({symbol:'BTC/USD',direction:LAST.direction,entry:LAST.entry,
+        size:Number(LAST.size.toFixed(6)),leverage:LAST.leverage,book:LAST.book})});
+    if(!r.ok){ throw new Error((await r.json()).detail||'log failed'); }
+    const t=await r.json();
+    $('logmsg').innerHTML='✓ logged open '+LAST.direction+' #'+t.id+' · <a href="/journal?trade='+t.id+'" style="color:var(--accent)">journal</a>';
+  }catch(e){ $('logmsg').textContent='✗ '+(e.message||e); }
+  $('logbtn').disabled=false;
+}
+
+// calculator — type 60000*1.02 → Enter/blur → evaluates, then re-sizes
+['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std'].forEach(id=>{
+  const inp=$(id);
+  function tryCalc(){ const v=inp.value.trim(); if(!v||!/[+*\/]/.test(v))return;
+    try{ const r=Function('"use strict";return('+v.replace(/[^0-9+\-*/.() \t]/g,'')+')')();
+      if(isFinite(r)){ inp.value=parseFloat(r.toFixed(8)); calc(); } }catch(e){} }
+  inp.addEventListener('input', ()=>{ clearTimeout(deb); deb=setTimeout(calc, 250); });
+  inp.addEventListener('blur', tryCalc);
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ tryCalc(); e.preventDefault(); } });
+});
 
 (async ()=>{ const c=await ensureCfg();
   HEDGE_BAL = c.start_balance!=null ? c.start_balance : null;
@@ -246,6 +276,7 @@ function renderProp(t){
     if(a.eur_usd) EURUSD=a.eur_usd;
     if(a.total_eur){ HEDGE_BAL=a.total_eur.toFixed(2); if(book==='hedge') $('p-bal').value=HEDGE_BAL; }
     const v=await fetch('/api/volatility').then(r=>r.json());
+    if(v.btc_usd){ $('p-entry').placeholder=v.btc_usd.toFixed(0); if(!$('p-entry').value){ $('p-entry').value=v.btc_usd.toFixed(0); calc(); } }
     if(v.btc_usd && a.eur_usd) $('p-btc').value=(v.btc_usd/a.eur_usd).toFixed(2);
     if(v.daily_sigma){ $('o-std').placeholder=v.daily_sigma; if(!$('o-std').value) $('o-std').value=v.daily_sigma; }
   }catch(e){}
