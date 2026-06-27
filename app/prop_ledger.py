@@ -148,6 +148,24 @@ _CSS = r"""<style>
 .pl .lf.full{grid-column:1/-1}
 .pl .logbtn{background:var(--accent-d);color:var(--accent);border:1px solid var(--line2);border-radius:6px;padding:8px 16px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;align-self:end}
 .pl .logbtn:hover{filter:brightness(1.3)}
+/* open prop positions — live-marked cards (mirrors /journal) */
+.op-wrap{margin-bottom:16px}
+.op-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.op-hd b{font-size:11px;letter-spacing:.04em;color:var(--ink)}
+.op-hd .live{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--long);border:1px solid var(--long);border-radius:4px;padding:1px 5px}
+.opcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.opcard{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.opcard.long{border-left:3px solid var(--long)}.opcard.short{border-left:3px solid var(--short)}
+.opcard .top{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.opcard .ven{font-size:8.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim)}
+.opcard .mkt{font-size:13.5px;font-weight:700;color:var(--ink);font-family:var(--mono)}
+.opcard .sd{font-size:10.5px;font-weight:700;font-family:var(--mono)}
+.opcard .body{padding:7px 12px 11px}
+.oprow{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:2.5px 0;font-size:11.5px;align-items:baseline}
+.oprow .l{color:var(--dim)}.oprow .v{font-family:var(--mono);color:var(--ink);text-align:right}
+.oprow .v small{color:var(--dim);font-size:10px}
+.opsec{font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:9px 0 3px;border-top:1px solid var(--line);padding-top:8px}
+.opcard .g{color:var(--long)}.opcard .r{color:var(--short)}.opcard .dim{color:var(--dim)}
 </style>"""
 
 
@@ -156,6 +174,8 @@ def ledger_page() -> str:
 <div class="pl">
   <h1>Prop Ledger</h1>
   <div class="sub">Realised <b>ASIAN_RSI_DIP_v1</b> trades on the Breakout eval book — equity vs the walls. Simulated streak risk lives on <a href="/survival" class="ac">Survival</a>.</div>
+
+  <div id="prop-open"></div>
 
   <div id="cards"></div>
   <div class="corridor" id="corridor" style="display:none"></div>
@@ -232,7 +252,62 @@ function render(d){
     ${rows}</table></div>`;
 }
 
+async function goalLevels(){
+  // expected TP/SL move % from the Goal model (config-driven), overlaid on the position
+  try{
+    const cfg=await fetch('/api/config').then(r=>r.json());
+    const g=await fetch('/api/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json());
+    if(g&&g.underlying_win_pct!=null) return {tp:g.underlying_win_pct/100, sl:g.underlying_loss_pct/100, rr:g.actual_rr};
+  }catch(e){}
+  return null;
+}
+async function loadPropOpen(){
+  const el=$('prop-open');
+  try{
+    const [d,lvl]=await Promise.all([fetch('/api/prop/positions/open').then(r=>r.json()), goalLevels()]);
+    const ps=d.positions||[];
+    if(!ps.length){ el.innerHTML=''; return; }
+    const u=(v,dp=0)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:dp});
+    const sU=(v)=>v==null?'—':(v>=0?'+':'-')+'$'+Math.abs(v).toLocaleString('en',{maximumFractionDigits:2});
+    const pc=(v)=>v==null?'—':(v>=0?'+':'')+Number(v).toFixed(2)+'%';
+    const row=(l,v,c)=>`<div class="oprow"><span class="l">${l}</span><span class="v ${c||''}">${v}</span></div>`;
+    const cards=ps.map(p=>{
+      const isL=p.direction==='long', up=p.upnl_usd||0;
+      let plan='';
+      if(lvl){
+        const tp=isL?p.entry*(1+lvl.tp):p.entry*(1-lvl.tp);
+        const sl=isL?p.entry*(1-lvl.sl):p.entry*(1+lvl.sl);
+        const win=(p.cost_usd||0)*lvl.tp, loss=(p.cost_usd||0)*lvl.sl;
+        plan=`<div class="opsec">Plan — from Goal</div>`
+          +row('Take profit',`${u(tp,1)} <small>+${(lvl.tp*100).toFixed(1)}%</small>`,'g')
+          +row('Stop loss',`${u(sl,1)} <small>-${(lvl.sl*100).toFixed(1)}%</small>`,'r')
+          +row('Expected win',`${sU(win)} <small>${pc(lvl.tp*100)}</small>`,'g')
+          +row('Expected loss',`${sU(-loss)} <small>${pc(-lvl.sl*100)}</small>`,'r')
+          +row('R:R',lvl.rr!=null?lvl.rr.toFixed(2):(lvl.tp/lvl.sl).toFixed(2),'dim');
+      } else { plan=`<div class="opsec">Plan</div>`+row('levels','set Goal config to see plan','dim'); }
+      return `<div class="opcard ${isL?'long':'short'}">
+        <div class="top"><div><div class="ven">${p.venue}</div><div class="mkt">${p.symbol}</div></div>
+          <div class="sd ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} · ${p.leverage}×</div></div>
+        <div class="body">
+          ${row('Opening price',u(p.entry))}
+          ${row('Last price',`${u(p.mark)} <small>move ${pc(p.move_pct)}</small>`,(p.move_pct||0)>=0?'g':'r')}
+          ${row('Base qty',p.size+' ₿')}
+          ${row('Quote qty / value',u(p.quote_qty))}
+          ${row('Initial margin',u(p.margin_usd))}
+          ${row('Unrealised P&L',`${sU(up)} <small>${pc(p.upnl_pct)}</small>`,up>=0?'g':'r')}
+          ${row('RoE',pc(p.roe_pct),(p.roe_pct||0)>=0?'g':'r')}
+          ${row('Est. liquidation',u(p.liquidation),'r')}
+          ${row('Funding rate',p.funding!=null?p.funding.toFixed(6):'—','dim')}
+          ${plan}
+        </div></div>`;
+    }).join('');
+    const tag=ps[0].live?'<span class="live">● live</span>'
+      :'<span class="live" style="color:var(--amber);border-color:var(--amber)">○ no feed</span>';
+    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open prop positions</b>${tag}<span class="dim" style="font-size:10px">your logged fill marked to live Kraken price · drops into the ledger once you add an exit</span></div><div class="opcards">${cards}</div></div>`;
+  }catch(e){ el.innerHTML=''; }
+}
 async function load(){
+  loadPropOpen();
   try{ const r=await fetch('/api/prop/ledger'); render(await r.json()); }
   catch(e){ $('cards').innerHTML='<div class="empty" style="color:var(--amber)">failed to load</div>'; }
 }
@@ -240,8 +315,11 @@ async function load(){
 function toISO(v){ return v ? new Date(v).toISOString() : null; }
 async function submitLog(ev){
   ev.preventDefault();
+  const btn=ev.target.querySelector('button[type=submit]');
+  if(btn&&btn.disabled) return false;          // guard: kills the double-submit dup
   const entry=parseFloat($('f-entry').value);
   if(!entry){ alert('entry price required'); return false; }
+  if(btn) btn.disabled=true;
   const payload={
     book:'prop', direction:$('f-dir').value, symbol:'BTC/USD:USD',
     entry, exit:parseFloat($('f-exit').value)||null,
@@ -257,6 +335,7 @@ async function submitLog(ev){
     ['f-entry','f-exit','f-size','f-pnl','f-note'].forEach(id=>$(id).value='');
     load();
   }catch(e){ alert('log failed: '+e.message); }
+  finally{ if(btn) btn.disabled=false; }
   return false;
 }
 

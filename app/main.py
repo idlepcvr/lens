@@ -1651,6 +1651,56 @@ def api_prop_trade(trade: TradeCreate):
     return create_trade(trade)
 
 
+@app.get("/api/prop/positions/open")
+def api_prop_open_positions():
+    """Logged OPEN prop-book trades (no exit yet), marked to the live BTC market.
+    Breakout's eval account has no readable API, so we mark your logged fill to
+    public Kraken price + funding — same card shape as /api/positions/live, but
+    USD money (the eval account is USD)."""
+    from .database import get_trades
+    opens = [t for t in get_trades(limit=5000, book="prop") if t.pnl is None]
+    if not opens:
+        return {"positions": []}
+    mk = {"mark": None, "funding": None}
+    try:
+        key, secret = kraken_sync.get_api_keys("personal")
+        mk = kraken_sync.fetch_market_btc(key, secret)
+    except Exception:
+        pass
+    mark, funding = mk.get("mark"), mk.get("funding")
+    out = []
+    for t in opens:
+        entry = float(t.entry or 0); size = abs(float(t.size or 0))
+        if not entry or not size:
+            continue
+        is_short = (t.direction == "short")
+        lev = float(t.leverage or 1.0) or 1.0
+        m = float(mark) if mark else entry
+        notional = size * m
+        cost = size * entry
+        margin = notional / lev if lev else notional
+        upnl = (m - entry) * size * (-1 if is_short else 1)
+        upnl_pct = (upnl / cost * 100) if cost else None
+        roe = (upnl / margin * 100) if margin else None
+        move_pct = ((m - entry) / entry * 100) * (-1 if is_short else 1)
+        # ponytail: liq estimate off the logged leverage (entry ± 1/lev), not the
+        # eval's true wallet margin — same approximation the live card uses.
+        liq = entry * (1 + 1 / lev) if is_short else entry * (1 - 1 / lev)
+        out.append({
+            "id": t.id, "venue": "Kraken Prop (Breakout)", "symbol": "BTC/USD:USD",
+            "direction": "short" if is_short else "long", "leverage": round(lev, 2),
+            "entry": round(entry, 2), "mark": round(m, 2), "move_pct": round(move_pct, 3),
+            "size": round(size, 6), "quote_qty": round(notional, 2), "cost_usd": round(cost, 2),
+            "margin_usd": round(margin, 2), "upnl_usd": round(upnl, 2),
+            "upnl_pct": round(upnl_pct, 2) if upnl_pct is not None else None,
+            "roe_pct": round(roe, 2) if roe is not None else None,
+            "liquidation": round(liq, 2),
+            "funding": round(funding, 6) if funding is not None else None,
+            "live": mark is not None,
+        })
+    return {"positions": out}
+
+
 @app.get("/api/prop/signals")
 def api_prop_signals(limit: int = Query(300, ge=1, le=2000)):
     """Prop hero signals (ASIAN_RSI_DIP_v1), each with the prop-legal ticket."""

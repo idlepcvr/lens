@@ -649,6 +649,20 @@ def fetch_open_positions_enriched(api_key: str, api_secret: str, account: str = 
     return out
 
 
+def fetch_market_btc(api_key: str, api_secret: str, contract: str = "PF_XBTUSD") -> dict:
+    """Live BTC perp mark price + funding rate from Kraken Futures public tickers.
+    Same market the prop (Breakout) eval trades on — used to mark a logged prop
+    fill to live, since the eval account itself has no readable API. The key is
+    only needed to build the client; the tickers endpoint is public."""
+    market = Market(key=api_key, secret=api_secret)
+    for tk in _retry(lambda: market.get_tickers()).get("tickers", []):
+        if tk.get("symbol") == contract:
+            mp = tk.get("markPrice") or tk.get("last")
+            return {"mark": float(mp) if mp else None,
+                    "funding": float(tk.get("fundingRate") or 0.0)}
+    return {"mark": None, "funding": None}
+
+
 # ─── Spot API Ledger Sync ──────────────────────────────────────────────────────
 
 def sync_spot_ledger(api_key: str, api_secret: str, db_transfer_fn) -> dict:
