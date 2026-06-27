@@ -92,7 +92,7 @@ def position_page() -> str:
     script = r"""
 const $=id=>document.getElementById(id);
 let dir='long', book='hedge', CFG=null, deb, EURUSD=null, HEDGE_BAL=null, LAST=null;
-const fP=n=>n==null?'—':'$'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fP=n=>n==null?'—':Number(n).toLocaleString('en',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2}); // ponytail: no $/commas so prices paste straight into Kraken
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
 const pc=n=>n==null?'—':Number(n).toFixed(2)+'%';
@@ -163,8 +163,8 @@ function render(g, p, pl, bal, btcE){
     ])
   + sec('Calculations', [
       ['Win / loss rate', pc(pl.win_rate*100), pc((1-pl.win_rate)*100), 'g','r'],
-      ['Acct gain (win)', '+'+pc(g.acct_gain_win), '+'+(gainE/btcE).toFixed(8)+' ₿', 'g'],
-      ['Acct loss (loss)','−'+pc(g.acct_loss_loss), '−'+(lossE/btcE).toFixed(8)+' ₿', 'r'],
+      ['Acct gain (win)', '+'+pc(g.acct_gain_win), 'mkt +'+pc(g.underlying_win_pct), 'g','g'],
+      ['Acct loss (loss)','−'+pc(g.acct_loss_loss), 'mkt −'+pc(g.underlying_loss_pct), 'r','r'],
       ['€ if win',  '+'+fE(gainE), fE(bal+gainE), 'g'],
       ['€ if loss', '−'+fE(lossE), fE(bal-lossE), 'r'],
     ])
