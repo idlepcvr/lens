@@ -41,15 +41,12 @@ NAV_HEDGE = [
     ("/analytics", "Analytics"),
     ("/journal", "Journal"),
     ("/edge", "Edge"),
-    ("/strategy", "Board"),
+    ("/strategy-hedge", "Board"),
     ("/glossary", "Learn"),
 ]
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
 _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
-# /strategy is a shared prop+hedge board; keep it anchored to the PROP nav even
-# though it's also linked from HEDGE (so prop users aren't bounced out of it).
-_PAGE_MODE["/strategy"] = "prop"
 
 
 def page_mode(path: str) -> str:

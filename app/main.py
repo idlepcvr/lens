@@ -1565,7 +1565,13 @@ def prop_page():
 @app.get("/strategy", response_class=HTMLResponse)
 def strategy_engine():
     from .prop_views import strategy_page
-    return strategy_page()
+    return strategy_page("prop")
+
+
+@app.get("/strategy-hedge", response_class=HTMLResponse)
+def strategy_engine_hedge():
+    from .prop_views import strategy_page
+    return strategy_page("hedge")
 
 
 @app.get("/risk", response_class=HTMLResponse)
