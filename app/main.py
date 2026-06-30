@@ -1503,9 +1503,16 @@ def api_backtest_strategies():
 
 @app.get("/overview", response_class=HTMLResponse)
 def overview_page():
-    """One snapshot for both books — live account, performance, market."""
+    """Prop-book snapshot — eval ledger, performance, market."""
     from .overview_page import render
-    return render()
+    return render("prop")
+
+
+@app.get("/overview-hedge", response_class=HTMLResponse)
+def overview_page_hedge():
+    """Hedge-book snapshot — live Kraken account, performance, market."""
+    from .overview_page import render
+    return render("hedge")
 
 
 @app.get("/position", response_class=HTMLResponse)

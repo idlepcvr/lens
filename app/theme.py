@@ -31,7 +31,7 @@ NAV_PROP = [
     ("/backtest", "Backtest"),
 ]
 NAV_HEDGE = [
-    ("/overview", "Overview"),
+    ("/overview-hedge", "Overview"),
     ("/dashboard", "Dashboard"),
     ("/goal", "Goal"),
     ("/position", "Position"),

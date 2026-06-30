@@ -26,16 +26,20 @@ _CSS = r"""<style>
 </style>"""
 
 
-def render() -> str:
+# book -> (route, nav label, page title)
+_META = {
+    "prop":  ("/overview",       "Overview", "Overview — PROP"),
+    "hedge": ("/overview-hedge", "Overview", "Overview — HEDGE"),
+}
+
+
+def render(book: str = "hedge") -> str:
+    path, label, title = _META[book]
     data = overview_data()
-    body = r"""
+    body = f"""
 <div class="ov">
-  <h1>Overview</h1>
+  <h1>{title}</h1>
   <div class="sub">One snapshot — live account, performance, market. Read-only; LENS never trades it.</div>
-  <div class="toggle">
-    <button id="t-hedge" class="on" onclick="setBook('hedge')">Hedge</button>
-    <button id="t-prop" onclick="setBook('prop')">Prop</button>
-  </div>
 
   <h2>Live account<span class="hint" id="live-hint">live from Kraken</span></h2>
   <div class="grid" id="live"></div>
@@ -50,7 +54,7 @@ def render() -> str:
     script = r"""
 const DATA = __DATA__;
 const $=id=>document.getElementById(id);
-let book='hedge', liveCache=null;
+let book='__BOOK__', liveCache=null;
 const money=(n,d=0)=>n==null?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d});
 const signed=(n,d=0)=>n==null?'—':(n>=0?'+':'−')+money(Math.abs(n),d);
 const card=(lbl,val,note,cls)=>`<div class="card ${cls||''}"><div class="lbl">${lbl}</div><div class="val">${val}</div><div class="note">${note||''}</div></div>`;
@@ -106,13 +110,7 @@ function paintHedgeLive(a){
     + card('Business acct', a.biz_eur!=null?'€'+money(a.biz_eur):'—', 'biz funds · not traded', 'b');
 }
 
-function setBook(b){
-  book=b;
-  $('t-hedge').classList.toggle('on', b==='hedge');
-  $('t-prop').classList.toggle('on', b==='prop');
-  renderLive(); renderPerf();
-}
-renderMarket(); setBook('hedge');
+renderMarket(); renderLive(); renderPerf();
 """
-    script = script.replace("__DATA__", json.dumps(data))
-    return shell("/overview", "Overview", body, script=script, head_extra=_CSS, meta="snapshot")
+    script = script.replace("__DATA__", json.dumps(data)).replace("__BOOK__", book)
+    return shell(path, label, body, script=script, head_extra=_CSS, meta="snapshot")
