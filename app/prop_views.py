@@ -15,14 +15,27 @@ view can drift from another. Server-rendered except /equity (needs a canvas).
 from .theme import shell
 
 HERO = "ASIAN_RSI_DIP_v1"
+# Defaults only — the live eval (account size / risk / plan) is persisted and read
+# via prop_config(). These are the fallback when nothing's been saved yet.
 EVAL = "BREAKOUT_1STEP_TURBO"   # "Advanced" — the €20 plan
 ACCOUNT = 5000.0
 RISK = 0.5
 
 
+def prop_config() -> dict:
+    """Active eval params from the DB (account, risk, eval_name). Single source
+    of truth for every prop page so a 'new eval' propagates everywhere."""
+    from .database import get_prop_eval
+    return get_prop_eval()
+
+
 # ── shared metrics ────────────────────────────────────────────────────────────
-def prop_metrics(strategy=HERO, eval_name=EVAL, account=ACCOUNT, risk=RISK, months=30):
+def prop_metrics(strategy=HERO, eval_name=None, account=None, risk=None, months=30):
     """One dict with everything every engine page needs."""
+    cfg = prop_config()
+    eval_name = eval_name or cfg["eval_name"]
+    account = account if account is not None else cfg["account"]
+    risk = risk if risk is not None else cfg["risk"]
     from .prop_eval import eval_summary, _trade_log, _cached_df, EVALS
     from .backtest_engine import STRATEGIES
 
@@ -144,7 +157,7 @@ def goals_page():
     body = f"""
 <div class="pv">
   <h1>Goals — the eval, visualised</h1>
-  <div class="sub">5k Advanced · {HERO} @ {RISK}% risk. Stay inside the corridor, reach the target. Pass odds ~<b class="green">{m['pass_pct']:.0f}%</b>.</div>
+  <div class="sub">${a:,.0f} eval · {HERO} @ {m['risk_pct']}% risk. Stay inside the corridor, reach the target. Pass odds ~<b class="green">{m['pass_pct']:.0f}%</b>.</div>
 
   <div class="panel">
     <h2>The target corridor</h2>

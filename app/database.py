@@ -20,9 +20,11 @@ DB_PATH = "lens.db"
 # ─── Connection / schema ──────────────────────────────────────────────────────
 
 def _conn():
-    c = sqlite3.connect(DB_PATH)
+    c = sqlite3.connect(DB_PATH, timeout=10)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys = ON")
+    c.execute("PRAGMA busy_timeout = 10000")  # wait, don't instantly "database is locked"
+    c.execute("PRAGMA journal_mode = WAL")    # readers + one writer coexist (sync loop vs UI writes)
     return c
 
 
@@ -391,8 +393,78 @@ def update_trade(trade_id: int, data: TradeUpdate) -> Optional[TradeResponse]:
     return _row_to_response(row) if row else None
 
 
+_PROP_EVAL_DEFAULT = {"account": 5000.0, "risk": 0.5, "eval_name": "BREAKOUT_1STEP_TURBO"}
+
+
+def get_prop_eval() -> dict:
+    """Active prop-eval parameters (account size, risk %, plan). Single row,
+    lazily created — defaults to the Turbo 5k that was hardcoded before."""
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        account REAL, risk REAL, eval_name TEXT)""")
+    row = c.execute("SELECT account, risk, eval_name FROM prop_eval_state WHERE id = 1").fetchone()
+    c.close()
+    if not row:
+        return dict(_PROP_EVAL_DEFAULT)
+    return {"account": row["account"], "risk": row["risk"], "eval_name": row["eval_name"]}
+
+
+def set_prop_eval(account: float, risk: float, eval_name: str) -> dict:
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        account REAL, risk REAL, eval_name TEXT)""")
+    c.execute("""INSERT INTO prop_eval_state (id, account, risk, eval_name) VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET account=excluded.account, risk=excluded.risk, eval_name=excluded.eval_name""",
+        (account, risk, eval_name))
+    c.commit()
+    c.close()
+    return {"account": account, "risk": risk, "eval_name": eval_name}
+
+
+def archive_prop_trades(meta: dict = None) -> int:
+    """Start a fresh eval: re-tag the current prop run to a dated archive book so
+    the live ledger (book='prop') resets to the start. Move-never-delete — the old
+    run stays queryable under its archive tag. `meta` records the account/risk/plan
+    the run used (trades don't carry it), so the history view can score it later."""
+    tag = "prop_arch_" + datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_archive (
+        tag TEXT PRIMARY KEY, account REAL, risk REAL, eval_name TEXT, created_at TEXT)""")
+    if meta:
+        c.execute("INSERT OR REPLACE INTO prop_eval_archive (tag, account, risk, eval_name, created_at) VALUES (?,?,?,?,?)",
+                  (tag, meta.get("account"), meta.get("risk"), meta.get("eval_name"), datetime.utcnow().isoformat()))
+    cur = c.execute("UPDATE trades SET book = ? WHERE book = 'prop'", (tag,))
+    c.commit()
+    c.close()
+    return cur.rowcount
+
+
+def prop_archive_books() -> list[str]:
+    """Distinct archive book tags present in the trades table (source of truth —
+    catches runs archived before metadata stamping existed)."""
+    c = _conn()
+    rows = c.execute("SELECT DISTINCT book FROM trades WHERE book LIKE 'prop_arch_%' ORDER BY book DESC").fetchall()
+    c.close()
+    return [r[0] for r in rows]
+
+
+def get_prop_archives() -> list[dict]:
+    """Archived eval runs (tag + the params they ran under), newest first."""
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_archive (
+        tag TEXT PRIMARY KEY, account REAL, risk REAL, eval_name TEXT, created_at TEXT)""")
+    rows = c.execute("SELECT tag, account, risk, eval_name, created_at FROM prop_eval_archive ORDER BY tag DESC").fetchall()
+    c.close()
+    return [dict(r) for r in rows]
+
+
 def delete_trade(trade_id: int) -> bool:
     c = _conn()
+    # un-link any signal pointing here first — the FK has no cascade, and the
+    # signal should outlive its trade (just lose the link), not block the delete.
+    c.execute("UPDATE signals SET linked_trade_id = NULL WHERE linked_trade_id = ?", (trade_id,))
     cur = c.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
     c.commit()
     c.close()

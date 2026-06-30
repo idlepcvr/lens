@@ -282,9 +282,10 @@ async function logTrade(){
   }catch(e){}
 })();
 """
-    from .prop_views import ACCOUNT, RISK, EVAL
+    from .prop_views import prop_config
     from .prop_eval import EVALS
-    prop_def = {"account": ACCOUNT, "risk": round(RISK / 100, 4),
-                "leverage": EVALS[EVAL]["max_leverage"]}
+    cfg = prop_config()
+    prop_def = {"account": cfg["account"], "risk": round(cfg["risk"] / 100, 4),
+                "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
     script = f"const PROP={json.dumps(prop_def)};\n" + script
     return shell("/position", "Position", body, script=script, head_extra=_CSS, meta="size the trade")

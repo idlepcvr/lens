@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime
 
 from .prop_eval import EVALS, _legal_leverage
-from .prop_views import ACCOUNT, EVAL, HERO, RISK
+from .prop_views import HERO, prop_config
 from .setups import _notify
 
 PROP_STRATEGY = HERO            # default hero / fallback signal discriminator
@@ -45,12 +45,16 @@ def prop_tradeable() -> list[tuple[str, float]]:
 
 
 def prop_ticket(entry: float, stop: float, target: float, long_: bool,
-                strategy: str = PROP_STRATEGY, account: float = ACCOUNT) -> dict:
+                strategy: str = PROP_STRATEGY, account: float = None) -> dict:
     """Prop-legal order ticket from a signal's levels — same sizing math as
     prop_desk_state (risk% of the eval account, leverage capped at the firm's
     5x). Deterministic from entry/stop/target, so it recomputes identically for a
-    live pending signal or a historical one on the review page. `account` defaults
-    to the $5k nominal; pass the live eval equity to size off current balance."""
+    live pending signal or a historical one on the review page. `account`/risk/plan
+    default to the active eval config; pass the live eval equity to size off it."""
+    cfg = prop_config()
+    EVAL, RISK = cfg["eval_name"], cfg["risk"]
+    if account is None:
+        account = cfg["account"]
     rule = EVALS[EVAL]
     fee_rt = rule.get("commission_per_side", 0.0004) * 2
     stop_pct = abs(entry - stop) / entry * 100 if entry else 0.0

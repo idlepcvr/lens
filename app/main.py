@@ -702,12 +702,12 @@ def api_prop_position(entry: float, direction: str = "long"):
     the signal ticket and the eval ledger)."""
     from .prop_scan import prop_ticket
     from .prop_ledger import prop_ledger_data
-    from .prop_views import ACCOUNT as PROP_NOMINAL
+    from .prop_views import prop_config
     win_pct, loss_pct, wr = _prop_moves()
     if not loss_pct:
         raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
-    # size off the CURRENT eval equity (realized ledger), not the $5k nominal
-    equity = prop_ledger_data().get("equity") or PROP_NOMINAL
+    # size off the CURRENT eval equity (realized ledger), not the nominal start
+    equity = prop_ledger_data().get("equity") or prop_config()["account"]
     long_ = direction == "long"
     stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
     target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
@@ -1646,9 +1646,53 @@ def api_prop_ledger():
 
 @app.post("/api/prop/trades")
 def api_prop_trade(trade: TradeCreate):
-    """Log a trade onto the prop book (forces book='prop')."""
+    """Log a trade onto the prop book (forces book='prop'). Blocked once the eval
+    is failed — you can't trade a blown book; close/edit existing trades or start a
+    new eval. Guard uses the realised (latched) verdict, no live feed needed."""
+    from .prop_ledger import prop_ledger_data
+    if prop_ledger_data(live=False)["failed"]:
+        raise HTTPException(status_code=409,
+            detail="This eval is failed — start a new eval to log fresh trades.")
     trade.book = "prop"
     return create_trade(trade)
+
+
+class PropEvalParams(BaseModel):
+    account: float
+    risk: float
+    eval_name: str
+
+
+@app.get("/api/prop/config")
+def api_prop_config():
+    """Active eval params + the available plans (for the new-eval form)."""
+    from .prop_views import prop_config
+    from .prop_eval import EVALS
+    plans = {k: {"daily_loss_pct": v["daily_loss_pct"], "max_dd_pct": v["max_dd_pct"],
+                 "profit_target_pct": v["profit_target_pct"], "max_leverage": v["max_leverage"]}
+             for k, v in EVALS.items()}
+    return {"config": prop_config(), "plans": plans}
+
+
+@app.post("/api/prop/new-eval")
+def api_prop_new_eval(params: PropEvalParams):
+    """Start a new eval: archive the current run (book='prop' → dated archive) AND
+    save the new account/risk/plan so every prop page resets to it. History kept."""
+    from .database import archive_prop_trades, set_prop_eval
+    from .prop_views import prop_config
+    from .prop_eval import EVALS
+    if params.eval_name not in EVALS:
+        raise HTTPException(status_code=422, detail=f"unknown plan {params.eval_name}")
+    archived = archive_prop_trades(meta=prop_config())   # stamp the run's params before re-tag
+    cfg = set_prop_eval(params.account, params.risk, params.eval_name)
+    return {"archived": archived, "config": cfg}
+
+
+@app.get("/api/prop/archives")
+def api_prop_archives():
+    """Past eval attempts, scored under the params each ran with."""
+    from .prop_ledger import archive_summaries
+    return {"archives": archive_summaries()}
 
 
 @app.get("/api/prop/positions/open")
