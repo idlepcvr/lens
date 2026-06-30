@@ -216,6 +216,14 @@ def _r_cols(rows, r_levels):
     return out
 
 
+_BOARD_META = {
+    "prop": ("Strategy Board — Prop Rankings",
+             "Strategies for your <b>Breakout eval account</b> (the prop challenge) — the Asian-dip family, scored on the real 4H/1H backtest."),
+    "hedge": ("Strategy Board — Personal-Account Rankings",
+              "Strategies for your <b>own trading account</b> (the app calls this book “hedge”) — 1h scalp setups."),
+}
+
+
 def _board(results, mode, r_levels):
     ranked = sorted([o for o in results if o["mode"] == mode and not o["thin"]],
                     key=lambda x: x["rank"])
@@ -241,9 +249,11 @@ def _board(results, mode, r_levels):
     if thin:
         thin_note = ('<div class="prose" style="margin-top:8px">thin (n&lt;40, not ranked): '
                      + ", ".join(f"{o['name']} (n={o['n']})" for o in thin) + "</div>")
+    title, blurb = _BOARD_META.get(mode, (f"{mode.upper()} ranking", ""))
     return f"""
   <div class="panel">
-    <h2>{mode.upper()} ranking — net R/trade by target, after fees</h2>
+    <h2 style="font-size:13.5px;color:var(--accent);letter-spacing:.04em">{title}</h2>
+    <div class="prose" style="margin:-6px 0 13px">{blurb} <span style="color:var(--faint)">Net R per trade by target, after fees.</span></div>
     <div style="overflow-x:auto"><table>
       <tr><th>#</th><th>strategy</th><th>dir</th><th>n</th><th>stop</th>
           {rcols_head}<th>best</th><th>score</th></tr>
@@ -264,23 +274,25 @@ def strategy_page():
                      head_extra=_CSS, meta="strategy board")
     rl = d["r_levels"]
     gen = d["generated_at"][:16].replace("T", " ")
-    sub = (f'Every strategy run through R = {rl[0]:g}–{rl[-1]:g}, first-touch, '
-           f'net of {d["fee_pct"]}% round-trip fee · {d["span"][0]} → {d["span"][1]} · '
-           f'scored to reward profit at higher R ("let winners run") · '
-           f'<span style="color:var(--faint)">refreshed {gen}</span>')
+    sub = (f'Two separate leaderboards — one for the <b>prop eval account</b>, one for your <b>personal account</b>. '
+           f'Each backtests every strategy and ranks them after fees. '
+           f'<span style="color:var(--faint)">R = {rl[0]:g}–{rl[-1]:g}, first-touch, net of {d["fee_pct"]}% round-trip · '
+           f'{d["span"][0]} → {d["span"][1]} · refreshed {gen}</span>')
     body = f"""
 <div class="pv">
   <h1>Strategy Board</h1>
   <div class="sub">{sub}</div>
   {_board(d['results'], 'prop', rl)}
+  <div style="height:1px;background:var(--line);margin:6px 0 18px"></div>
   {_board(d['results'], 'hedge', rl)}
   <div class="panel"><h2>Read</h2><div class="prose">
     Each cell is <strong>net R per trade</strong> at that target multiple — green = profitable after fees.
     <strong>score</strong> sums the profitable cells weighted by R, so a strategy that still pays at 3R outranks
-    one that only pays at 1R. Top 3 per mode are highlighted.<br><br>
-    <strong>PROP</strong> (real 4H/1H backtest) vs <strong>HEDGE</strong> (1h bar-context first-touch) are scored
-    under the same fee model so they're comparable. The headline: the <strong>Asian-dip prop family carries a real
-    post-fee edge</strong>, while the 1h hedge scalps barely clear the fee hurdle — fees are the tax that decides it.
+    one that only pays at 1R. Top 3 per board are highlighted.<br><br>
+    The <strong>eval account</strong> (real 4H/1H backtest) and your <strong>personal account</strong> (1h bar-context
+    first-touch) are scored under the same fee model so they're comparable. The headline: the <strong>Asian-dip eval
+    family carries a real post-fee edge</strong>, while the 1h personal-account scalps barely clear the fee hurdle —
+    fees are the tax that decides it.
     Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>
 </div>"""
     return shell("/strategy", "Strategy", body, head_extra=_CSS, meta="strategy board")
