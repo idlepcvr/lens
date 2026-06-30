@@ -44,6 +44,11 @@ NAV_HEDGE = [
     ("/strategy-hedge", "Board"),
     ("/glossary", "Learn"),
 ]
+# Primary chips shown in the top nav; everything else in each mode drops to the
+# footer ("more"). Pages stay reachable either way.
+PROP_MAIN  = {"/overview", "/prop-desk", "/prop-ledger"}
+HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
+
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
 _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
@@ -357,19 +362,34 @@ def nav_html(current_path: str) -> str:
     Switching modes just navigates to that mode's home — stateless, no cookie."""
     mode = page_mode(current_path)
     items = NAV_PROP if mode == "prop" else NAV_HEDGE
+    main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
     out = []
     for href, label in items:
+        if href not in main:
+            continue
         cur = " cur" if href == current_path else ""
         out.append('<a href="%s" class="%s">%s</a>' % (href, cur.strip(), label))
     sw = (
         '<div class="modesw">'
-        '<a href="/prop" class="%s">◎ PROP</a>'
-        '<a href="/dashboard" class="%s">▤ HEDGE</a>'
+        '<a href="/overview" class="%s">◎ PROP</a>'
+        '<a href="/overview-hedge" class="%s">▤ HEDGE</a>'
         '<a href="/sitemap" class="home">☰</a>'
         '<a href="/" class="home">⌂</a>'
         '</div>'
     ) % ("on" if mode == "prop" else "", "on" if mode == "hedge" else "")
     return sw + '<nav class="nav">' + "".join(out) + "</nav>"
+
+
+def footer_html(current_path: str) -> str:
+    """Secondary pages for the current mode — the chips not in the top nav."""
+    mode = page_mode(current_path)
+    items = NAV_PROP if mode == "prop" else NAV_HEDGE
+    main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
+    out = ['<a href="%s" class="%s">%s</a>' % (href, "cur" if href == current_path else "", label)
+           for href, label in items if href not in main]
+    if not out:
+        return ""
+    return '<footer class="navftr"><span class="ftl">more</span>' + "".join(out) + "</footer>"
 
 
 def shell(current_path: str, page_label: str, body: str, *,
@@ -388,6 +408,15 @@ def shell(current_path: str, page_label: str, body: str, *,
         "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon.svg\">"
         "<link rel=\"apple-touch-icon\" href=\"/assets/favicon.svg\">"
         "<link rel=\"stylesheet\" href=\"/assets/lens.css\">"
+        "<style>"
+        "footer.navftr{max-width:1000px;margin:38px auto 0;padding:13px 14px 44px;"
+        "border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:7px 15px;align-items:center}"
+        "footer.navftr .ftl{font-family:var(--mono);font-size:9px;letter-spacing:.18em;"
+        "text-transform:uppercase;color:var(--faint);margin-right:4px}"
+        "footer.navftr a{color:var(--dim);font-size:11.5px;text-decoration:none}"
+        "footer.navftr a:hover{color:var(--ink)}"
+        "footer.navftr a.cur{color:var(--accent)}"
+        "</style>"
         + head_extra +
         "</head><body><div class=\"app\">"
         "<div class=\"bar\">"
@@ -397,5 +426,5 @@ def shell(current_path: str, page_label: str, body: str, *,
         "</div>"
         + nav_html(current_path)
     )
-    tail = "</div>" + (("<script>" + script + "</script>") if script else "") + "</body></html>"
+    tail = footer_html(current_path) + "</div>" + (("<script>" + script + "</script>") if script else "") + "</body></html>"
     return head + body + tail
