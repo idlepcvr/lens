@@ -1,5 +1,16 @@
 # LENS_EDGE_v3 — Your trading, translated into ICT / visual language
 
+> **STATUS — 2026-07-01: framework research is DONE. This is an execution problem now, not a build problem.**
+> ICT / SMC / "smart money" / TFS-style frameworks are already fully mined and
+> codified here (S1–S5 + 7 vetoes) and in `app/setups.py`. The mechanical SMC
+> strategies (`SMC_LUX_4R_v1`, `SMC_SWEEP_v1`) were tested and retired. **Do not
+> rebuild this** when a new framework shows up on Twitter — diff it against the
+> setups/vetoes below; it will almost always be a reskin of what's already here.
+> Key personal finding that overrides textbook ICT: **you are a continuation
+> trader, not a reversal trader** — trade *with* the sweep (50% WR), never fade
+> it (33% WR), and never enter inside an FVG retrace (38% WR). The remaining work
+> is sticking to the checklist, not adding to it.
+
 > Mined with `ict_miner.py` from 464 closed real trades (Apr 2025 – Jun 2026,
 > baseline 41.8% WR, €+736) plus all 580 mechanical flush-short occurrences in
 > the same window. Same robustness bar as v2: every rule below survived

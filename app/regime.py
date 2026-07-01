@@ -87,6 +87,48 @@ def _kmeans(points: list[tuple], k: int = 3, iters: int = 40) -> list[int]:
     return labels
 
 
+def _transition_stats(history: list[dict]) -> dict:
+    """The Markov slice: P(next regime | current regime) from the ordered daily
+    labels, how sticky each regime is, avg run length, and the current unbroken
+    run. Pure counts off data detect_regimes already produces — no dependency."""
+    names = ("BULL", "SIDEWAYS", "BEAR")
+    idx = {n: i for i, n in enumerate(names)}
+    counts = [[0, 0, 0] for _ in range(3)]
+    seq = [h["regime"] for h in history if h["regime"] in idx]
+    for a, b in zip(seq, seq[1:]):
+        counts[idx[a]][idx[b]] += 1
+
+    matrix, persistence = {}, {}
+    for n in names:
+        row = counts[idx[n]]
+        tot = sum(row)
+        matrix[n] = {names[j]: (round(row[j] / tot, 3) if tot else None) for j in range(3)}
+        persistence[n] = round(row[idx[n]] / tot, 3) if tot else None
+
+    runs = {n: [] for n in names}
+    if seq:
+        cur, length = seq[0], 1
+        for r in seq[1:]:
+            if r == cur:
+                length += 1
+            else:
+                runs[cur].append(length)
+                cur, length = r, 1
+        runs[cur].append(length)
+    avg_run = {n: (round(sum(v) / len(v), 1) if v else None) for n, v in runs.items()}
+
+    current_run = 0
+    if seq:
+        last = seq[-1]
+        for r in reversed(seq):
+            if r != last:
+                break
+            current_run += 1
+
+    return {"matrix": matrix, "persistence": persistence,
+            "avg_run_days": avg_run, "current_run_days": current_run}
+
+
 def detect_regimes(limit: int = 1000) -> dict:
     """Classify the full daily window into BULL/SIDEWAYS/BEAR.
     Returns current regime, 60d history, per-regime stats, and a full
@@ -149,6 +191,7 @@ def detect_regimes(limit: int = 1000) -> dict:
         "current_date": last.get("date", ""),
         "history": history[-60:],
         "regime_stats": regime_stats,
+        "transitions": _transition_stats(history),
         "by_date": by_date,
     }
 

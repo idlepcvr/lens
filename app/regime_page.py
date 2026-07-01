@@ -86,6 +86,49 @@ def render(p: dict) -> str:
             f'<td>{s.get("avg_ret14_pct", 0)}%</td><td>{s.get("avg_vol14_pct", 0)}%</td></tr>'
         )
 
+    # Regime persistence / transition panel (the Markov slice)
+    tr = p.get("transitions", {})
+    persist_panel = ""
+    if tr and tr.get("matrix"):
+        mtx, persist, avg_run = tr["matrix"], tr["persistence"], tr["avg_run_days"]
+        cur_run = tr.get("current_run_days", 0)
+        cur_avg = avg_run.get(cur)
+
+        def _pct(x):
+            return f"{x*100:.0f}%" if x is not None else "—"
+
+        run_note = ""
+        if cur_avg and cur_run:
+            ratio = cur_run / cur_avg
+            if ratio >= 1.8:
+                run_note = (f"You've been in <strong class='{cur_cls}'>{cur}</strong> for <strong>{cur_run} days</strong> — "
+                            f"about <strong>{ratio:.1f}×</strong> the typical {cur_avg}-day {cur} stretch. This regime is "
+                            f"running long; a change is statistically overdue.")
+            else:
+                run_note = (f"You've been in <strong class='{cur_cls}'>{cur}</strong> for <strong>{cur_run} days</strong>, "
+                            f"vs a typical {cur_avg}-day stretch — within the normal range.")
+
+        nd = mtx.get(cur, {})
+        nd_txt = " · ".join(f'<b class="{_CLS[r]}">{r} {_pct(nd.get(r))}</b>' for r in ("BULL", "SIDEWAYS", "BEAR"))
+        mrows = ""
+        for frm in ("BULL", "SIDEWAYS", "BEAR"):
+            row = mtx.get(frm, {})
+            mark = ' <span class="cur-tag">◀ NOW</span>' if frm == cur else ""
+            cells = "".join(f'<td>{_pct(row.get(to))}</td>' for to in ("BULL", "SIDEWAYS", "BEAR"))
+            mrows += f'<tr><td class="{_CLS[frm]}">{frm}{mark}</td>{cells}<td>{avg_run.get(frm) or "—"}d</td></tr>'
+
+        persist_panel = f"""
+  <div class="panel">
+    <h2>Regime persistence — how sticky is now?</h2>
+    <div class="verdict">{run_note}</div>
+    <div class="prose" style="margin:14px 0 4px">Tomorrow from <strong class="{cur_cls}">{cur}</strong>: {nd_txt}</div>
+    <table style="margin-top:12px">
+      <tr><th>From ↓ / To →</th><th>BULL</th><th>SIDEWAYS</th><th>BEAR</th><th>Avg run</th></tr>
+      {mrows}
+    </table>
+    <div class="prose" style="margin-top:12px">Each row: given <strong>today's</strong> regime, the chance of each regime <strong>tomorrow</strong> (rows sum to 100%). The diagonal is <strong>persistence</strong> — how often a regime repeats day-to-day (BTC regimes are sticky, ~85–93%). "Avg run" = how many days that regime usually lasts before it flips.</div>
+  </div>"""
+
     # Verdict
     cur_wr = hbr.get(cur, {}).get("wr_pct")
     if cur_wr is not None and best_reg:
@@ -113,7 +156,7 @@ def render(p: dict) -> str:
     </div>
     <div class="verdict" style="margin-top:16px">{verdict}</div>
   </div>
-
+{persist_panel}
   <div class="panel">
     <h2>Hero edge by regime — ASIAN_RSI_DIP_v1 (30mo backtest)</h2>
     <div class="grid3">{cards}</div>

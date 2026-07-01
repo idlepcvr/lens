@@ -951,6 +951,22 @@ def _compute_metrics(result: dict, initial_capital: float, months: int) -> dict:
     net_loss_pct = abs(avg_loss) if losses else 13.0
     breakeven_wr = round(net_loss_pct / (net_loss_pct + net_win_pct) * 100, 1)
 
+    # Risk-adjusted ratios — the 3 from QF-Lib's tearsheet that matter, without
+    # the dependency. Trade-level, annualised by trade frequency.
+    # ponytail: approximate — annualised on trade count, not calendar-compounded.
+    rets = np.array([t["pnl_pct"] for t in trades], dtype=float)
+    ann  = np.sqrt(tpw * 52) if tpw > 0 else 0.0
+    sd   = rets.std(ddof=1) if n > 1 else 0.0
+    # Sortino downside deviation = RMS of returns below the 0 target (not the
+    # spread among losses) — stays meaningful even when every fixed-SL loss is
+    # identical, which is exactly the case for this bracket-based backtester.
+    dsd  = float(np.sqrt(np.mean(np.minimum(rets, 0.0) ** 2)))
+    sharpe  = round(rets.mean() / sd * ann, 2)  if sd > 0 else 0.0
+    sortino = round(rets.mean() / dsd * ann, 2) if dsd > 0 else 0.0
+    years = max(months / 12, 1e-9)
+    cagr  = ((final / initial_capital) ** (1 / years) - 1) * 100 if final > 0 and initial_capital > 0 else -100.0
+    calmar = round(cagr / (max_dd * 100), 2) if max_dd > 0 else 0.0
+
     return {
         "n":               n,
         "win_rate":        round(wr, 1),
@@ -967,6 +983,10 @@ def _compute_metrics(result: dict, initial_capital: float, months: int) -> dict:
         "initial_equity":  round(initial_capital, 2),
         "breakeven_wr":    breakeven_wr,
         "goal_wr":         48.0,
+        "sharpe":          sharpe,
+        "sortino":         sortino,
+        "calmar":          calmar,
+        "cagr_pct":        round(cagr, 1),
     }
 
 
@@ -1329,6 +1349,47 @@ STRATEGIES: dict = {
 
 
 # ─── Public entry point ───────────────────────────────────────────────────────
+
+def sweep_strategy(name: str, months: int = 30, initial_capital: float = 637.0,
+                   stops: list | None = None, tps: list | None = None) -> dict:
+    """2D robustness sweep: re-run the strategy across a grid of stop_pct × tp_pct,
+    reusing ONE OHLCV load (no refetch per cell). A real edge is a green
+    neighbourhood; a lone green cell next to red is a cherry-picked fluke. This is
+    the native replacement for reaching for vectorbt — same insight, no dependency.
+    """
+    if name not in STRATEGIES:
+        return {"error": f"unknown strategy: {name}"}
+    stops = stops or [0.5, 1.0, 1.5, 2.0, 2.5]
+    tps   = tps   or [2.0, 3.0, 4.0, 5.0, 6.0, 8.0]
+    strat = STRATEGIES[name]
+    tf = strat.get("timeframe", "4h")
+    ex = strat["params"].get("exchange") or "bybit"
+    sym = strat["params"].get("symbol") or "BTC/USDT:USDT"
+    df = add_indicators(load_ohlcv(symbol=sym, months=months, timeframe=tf, exchange_id=ex))
+    base = strat["params"]
+
+    cells = []
+    for sp in stops:
+        for tp in tps:
+            res = _run_backtest(df, strat["signal_fn"], {**base, "stop_pct": sp, "tp_pct": tp},
+                                initial_capital)
+            m = _compute_metrics(res, initial_capital, months)
+            pf = m.get("profit_factor")
+            cells.append({
+                "stop": sp, "tp": tp, "r": round(tp / sp, 2),
+                "n": m.get("n", 0),
+                "win_rate": m.get("win_rate", 0),
+                "net_pct": m.get("net_pct", 0),
+                "sharpe": m.get("sharpe", 0),
+                "sortino": m.get("sortino", 0),
+                "calmar": m.get("calmar", 0),
+                "max_dd": m.get("max_drawdown_pct", 0),
+                "pf": (None if pf in (float("inf"), None) else pf),
+            })
+    return {"strategy": name, "months": months, "stops": stops, "tps": tps,
+            "base_stop": base.get("stop_pct", 1.0), "base_tp": base.get("tp_pct", 4.0),
+            "cells": cells}
+
 
 def run_strategy(name: str, months: int = 30,
                  initial_capital: float = 637.0,

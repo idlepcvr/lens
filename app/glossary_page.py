@@ -112,6 +112,43 @@ numbers might suggest ~6% risk; sixth-Kelly ≈ 1%; the DD limit ≈ 3.5%. Optim
 optimal</span> warning — the goal is aggressive for the edge, so stretch the timeline rather than
 oversize.</p>
 
+<h4 id="sharpe">Sharpe ratio — reward per unit of bumpiness</h4>
+<p>Two strategies can both make 30% a year, but one gets there in a smooth line and the
+other on a rollercoaster. <b>Sharpe</b> measures which is which: return divided by how much
+the results <i>wobble</i>. Higher = smoother ride for the same money. Rough read:
+<code>&lt;0</code> bad, <code>~1</code> solid, <code>&gt;2</code> excellent. It's the single
+number quants use to compare two edges fairly — it punishes a strategy for being wild.</p>
+
+<h4 id="sortino">Sortino ratio — Sharpe, but fairer to big winners</h4>
+<p>Sharpe punishes <i>all</i> wobble, including the good kind (a huge winning trade counts
+as "volatility" against you). <b>Sortino</b> fixes that by only counting the <b>downside</b>
+wobble — the losses. For a high-R strategy like yours (small losses, occasional big wins),
+Sortino is the more honest score, and it'll usually read higher than Sharpe. Same scale:
+higher = better.</p>
+
+<h4 id="calmar">Calmar ratio — return for the pain you sat through</h4>
+<p>Annual return divided by your <b>worst drawdown</b> (the deepest hole the account fell
+into). It answers "how much did I make for the scariest moment I had to stomach?" A Calmar
+of <code>2</code> means you made 2× your worst peak-to-trough drop. High Calmar = you didn't
+have to bleed much to earn it. This is the one that maps to whether you can actually <i>hold</i>
+a strategy without panic-quitting.</p>
+
+<h4 id="regime">Market regime — what "mood" BTC is in</h4>
+<p>LENS sorts every day into one of three moods: <b class="g">BULL</b> (trending up),
+<b class="a">SIDEWAYS</b> (chopping in a range), <b class="r">BEAR</b> (trending down), using
+14-day return + volatility. It matters because your setups <b>don't win equally in all three</b>
+— continuation setups starve in a range and print in a trend. The <code>/regime</code> page
+tells you which mood is live and whether your hero strategy actually wins in it right now.</p>
+
+<h4 id="transition">Transition matrix &amp; persistence — is the mood about to change?</h4>
+<p>Knowing today's regime isn't enough; you want to know if it's about to flip. The
+<b>transition matrix</b> is a small grid: "given BTC is BULL today, how often was it still
+BULL tomorrow vs flipped to SIDEWAYS/BEAR?" — read straight from history. The diagonal of
+that grid is <b>persistence</b>: how <i>sticky</i> a mood is (BTC regimes are very sticky,
+~85–93% stay day-to-day). Paired with <b>average run length</b> (how many days a mood usually
+lasts), it gives you a read like "we've been sideways 66 days vs a typical 13 — a break is
+overdue." It doesn't predict <i>which</i> way, only that the range is stretched.</p>
+
 <h4>How you're meant to use it</h4>
 <ol>
 <li><b>Set the goal once</b> on <code>/goal</code>: balance, target, date, trades/week, your honest win% and R:R.</li>

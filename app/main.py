@@ -1290,6 +1290,11 @@ td{padding:6px 10px;border-bottom:1px solid var(--b1)}
 .win{color:var(--long)}.loss{color:var(--short)}
 #status{color:var(--ac);font-size:12px;margin-left:12px}
 canvas{width:100%;height:200px;display:block}
+.hm{border-collapse:collapse;font-family:var(--mono);width:auto}
+.hm th{padding:5px 8px;font-size:9px;color:var(--t3);text-align:center;border:none}
+.hm th.hm-corner,.hm tbody th{text-align:right;color:var(--t2)}
+.hm td.hm-cell{width:56px;height:34px;text-align:center;font-size:11px;border:1px solid var(--b1);color:var(--t1)}
+.hm td.hm-base{outline:2px solid var(--t1);outline-offset:-2px}
 </style>"""
 
     body = f"""
@@ -1300,6 +1305,7 @@ canvas{width:100%;height:200px;display:block}
 <div class="sec-body closed" id="s-help"><div class="help-body">
 <h4>what this page is</h4>Runs a <b>locked, mechanical strategy</b> over ~30 months of BTC/USDT 4H history and reports exactly how it would have done — no discretion, no curve-fitting. Pick a strategy, hit <b>Run</b>, read the scorecard.
 <h4>the metrics that matter</h4><b class="g">Win rate</b> ≥48% = goal-grade. <b>Profit factor</b> ≥1.5 (gross win ÷ gross loss). <b class="a">Avg R</b> ≥3.5 — the real lever. <b class="r">Max DD</b> &lt;40% survivable, and <b>max consecutive losses</b> = your risk-of-ruin reality check.
+<h4>the risk-adjusted trio (plain English)</h4><b>Sharpe</b> = return per unit of <i>bumpiness</i> — how much reward you got for how wildly the equity swung. ≥1 is solid, higher is smoother. <b>Sortino</b> = the same idea but only counts the <i>downside</i> swings (it doesn't punish you for big <i>up</i> moves — fairer for high-R strategies). <b>Calmar</b> = annual return ÷ worst drawdown — "how much did I make for the deepest hole I sat in." Use them to compare two strategies with similar returns: the higher trio = the same money with less pain.
 <h4>equity curve + trade log</h4>The curve is account €over the window; the log lists every entry/exit with PnL% and hold time. Look for <b>smooth-ish</b> growth, not one lucky spike.
 <h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/journal">Journal</a>.
 </div></div>
@@ -1314,7 +1320,25 @@ canvas{width:100%;height:200px;display:block}
   <input id="capital" type="number" step="any" value="637" title="Starting balance for the sim — defaults to your live hedge equity"
          style="width:96px;background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--ui)">
   <button class="run" id="run-btn" onclick="runBacktest()">▶ Run</button>
+  <button id="sweep-btn" onclick="runSweep()" title="Re-run this strategy across a grid of stop-loss × take-profit to see if the edge is robust or a lucky single point">⊞ Sweep SL×TP</button>
   <span id="status"></span>
+</div>
+
+<div id="sweep-wrap" style="display:none">
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="font-size:14px;font-weight:700;color:var(--t1)">Robustness sweep — SL × TP</div>
+      <select id="sweep-metric" onchange="colorHeatmap()" style="padding:6px 12px">
+        <option value="net_pct">colour by: Net return %</option>
+        <option value="sharpe">colour by: Sharpe</option>
+        <option value="sortino">colour by: Sortino</option>
+        <option value="calmar">colour by: Calmar</option>
+        <option value="win_rate">colour by: Win rate %</option>
+      </select>
+    </div>
+    <div id="heatmap" style="overflow-x:auto"></div>
+    <div style="font-size:11px;color:var(--t3);margin-top:12px;line-height:1.55">Each cell = the same strategy re-run with that <b>SL</b> (rows, stop-loss) and <b>TP</b> (columns, take-profit). <b class="win">A real edge is a green neighbourhood</b> — several good cells clustered together. <b class="loss">One lone green square surrounded by red</b> = curve-fitting; it won't survive live. The <b>outlined</b> cell is the strategy's own configured setting. Hover any cell for full stats.</div>
+  </div>
 </div>
 
 <div id="results" style="display:none">
@@ -1364,10 +1388,75 @@ function runBacktest() {{
   .catch(function(e) {{ btn.disabled = false; btn.textContent = '▶ Run'; stat.textContent = 'Failed: ' + e; }});
 }}
 
+function runSweep() {{
+  var name = document.getElementById('strat').value;
+  var months = parseInt(document.getElementById('months').value) || 24;
+  var capital = parseFloat(document.getElementById('capital').value) || 637;
+  var btn = document.getElementById('sweep-btn');
+  btn.disabled = true; btn.textContent = '⏳ Sweeping…';
+  document.getElementById('sweep-wrap').style.display = 'none';
+  fetch('/api/backtest/sweep', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{name: name, months: months, initial_capital: capital}})
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(d) {{
+    btn.disabled = false; btn.textContent = '⊞ Sweep SL×TP';
+    if (d.error) {{ alert('Sweep error: ' + d.error); return; }}
+    window._sweep = d; buildHeatmap(d);
+    document.getElementById('sweep-wrap').style.display = '';
+  }})
+  .catch(function(e) {{ btn.disabled = false; btn.textContent = '⊞ Sweep SL×TP'; alert('Sweep failed: ' + e); }});
+}}
+
+function buildHeatmap(d) {{
+  var map = {{}};
+  d.cells.forEach(function(c) {{ map[c.stop + '|' + c.tp] = c; }});
+  var h = '<table class="hm"><thead><tr><th class="hm-corner">SL ╲ TP</th>';
+  d.tps.forEach(function(tp) {{ h += '<th>' + tp + '%</th>'; }});
+  h += '</tr></thead><tbody>';
+  d.stops.forEach(function(sp) {{
+    h += '<tr><th>' + sp + '%</th>';
+    d.tps.forEach(function(tp) {{
+      var c = map[sp + '|' + tp] || {{}};
+      var base = (sp === d.base_stop && tp === d.base_tp) ? ' hm-base' : '';
+      var tip = 'SL ' + sp + '% / TP ' + tp + '% · R ' + (c.r||'') + ' · n=' + (c.n||0) +
+                ' · WR ' + (c.win_rate||0) + '% · Sharpe ' + (c.sharpe||0) +
+                ' · Sortino ' + (c.sortino||0) + ' · net ' + (c.net_pct||0) + '% · maxDD ' + (c.max_dd||0) + '%';
+      h += '<td class="hm-cell' + base + '" data-k="' + sp + '|' + tp + '" title="' + tip + '"></td>';
+    }});
+    h += '</tr>';
+  }});
+  h += '</tbody></table>';
+  document.getElementById('heatmap').innerHTML = h;
+  colorHeatmap();
+}}
+
+function colorHeatmap() {{
+  var d = window._sweep; if (!d) return;
+  var metric = document.getElementById('sweep-metric').value;
+  var map = {{}}; d.cells.forEach(function(c) {{ map[c.stop + '|' + c.tp] = c; }});
+  var vals = d.cells.filter(function(c) {{ return c.n > 0; }}).map(function(c) {{ return c[metric]; }});
+  var maxAbs = Math.max.apply(null, vals.map(function(v) {{ return Math.abs(v); }}).concat([1]));
+  var isWR = (metric === 'win_rate');
+  document.querySelectorAll('#heatmap .hm-cell').forEach(function(td) {{
+    var c = map[td.dataset.k] || {{}};
+    if (!c.n) {{ td.style.background = 'var(--s1)'; td.style.color = 'var(--t3)'; td.textContent = '—'; return; }}
+    var v = c[metric];
+    var t = isWR ? (v - 50) / 50 : v / maxAbs;
+    t = Math.max(-1, Math.min(1, t));
+    var hue = t >= 0 ? 150 : 5;
+    td.style.background = 'hsla(' + hue + ',72%,45%,' + (0.12 + 0.55 * Math.abs(t)) + ')';
+    td.style.color = 'var(--t1)';
+    td.textContent = (metric === 'net_pct' || metric === 'win_rate') ? Math.round(v) + '%' : ('' + v);
+  }});
+}}
+
 function metricColor(key, val) {{
   if (key === 'win_rate') return val >= 48 ? 'good' : val >= 31 ? 'warn' : 'bad';
   if (key === 'profit_factor') return val >= 1.5 ? 'good' : val >= 1.0 ? 'warn' : 'bad';
   if (key === 'max_drawdown_pct') return val < 40 ? 'good' : val < 70 ? 'warn' : 'bad';
+  if (key === 'sharpe' || key === 'sortino' || key === 'calmar') return val >= 1 ? 'good' : val >= 0 ? 'warn' : 'bad';
   if (key === 'net_pct') return val > 0 ? 'good' : 'bad';
   return '';
 }}
@@ -1383,6 +1472,9 @@ function renderResults(d) {{
     ['n',                 'Trades',          m.n,                  d.months + 'mo'],
     ['trades_per_week',   'Trades/wk',       m.trades_per_week,    'target 1–5'],
     ['avg_r',             'Avg R',           m.avg_r,              'target ≥3.5'],
+    ['sharpe',            'Sharpe',          m.sharpe,             '≥1 = solid'],
+    ['sortino',           'Sortino',         m.sortino,            'downside-only'],
+    ['calmar',            'Calmar',          m.calmar,             'return ÷ maxDD'],
     ['max_drawdown_pct',  'Max DD',          m.max_drawdown_pct + '%', '<40% safe'],
     ['max_consec_losses', 'Max Consec Loss', m.max_consec_losses,  'risk of ruin'],
     ['avg_hours_held',    'Avg Hold (h)',    m.avg_hours_held,     '≥24h = multi-day'],
@@ -1486,6 +1578,18 @@ def api_backtest_run(req: BtRunRequest):
         result = _run_strategy(req.name, months=req.months, initial_capital=req.initial_capital)
         _bt_cache[req.name] = result
         return result
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
+
+
+@app.post("/api/backtest/sweep")
+def api_backtest_sweep(req: BtRunRequest):
+    if req.name not in BT_STRATEGIES:
+        return {"error": f"unknown strategy '{req.name}'. Available: {list(BT_STRATEGIES)}"}
+    try:
+        from app.backtest_engine import sweep_strategy as _sweep
+        return _sweep(req.name, months=req.months, initial_capital=req.initial_capital)
     except Exception as e:
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
