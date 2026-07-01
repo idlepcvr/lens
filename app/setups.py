@@ -346,6 +346,7 @@ def backfill_setup_tags(only_untagged: bool = True) -> dict:
     ).fetchall()
 
     tagged, skipped = 0, 0
+    flagged = []   # newly tagged trades that land off-playbook (VETO*/NONE)
     for tid, direction, opened_at in trades:
         s = opened_at.replace("Z", "+00:00")
         dt = datetime.datetime.fromisoformat(s)
@@ -358,9 +359,30 @@ def backfill_setup_tags(only_untagged: bool = True) -> dict:
         tag = classify(eng.context(i), direction)
         conn.execute("UPDATE trades SET setup_tag=? WHERE id=?", (tag, tid))
         tagged += 1
-    conn.commit()
+        if tag.startswith("VETO") or tag == "NONE":
+            flagged.append((tid, direction, tag))
+    conn.commit()   # tags are safe before any notify I/O
+
+    # Accountability push: the loop alerts when a setup fires, but said nothing
+    # when a trade was taken OFF-signal — that feedback never arrived (found
+    # 2026-07-02: 11 of 13 post-go-live trades bypassed the loop). Incremental
+    # sync path only, so a manual full re-tag doesn't spam the phone.
+    if only_untagged and flagged:
+        veto = conn.execute(
+            "SELECT count(*), coalesce(round(sum(pnl)),0) FROM trades "
+            "WHERE setup_tag LIKE 'VETO%' AND pnl IS NOT NULL"
+        ).fetchone()
+        lines = [f"#{tid} {direction} -> {tag}" for tid, direction, tag in flagged[:5]]
+        lines.append(f"lifetime VETO bucket: {veto[0]} trades, EUR {veto[1]:+.0f}")
+        _notify(
+            f"OFF-PLAYBOOK trade{'s' if len(flagged) > 1 else ''} detected ({len(flagged)})",
+            "\n".join(lines),
+            tags="warning",
+        )
+
     conn.close()
-    return {"tagged": tagged, "skipped_no_candles": skipped}
+    return {"tagged": tagged, "skipped_no_candles": skipped,
+            "off_playbook_flagged": len(flagged)}
 
 
 def scan_latest() -> dict:
