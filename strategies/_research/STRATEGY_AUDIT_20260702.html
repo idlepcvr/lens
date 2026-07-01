@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LENS // Strategy Audit 2026-07-02</title>
+<style>
+:root{--bg:#06080c;--card:#0b0f16;--line:#1a2230;--ink:#e8edf5;--dim:#8b96a8;--faint:#4a5468;
+--accent:#5b9dff;--green:#1fd989;--red:#ff5d6c;--amber:#ffb454;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.65 system-ui,-apple-system,sans-serif;padding:32px 16px 80px}
+main{max-width:880px;margin:0 auto}h1{font-size:26px;letter-spacing:.02em;margin:0 0 4px}
+h1 span{color:var(--accent)}h2{font-size:17px;margin:44px 0 12px;color:var(--accent);
+border-bottom:1px solid var(--line);padding-bottom:8px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:28px}
+.mono{font-family:var(--mono);font-size:12.5px}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px}
+th{text-align:left;color:var(--faint);font-family:var(--mono);font-size:10.5px;
+text-transform:uppercase;letter-spacing:.12em;padding:7px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--line)}
+.g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:16px 0}
+.tldr{border-left:3px solid var(--green)}
+.warn{border-left:3px solid var(--amber)}
+.big{font-size:20px;font-weight:700}
+.bar{height:14px;border-radius:3px;display:inline-block;vertical-align:middle}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+.kpi>div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .n{font-family:var(--mono);font-size:22px;font-weight:700}
+.kpi .l{color:var(--dim);font-size:12px;margin-top:2px}
+code{font-family:var(--mono);font-size:12px;background:#111826;padding:1px 6px;border-radius:4px}
+.chart{margin:10px 0}.row{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12.5px}
+.row .lb{width:280px;color:var(--dim);font-family:var(--mono);font-size:11.5px;text-align:right;flex-shrink:0}
+.row .vl{font-family:var(--mono);width:70px}
+@media(max-width:640px){.row .lb{width:150px}}
+</style></head><body><main>
+
+<h1>LEN<span>S</span> · Strategy Audit</h1>
+<div class="sub">2026-07-02 · 62,671 × 1h candles (2019-05 → 2026-07) · 0.30% round-trip fees ·
+old/new-half robustness on everything · 392 real fills · buy-every-bar baseline passed
+(it loses at every geometry — the edges below are selection, not drift)</div>
+
+<div class="kpi">
+<div><div class="n g">0.63%</div><div class="l">your stop — correct, keeps ~85% of winners. Don't touch.</div></div>
+<div><div class="n a">0.95% → 1.5%</div><div class="l">the target — too tight. Half of playbook winners ran to +1.5%.</div></div>
+<div><div class="n">59% → 44%</div><div class="l">break-even WR, current vs proposed geometry (fees in)</div></div>
+<div><div class="n r">−€2,254</div><div class="l">VETO bucket, 314 trades, 36% WR both halves — still the #1 lever</div></div>
+</div>
+
+<div class="card tldr"><b>Do this:</b> keep the 0.63% stop · raise the target to ~1.5%
+(2.4R gross, ~1.3R after fees; break-even WR drops to ~44% vs your realized 46–58%) ·
+move stop to break-even after +0.6% (scratches ~¼ of losers, barely touches winners) ·
+keep obeying the vetoes — the off-playbook push now polices this automatically.</div>
+
+<h2>1 · Where your money actually came from (481 real trades)</h2>
+<div class="chart">
+<div class="row"><span class="lb">PLAYBOOK S1–S5 · 50 trades · 58% WR</span><span class="bar" style="width:151px;background:var(--green)"></span><span class="vl g">+€1,092</span></div>
+<div class="row"><span class="lb">NONE (off-context) · 122 · 42% WR</span><span class="bar" style="width:124px;background:#1fd98966"></span><span class="vl d">+€901*</span></div>
+<div class="row"><span class="lb">VETO (your no-go list) · 309 · 36% WR</span><span class="bar" style="width:300px;background:var(--red)"></span><span class="vl r">−€2,170</span></div>
+</div>
+<div class="d" style="font-size:12.5px">* carried by 5 outlier wins; WR decaying 43→28 across halves. Not a strategy.</div>
+
+<h2>2 · Geometry — what your own fills say</h2>
+<table>
+<tr><th>metric (playbook winners)</th><th>p50</th><th>p75 / p80</th><th>p90</th><th>meaning</th></tr>
+<tr><td>Max move AGAINST before winning (MAE)</td><td class="mono">0.23%</td><td class="mono">0.54%</td><td class="mono">0.67%</td><td>0.63% stop keeps ~85% ✓</td></tr>
+<tr><td>Max move FOR you (MFE)</td><td class="mono g">1.49%</td><td class="mono g">2.01%</td><td class="mono g">2.72%</td><td>0.95% target sells half the move</td></tr>
+<tr><td>Losers' best moment (MFE)</td><td class="mono">0.20%</td><td class="mono">0.56%</td><td>—</td><td>BE-move at +0.6% is nearly free</td></tr>
+</table>
+<div class="card"><b>At 10x all-in:</b> a stop-out ≈ <span class="r">−6.3% of account + ~3% fees ≈ −9%</span>;
+a 1.5% target ≈ <span class="g">+12% after fees</span>. Fees at 10x are 3% of account per round trip —
+the silent killer of tight targets. If −9%/loss feels heavy, lower leverage, not the stop.</div>
+
+<h2>3 · Labeled setups — mechanical truth vs your results</h2>
+<table>
+<tr><th>setup</th><th>mechanical (best geometry, full history)</th><th>your realized</th></tr>
+<tr><td>S1 NY-AM flush ↓</td><td class="g">✅ +0.21%/tr @ 2/2 · 62.7% WR · both halves</td><td class="g">11 tr · 90.9% · +€116</td></tr>
+<tr><td>S3 continuation ↑</td><td class="r">❌ negative at every geometry</td><td class="g">35 tr · 45.7% · <b>+€614</b></td></tr>
+<tr><td>S5 London mom. ↑</td><td class="r">❌ negative at every geometry</td><td class="g">5 tr · +€337</td></tr>
+<tr><td>S2 / S4</td><td class="r">❌ negative at every geometry</td><td class="d">small n, ~flat</td></tr>
+<tr><td>H7 rsi&gt;70 no-sweep ↑</td><td class="g">✅ +0.25%/tr @ 2/4 · both halves</td><td class="d">untraded</td></tr>
+</table>
+<div class="card"><b>The point:</b> S3/S5 make you money with <i>no</i> mechanical edge →
+your entry timing <i>inside</i> the context is the edge. The scanner finds the context;
+you supply the timing. Same discretion <i>outside</i> the contexts = the red bar above.</div>
+
+<h2>4 · Mined candidates (forward-test before trusting)</h2>
+<div class="chart">
+<div class="row"><span class="lb">H12 · quiet-uptrend grind · LONG 2/6 · n=825</span><span class="bar" style="width:188px;background:var(--green)"></span><span class="vl g">+0.94%</span></div>
+<div class="row"><span class="lb">atr_low & eq & raid_pdh · LONG 2/6 · n=340</span><span class="bar" style="width:218px;background:#1fd989aa"></span><span class="vl g">+1.09%</span></div>
+<div class="row"><span class="lb">rsi&gt;70 & disp_bear (momentum dip-buy) · 2/4 · n=111</span><span class="bar" style="width:134px;background:#1fd989aa"></span><span class="vl g">+0.67%</span></div>
+<div class="row"><span class="lb">rsi&gt;70 & atr_low · LONG 1.5/6 · n=747</span><span class="bar" style="width:104px;background:#1fd989aa"></span><span class="vl g">+0.52%</span></div>
+<div class="row"><span class="lb">H13 · weak-bounce fade · SHORT 2/3 · n=148</span><span class="bar" style="width:100px;background:var(--red)"></span><span class="vl g">+0.50%</span></div>
+<div class="row"><span class="lb">baseline: buy every bar (best case)</span><span class="bar" style="width:58px;background:var(--faint)"></span><span class="vl r">−0.29%</span></div>
+</div>
+<div class="card"><b>H12 in plain English:</b> BTC is <i>boring</i> (calmest third of history),
+price mid-range, short trend up → buy and sit for days. Stop 2%, target 6%. A <b>swing trade</b> —
+its own geometry, NOT a change to your 0.63% day-trade stop. Consistent theme across every winner:
+<b>momentum continuation · wide targets · calm regimes</b> — the opposite of the sub-2h scalps that bled −€747.</div>
+
+<div class="card warn"><b>Honesty box:</b> ~750 combos × 42 geometries were tested — some survivorship
+luck is inevitable even with the split-half guard. Every edge is weaker in the recent half than the old half.
+Funding on multi-day holds isn't modeled. H12/H13 are in the Monday re-rank
+(<code>/strategy</code>) and get promoted to shadow signals only if they survive ~a month of unseen data.</div>
+
+<h2>5 · Next</h2>
+<table>
+<tr><th>#</th><th>action</th><th>owner</th></tr>
+<tr><td>1</td><td>Trade playbook alerts with target → 1.5% zone + BE-move after +0.6%</td><td><b>you</b></td></tr>
+<tr><td>2</td><td>Don't take VETO-context trades — off-playbook push will call them out hourly</td><td><b>you</b> (policed)</td></tr>
+<tr><td>3</td><td>Watch H12/H13 Monday re-ranks; promote to shadow signals if they hold</td><td>system</td></tr>
+<tr><td>4</td><td>Re-mine (v4) once tagged live trades accumulate</td><td>later</td></tr>
+</table>
+
+<div class="d" style="margin-top:36px;font-size:12px">Full method + numbers:
+<code>STRATEGY_AUDIT_20260702.md</code> · raw <code>mine_20260702.json</code> ·
+re-run <code>mine_20260702.py</code></div>
+</main></body></html>
