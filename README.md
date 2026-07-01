@@ -417,32 +417,41 @@ Useful API: `POST /api/setups/scan` (scan now) ·
 
 ---
 
-## TODO — next session (2026-06-23)
+## Working philosophy — the rule that keeps this from becoming tool-chasing
 
-0. **Actually run the loop.** This is the real bottleneck, not code. The scanner
-   is live but **0 trades have been taken since go-live** — the build is ahead of
-   the usage. Before adding any surface area: take the next valid S1–S5 alert on
-   Kraken, let it auto-tag on sync, and start accumulating tagged live trades
-   toward the v4 re-mine (~3 months needed). No new features until the loop has
-   real reps.
-1. **Fix the leverage + balance pipeline** (the data layer is unreliable — found
-   2026-06-22). Two faces of one bug:
-   - `leverage` is *derived* (`notional / balance_before`), not read from the
-     fill → 454/470 closed trades show `1`, ~16 show garbage (97×–159×). Read it
-     straight from the Kraken fill/position payload instead.
-   - `balance_after` is NULL on 450/470 trades because `_build_eur_timeline`
-     only keeps `asset == 'eur'` ledger rows, but the flex account is
-     **USD-settled** → timeline is near-empty. Rebuild it off the real settle
-     currency so the equity curve / goal model / snapshots run on live data.
-   - Knock-ons: 1 closed trade with NULL pnl; Bybit clear-path wired but
-     untested (no live position).
-2. **Get the navbar in order.** 24 page routes exist but the two navs surface
-   only ~17. Orphans reachable by URL only: `analytics`, `calendar`, `edge`,
-   `glossary`, `journal`, `recap`, `style`, `health`. Decide: promote to nav,
-   or cut.
-3. **Over-engineering audit** — have we built too many pages / `.notes`? Hunt
-   for redundant or never-opened pages and collapse/delete. The bottleneck is
-   *running* the loop, not adding surface area; trim accordingly.
+**Every input becomes a commit or gets discarded — never an open tab.** The
+outside world (Twitter frameworks, open-source libs, other people's dashboards)
+is raw material; LENS is the filter and the filter is ruthless. Slice the one
+good idea *into* the system and throw the rest away. Example — the 2026-07-01
+session: a whole folder of quant-Twitter tools came in, and out came
+Sharpe/Sortino/Calmar + a native SL×TP robustness heatmap + a regime transition
+matrix; everything else (vectorbt, OpenBB, QF-Lib, the funnels) was rejected on
+evidence. That's abundance/anti-fragility, not FOMO. The bottleneck was never
+missing tools — it's **reps in the journal.** Consistency and commits compound;
+FOMO doesn't. This is a craft-persistence project, not a "keep adding surface
+area" project.
+
+## TODO — next session (updated 2026-07-02)
+
+0. **Actually run the loop.** Still the real bottleneck, not code. Signals
+   sitting at ~21, trades still not being taken through it — the build is way
+   ahead of the usage. Before ANY new surface area: take the next valid S1–S5
+   alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
+   the v4 re-mine (~3 months needed).
+1. **Decide the `/mvp` "Now" page.** The watch-only MODEL-B "Now" page (live
+   equity + unrealized + open positions — the interface meant for actually
+   trading off) is stranded on the unpushed `mvp-executor` branch, so `/mvp` is
+   **404 on master.** Merge it in or consciously drop it.
+2. **Leverage + historical-balance reconstruction** (data layer). `leverage` is
+   still *derived* not read from the fill; equity-curve / `balance_after`
+   reconstruction off the real USD settle currency is still partial. Fix so the
+   equity curve / goal model run on fully live data.
+3. **Navbar / over-engineering trim.** ~24 routes, ~17 surfaced; orphans
+   (`analytics`, `calendar`, `edge`, `style`, `health`) reachable by URL only —
+   promote or cut. Bottleneck is running the loop, not adding pages.
+
+Done 2026-07-02: branded 404 page (`shell()`-based handler in `main.py`;
+`/api/*` keeps the JSON contract).
 
 ## Status / honesty
 

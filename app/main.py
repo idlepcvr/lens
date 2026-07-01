@@ -70,6 +70,25 @@ def startup():
     init_db()
 
 
+@app.exception_handler(404)
+async def not_found(request, exc):
+    # API callers keep the JSON contract; browsers get a branded page.
+    if request.url.path.startswith("/api/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    from .theme import shell
+    body = (
+        '<div style="max-width:520px;margin:12vh auto 0;text-align:center">'
+        '<div style="font-family:var(--mono);font-size:64px;color:var(--faint)">404</div>'
+        '<p style="color:var(--dim);margin:14px 0 26px">'
+        "This route doesn't exist. The signal was a ghost.</p>"
+        '<a href="/" style="color:var(--accent);text-decoration:none;'
+        'font-family:var(--mono);font-size:12px;letter-spacing:.14em;'
+        'text-transform:uppercase">&larr; back to the desk</a></div>'
+    )
+    return HTMLResponse(shell(request.url.path, "404", body), status_code=404)
+
+
 # ─── Landing + health ─────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
