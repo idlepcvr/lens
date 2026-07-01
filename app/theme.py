@@ -49,6 +49,9 @@ NAV_HEDGE = [
 PROP_MAIN  = {"/overview", "/prop-desk", "/prop-ledger"}
 HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
 
+# Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
+NAV_NEUTRAL = [("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
 _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
@@ -387,6 +390,8 @@ def footer_html(current_path: str) -> str:
     main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
     out = ['<a href="%s" class="%s">%s</a>' % (href, "cur" if href == current_path else "", label)
            for href, label in items if href not in main]
+    out += ['<a href="%s" class="%s">%s</a>' % (href, "cur" if href == current_path else "", label)
+            for href, label in NAV_NEUTRAL]
     if not out:
         return ""
     return '<footer class="navftr"><span class="ftl">more</span>' + "".join(out) + "</footer>"

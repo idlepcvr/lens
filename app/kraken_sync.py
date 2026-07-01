@@ -153,51 +153,75 @@ def _build_transfers(raw_logs: list[dict]) -> list[dict]:
 
 # ─── EUR balance timeline ─────────────────────────────────────────────────────
 
-def _build_eur_timeline(user_client: User) -> tuple[list[tuple], list[dict]]:
+CASH_WALLETS = ("eur", "usd")   # cash margin wallets; position rows (pf_*) are not cash
+
+
+def _build_eur_timeline(user_client: User, eur_usd: float = 1.10) -> tuple[list[tuple], list[dict]]:
     """
     Return (timeline, raw_logs) where:
-    - timeline: list of (datetime, eur_balance) sorted oldest-first
+    - timeline: list of (datetime, total_balance_in_eur) sorted oldest-first
     - raw_logs: all raw account log entries (used for transfer extraction)
+
+    The flex account is multi-collateral: trades settle into the *usd* wallet
+    while cash may sit in *eur* (the old asset=='eur' filter saw an almost-empty
+    timeline once trading went USD-settled — 450/470 trades had NULL balances).
+    Fix: track a running balance per cash wallet and emit the summed total in
+    EUR at every change. USD→EUR uses the sync-time rate — the same
+    approximation pnl_eur already uses.
 
     Paginates get_account_log() using the `before` entry-ID cursor to fetch
     the complete account history (not just the most recent 2000 entries).
     """
-    timeline     = []
+    events       = []   # (datetime, asset, balance)
     all_raw_logs = []
     try:
+        # Paginate with `before` = ms timestamp of the oldest entry seen.
+        # (The old cursor passed an entry *id* here, but the API reads `before`
+        # as a timestamp — page 2 asked for "before 1970" and came back empty,
+        # silently capping history at the most recent 1000 entries.)
         before = None
-        while True:
+        seen: set = set()
+        for _ in range(100):                      # hard stop: 100k entries
             kwargs = {"count": 1000}
             if before is not None:
                 kwargs["before"] = before
 
             log      = _retry(lambda: user_client.get_account_log(**kwargs))
-            raw_logs = log.get("logs", [])
+            raw_logs = [e for e in log.get("logs", [])
+                        if e.get("booking_uid") not in seen]
             if not raw_logs:
                 break
-
+            seen.update(e.get("booking_uid") for e in raw_logs)
             all_raw_logs.extend(raw_logs)
 
             for entry in raw_logs:
-                if entry.get("asset") != "eur":
+                asset = str(entry.get("asset", "")).lower()
+                if asset not in CASH_WALLETS:
                     continue
                 bal = entry.get("new_balance")
                 if bal is None:
                     continue
                 try:
-                    timeline.append((_parse_ts(entry["date"]), float(bal)))
+                    events.append((_parse_ts(entry["date"]), asset, float(bal)))
                 except Exception:
                     continue
 
-            # Paginate: `before` = smallest entry id in this page
-            ids = [int(e["id"]) for e in raw_logs if e.get("id") is not None]
-            if not ids or len(raw_logs) < 1000:
-                break
-            before = min(ids)
+            oldest = min(_parse_ts(e["date"]) for e in raw_logs)
+            before = int(oldest.timestamp() * 1000)
 
     except Exception:
         pass
-    return sorted(timeline, key=lambda x: x[0]), all_raw_logs
+
+    # Replay oldest-first, keeping the last-known balance per wallet; each
+    # event emits one timeline point = sum of all known wallets, in EUR.
+    events.sort(key=lambda x: x[0])
+    last: dict = {}
+    timeline = []
+    for dt, asset, bal in events:
+        last[asset] = bal
+        total_eur = last.get("eur", 0.0) + last.get("usd", 0.0) / eur_usd
+        timeline.append((dt, total_eur))
+    return timeline, all_raw_logs
 
 
 # ─── Pull fills ───────────────────────────────────────────────────────────────
@@ -471,7 +495,7 @@ def sync_account(
         market_client = Market(key=api_key, secret=api_secret)
 
         eur_usd                  = _get_eur_usd(market_client)
-        eur_timeline, raw_logs   = _build_eur_timeline(user_client)
+        eur_timeline, raw_logs   = _build_eur_timeline(user_client, eur_usd)
         fills                    = _pull_fills(user_client, since_dt)
         trades                   = _build_trades(fills, eur_timeline, eur_usd)
         open_positions           = _retry(lambda: user_client.get_open_positions()).get("openPositions", [])
