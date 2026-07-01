@@ -50,7 +50,7 @@ PROP_MAIN  = {"/overview", "/prop-desk", "/prop-ledger"}
 HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
-NAV_NEUTRAL = [("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+NAV_NEUTRAL = [("/audit", "Audit"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}

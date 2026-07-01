@@ -917,6 +917,16 @@ def run_scan_cli():
     init_db()
     scan = scan_latest()                       # still drives /desk checklists + scoreboard
     emitted = emit_board_signals()             # board-driven emit (per-strategy geometry)
+    # Playbook alerts too: clean S1–S5 matches are alert-worthy even when the
+    # mechanical board doesn't rank them — the S-setups' edge is discretionary
+    # timing inside the context (audit 2026-07-02: S3 mechanically dead yet
+    # +€614 realized). Before this, /desk could say ENTER while the scanner
+    # stayed silent. Skip setups the board already emitted this run.
+    board_fired = {(s.get("trigger_type") or "").split(" ")[0] for s in emitted}
+    scan_playbook = dict(scan)
+    scan_playbook["matches"] = [m for m in scan["matches"]
+                                if m["clean"] and m["setup"] not in board_fired]
+    emitted += emit_signals(scan_playbook)
     for s in emitted:
         if s["status"] == "pending":
             title, body, tag = _alert_message(s)

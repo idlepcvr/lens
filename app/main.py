@@ -985,6 +985,83 @@ def glossary_page():
     return render()
 
 
+@app.get("/audit", response_class=HTMLResponse)
+def audit_page():
+    """Plain-English home for the 2026-07-02 strategy-audit recommendations,
+    compared LIVE against the current goal config. The 'where do I see this'
+    page — recommendations were previously only in code comments and git."""
+    from .setups import SL_PCT, TP_PCT
+    from .theme import shell
+    cfg = get_lens_config()
+    rr_live = round(TP_PCT / SL_PCT, 2)
+    rr_cfg = cfg.get("rr_ratio")
+    wr_cfg = cfg.get("win_rate")
+    rows = []
+
+    def row(ok, what, current, rec, why):
+        badge = ('<span style="color:var(--green)">✓</span>' if ok
+                 else '<span style="color:var(--red)">✗ fix</span>')
+        rows.append(f"<tr><td>{badge}</td><td>{what}</td><td class='m'>{current}</td>"
+                    f"<td class='m'>{rec}</td><td class='why'>{why}</td></tr>")
+
+    row(True, "Alert stop", f"{SL_PCT}%", "0.63%",
+        "From your own winners: 80–85% of winning playbook trades never went more "
+        "than ~0.55% against you. Keep it. (Not the daily-range metric — that one "
+        "belongs to the goal model's sizing floor.)")
+    row(abs(TP_PCT - 1.5) < 0.01, "Alert target", f"{TP_PCT}%", "1.5%",
+        "Half your playbook winners ran to +1.5%, a quarter past +2.0% — the old "
+        "0.95% sold half the move. After 0.3% round-trip fees the break-even win "
+        "rate falls from ~59% to ~44%; you actually win 46–58% in playbook contexts.")
+    row(rr_cfg is not None and abs(rr_cfg - rr_live) < 0.2,
+        "Goal-model R:R (Dashboard → Parameters)", f"{rr_cfg}", f"{rr_live}",
+        f"Your projections on /goal and /dashboard are computed with this payoff. "
+        f"The alerts actually deliver {rr_live}R gross (~1.3R net of fees) — set it "
+        f"to {rr_live} so the projections stop assuming a payoff you never take.")
+    row(wr_cfg is not None and 0.40 <= wr_cfg <= 0.50,
+        "Goal-model win rate", f"{wr_cfg}", "0.44–0.50",
+        "0.44 is exactly the new geometry's break-even — conservative and honest. "
+        "Realized playbook WR is 46–58%.")
+    row(True, "Leverage reality (10x all-in)", "—", "—",
+        "Each stop-out ≈ −9% of account (6.3% move + ~3% fees). Each 1.5% target "
+        "≈ +12% after fees. If −9% per loss feels heavy, lower leverage — not the stop.")
+    row(False, "Goal target €" + format(int(cfg.get("target_balance") or 0), ","),
+        "€52,950 by Oct", "keep as north star, don't trust the ETA",
+        "At honest numbers (44–50% WR, ~1.3R net, 2 trades/wk from your balance) the "
+        "math lands near €1,200–1,500 by October — the dashboard only connects to "
+        "€53k through the old 3R assumption. The goal is yours; the timeline isn't data.")
+
+    body = (
+        '<div class="card" style="background:var(--card);border:1px solid var(--line);'
+        'border-radius:10px;padding:16px 18px;margin:14px 0">'
+        "<b>What changed 2026-07-02:</b> every scanner alert now carries the validated "
+        "geometry below, and clean S1–S5 playbook matches alert again (previously only "
+        "the mechanical board top-3 could page you — a clean S3, your best realized "
+        "earner, could never send a notification. That was the desk-says-ENTER-but-"
+        "phone-stays-silent bug.)</div>"
+        "<table><tr><th></th><th>Setting</th><th>Current</th><th>Recommended</th>"
+        "<th>Why (plain English)</th></tr>" + "".join(rows) + "</table>"
+        '<p style="margin-top:18px"><a href="/audit-report" style="color:var(--accent)">'
+        "→ Full audit report (visual)</a> · "
+        '<a href="/strategy" style="color:var(--accent)">→ live strategy re-ranks (H12/H13 watch)</a></p>'
+    )
+    css = ("<style>table{border-collapse:collapse;width:100%;font-size:13.5px}"
+           "th{text-align:left;color:var(--faint);font-family:var(--mono);font-size:10.5px;"
+           "text-transform:uppercase;letter-spacing:.12em;padding:7px 9px;border-bottom:1px solid var(--line)}"
+           "td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top}"
+           "td.m{font-family:var(--mono);font-size:12.5px;white-space:nowrap}"
+           "td.why{color:var(--dim);font-size:12.5px;line-height:1.55}</style>")
+    return shell("/audit", "Audit", body, head_extra=css, meta="what to change and why")
+
+
+@app.get("/audit-report", response_class=HTMLResponse)
+def audit_report():
+    import os
+    from fastapi.responses import FileResponse
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                        "strategies", "_research", "STRATEGY_AUDIT_20260702.html")
+    return FileResponse(path, media_type="text/html")
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()
