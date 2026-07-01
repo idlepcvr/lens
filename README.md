@@ -18,7 +18,8 @@ thinking/measuring tool. You place the trades on Kraken yourself.
 | HEDGE track (S1–S5 edge, desk/signals/journal/position) | ✅ built |
 | Data layer (fills, balances, leverage, equity curve) | ✅ fixed 2026-07-02 — full account-log history, 0 NULL balances |
 | Design system (`theme.py`, one CSS, branded 404) | ✅ done |
-| Signals logged / **trades taken through the loop** | 21 / **0 ← the actual bottleneck** |
+| Signals / trades through the loop since go-live | 21 signals · **2 of 13 trades via the loop; 11 bypassed it (9 in VETO contexts) ← the actual bottleneck** |
+| Strategy audit (geometry + mining, full history) | ✅ 2026-07-02 — `strategies/_research/STRATEGY_AUDIT_20260702.md` |
 | v4 re-mine | ⏳ blocked on ~3 months of tagged live trades |
 
 Detailed build history: `LENS_PLAN.md` + `git log`.
@@ -446,11 +447,13 @@ area" project.
    ahead of the usage. Before ANY new surface area: take the next valid S1–S5
    alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
    the v4 re-mine (~3 months needed).
-1. **Strategy R&D session (dedicated).** Go through everything in `strategies/`
-   plus the full (now-repaired) trade history and either sharpen the existing
-   setups or mine new candidates — the early v4 pass, run on realized data
-   instead of waiting the full 3 months. The weekly `strategy_eval` cron
-   already re-ranks what exists; this is the human+Claude deep pass.
+1. ~~Strategy R&D session~~ ✅ **DONE 2026-07-02** — full audit at
+   `strategies/_research/STRATEGY_AUDIT_20260702.md`. Headlines: S1 is the
+   only mechanically-alive labeled setup; the 0.63% stop is right but the
+   0.95% target is too tight (real winners run to 1.5-2%); two mined
+   candidates (H12 quiet-uptrend grind, H13 weak-bounce fade) now tracked by
+   the Monday re-rank — promote to shadow signals only if they hold on fresh
+   data for ~a month.
 
 Done 2026-07-02 (see git log for detail):
 - Branded 404 page · `/mvp` **dropped** (covered by `/position` +
