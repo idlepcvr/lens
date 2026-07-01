@@ -34,9 +34,11 @@ OHLCV_SYMBOL = "binance:BTC/USDT"
 # also loaded by the systemd unit as EnvironmentFile, so env vars win at runtime.
 ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 
-# ⚠️ PLACEHOLDER exit geometry — NOT a validated edge. Pending decision on the
-# real stop/target source (ATR vs env-config vs per-setup). Do not cite as fact.
-SL_PCT, TP_PCT = 0.63, 0.95
+# Exit geometry — validated 2026-07-02 (strategies/_research/STRATEGY_AUDIT_20260702.md):
+# SL 0.63% = p80-85 of real playbook winners' MAE (keeps ~85% of winners).
+# TP 1.5%  = p50 of winners' MFE; breakeven WR drops 59%→44% after 0.3% RT fees
+# (the old 0.95% target needed 59% WR just to beat fees). 2.4R gross, ~1.3R net.
+SL_PCT, TP_PCT = 0.63, 1.5
 
 # ── alert ticket sizing (tunable in .env; falls back to these defaults) ──
 MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%
