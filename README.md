@@ -111,13 +111,17 @@ Start the server (below), then visit **http://localhost:8765**. The home page
 ("/") is a **two-door mode chooser** — the app is split into two systems that
 never share a nav (2026-06-17):
 
-- **PROP** — pass the Kraken Prop eval. Nav: **Goals · Live · Signals · Ledger ·
-  Income · Strategy · Risk · Survival · Rules · Equity · Regime · Backtest**.
+- **PROP** — pass the Kraken Prop eval. Nav: **Overview · Goals · Live ·
+  Signals · Ledger · Income · Strategy · Risk · Survival · Rules · Equity ·
+  Regime · Backtest**.
 - **HEDGE** — discretionary own-money trading (the S1–S5 edge). Nav:
-  **Dashboard · Desk · Signals · Review · Projection**.
+  **Overview · Dashboard · Goal · Position · Desk · Signals · Calendar ·
+  Analytics · Journal · Edge · Board · Learn**.
 
 A `◎ PROP | ▤ HEDGE | ⌂` switch sits above every nav; switching = jumping to
-that mode's home (stateless).
+that mode's home (stateless). Each mode shows a few **primary chips** in the
+top bar (`PROP_MAIN` / `HEDGE_MAIN` in `theme.py`); the rest drop to a "more"
+footer — every page stays reachable either way.
 
 ### Web UI / design system (2026-06)
 
@@ -147,12 +151,9 @@ source of truth for the whole app:
 - **`/style`** — **living style guide.** Renders every token + component straight
   from `lens.css`, so it's both the design docs and a visual regression check.
   See also **`BRAND.md`** (logo, voice, palette in one page).
-- **On `shell()`:** `/desk`, `/signals`, `/dashboard`, `/projection`, `/backtest`,
-  `/montecarlo`, `/prop` (+ `/prop-desk`, `/prop-ledger`, `/prop-income`), `/style`
-  — all share the bar/nav and carry a collapsible "❔ how to read this …" explainer.
-- **Recolor exception:** `/review` keeps its bespoke full-viewport 3-pane chart
-  workstation layout (doesn't fit the scrolling shell), but uses the shared
-  palette + fonts (sourced from `lens.css`, so it can't drift).
+- **On `shell()`:** every page — they all share the bar/nav and most carry a
+  collapsible "❔ how to read this …" explainer. Unknown routes get a branded
+  404 (same shell; `/api/*` keeps the JSON contract).
 
 **Mobile pass (2026-06-19):** real phone audit + fixes —
 - `/desk` migrated to a true `shell()` build (was hand-rolling its own head/nav).
@@ -192,18 +193,23 @@ discipline filters auto-reject or *you* decide) and documents every auto-skip
 filter (`filter:saturday`, `filter:bleed_hour_*`, `filter:bad_venue_*`,
 `filter:cooldown_*`) with the historical loss each is based on.
 
-### `/review` — replay real trades on an ICT-style chart
-Every closed fill with its entry context computed. Where v1→v3 came from.
+### `/journal` + `/position` — the live book
+The journal absorbed the old `/review` chart workstation (retired in
+`b8e6d10`): every closed fill with entry context + **auto-review**, fed by the
+`/api/review/*` endpoints. `/position` shows live open positions from the
+Kraken sync — the watch-only "what am I holding right now" view.
 
-### `/` Dashboard + `/projection` — the 4R planning track (legacy)
+### `/dashboard` + `/goal` — the 4R planning track (legacy)
 Goal-first ("what does each trade need to do?") and parameter-first ("where do
 locked params land?") calculators with percentile bands, fee-honest R, ruin %.
+`/projection` now redirects to `/goal`.
 
-### `/backtest` + `/montecarlo` — pressure-testing
+### `/backtest` — pressure-testing
 Backtest engine over cached OHLCV (includes `LIVE_SCALP_v1`, a baseline that
 reproduces the realized ~42% WR from pure SL/TP geometry — the bar any
-strategy must beat). Monte Carlo can seed its inputs from live trades or any
-backtest strategy.
+strategy must beat), plus Sharpe/Sortino/Calmar and the SL×TP robustness
+heatmap. The standalone `/montecarlo` page was deleted with the old review
+workstation; Monte Carlo lives on in `/equity` (prop eval sim).
 
 ### PROP mode — the eval cockpit, split into engines
 `/prop` is the **Goals hub**: a visual target corridor (floor ── start ──
@@ -389,25 +395,23 @@ pip install -r requirements.txt
 cp prism.env .env       # exchange keys etc.
 ```
 
-**Enable the loop (two one-time steps):**
+**The loop crons (all installed and live on the miniPC, 2026-07-02):**
 
 ```bash
-# 1. schedule the hourly scanner (minute 2, right after the 1H bar closes)
-(crontab -l 2>/dev/null; echo '2 * * * * cd /home/mini/lens && /home/mini/prism/.venv/bin/python3 -m app.setups >> setup_scan.log 2>&1') | crontab -
-
-# 2. phone alerts: install the ntfy app, subscribe to a topic you invent,
-#    then add it to prism.env:
-echo 'LENS_NTFY_TOPIC=your-secret-topic-name' >> prism.env
-
-# 3. (for the TAKE/SKIP buttons) tell the push where the LENS server lives,
-#    as seen FROM THE PHONE. LAN address for home wifi; a public tunnel URL
-#    if you want the buttons to work on mobile data.
-echo 'LENS_BASE_URL=http://192.168.1.47:8765' >> prism.env
-
-# 4. (optional, closes the loop) auto-pull Kraken fills every hour so trades
-#    self-tag without you opening the dashboard:
-(crontab -l 2>/dev/null; echo '5 * * * * curl -s -X POST http://localhost:8765/api/sync/kraken >/dev/null') | crontab -
+# hourly HEDGE scanner (minute 2, right after the 1H bar closes)
+2 * * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.setups >> setup_scan.log 2>&1
+# hourly Kraken fill sync (closes the loop — trades self-tag)
+5 * * * *  curl -s -X POST http://localhost:8765/api/sync/kraken >/dev/null
+# PROP scanner on every 4H close (script gates internally to the Asian 00/04 UTC windows)
+5 3,7,11,15,19,23 * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.prop_scan >> prop_scan.log 2>&1
+# weekly strategy R-sweep re-rank (Mon 04:17)
+17 4 * * 1  cd /home/mini/lens && .venv/bin/python3 -m app.strategy_eval >> strategy_eval.log 2>&1
 ```
+
+Phone alerts need two `prism.env` values: `LENS_NTFY_TOPIC` (ntfy topic you
+invented) and `LENS_BASE_URL` (the server address **as seen from the phone** —
+LAN address on home wifi, public tunnel for mobile data — this is what the
+TAKE/SKIP buttons POST to).
 
 Health check: `curl localhost:8765/health` · API docs: http://localhost:8765/docs
 
@@ -438,20 +442,23 @@ area" project.
    ahead of the usage. Before ANY new surface area: take the next valid S1–S5
    alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
    the v4 re-mine (~3 months needed).
-1. **Decide the `/mvp` "Now" page.** The watch-only MODEL-B "Now" page (live
-   equity + unrealized + open positions — the interface meant for actually
-   trading off) is stranded on the unpushed `mvp-executor` branch, so `/mvp` is
-   **404 on master.** Merge it in or consciously drop it.
-2. **Leverage + historical-balance reconstruction** (data layer). `leverage` is
+1. **Leverage + historical-balance reconstruction** (data layer). `leverage` is
    still *derived* not read from the fill; equity-curve / `balance_after`
    reconstruction off the real USD settle currency is still partial. Fix so the
    equity curve / goal model run on fully live data.
-3. **Navbar / over-engineering trim.** ~24 routes, ~17 surfaced; orphans
-   (`analytics`, `calendar`, `edge`, `style`, `health`) reachable by URL only —
-   promote or cut. Bottleneck is running the loop, not adding pages.
+2. **Orphan-page trim (small).** Only three pages sit outside both navs now:
+   `/style` (style guide — fine as a dev page), `/sitemap`, and the `/health`
+   JSON probe. Decide if `/sitemap` earns a footer link or gets cut.
 
-Done 2026-07-02: branded 404 page (`shell()`-based handler in `main.py`;
-`/api/*` keeps the JSON contract).
+Done 2026-07-02:
+- Branded 404 page (`shell()`-based handler in `main.py`; `/api/*` keeps JSON).
+- **`/mvp` "Now" page: DROPPED** (decided 2026-07-02). Its job — live equity +
+  open positions, watch-only — is already covered by `/position` +
+  `/overview-hedge` on master. The unpushed `mvp-executor` branch stays as a
+  local archive (nothing merged; delete it whenever).
+- README trued up against the app: navs, retired `/review` + `/montecarlo`
+  (absorbed into journal/auto-review + `/equity` in `b8e6d10`), `/projection`
+  → `/goal` redirect, real cron table (incl. weekly `strategy_eval`).
 
 ## Status / honesty
 
