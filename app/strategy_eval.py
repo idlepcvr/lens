@@ -32,7 +32,7 @@ CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)),
 
 # ── strategy registry ─────────────────────────────────────────────────────────
 
-def _registry(atr_hi):
+def _registry(atr_hi, atrpct_lo=None):
     """Every evaluatable strategy as a bar-context predicate. pred(ctx, atr)->bool.
     mode = prop | hedge; dir = long | short."""
     R = []
@@ -76,6 +76,16 @@ def _registry(atr_hi):
     add("H11 · high-vol RSI55-70", "hedge", "short",
         lambda c, a: a and a > atr_hi and c.rsi is not None and 55 < c.rsi < 70,
         "high-vol fade from momentum")
+    # ── mined 2026-07-02 (strategies/_research/STRATEGY_AUDIT_20260702.md) ──
+    # atr% (not absolute ATR) so the low-vol regime is honest across price eras.
+    add("H12 · quiet-uptrend grind", "hedge", "long",
+        lambda c, a: (atrpct_lo and a and c.close
+                      and (a / c.close * 100) < atrpct_lo
+                      and c.pd_zone == "eq" and c.slope == "up"),
+        "low-vol equilibrium + rising EMA21; mined +0.94%/tr @ 2/6")
+    add("H13 · weak-bounce fade", "hedge", "short",
+        lambda c, a: c.rsi is not None and c.rsi < 30 and c.pd_zone == "eq",
+        "RSI<30 in equilibrium, continuation short; mined +0.50%/tr @ 2/3")
 
     # PROP strategies are evaluated through their real 4H/1H backtest engine
     # (see PROP_BACKTEST / _eval_prop), not this 1h bar-context proxy.
@@ -215,6 +225,8 @@ def compute_all():
     eng = SetupEngine(c1h)
     atrs = [a for a in eng.atr14 if a]
     _, atr_hi = st.quantiles(atrs, n=3)
+    atr_pcts = [a / r[4] * 100 for a, r in zip(eng.atr14, c1h) if a and r[4]]
+    atrpct_lo, _ = st.quantiles(atr_pcts, n=3)
 
     ctxs = [None] * N
     for i in range(60, N):
@@ -223,7 +235,7 @@ def compute_all():
         except Exception:
             ctxs[i] = None
 
-    results = [_evaluate(c1h, N, ctxs, eng.atr14, s) for s in _registry(atr_hi)]
+    results = [_evaluate(c1h, N, ctxs, eng.atr14, s) for s in _registry(atr_hi, atrpct_lo)]
     results += [r for r in (_eval_prop(n) for n in PROP_BACKTEST) if r]
     results.sort(key=lambda x: -x["score"])
     for mode in ("hedge", "prop"):
@@ -285,7 +297,9 @@ def live_matches(eng, i, names):
     if not atrs:
         return []
     _, atr_hi = st.quantiles(atrs, n=3)
-    reg = {s["name"]: s for s in _registry(atr_hi)}
+    atr_pcts = [a / r[4] * 100 for a, r in zip(eng.atr14, eng.c1h) if a and r[4]]
+    atrpct_lo, _ = st.quantiles(atr_pcts, n=3)
+    reg = {s["name"]: s for s in _registry(atr_hi, atrpct_lo)}
     ctx = eng.context(i)
     a = eng.atr14[i]
     out = []
