@@ -41,3 +41,4 @@ strategy_scores.json
 
 # local DB backups
 lens.db.bak-*
+.playwright-cli/

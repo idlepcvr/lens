@@ -2,9 +2,26 @@
 
 **A personal cockpit for trading BTC perpetual futures with discipline.**
 
-LENS runs locally on a miniPC (FastAPI + SQLite, no cloud) and you open it in a
-browser. Nothing here trades for you — it's a thinking/measuring tool. You place
-the trades on Kraken yourself.
+LENS runs on the miniPC (FastAPI + SQLite, no cloud dependencies) — open
+**https://lens.restedpc.com** from anywhere on the tailnet, or
+http://localhost:8765 on the box itself. Nothing here trades for you — it's a
+thinking/measuring tool. You place the trades on Kraken yourself.
+
+![Home — pick a machine](docs/home.png)
+
+## At a glance (2026-07-02)
+
+| Piece | State |
+|---|---|
+| **The loop** (scan → alert → decide → trade → sync → tag) | ✅ live — 4 crons firing, phone buttons work |
+| PROP track (eval cockpit, 6 engine pages + live desk/signals/ledger) | ✅ built · eval **not yet bought** |
+| HEDGE track (S1–S5 edge, desk/signals/journal/position) | ✅ built |
+| Data layer (fills, balances, leverage, equity curve) | ✅ fixed 2026-07-02 — full account-log history, 0 NULL balances |
+| Design system (`theme.py`, one CSS, branded 404) | ✅ done |
+| Signals logged / **trades taken through the loop** | 21 / **0 ← the actual bottleneck** |
+| v4 re-mine | ⏳ blocked on ~3 months of tagged live trades |
+
+Detailed build history: `LENS_PLAN.md` + `git log`.
 
 It started as a "hold winners to 4R" discipline tool. Then we mined the actual
 trade history (464 closed Kraken trades) and the data said something different —
@@ -87,7 +104,7 @@ lean — setup + direction, the three levels (entry / TP / SL with the underlyin
 move), **win/lose balance**, notional, leverage and account risk — enough to
 decide and place the order. The deep breakdown (breakeven, liquidation, Kelly,
 geometric drift) lives on `/desk` and the review pages, not the lock screen.
-Sizing is tunable in `prism.env`: `LENS_ACCOUNT_USD`, `LENS_LEVERAGE`,
+Sizing is tunable in `.env`: `LENS_ACCOUNT_USD`, `LENS_LEVERAGE`,
 `LENS_FEE_RT_PCT`. **Both modes alert now:** HEDGE fires hourly (`app.setups`),
 PROP fires on Asian-session 4H closes (`app.prop_scan`, 00/04 UTC) — see the
 prop track below.
@@ -155,21 +172,11 @@ source of truth for the whole app:
   collapsible "❔ how to read this …" explainer. Unknown routes get a branded
   404 (same shell; `/api/*` keeps the JSON contract).
 
-**Mobile pass (2026-06-19):** real phone audit + fixes —
-- `/desk` migrated to a true `shell()` build (was hand-rolling its own head/nav).
-- `/review` got a **responsive stack** at ≤700px: the 3 panes restack vertically
-  (chart on top, then filters + trade list) and the detail panel becomes a
-  **slide-up sheet** on trade tap. Same JS/data, no second codebase.
-- `/dashboard` Parameters no longer pin on mobile; the panel + the results /
-  signals / API sections are all collapsible.
-- `/projection` every section is a consistent collapsible (incl. the hero cards
-  in a "key metrics" window); wide tables + the My-plans block scroll inside the
-  viewport instead of breaking width.
-- `/signals` "recent decisions" rows expand to the full plan as proposed
-  (entry/stop/target/R:R, strategy, proposed-vs-decided timing, conviction).
+Built phone-first (full mobile audit 2026-06-19) — open it on the iPhone
+(Safari → Add to Home Screen for a fullscreen app feel), it reflows for
+iPad / desktop.
 
-Built phone-first — open it on the iPhone (Safari → Add to Home Screen for a
-fullscreen app feel), it reflows for iPad / desktop.
+![Desk — can I enter right now?](docs/desk.png)
 
 ### `/desk` — **the live one. "Can I enter right now?"**
 Per-direction verdict (ENTER / BLOCKED / STAND DOWN) with the active vetoes
@@ -344,15 +351,6 @@ trades/mo. It takes **~6 losses in a row** to hit the floor (≈4% odds). The
 hero's edge is regime-dependent — **BULL ~50% WR vs BEAR ~25%** (see `/regime`),
 and with no time limit, waiting for a kinder regime is a free lever.
 
-### Steps taken (2026-06-17)
-1. **Verified live rules** at kraken.com/breakout — no time limit / consistency /
-   min-days; fees 0.04%/side (sim was modelling 0.15% → ~3.6pts pessimistic, fixed).
-2. **Pivoted to the €20 Advanced plan** (3% DD) and found **risk % is the whole
-   game** — 0.5% = ~89% single-shot, 2% = ~35%.
-3. **Split the app into PROP / HEDGE modes**; rebuilt `/prop` into a Goals hub +
-   engine pages (Strategy / Risk / Survival / Rules / Equity).
-4. **Ported the market-regime analytic** (`/regime`) and added hero WR-per-regime.
-
 ### Next (later)
 - [ ] **Forward-test** ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
 - [ ] Long game: lift WR via the **HEDGE** discretionary edge (real flush WR ~60%
@@ -368,7 +366,13 @@ proptradingvibes.com/blog/breakout-faq · **verify on the Breakout dashboard bef
 
 ## Strategies (the TradingView side)
 
-`strategies/` holds Pine Script. Load in TradingView → Pine Editor.
+`strategies/` holds Pine Script. Load in TradingView → Pine Editor. The
+"make it an indicator" plan **was built, not abandoned** — the deliberate
+choice was a HUD *indicator* rather than a Pine *strategy*, because the edge
+is discretionary selection inside contexts (a mechanical Pine strategy of the
+same setups is a coin flip — see the caveat above). The scanner cron is the
+server-side twin of the same logic, so the phone alerts work even with
+TradingView closed.
 
 - **`LENS_EDGE_v3_ICT/indicator.pine`** — **the current one.** Not a strategy:
   a HUD. S1–S5 markers, veto background shading, ghost-marks where a setup
@@ -392,7 +396,7 @@ First-time setup:
 
 ```bash
 pip install -r requirements.txt
-cp prism.env .env       # exchange keys etc.
+# create .env with exchange keys + LENS_* settings (see setups.py header)
 ```
 
 **The loop crons (all installed and live on the miniPC, 2026-07-02):**
@@ -408,7 +412,7 @@ cp prism.env .env       # exchange keys etc.
 17 4 * * 1  cd /home/mini/lens && .venv/bin/python3 -m app.strategy_eval >> strategy_eval.log 2>&1
 ```
 
-Phone alerts need two `prism.env` values: `LENS_NTFY_TOPIC` (ntfy topic you
+Phone alerts need two `.env` values: `LENS_NTFY_TOPIC` (ntfy topic you
 invented) and `LENS_BASE_URL` (the server address **as seen from the phone** —
 LAN address on home wifi, public tunnel for mobile data — this is what the
 TAKE/SKIP buttons POST to).
@@ -442,23 +446,22 @@ area" project.
    ahead of the usage. Before ANY new surface area: take the next valid S1–S5
    alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
    the v4 re-mine (~3 months needed).
-1. **Leverage + historical-balance reconstruction** (data layer). `leverage` is
-   still *derived* not read from the fill; equity-curve / `balance_after`
-   reconstruction off the real USD settle currency is still partial. Fix so the
-   equity curve / goal model run on fully live data.
-2. **Orphan-page trim (small).** Only three pages sit outside both navs now:
-   `/style` (style guide — fine as a dev page), `/sitemap`, and the `/health`
-   JSON probe. Decide if `/sitemap` earns a footer link or gets cut.
+1. **Strategy R&D session (dedicated).** Go through everything in `strategies/`
+   plus the full (now-repaired) trade history and either sharpen the existing
+   setups or mine new candidates — the early v4 pass, run on realized data
+   instead of waiting the full 3 months. The weekly `strategy_eval` cron
+   already re-ranks what exists; this is the human+Claude deep pass.
 
-Done 2026-07-02:
-- Branded 404 page (`shell()`-based handler in `main.py`; `/api/*` keeps JSON).
-- **`/mvp` "Now" page: DROPPED** (decided 2026-07-02). Its job — live equity +
-  open positions, watch-only — is already covered by `/position` +
-  `/overview-hedge` on master. The unpushed `mvp-executor` branch stays as a
-  local archive (nothing merged; delete it whenever).
-- README trued up against the app: navs, retired `/review` + `/montecarlo`
-  (absorbed into journal/auto-review + `/equity` in `b8e6d10`), `/projection`
-  → `/goal` redirect, real cron table (incl. weekly `strategy_eval`).
+Done 2026-07-02 (see git log for detail):
+- Branded 404 page · `/mvp` **dropped** (covered by `/position` +
+  `/overview-hedge`; `mvp-executor` branch kept as local archive).
+- **Data layer fixed**: balance timeline now reads both cash wallets (account
+  is USD-settled; old code filtered to EUR) *and* account-log pagination
+  actually works (old cursor bug capped history at 1000 entries). Backfill
+  endpoint repaired all 481 closed trades — 0 NULL balances, real leverage.
+- README trued up + restructured (at-a-glance table, screenshots, history
+  trimmed); `prism.env` retired (everything reads `.env`); orphan pages
+  (Style / Sitemap / Health) added to both mode footers.
 
 ## Status / honesty
 
@@ -467,8 +470,10 @@ Done 2026-07-02:
 - ✅ Exchange sync, signal ingestion, discipline filters, projection/goal math.
 - ✅ Loop is live: hourly scanner cron installed and firing (first real S1 short
   emitted + pushed 2026-06-16). Decisions post back from the phone buttons.
-- ⚠️ Kraken fill sync is **manual** (or the optional hourly sync cron above) —
-  the scanner cron does not pull fills itself.
+  Fill sync runs hourly by cron too (the scanner itself never pulls fills).
+- ✅ Data layer live (2026-07-02): balances + leverage reconstructed for all
+  481 closed trades from the full account log; equity curve / goal model run
+  on real data.
 - ⚠️ Phone buttons reach the server over LAN only unless `LENS_BASE_URL` points
   at a public tunnel.
 - ⏳ v4 needs ~3 months of tagged trades; candidate new features: order-flow

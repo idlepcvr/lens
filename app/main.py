@@ -132,7 +132,7 @@ def home():
     <div class="sub">Trade your edge</div>
     <h2>HEDGE</h2>
     <p>Your own Kraken money. Mined setups S1–S5, the 7 vetoes that kill the
-       bleed, sizing & journal. Dashboard · Desk · Signals · Review · Projection.</p>
+       bleed, sizing & journal. Dashboard · Position · Desk · Signals · Journal.</p>
     <div class="go">ENTER →</div>
   </a>
 </div>"""
