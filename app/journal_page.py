@@ -46,6 +46,18 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 .jr .flag.auto.gA,.jr .flag.auto.gB{border-color:var(--long);color:var(--long)}
 .jr .flag.auto.gC{border-color:var(--amber);color:var(--amber)}
 .jr .flag.auto.gD,.jr .flag.auto.gF{border-color:var(--short);color:var(--short)}
+.jr .wl{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;letter-spacing:.03em}
+.jr .wl.w{color:var(--long);border:1px solid var(--long)}
+.jr .wl.l{color:var(--short);border:1px solid var(--short)}
+.jr .planlvl{color:var(--faint);font-style:italic}
+.colpick{position:relative}
+.colmenu{display:none;position:absolute;right:0;top:28px;z-index:50;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;box-shadow:0 12px 32px rgba(0,0,0,.5);
+  columns:2;column-gap:16px;width:270px}
+.colmenu.open{display:block}
+.colmenu label{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--ink);font-family:var(--mono);padding:2.5px 0;cursor:pointer;break-inside:avoid;white-space:nowrap}
+.colmenu label input{accent-color:var(--accent)}
+.colmenu .cm-actions{column-span:all;border-top:1px solid var(--line);margin-top:7px;padding-top:7px;display:flex;gap:8px}
+.colmenu .cm-actions button{flex:1;padding:3px 0;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:10px;border-radius:5px;cursor:pointer;font-family:var(--mono)}
 .rv-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px;letter-spacing:.03em}
 .rv-badge.man{color:var(--long);border:1px solid var(--long)}
 .rv-badge.auto{color:var(--amber);border:1px solid var(--amber)}
@@ -99,6 +111,10 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 .oprow .v small{color:var(--dim);font-size:10px}
 .opsec{font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:9px 0 3px;border-top:1px solid var(--line);padding-top:8px}
 .opcard .g{color:var(--long)}.opcard .r{color:var(--short)}.opcard .dim{color:var(--dim)}
+.ophero{padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.ophero .bigpnl{font-size:24px;font-weight:800;font-family:var(--mono);letter-spacing:-.02em}
+.ophero.g .bigpnl{color:var(--long)}.ophero.r .bigpnl{color:var(--short)}
+.ophero .subpnl{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:2px}
 </style>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 """
@@ -113,16 +129,18 @@ BODY = """
   <div class="jseg" data-k="match"><b>Match</b><button data-v="" class="on">All</button><button data-v="1">⇄ Merged</button></div>
   <div class="jseg" data-k="rev"><b>Review</b><button data-v="" class="on">All</button><button data-v="manual">✍️ Mine</button><button data-v="auto">🤖 Auto</button></div>
   <div class="jr-spacer"></div>
+  <div class="colpick" id="colpick">
+    <button id="jr-cols" onclick="toggleCols(event)" style="padding:4px 11px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⚙ Columns</button>
+    <div class="colmenu" id="colmenu"></div>
+  </div>
   <button id="jr-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
   <div class="jr-stat" id="jr-stat">—</div>
 </div>
 <div id="open-pos"></div>
 <div class="jr-wrap">
   <table class="jr">
-    <thead><tr>
-      <th data-k="opened_at">Date</th><th data-k="direction">Dir</th><th data-k="book">Book</th><th data-k="symbol">Sym</th><th data-k="entry">Entry</th><th data-k="exit">Exit</th><th data-k="pnl">P&L</th><th data-k="fees">Fees</th><th data-k="leverage">Lev</th><th data-k="R">R</th><th data-k="dur">Dur</th><th>Setup</th><th>Review</th>
-    </tr></thead>
-    <tbody id="jr-body"><tr><td colspan="13" class="dim l" style="padding:20px">Loading…</td></tr></tbody>
+    <thead id="jr-head"></thead>
+    <tbody id="jr-body"><tr><td class="dim l" style="padding:20px">Loading…</td></tr></tbody>
   </table>
 </div>
 <div id="modal"></div>
@@ -174,18 +192,18 @@ async function loadOpenPositions(){
           +row('Expected loss',`${sUsd(-loss)} <small>${pc(-lvl.sl*100)}</small>`,'r')
           +row('R:R',lvl.rr!=null?lvl.rr.toFixed(2):(lvl.tp/lvl.sl).toFixed(2),'dim');
       } else { plan=`<div class="opsec">Plan</div>`+row('levels','set Goal config to see plan','dim'); }
+      const upe=p.upnl_eur||0;
       return `<div class="opcard ${isL?'long':'short'}">
         <div class="top"><div><div class="ven">${p.venue}</div><div class="mkt">${p.symbol}</div></div>
           <div class="sd ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} · ${p.leverage}×</div></div>
+        <div class="ophero ${up>=0?'g':'r'}">
+          <div class="bigpnl">${(upe>=0?'+':'-')+'€'+Math.abs(upe).toLocaleString('en',{maximumFractionDigits:2})}</div>
+          <div class="subpnl">${sUsd(up)} · ${pc(p.upnl_pct)} · RoE ${pc(p.roe_pct)}</div>
+        </div>
         <div class="body">
-          ${row('Opening price',usd(p.entry))}
-          ${row('Last price',`${usd(p.mark)} <small>move ${pc(p.move_pct)}</small>`,(p.move_pct||0)>=0?'g':'r')}
-          ${row('Base qty',p.size+' ₿')}
-          ${row('Quote qty',usd(p.quote_qty))}
-          ${row('Value',`${eu(p.value_eur)} <small>${usd(p.quote_qty)}</small>`)}
-          ${row('Initial margin',`${usd(p.margin_usd)} <small>${eu(p.margin_eur)}</small>`)}
-          ${row('Unrealised P&L',`${sUsd(up)} <small>${eu(p.upnl_eur)} · ${pc(p.upnl_pct)}</small>`,up>=0?'g':'r')}
-          ${row('RoE',pc(p.roe_pct),(p.roe_pct||0)>=0?'g':'r')}
+          ${row('Entry → last',`${usd(p.entry,1)} → ${usd(p.mark,1)} <small>${pc(p.move_pct)}</small>`,(p.move_pct||0)>=0?'g':'r')}
+          ${row('Size',`${p.size} ₿ <small>${usd(p.quote_qty)} · ${eu(p.value_eur)}</small>`)}
+          ${row('Margin',`${usd(p.margin_usd)} <small>${eu(p.margin_eur)}</small>`)}
           ${row('Est. liquidation',usd(p.liquidation),'r')}
           ${row('Funding',p.funding!=null?p.funding.toFixed(4):'—','dim')}
           ${plan}
@@ -205,10 +223,7 @@ async function load(){
     const o=document.createElement('option'); o.value=o.textContent=tg; tagsel.appendChild(o);});
   document.querySelectorAll('.jseg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     F[seg.dataset.k]=b.dataset.v; seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); applyF();}));
-  document.querySelectorAll('table.jr thead th[data-k]').forEach(th=>th.onclick=()=>{
-    const k=th.dataset.k; SORT.dir=(SORT.k===k)?-SORT.dir:(['opened_at','pnl','R'].includes(k)?-1:1); SORT.k=k;
-    document.querySelectorAll('table.jr thead th').forEach(x=>x.classList.remove('sa','sd'));
-    th.classList.add(SORT.dir>0?'sa':'sd'); renderTable();});
+  renderColMenu();
   applyF();
   const q=new URLSearchParams(location.search).get('trade');
   if(q && TRADES.some(t=>String(t.id)===String(q))) openTrade(parseInt(q));
@@ -232,13 +247,22 @@ function applyF(){
   renderTable();
 }
 function sortVal(t,k){
-  if(k==='opened_at') return t.opened_at||'';
+  if(k==='opened_at'||k==='time') return t.opened_at||'';
   if(k==='direction') return t.direction||'';
   if(k==='book') return t.book||'hedge';
   if(k==='symbol') return t.symbol||'';
+  if(k==='venue') return t.venue||'';
+  if(k==='wl') return t.pnl||0;
   if(k==='R'){ const r=rOf(t); return r==null?-1e9:r; }
   if(k==='dur') return (t.ts_entry&&t.ts_exit)?(t.ts_exit-t.ts_entry):-1;
+  if(k==='tp'||k==='sl'){ const v=t[k]!=null?t[k]:planLvl(t)[k]; return v==null?-1e9:v; }
   const v=t[k]; return v==null?-1e9:v;
+}
+// expected TP/SL from the Goal plan when the trade has none stored
+function planLvl(t){
+  if(!GOALLVL||!t.entry) return {tp:null,sl:null};
+  const L=t.direction==='long';
+  return {tp:t.entry*(1+(L?1:-1)*GOALLVL.tp), sl:t.entry*(1-(L?1:-1)*GOALLVL.sl)};
 }
 function applySort(){ VISIBLE.sort((a,b)=>{ const x=sortVal(a,SORT.k),y=sortVal(b,SORT.k); return (x>y?1:x<y?-1:0)*SORT.dir; }); }
 function rOf(t){ if(t.entry&&t.sl&&t.exit){const rp=Math.abs(t.entry-t.sl),mp=(t.exit-t.entry)*(t.direction==='long'?1:-1); if(rp>0)return mp/rp;} return null; }
@@ -274,30 +298,75 @@ function autoReview(t){
   const emoji={A:'🟢',B:'🟩',C:'🟡',D:'🟠',F:'🔴'}[grade]||'⚪';
   return {grade,emoji,take:bits.join(' · ')};
 }
+// ── columns ─────────────────────────────────────────────────────────────────
+const usd1=v=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:1,minimumFractionDigits:0});
+const eu2=v=>v==null?'—':'€'+Number(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+const tri=v=>v===true?'<span class="g">✓</span>':v===false?'<span class="r">✗</span>':'<span class="dim">—</span>';
+const tpsl=(t,k)=>{ if(t[k]!=null) return usd1(t[k]);
+  const p=planLvl(t)[k]; return p!=null?`<span class="planlvl" title="not set on trade — expected from Goal plan">${usd1(p)}</span>`:'—'; };
+const COLS=[
+  {k:'date',    h:'Date',    sort:'opened_at', cls:'l dim', r:t=>(t.opened_at||'').slice(0,10)},
+  {k:'time',    h:'Time',    sort:'time',      cls:'l dim', r:t=>(t.opened_at||'').slice(11,16)},
+  {k:'dur',     h:'Dur',     sort:'dur',       cls:'dim',   r:t=>durOf(t)},
+  {k:'venue',   h:'Venue',   sort:'venue',     cls:'l dim', r:t=>({kraken_futures:'Kraken',bybit:'Bybit',manual:'Manual'})[t.venue]||t.venue||'—'},
+  {k:'symbol',  h:'Symbol',  sort:'symbol',    cls:'l dim', r:t=>(t.symbol||'BTC').replace('/USD','')},
+  {k:'side',    h:'Side',    sort:'direction', cls:'l',     r:t=>`<span class="${t.direction==='long'?'dir-l':'dir-s'}">${t.direction==='long'?'▲ L':'▼ S'}</span>`},
+  {k:'wl',      h:'W/L',     sort:'wl',        cls:'l',     r:t=>t.pnl>0?'<span class="wl w">W</span>':t.pnl<0?'<span class="wl l">L</span>':'<span class="dim">—</span>'},
+  {k:'lev',     h:'Lev',     sort:'leverage',  cls:'dim',   r:t=>t.leverage!=null?(+t.leverage).toFixed(0)+'×':'—'},
+  {k:'size',    h:'Size',    sort:'size',      cls:'dim',   r:t=>t.size!=null?(+t.size).toFixed(4):'—'},
+  {k:'entry',   h:'Entry $', sort:'entry',     cls:'',      r:t=>usd1(t.entry)},
+  {k:'exit',    h:'Exit $',  sort:'exit',      cls:'',      r:t=>usd1(t.exit)},
+  {k:'tp',      h:'TP $',    sort:'tp',        cls:'',      r:t=>tpsl(t,'tp')},
+  {k:'sl',      h:'SL $',    sort:'sl',        cls:'',      r:t=>tpsl(t,'sl')},
+  {k:'pnl',     h:'P&L €',   sort:'pnl',       cls:'',      r:t=>`<span class="${t.pnl>=0?'g':'r'}">${eur(t.pnl)}</span>`},
+  {k:'bal',     h:'Bal €',   sort:'balance_after', cls:'dim', r:t=>t.balance_after!=null?`<span title="${t.balance_before!=null?eu2(t.balance_before)+' → ':''}${eu2(t.balance_after)}">${eu2(t.balance_after)}</span>`:'—'},
+  {k:'fees',    h:'Fees €',  sort:'fees',      cls:'dim',   r:t=>t.fees!=null?eur(-Math.abs(t.fees)):'—'},
+  {k:'funding', h:'Funding', sort:'funding_cost', cls:'dim', r:t=>t.funding_cost!=null?eur(-t.funding_cost):'—'},
+  {k:'market',  h:'Market',  sort:'market_type', cls:'l dim', r:t=>t.market_type||'—'},
+  {k:'order',   h:'Order',   sort:'order_type',  cls:'l dim', r:t=>t.order_type||'—'},
+  {k:'fills',   h:'Fills',   sort:'fill_count',  cls:'dim',   r:t=>t.fill_count!=null?t.fill_count:'—'},
+  {k:'plan',    h:'Plan',    sort:'followed_plan',     cls:'l', r:t=>tri(t.followed_plan)},
+  {k:'strat',   h:'Strat',   sort:'followed_strategy', cls:'l', r:t=>tri(t.followed_strategy)},
+  {k:'lock',    h:'🔒',      sort:'manually_edited',   cls:'l', r:t=>t.manually_edited?'<span title="hand-edited — sync will not overwrite">🔒</span>':'<span class="dim">—</span>'},
+  {k:'notes',   h:'Notes',   sort:null,          cls:'l',     r:t=>(t.notes||t.lesson)?`<span class="flag" title="${((t.notes||'')+' '+(t.lesson||'')).trim().replace(/"/g,'&quot;')}">📝</span>`:'<span class="dim">—</span>'},
+  {k:'book',    h:'Book',    sort:'book',        cls:'l',     r:t=>{const bk=t.book||'hedge';return `<span class="bk ${bk}">${bk==='prop'?'PROP':'HEDGE'}</span>`;}, off:true},
+  {k:'R',       h:'R',       sort:'R',           cls:'',      r:t=>{const r=rOf(t);return r==null?'<span class="dim">—</span>':`<span class="${r>=0?'g':'r'}">${(r>=0?'+':'')+r.toFixed(1)}R</span>`;}, off:true},
+  {k:'setup',   h:'Setup',   sort:'setup_tag',   cls:'',      r:t=>`<select class="tagsel" onclick="event.stopPropagation()" onchange="saveTag(${t.id},this.value)">${['',...SETUPS].map(s=>`<option value="${s}" ${(t.setup_tag||'')===s?'selected':''}>${s||'—'}</option>`).join('')}</select>`},
+  {k:'review',  h:'Review',  sort:null,          cls:'l',     r:t=>{
+      const ar=autoReview(t);
+      const g=t.grade?`<span class="flag gr" title="your grade">${t.grade}</span>`:`<span class="flag auto g${ar.grade}" title="LENS auto-review: ${ar.take}">${ar.emoji}${ar.grade}</span>`;
+      return g+(t.mistakes?`<span class="flag ms">⚠${t.mistakes.split(',').length}</span>`:'')
+        +(t.followed_plan===false?'<span class="flag ms" title="did not follow plan">✗plan</span>':'')
+        +(t.merged_manual?'<span class="flag" title="manual entry reconciled with exchange fill">⇄</span>':'');}},
+];
+const COL_LS='lens_jr_cols_v1';
+let VIS_COLS=(()=>{ try{const s=JSON.parse(localStorage.getItem(COL_LS)); if(Array.isArray(s)&&s.length)return s;}catch(e){}
+  return COLS.filter(c=>!c.off).map(c=>c.k); })();
+function saveCols(){ localStorage.setItem(COL_LS, JSON.stringify(VIS_COLS)); }
+function toggleCols(e){ e.stopPropagation(); $('colmenu').classList.toggle('open'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.colpick')) $('colmenu').classList.remove('open'); });
+function renderColMenu(){
+  $('colmenu').innerHTML=COLS.map(c=>`<label><input type="checkbox" data-k="${c.k}" ${VIS_COLS.includes(c.k)?'checked':''}>${c.h==='🔒'?'🔒 Lock':c.h}</label>`).join('')
+    +'<div class="cm-actions"><button data-act="all">All</button><button data-act="def">Default</button></div>';
+  $('colmenu').querySelectorAll('input').forEach(i=>i.onchange=()=>{
+    const k=i.dataset.k;
+    VIS_COLS=i.checked?COLS.filter(c=>VIS_COLS.includes(c.k)||c.k===k).map(c=>c.k):VIS_COLS.filter(x=>x!==k);
+    saveCols(); renderTable();});
+  $('colmenu').querySelectorAll('.cm-actions button').forEach(b=>b.onclick=()=>{
+    VIS_COLS=(b.dataset.act==='all'?COLS:COLS.filter(c=>!c.off)).map(c=>c.k);
+    saveCols(); renderColMenu(); renderTable();});
+}
 function renderTable(){
   const n=VISIBLE.length, w=VISIBLE.filter(t=>t.pnl>0).length, tot=VISIBLE.reduce((s,t)=>s+t.pnl,0);
   $('jr-stat').innerHTML=`<b>${n}</b> trades · WR <b>${n?(w/n*100).toFixed(0):0}%</b> · net <b style="color:${tot>=0?'var(--long)':'var(--short)'}">${eur(tot)}</b>`;
-  const opts=tg=>['',...SETUPS].map(s=>`<option value="${s}" ${(tg||'')===s?'selected':''}>${s||'—'}</option>`).join('');
   applySort();
-  $('jr-body').innerHTML=VISIBLE.map(t=>{
-    const r=rOf(t), R=r==null?'—':(r>=0?'+':'')+r.toFixed(1)+'R';
-    const bk=(t.book||'hedge'), ar=autoReview(t), man=isManual(t);
-    const gradeBadge=t.grade?`<span class="flag gr" title="your grade">${t.grade}</span>`:`<span class="flag auto g${ar.grade}" title="LENS auto-review: ${ar.take}">${ar.emoji}${ar.grade}</span>`;
-    const flags=gradeBadge+(t.mistakes?`<span class="flag ms">⚠${t.mistakes.split(',').length}</span>`:'')+(t.notes||t.lesson?'<span class="flag">📝</span>':'')+(t.followed_plan===false?'<span class="flag ms" title="did not follow plan">✗plan</span>':'')+(t.merged_manual?'<span class="flag" title="manual entry reconciled with exchange fill">⇄</span>':'');
-    return `<tr data-id="${t.id}">
-      <td class="l dim">${(t.opened_at||'').slice(0,16).replace('T',' ')}</td>
-      <td class="l ${t.direction==='long'?'dir-l':'dir-s'}">${t.direction==='long'?'▲ L':'▼ S'}</td>
-      <td class="l"><span class="bk ${bk}">${bk==='prop'?'PROP':'HEDGE'}</span></td>
-      <td class="l dim">${(t.symbol||'BTC').replace('/USD','')}</td>
-      <td>${usd(t.entry)}</td><td>${usd(t.exit)}</td>
-      <td class="${t.pnl>=0?'g':'r'}">${eur(t.pnl)}</td>
-      <td class="dim">${t.fees!=null?eur(-Math.abs(t.fees)):'—'}</td>
-      <td class="dim">${t.leverage!=null?(+t.leverage).toFixed(0)+'×':'—'}</td>
-      <td class="${r==null?'dim':r>=0?'g':'r'}">${R}</td>
-      <td class="dim">${durOf(t)}</td>
-      <td><select class="tagsel" data-id="${t.id}" onclick="event.stopPropagation()" onchange="saveTag(${t.id},this.value)">${opts(t.setup_tag)}</select></td>
-      <td class="l">${flags||'<span class="dim">—</span>'}</td>
-    </tr>`;}).join('') || '<tr><td colspan="13" class="dim l" style="padding:20px">No trades match</td></tr>';
+  const cols=COLS.filter(c=>VIS_COLS.includes(c.k));
+  $('jr-head').innerHTML='<tr>'+cols.map(c=>`<th ${c.sort?`data-k="${c.sort}"`:''} class="${SORT.k===c.sort?(SORT.dir>0?'sa':'sd'):''}">${c.h}</th>`).join('')+'</tr>';
+  $('jr-head').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; SORT.dir=(SORT.k===k)?-SORT.dir:(['opened_at','pnl','R'].includes(k)?-1:1); SORT.k=k; renderTable();});
+  $('jr-body').innerHTML=VISIBLE.map(t=>
+    `<tr data-id="${t.id}">`+cols.map(c=>`<td class="${c.cls}">${c.r(t)}</td>`).join('')+'</tr>'
+  ).join('') || `<tr><td colspan="${cols.length}" class="dim l" style="padding:20px">No trades match</td></tr>`;
   $('jr-body').querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>openTrade(+tr.dataset.id));
 }
 async function saveTag(id,val){
@@ -314,7 +383,8 @@ function openTrade(id){
   let st={grade:t.grade||null,conviction:t.conviction||null,emotion:t.emotion||null,
           mistakes:new Set((t.mistakes||'').split(',').map(s=>s.trim()).filter(Boolean)),
           fp:t.followed_plan??null,fs:t.followed_strategy??null};
-  const inp=(id,v)=>`<input id="${id}" type="number" step="any" value="${v??''}">`;
+  const inp=(id,v,ph)=>`<input id="${id}" type="number" step="any" value="${v??''}" ${ph!=null?`placeholder="${ph}" title="expected from Goal plan — type to store on the trade"`:''}>`;
+  const plan=planLvl(t);
   const fld=(k,inner)=>`<div class="bm-fld"><div class="k">${k}</div>${inner}</div>`;
   const fv=(k,v,c)=>`<div class="bm-fld"><div class="k">${k}</div><div class="v ${c||''}">${v}</div></div>`;
   const optrow=(lbl,key,opts,cur,cls='')=>`<div class="pickrow" data-key="${key}"><span class="pl">${lbl}</span>`+
@@ -328,13 +398,15 @@ function openTrade(id){
   const r=rOf(t), R=r==null?'—':(r>=0?'+':'')+r.toFixed(2)+'R';
   $('modal').innerHTML=`<div class="bm-bg open" id="mbg"><div class="bm ${isL?'long':'short'}">
     <div class="bm-h"><div class="bm-t"><span class="${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'}</span> ${t.symbol||'BTC/USD'} · #${t.id}
-      · <span class="${win?'g':'r'}">${eur(t.pnl)}</span>${t.setup_tag?` · <span class="amb">${t.setup_tag}</span>`:''}</div>
+      · <span class="wl ${win?'w':'l'}" style="font-size:11px;font-weight:800;padding:1px 7px;border-radius:4px;border:1px solid ${win?'var(--long)':'var(--short)'};color:${win?'var(--long)':'var(--short)'}">${win?'WIN':'LOSS'}</span>
+      · <span class="${win?'g':'r'}">${eur(t.pnl)}</span>${t.setup_tag?` · <span class="amb">${t.setup_tag}</span>`:''}
+      <span class="dim" style="font-size:11px;font-weight:400"> · ${(t.opened_at||'').slice(0,16).replace('T',' ')}${t.closed_at?' → '+(t.closed_at||'').slice(11,16):''}</span></div>
       <button class="bm-x" id="mx">✕</button></div>
     <div id="bm-chart"></div>
     <div class="bm-cols">
       <div class="bm-grid">
         ${fld('Entry $',inp('f-entry',t.entry))}${fld('Exit $',inp('f-exit',t.exit))}
-        ${fld('TP $',inp('f-tp',t.tp))}${fld('SL $',inp('f-sl',t.sl))}
+        ${fld('TP $',inp('f-tp',t.tp,plan.tp!=null?plan.tp.toFixed(0):null))}${fld('SL $',inp('f-sl',t.sl,plan.sl!=null?plan.sl.toFixed(0):null))}
         ${fld('Size',inp('f-size',t.size))}${fld('Lev ×',inp('f-lev',t.leverage))}
         ${fld('P&L €',inp('f-pnl',t.pnl))}${fld('Fees €',inp('f-fees',t.fees))}
         ${fv('R multiple',R,r==null?'dim':r>=0?'g':'r')}${fv('Duration',durOf(t))}
@@ -346,6 +418,8 @@ function openTrade(id){
         ${fv('4H trend',t.trend_4h?t.trend_4h.toUpperCase()+(t.trend_aligned?' ✓':' ✗'):'—',t.trend_4h?(t.trend_aligned?'g':'r'):'')}
         ${fv('RSI @ entry',t.rsi!=null?t.rsi+' '+(t.rsi_zone||''):'—')}
         ${fv('Move %',t.move_pct!=null?t.move_pct+'%':'—',(t.move_pct||0)>=0?'g':'r')}
+        ${fv('Funding €',t.funding_cost!=null?eur(-t.funding_cost):'—','dim')}
+        ${fv('Venue',({kraken_futures:'Kraken',bybit:'Bybit',manual:'Manual'})[t.venue]||t.venue||'—','dim')}
       </div>
     </div>
     <div class="bm-sec">Assessment ${isManual(t)?'<span class="rv-badge man">✍️ reviewed by you</span>':'<span class="rv-badge auto">🤖 auto</span>'}</div>

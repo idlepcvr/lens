@@ -202,7 +202,7 @@ def _build_eur_timeline(user_client: User, eur_usd: float = 1.10) -> tuple[list[
                 if bal is None:
                     continue
                 try:
-                    events.append((_parse_ts(entry["date"]), asset, float(bal)))
+                    events.append((_parse_ts(entry["date"]), len(events), asset, float(bal)))
                 except Exception:
                     continue
 
@@ -214,14 +214,36 @@ def _build_eur_timeline(user_client: User, eur_usd: float = 1.10) -> tuple[list[
 
     # Replay oldest-first, keeping the last-known balance per wallet; each
     # event emits one timeline point = sum of all known wallets, in EUR.
-    events.sort(key=lambda x: x[0])
+    # One trade settles as a same-second BURST of entries whose log timestamps
+    # are identical — the API returns newest-first, so within a burst the raw
+    # order is reverse-chronological. Sort by (ts, -raw_index) so a burst's
+    # LAST timeline point is its true settled balance, not its opening value.
+    events.sort(key=lambda x: (x[0], -x[1]))
     last: dict = {}
     timeline = []
-    for dt, asset, bal in events:
+    for dt, _, asset, bal in events:
         last[asset] = bal
         total_eur = last.get("eur", 0.0) + last.get("usd", 0.0) / eur_usd
         timeline.append((dt, total_eur))
     return timeline, all_raw_logs
+
+
+def _build_funding_events(raw_logs: list[dict]) -> list[tuple]:
+    """(datetime, realized_funding_usd) from 'funding rate change' account-log
+    entries — funding settles hourly into the wallet, never through fills
+    (every fill's unrealizedFunding is 0). Negative = you paid."""
+    out = []
+    for e in raw_logs:
+        if str(e.get("info", "")).lower() != "funding rate change":
+            continue
+        amt = e.get("realized_funding")
+        if amt is None:
+            continue
+        try:
+            out.append((_parse_ts(e["date"]), float(amt)))
+        except Exception:
+            continue
+    return out
 
 
 # ─── Pull fills ───────────────────────────────────────────────────────────────
@@ -301,54 +323,73 @@ def _build_trades(
     fills:        list[dict],
     eur_timeline: list[tuple],
     eur_usd:      float,
+    funding_events: Optional[list[tuple]] = None,   # (datetime, realized_funding_usd)
 ) -> list[dict]:
     """
     Convert raw fills into completed trade records using position tracking.
     When running position returns to ~0 a round-trip trade is emitted.
+
+    A round trip is ALL its fills: positions closed across several partial
+    fills used to record only the final closing fill (trade 574 logged size
+    0.0004 / −€0.14 for a 0.164 / −€77 trade — every partial close's P&L was
+    silently dropped). Closing fills now accumulate and the trade is emitted
+    over the full size with weighted-average entry/exit.
     """
     if not fills:
         return []
 
-    position   = 0.0
-    open_fills = []   # fills that make up the current open leg
-    trades_out = []
+    position    = 0.0
+    open_fills  = []   # fills that opened the current leg
+    close_fills = []   # fills that (partially) closed it
+    trades_out  = []
 
-    def _record(opening_fills, close_fill, close_size, trade_side):
-        entry_avg  = _wavg(opening_fills)
-        exit_price = close_fill["price"]
+    def _record(trade_side):
+        entry_avg  = _wavg(open_fills)
+        exit_avg   = _wavg(close_fills)
+        close_size = sum(f["_qty"] for f in close_fills)
 
         if trade_side == "LONG":
-            pnl_usd = (exit_price - entry_avg) * close_size
+            pnl_usd = (exit_avg - entry_avg) * close_size
         else:
-            pnl_usd = (entry_avg - exit_price) * close_size
+            pnl_usd = (entry_avg - exit_avg) * close_size
 
-        open_fee_usd   = sum(f["_qty"] * f["price"] * f["fee_pct"] for f in opening_fills)
-        close_fee_usd  = close_size * exit_price * close_fill["fee_pct"]
-        total_fees_usd = open_fee_usd + close_fee_usd
+        total_fees_usd = sum(f["_qty"] * f["price"] * f["fee_pct"]
+                             for f in open_fills + close_fills)
         pnl_usd       -= total_fees_usd
 
         pnl_eur        = round(pnl_usd / eur_usd, 2)
         fees_eur       = round(total_fees_usd / eur_usd, 6)
+        close_fill     = close_fills[-1]
         close_ts       = close_fill["fill_time"]
-        open_time      = opening_fills[0]["fill_time"]
+        open_time      = open_fills[0]["fill_time"]
         notional_usd   = close_size * entry_avg
         notional_eur   = notional_usd / eur_usd
 
-        balance_after  = _balance_at(eur_timeline, close_ts)
-        balance_before = (balance_after - pnl_eur) if balance_after is not None else None
+        # balance_before/after from the actual account-log timeline (truth),
+        # sampled OUTSIDE the settlement bursts: 1s before open, 1s after close.
+        # Derived fallback only when the timeline has no point that early.
+        balance_after  = _balance_at(eur_timeline, close_ts + timedelta(seconds=1))
+        balance_before = _balance_at(eur_timeline, open_time - timedelta(seconds=1))
+        if balance_before is None and balance_after is not None:
+            balance_before = balance_after - pnl_eur
         try:
             leverage = max(1, round(notional_eur / balance_before)) if balance_before and balance_before > 0 else 1
         except Exception:
             leverage = 1
 
         # Fill metadata for the round-trip
-        all_fills   = opening_fills + [dict(close_fill, _qty=close_size)]
+        all_fills   = open_fills + close_fills
         fill_types  = {f["fill_type"] for f in all_fills}
         order_types = {f["order_type"] for f in all_fills}
         fill_type   = next(iter(fill_types)) if len(fill_types) == 1 else "mixed"
         order_type  = next(iter(order_types)) if len(order_types) == 1 else "mixed"
-        funding_cost = round(abs(close_fill.get("funding", 0)) / eur_usd, 6)
-        open_sz      = sum(f["_qty"] for f in opening_fills)
+        # Funding realizes hourly into the wallet via account-log entries, not
+        # fills — sum the trade's window. Negative realized_funding = paid, so
+        # flip sign: positive funding_cost = it cost you money.
+        funding_usd  = sum(amt for ts, amt in (funding_events or [])
+                           if open_time < ts <= close_ts)
+        funding_cost = round(-funding_usd / eur_usd, 6)
+        open_sz      = sum(f["_qty"] for f in open_fills)
         contract     = close_fill["symbol"]
 
         trades_out.append({
@@ -358,7 +399,7 @@ def _build_trades(
             "venue":           "kraken_futures",
             "direction":       "long" if trade_side == "LONG" else "short",
             "entry":           round(entry_avg, 2),
-            "exit":            round(exit_price, 2),
+            "exit":            round(exit_avg, 2),
             "size":            round(open_sz, 6),
             "leverage":        int(leverage),
             "pnl":             pnl_eur,
@@ -382,42 +423,28 @@ def _build_trades(
 
         if side == "buy":
             if position < -1e-6:
-                # Closing a short
+                # Closing (part of) a short
                 close_qty = min(qty, abs(position))
-                used      = []
-                remaining = close_qty
-                for of in open_fills:
-                    take = min(of["_qty"], remaining)
-                    used.append(dict(of, _qty=take))
-                    remaining -= take
-                    if remaining <= 1e-6:
-                        break
-                if abs(position + close_qty) < 1e-6:
-                    _record(used or open_fills, fill, close_qty, "SHORT")
-                    open_fills = []
+                close_fills.append({**fill, "_qty": close_qty})
                 position += close_qty
                 qty      -= close_qty
+                if abs(position) < 1e-6:
+                    _record("SHORT")
+                    open_fills, close_fills = [], []
             if qty > 1e-6:
                 open_fills.append({**fill, "_qty": qty})
                 position += qty
 
         else:  # sell
             if position > 1e-6:
-                # Closing a long
+                # Closing (part of) a long
                 close_qty = min(qty, position)
-                used      = []
-                remaining = close_qty
-                for of in open_fills:
-                    take = min(of["_qty"], remaining)
-                    used.append(dict(of, _qty=take))
-                    remaining -= take
-                    if remaining <= 1e-6:
-                        break
-                if abs(position - close_qty) < 1e-6:
-                    _record(used or open_fills, fill, close_qty, "LONG")
-                    open_fills = []
+                close_fills.append({**fill, "_qty": close_qty})
                 position -= close_qty
                 qty      -= close_qty
+                if abs(position) < 1e-6:
+                    _record("LONG")
+                    open_fills, close_fills = [], []
             if qty > 1e-6:
                 open_fills.append({**fill, "_qty": qty})
                 position -= qty
@@ -496,8 +523,9 @@ def sync_account(
 
         eur_usd                  = _get_eur_usd(market_client)
         eur_timeline, raw_logs   = _build_eur_timeline(user_client, eur_usd)
+        funding_events           = _build_funding_events(raw_logs)
         fills                    = _pull_fills(user_client, since_dt)
-        trades                   = _build_trades(fills, eur_timeline, eur_usd)
+        trades                   = _build_trades(fills, eur_timeline, eur_usd, funding_events)
         open_positions           = _retry(lambda: user_client.get_open_positions()).get("openPositions", [])
     except Exception as e:
         return {"imported": 0, "closed": 0, "skipped": 0, "errors": [str(e)],

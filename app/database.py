@@ -220,6 +220,10 @@ def init_db():
         # 1 = a manual entry the sync later matched to its exchange fill and
         # reconciled into this single row (review kept, numbers = exchange truth).
         c.execute("ALTER TABLE trades ADD COLUMN merged_manual INTEGER")
+    if "manually_edited" not in trade_cols:
+        # 1 = user hand-corrected the trade's numbers → sync must never
+        # overwrite this row again (the 🔒 lock in the journal).
+        c.execute("ALTER TABLE trades ADD COLUMN manually_edited INTEGER")
     # Review layer — execution grade, recurring-mistake tracking (Edgewonk-style),
     # conviction, mental state, and structured reflection. All nullable.
     for col, decl in (
@@ -373,10 +377,18 @@ def get_trade(trade_id: int) -> Optional[TradeResponse]:
     return _row_to_response(row) if row else None
 
 
+_EXCHANGE_TRUTH_COLS = ("entry", "exit", "size", "leverage", "pnl", "fees",
+                        "funding_cost", "opened_at", "closed_at")
+
+
 def update_trade(trade_id: int, data: TradeUpdate) -> Optional[TradeResponse]:
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
         return get_trade(trade_id)
+    # Hand-editing a number the sync owns locks the row (🔒) so the next sync
+    # doesn't overwrite the correction with exchange data.
+    if any(k in updates for k in _EXCHANGE_TRUTH_COLS):
+        updates["manually_edited"] = 1
     for ts_col in ("opened_at", "closed_at"):
         if ts_col in updates:
             updates[ts_col] = _iso(updates[ts_col])
@@ -478,16 +490,42 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
     c = _conn()
     if order_id:
         existing = c.execute(
-            "SELECT id FROM trades WHERE kraken_order_id = ?", (order_id,)
+            "SELECT id, manually_edited FROM trades WHERE kraken_order_id = ?", (order_id,)
         ).fetchone()
         if existing:
+            # Exchange numbers are truth: refresh them in place (a fixed sync
+            # rebuild must be able to repair old rows). Review fields, notes and
+            # setup_tag stay; a 🔒 hand-edited row is never touched.
+            if not existing["manually_edited"]:
+                # merged rows keep the hand-logged leverage (sync's is a
+                # margin-math estimate, the manual log is what he actually set)
+                c.execute("""
+                    UPDATE trades SET
+                        entry=?, exit=?, size=?,
+                        leverage=CASE WHEN merged_manual=1 THEN leverage ELSE ? END,
+                        pnl=?, fees=?,
+                        opened_at=?, closed_at=?, balance_after=?, balance_before=?,
+                        funding_cost=?, fill_type=?, order_type=?, fill_uuid=?, fill_count=?
+                    WHERE id=?
+                """, (
+                    trade_dict["entry"], trade_dict.get("exit"), trade_dict["size"],
+                    trade_dict.get("leverage", 1.0), trade_dict.get("pnl"), trade_dict.get("fees"),
+                    _iso(trade_dict.get("opened_at")), _iso(trade_dict.get("closed_at")),
+                    trade_dict.get("balance_after"), trade_dict.get("balance_before"),
+                    trade_dict.get("funding_cost"), trade_dict.get("fill_type"),
+                    trade_dict.get("order_type"), trade_dict.get("fill_uuid"),
+                    trade_dict.get("fill_count"), existing["id"],
+                ))
+                c.commit()
             c.close()
-            return None
+            return None   # not newly imported
 
     # Manual-twin merge: a manual entry with no exchange id, same direction &
-    # symbol, entry within 1%, opened within ±2 days → reconcile into that row
-    # rather than inserting a duplicate. Exchange numbers become truth; the
-    # manual row's notes/setup/review are left untouched; flag merged_manual.
+    # symbol, entry within 1% → reconcile into that row rather than inserting a
+    # duplicate. Closed manual rows match within ±2 days; still-OPEN manual rows
+    # (he logs the plan at entry, never closes it by hand) within ±6 hours of
+    # the fill. Exchange numbers become truth; the manual row's notes/setup/
+    # review are left untouched; flag merged_manual.
     if order_id and trade_dict.get("exit") is not None:
         opened_iso = _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat()
         twin = c.execute("""
@@ -495,24 +533,26 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
             WHERE kraken_order_id IS NULL
               AND (venue IS NULL OR venue = 'manual')
               AND direction = ? AND symbol = ?
-              AND exit IS NOT NULL AND entry > 0
+              AND entry > 0
               AND ABS(entry - ?) / entry < 0.01
-              AND ABS(julianday(opened_at) - julianday(?)) < 2
+              AND ABS(julianday(opened_at) - julianday(?)) < (CASE WHEN exit IS NULL THEN 0.25 ELSE 2 END)
             ORDER BY ABS(julianday(opened_at) - julianday(?)) LIMIT 1
         """, (trade_dict["direction"], trade_dict.get("symbol", "BTC/USD"),
               trade_dict["entry"], opened_iso, opened_iso)).fetchone()
         if twin:
             c.execute("""
                 UPDATE trades SET
-                    entry=?, exit=?, size=?, leverage=?, pnl=?, fees=?,
-                    closed_at=?, kraken_order_id=?, balance_after=?, balance_before=?,
+                    entry=?, exit=?, size=?,
+                    leverage=COALESCE(leverage, ?),
+                    pnl=?, fees=?,
+                    opened_at=?, closed_at=?, kraken_order_id=?, balance_after=?, balance_before=?,
                     venue=?, contract=?, market_type=?, fill_type=?, order_type=?,
                     funding_cost=?, fill_uuid=?, fill_count=?, merged_manual=1
                 WHERE id=?
             """, (
                 trade_dict["entry"], trade_dict.get("exit"), trade_dict["size"],
                 trade_dict.get("leverage", 1.0), trade_dict.get("pnl"), trade_dict.get("fees"),
-                _iso(trade_dict.get("closed_at")), order_id,
+                opened_iso, _iso(trade_dict.get("closed_at")), order_id,
                 trade_dict.get("balance_after"), trade_dict.get("balance_before"),
                 trade_dict.get("venue", "kraken_futures"), trade_dict.get("contract"),
                 trade_dict.get("market_type"), trade_dict.get("fill_type"),
@@ -570,13 +610,16 @@ def clear_synced_open_positions(venue: Optional[str] = None) -> int:
     sync. Real closed trades (exit IS NOT NULL, with an order_id) are untouched,
     and so are manually-entered trades (different notes). Returns rows deleted."""
     c = _conn()
-    sql = ("DELETE FROM trades WHERE notes = 'auto-synced open position' "
-           "AND exit IS NULL AND kraken_order_id IS NULL")
+    match = ("notes = 'auto-synced open position' "
+             "AND exit IS NULL AND kraken_order_id IS NULL")
     params: tuple = ()
     if venue:
-        sql += " AND venue = ?"
+        match += " AND venue = ?"
         params = (venue,)
-    cur = c.execute(sql, params)
+    # signals may back-link to an open row (no FK cascade) — unlink first
+    c.execute(f"UPDATE signals SET linked_trade_id = NULL WHERE linked_trade_id IN "
+              f"(SELECT id FROM trades WHERE {match})", params)
+    cur = c.execute(f"DELETE FROM trades WHERE {match}", params)
     c.commit()
     n = cur.rowcount
     c.close()

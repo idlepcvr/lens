@@ -90,7 +90,7 @@ def _load_trades():
                tp, sl, funding_cost, followed_plan, followed_strategy,
                market_type, order_type, fill_count,
                grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
-               book, venue, symbol
+               book, venue, symbol, manually_edited
         FROM trades WHERE closed_at IS NOT NULL ORDER BY opened_at
     """)
     rows = cur.fetchall()
@@ -121,7 +121,7 @@ def get_enriched_trades() -> list:
          tp, sl, funding_cost, followed_plan, followed_strategy,
          market_type, order_type, fill_count,
          grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
-         book, venue, symbol) = row
+         book, venue, symbol, manually_edited) = row
 
         ts_e = _parse_ms(opened_at)
         ts_x = _parse_ms(closed_at)
@@ -165,6 +165,7 @@ def get_enriched_trades() -> list:
             "balance_after":  bal_after,
             "balance_before": bal_before,
             "merged_manual":  merged_manual,
+            "manually_edited": manually_edited,
             "book":           book or "hedge",
             "venue":          venue or "",
             "symbol":         symbol or "BTC/USD",

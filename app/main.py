@@ -132,7 +132,7 @@ def home():
     <div class="sub">Trade your edge</div>
     <h2>HEDGE</h2>
     <p>Your own Kraken money. Mined setups S1–S5, the 7 vetoes that kill the
-       bleed, sizing & journal. Dashboard · Position · Desk · Signals · Journal.</p>
+       bleed, sizing & journal. Plan · Position · Desk · Signals · Journal.</p>
     <div class="go">ENTER →</div>
   </a>
 </div>"""
@@ -645,7 +645,7 @@ ATR_MULT.addEventListener("input", () => {{ clearTimeout(volDeb); volDeb = setTi
 refreshVol();
 """
 
-    return shell("/dashboard", "Dashboard", body, script=script, head_extra=css, meta="goal model")
+    return shell("/dashboard", "Plan", body, script=script, head_extra=css, meta="goal model")
 
 
 @app.get("/health")
