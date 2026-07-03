@@ -28,7 +28,6 @@ NAV_PROP = [
     ("/rules", "Rules"),
     ("/equity", "Equity"),
     ("/regime", "Regime"),
-    ("/backtest", "Backtest"),
 ]
 NAV_HEDGE = [
     ("/overview-hedge", "Overview"),
@@ -41,7 +40,6 @@ NAV_HEDGE = [
     ("/analytics", "Analytics"),
     ("/journal", "Journal"),
     ("/edge", "Edge"),
-    ("/strategy-hedge", "Board"),
     ("/glossary", "Learn"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the

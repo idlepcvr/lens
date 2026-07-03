@@ -36,6 +36,36 @@ function ago(iso){
   return Math.round(m/1440)+'d ago';
 }
 
+// ── same-zone clustering ─────────────────────────────────────────────────────
+// The hourly scanner re-fires the same context: 3× S3 within 0.2% is one trade
+// idea, not three. Group consecutive signals (same direction, entry within 0.5%
+// of the cluster anchor, ≤6h apart) so the queue reads as ideas, not spam.
+// Every member keeps its own identity and its own TAKE/SKIP — nothing is merged
+// in the data, only in the display.
+const ZONE_PCT=0.005, ZONE_GAP_MS=6*3600e3;
+function clusterize(list){ // list sorted newest-first
+  const out=[];
+  for(const s of list){
+    const c=out[out.length-1];
+    const prev=c&&c.members[c.members.length-1];
+    if(c && s.direction===c.dir && s.entry_price && c.entry &&
+       Math.abs(s.entry_price-c.entry)/c.entry<ZONE_PCT &&
+       prev && (new Date(prev.received_at)-new Date(s.received_at))<ZONE_GAP_MS){
+      c.members.push(s);
+    } else {
+      out.push({dir:s.direction, entry:s.entry_price, members:[s]});
+    }
+  }
+  return out;
+}
+function zoneLabel(c){
+  const es=c.members.map(m=>m.entry_price).filter(Boolean);
+  if(es.length<2) return '';
+  const lo=Math.min(...es), hi=Math.max(...es);
+  const w=((hi-lo)/lo*100).toFixed(2);
+  return `${money(lo)}–${money(hi)} · ${w}% apart`;
+}
+
 function pendingCard(s){
   const dir = s.direction;
   return `<div class="scard active" id="card-${s.signal_id}">
@@ -73,6 +103,18 @@ function toggleRow(id){
   const r=document.getElementById('d-'+id); if(!r) return;
   r.style.display = r.style.display==='none' ? '' : 'none';
 }
+function togGroup(gi){
+  const rows=document.querySelectorAll(`tr[data-grp="${gi}"]`);
+  const open=rows.length&&rows[0].style.display==='none';
+  rows.forEach(r=>{
+    r.style.display=open?'':'none';
+    if(!open){ // collapsing: also fold any member detail rows left open
+      const oc=r.getAttribute('onclick')||'';
+      const m=oc.match(/toggleRow\('(.+)'\)/);
+      if(m){ const d=document.getElementById('d-'+m[1]); if(d) d.style.display='none'; }
+    }
+  });
+}
 
 // the full order ticket (sizing as the alert + desk compute it) — same numbers
 // you'd punch into Kraken. null when the signal predates ticket math.
@@ -93,9 +135,11 @@ function ticketBlock(t){
     + `<div class="kv"><span class="k">liquidation</span><span class="v">${money(t.liq)}</span></div>`;
 }
 
-// each decision row expands to the full plan as proposed + decision timing
-function historyRow(s){
+// each decision row expands to the full plan as proposed + decision timing.
+// grp: cluster index — member rows start hidden behind their zone summary row.
+function historyRow(s, grp){
   const id = s.signal_id;
+  const grpAttr = grp?` data-grp="${grp}" style="display:none"`:'';
   const conv = s.your_conviction!=null ? s.your_conviction : '—';
   const g = gap(s.received_at, s.decided_at);
   const detail = `
@@ -112,8 +156,8 @@ function historyRow(s){
     <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
     ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}
     ${s.linked_trade_id?`<div class="kv"><span class="k">trade</span><span class="v"><a href="/journal?trade=${s.linked_trade_id}" style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation()">#${s.linked_trade_id}${s.pnl_eur!=null?` · ${s.pnl_eur>=0?'+':''}€${s.pnl_eur}`:''} — open in journal →</a></span></div>`:''}`;
-  return `<tr class="hrow" onclick="toggleRow('${id}')" style="cursor:pointer">
-    <td>${s.trigger_type||'?'}</td>
+  return `<tr class="hrow"${grpAttr} onclick="toggleRow('${id}')" style="cursor:pointer">
+    <td>${grp?'&nbsp;&nbsp;↳ ':''}${s.trigger_type||'?'}</td>
     <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>
     <td><span class="badge ${s.status}">${s.status}</span></td>
     <td class="m">${conv}</td>
@@ -167,19 +211,43 @@ function render(all){
     + `<h4>you still place the trade</h4>Approving here logs the decision — it does <b>not</b> place an order. Execute on Kraken yourself.`
     + `</div></div>`;
 
-  // pending
+  // pending — clustered: one bordered group per trade idea, cards inside
   html += secHead('pending', `pending · ${pending.length}`) + `<div class="sec-body" id="s-pending">`;
   if(pending.length===0){
     html += `<div class="panel dim" style="text-align:center;color:var(--dim)">no pending signals — scanner runs hourly at :02</div>`;
   } else {
-    html += `<div class="grid-auto">` + pending.map(pendingCard).join('') + `</div>`;
+    html += clusterize(pending).map(c=>{
+      if(c.members.length===1) return `<div class="grid-auto">${pendingCard(c.members[0])}</div>`;
+      return `<div style="border:1px solid var(--line2);border-radius:10px;padding:10px;margin-bottom:12px">`
+        + `<div style="font-size:11px;color:var(--dim);margin:0 2px 8px">≋ <b style="color:var(--ink)">${c.members.length} signals · same zone</b>`
+        + ` <span class="mono">${zoneLabel(c)}</span> — one trade idea rescanned hourly; decide each</div>`
+        + `<div class="grid-auto">${c.members.map(pendingCard).join('')}</div></div>`;
+    }).join('');
   }
   html += `</div>`;
 
-  // history
+  // history — same-zone decisions collapse behind one summary row
+  let hist='';
+  let gi=0;
+  for(const c of clusterize(decided)){
+    if(c.members.length===1){ hist+=historyRow(c.members[0]); continue; }
+    gi++;
+    const st={}; c.members.forEach(m=>st[m.status]=(st[m.status]||0)+1);
+    const stTxt=Object.entries(st).map(([k,v])=>`<span class="badge ${k}">${v} ${k}</span>`).join(' ');
+    const ty={}; c.members.forEach(m=>{const t=m.trigger_type||'?';ty[t]=(ty[t]||0)+1;});
+    const tyTxt=Object.entries(ty).map(([t,n])=>`${n}× ${t}`).join(' + ');
+    const newest=c.members[0];
+    hist+=`<tr class="hrow" onclick="togGroup(${gi})" style="cursor:pointer">
+      <td>≋ ${tyTxt} <span class="m mono" style="font-size:10px">${zoneLabel(c)}</span></td>
+      <td class="${c.dir==='long'?'g':'r'}">${VLAB[c.dir]||c.dir||''}</td>
+      <td>${stTxt}</td>
+      <td class="m">—</td>
+      <td class="m">${ago(newest.decided_at||newest.received_at)} ▸</td></tr>`;
+    hist+=c.members.map(m=>historyRow(m,gi)).join('');
+  }
   html += secHead('hist','recent decisions') + `<div class="sec-body" id="s-hist"><div class="sb-wrap"><table class="sb">`
     + `<tr><th>setup</th><th>dir</th><th>status</th><th>conv</th><th>when</th></tr>`
-    + (decided.length?decided.map(historyRow).join(''):'<tr><td colspan="5" class="m">no decisions yet</td></tr>')
+    + (decided.length?hist:'<tr><td colspan="5" class="m">no decisions yet</td></tr>')
     + `</table></div></div>`;
 
   $('body').innerHTML = html;

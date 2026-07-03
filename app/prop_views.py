@@ -266,7 +266,8 @@ def _board(results, mode, r_levels):
   </div>"""
 
 
-def strategy_page(mode="prop"):
+def strategy_page(mode="prop", extra_css="", extra_body="", extra_script=""):
+    """Board page; extra_* lets /strategy embed the backtest runner below the board."""
     from .strategy_eval import load_cache
     path, label, title, blurb = _BOARD_META[mode]
     d = load_cache()
@@ -274,8 +275,8 @@ def strategy_page(mode="prop"):
         return shell(path, label,
                      f'<div class="pv"><h1>{title}</h1><div class="panel">'
                      'No rankings cached yet. Run <code>python3 -m app.strategy_eval</code> '
-                     'to score every strategy.</div></div>',
-                     head_extra=_CSS, meta="strategy board")
+                     'to score every strategy.</div></div>' + extra_body,
+                     head_extra=_CSS + extra_css, script=extra_script, meta="strategy board")
     rl = d["r_levels"]
     gen = d["generated_at"][:16].replace("T", " ")
     sub = (f'{blurb} Ranked after fees. '
@@ -291,8 +292,8 @@ def strategy_page(mode="prop"):
     <strong>score</strong> sums the profitable cells weighted by R, so a strategy that still pays at 3R outranks
     one that only pays at 1R. Top 3 are highlighted.
     Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>
-</div>"""
-    return shell(path, label, body, head_extra=_CSS, meta="strategy board")
+</div>{extra_body}"""
+    return shell(path, label, body, head_extra=_CSS + extra_css, script=extra_script, meta="strategy board")
 
 
 # ── /risk — Risk Engine ───────────────────────────────────────────────────────

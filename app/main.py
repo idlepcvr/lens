@@ -25,7 +25,7 @@ from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 from .calculator import CalcError, compute_goal, compute_position, compute_projection
@@ -1337,9 +1337,10 @@ _bt_cache: dict = {}       # name → result
 _bt_running: dict = {}     # name → True/False
 
 
-@app.get("/backtest", response_class=HTMLResponse)
-def backtest_page():
-    from .theme import shell
+def _backtest_fragment():
+    """The interactive backtest runner (strategy picker → run / SL×TP sweep).
+    Lives embedded on /strategy so live ranks, simulated ranks and the runner
+    are one surface; /backtest redirects there. Returns (css, body, script)."""
     # Order the dropdown by the cached strategy ranking (strategy_scores.json,
     # the same R-sweep that powers the /strategy board) so the best-scoring
     # backtestable edges surface first instead of raw registry order. Ranking
@@ -1402,7 +1403,7 @@ canvas{width:100%;height:200px;display:block}
 </style>"""
 
     body = f"""
-<h1>Strategy Backtest</h1>
+<h1 id="backtest" style="margin-top:34px">Strategy Backtest — run it yourself</h1>
 <div class="sub">BTC perps · Bybit USDT data (= same price action as Kraken USD, arbitraged tick-for-tick — Kraken's public API only serves ~4mo of candles) · each strategy on its own timeframe · starting balance editable (defaults to your live equity) · 0.15%/side fee</div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this backtest</span><span class="line"></span></div>
@@ -1665,7 +1666,12 @@ function drawChart(curve) {{
 }})();
 """
 
-    return HTMLResponse(shell("/backtest", "Backtest", body, script=script, head_extra=css, meta="30mo history"))
+    return css, body, script
+
+
+@app.get("/backtest")
+def backtest_redirect():
+    return RedirectResponse("/strategy#backtest", status_code=301)
 
 
 class BtRunRequest(BaseModel):
@@ -1758,8 +1764,8 @@ def analytics_page():
 
 @app.get("/edge", response_class=HTMLResponse)
 def edge_page():
-    from .edge_page import EDGE_HTML
-    return EDGE_HTML
+    from .edge_page import render_page
+    return render_page()
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
@@ -1780,13 +1786,14 @@ def prop_page():
 @app.get("/strategy", response_class=HTMLResponse)
 def strategy_engine():
     from .prop_views import strategy_page
-    return strategy_page("prop")
+    css, body, script = _backtest_fragment()
+    return strategy_page("prop", extra_css=css, extra_body=body, extra_script=script)
 
 
-@app.get("/strategy-hedge", response_class=HTMLResponse)
+@app.get("/strategy-hedge")
 def strategy_engine_hedge():
-    from .prop_views import strategy_page
-    return strategy_page("hedge")
+    # hedge board now lives on /edge (live + simulated, one page)
+    return RedirectResponse("/edge#simulated", status_code=301)
 
 
 @app.get("/risk", response_class=HTMLResponse)

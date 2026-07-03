@@ -1,9 +1,13 @@
-"""LENS /edge — setup-edge scoreboard.
+"""LENS /edge — the strategy page for the hedge book, one question three tenses.
 
-Realised performance per setup family (S1..S5 / vetoed / VETO / NONE) with a
-KEEP / CUT / SIZE-UP / THIN verdict from expectancy·WR·sample, plus a grade
-split so you can see whether a setup's edge is the setup or your execution.
-Fed by /api/review/trades (auto-tagged on sync).
+PAST      — realised performance per setup family from YOUR live trades
+            (auto-tagged on sync, verdict from expectancy · WR · sample).
+SIMULATED — the coded strategies replayed over the full candle history
+            (the board that used to live at /strategy-hedge, now embedded;
+            that route redirects here).
+
+Live results and backtest ranks are different measurements of the same
+question — "which setups pay?" — so they live on one page.
 """
 
 from .theme import shell
@@ -11,6 +15,9 @@ from .theme import shell
 _CSS = """
 <style>
 .ed-sub{color:var(--dim);font-size:12px;margin:2px 0 14px}
+.ed-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:26px 0 4px}
+.ed-h:first-of-type{margin-top:0}
+.ed-hs{color:var(--dim);font-size:12px;margin-bottom:12px}
 .ed-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .ed-tbl th{text-align:right;color:var(--dim);font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:9px;letter-spacing:.05em}
 .ed-tbl th:first-child,.ed-tbl td:first-child{text-align:left}
@@ -21,9 +28,9 @@ _CSS = """
 </style>
 """
 
-BODY = """
-<div class="ed-sub">Per-setup realised edge — <b>your live trades</b>, auto-tagged on sync · verdict from expectancy · WR · sample.
-Simulated backtest ranks are a different measurement → <a href="/strategy" style="color:var(--accent)">Strategy board</a></div>
+_LIVE = """
+<div class="ed-h">Past — your live trades</div>
+<div class="ed-hs">Realised edge per setup family · auto-tagged on sync · verdict from expectancy · WR · sample</div>
 <div class="panel" style="overflow-x:auto">
   <table class="ed-tbl">
     <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>
@@ -74,4 +81,34 @@ fetch('/api/review/trades').then(r=>r.json()).then(render).catch(e=>{
   document.getElementById('edge-body').innerHTML='<tr><td colspan="6" class="r" style="padding:20px">Load error: '+e.message+'</td></tr>';});
 """
 
-EDGE_HTML = shell("/edge", "Edge", BODY, script=SCRIPT, head_extra=_CSS, meta="which setups pay?")
+
+def render_page() -> str:
+    from .prop_views import _board, _CSS as PV_CSS
+    from .strategy_eval import load_cache
+
+    d = load_cache()
+    if d:
+        rl = d["r_levels"]
+        gen = d["generated_at"][:16].replace("T", " ")
+        board = (
+            f'<div class="ed-h" id="simulated">Simulated — the rules replayed</div>'
+            f'<div class="ed-hs">Same question, no you in it: each coded strategy run over the full '
+            f'candle history ({d["span"][0]} → {d["span"][1]}), ranked by net R after {d["fee_pct"]}% '
+            f'round-trip fees · first-touch at R = {rl[0]:g}–{rl[-1]:g} · refreshed {gen}. '
+            f'<b>thin</b> = the pattern fired &lt;40× in the entire history — too few occurrences to '
+            f'rank (samples can\'t be generated, only more history or a looser pattern creates them). '
+            f'Prop-account board + run-it-yourself backtester → '
+            f'<a href="/strategy" style="color:var(--accent)">Strategy (prop)</a></div>'
+            f'<div class="pv">{_board(d["results"], "hedge", rl)}</div>'
+        )
+        head = _CSS + PV_CSS
+    else:
+        board = ('<div class="ed-h" id="simulated">Simulated — the rules replayed</div>'
+                 '<div class="ed-hs">No rankings cached yet — run '
+                 '<code>python3 -m app.strategy_eval</code>.</div>')
+        head = _CSS
+
+    body = ('<div class="ed-sub">Which setups pay? Two tenses of one question: what your '
+            'trades actually did, and what the coded rules would have done.</div>'
+            + _LIVE + board)
+    return shell("/edge", "Edge", body, script=SCRIPT, head_extra=head, meta="which setups pay?")
