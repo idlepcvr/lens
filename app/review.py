@@ -351,11 +351,17 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
         "SELECT snapshot_date, eur_balance FROM daily_snapshots "
         "WHERE eur_balance IS NOT NULL ORDER BY snapshot_date"
     ).fetchall()
-    # net EUR actually put into the account (deposits − withdrawals) — the real
-    # "how much went in". xbt/eth/fee legs are in-kind noise, EUR is the cash.
-    net_dep = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
-    ).fetchone()[0]
+    # EUR cash actually moved — gross deposits, gross withdrawals, and the raw
+    # list for the cash-flow table. xbt/eth/fee legs are in-kind noise, EUR is the cash.
+    dep_in, dep_out = conn.execute(
+        "SELECT COALESCE(SUM(CASE WHEN amount>0 THEN amount END),0),"
+        "       COALESCE(SUM(CASE WHEN amount<0 THEN -amount END),0)"
+        " FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
+    ).fetchone()
+    xfers = conn.execute(
+        "SELECT ts, transfer_type, amount FROM transfers "
+        "WHERE asset IN ('eur','ZEUR','EUR') ORDER BY ts DESC"
+    ).fetchall()
     conn.close()
     if not rows:
         return {"n": 0}
@@ -423,7 +429,10 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
     cur_bal = daily[-1]["bal"] if daily else (equity[-1]["bal"] if equity else None)
     return {"n": len(rows), "equity": equity, "daily": daily,
             "dow": dow, "hod": hod, "periods": periods,
-            "net_deposit": round(net_dep, 2), "cur_bal": cur_bal,
+            "deposits": round(dep_in, 2), "withdrawals": round(dep_out, 2),
+            "net_deposit": round(dep_in - dep_out, 2), "cur_bal": cur_bal,
+            "transfers": [{"ts": t[:10], "type": ty, "amount": round(a, 2)}
+                          for t, ty, a in xfers],
             "cum_pnl": equity[-1]["cum"] if equity else 0.0}
 
 

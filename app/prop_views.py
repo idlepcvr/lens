@@ -219,9 +219,14 @@ def _r_cols(rows, r_levels):
 # mode -> (route, nav label, page title, blurb)
 _BOARD_META = {
     "prop": ("/strategy", "Strategy", "Strategy Board — PROP",
-             "Strategies for the <b>prop eval account</b> — the Asian-dip family, scored on the real 4H/1H backtest."),
+             "Strategies for the <b>prop eval account</b> — the Asian-dip family, scored on the real 4H/1H backtest. "
+             "These are <b>simulated</b> ranks over 7 yrs of candles, not your live results — those live on "
+             '<a href="/edge" style="color:var(--accent)">Edge</a>. '
+             "<b>thin</b> = the pattern fired &lt;40× in the entire history; too few occurrences to trust a rank "
+             "(more samples need more history or a looser pattern, they can't be generated)."),
     "hedge": ("/strategy-hedge", "Board", "Strategy Board — HEDGE",
-              "Strategies for the <b>hedge book</b> — 1h bar-context scalp setups."),
+              "Strategies for the <b>hedge book</b> — 1h bar-context scalp setups. Simulated ranks, not live results "
+              '(live = <a href="/edge" style="color:var(--accent)">Edge</a>).'),
 }
 
 

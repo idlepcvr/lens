@@ -22,7 +22,8 @@ _CSS = """
 """
 
 BODY = """
-<div class="ed-sub">Per-setup realised edge · auto-tagged on sync · verdict from expectancy · WR · sample</div>
+<div class="ed-sub">Per-setup realised edge — <b>your live trades</b>, auto-tagged on sync · verdict from expectancy · WR · sample.
+Simulated backtest ranks are a different measurement → <a href="/strategy" style="color:var(--accent)">Strategy board</a></div>
 <div class="panel" style="overflow-x:auto">
   <table class="ed-tbl">
     <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>

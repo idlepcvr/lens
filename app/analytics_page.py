@@ -54,6 +54,10 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .an-tog label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .an-tog .sw{display:inline-block;width:11px;height:3px;border-radius:2px}
 .an-tog b{font-family:var(--mono);font-weight:700}
+.an-rng{display:flex;gap:4px;margin-left:auto}
+.an-rng button{padding:2px 9px;border:1px solid var(--line2);background:transparent;color:var(--dim);
+  font-size:10px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
+.an-rng button.on{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:700}
 </style>
 """
 
@@ -65,6 +69,11 @@ BODY = """
     <div class="an-tog">
       <label><input type="checkbox" id="t-cum" checked><span class="sw" style="background:var(--accent)"></span>Cumulative realised P&amp;L <b id="lg-cum">—</b></label>
       <label><input type="checkbox" id="t-bal" checked><span class="sw" style="background:var(--dim)"></span>Daily balance <b id="lg-bal">—</b></label>
+      <div class="an-rng" id="rng">
+        <button data-d="7">1W</button><button data-d="30">1M</button><button data-d="91">3M</button>
+        <button data-d="182">6M</button><button data-d="ytd">YTD</button><button data-d="365">1Y</button>
+        <button data-d="all" class="on">ALL</button>
+      </div>
     </div>
     <div id="eqchart"></div>
   </div>
@@ -73,8 +82,8 @@ BODY = """
 """
 
 SCRIPT = r"""
-const eur=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(0);
-const eur2=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(2);
+const eur=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(0);
+const eur2=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(2);
 const pc=v=>v>=0?'var(--long)':'var(--short)';
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let cumSeries=null, balSeries=null;
@@ -117,6 +126,15 @@ function drawEquity(d){
   new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth})).observe(el);
   document.getElementById('t-cum').onchange=e=>cumSeries&&cumSeries.applyOptions({visible:e.target.checked});
   document.getElementById('t-bal').onchange=e=>balSeries&&balSeries.applyOptions({visible:e.target.checked});
+  // range selector — last data point anchors the window
+  const last=d.equity[d.equity.length-1].t;
+  document.querySelectorAll('#rng button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#rng button').forEach(x=>x.classList.toggle('on',x===b));
+    const v=b.dataset.d;
+    if(v==='all'){chart.timeScale().fitContent();return;}
+    const from=v==='ytd'?Date.UTC(new Date(last*1000).getUTCFullYear(),0,1)/1000:last-(+v)*86400;
+    chart.timeScale().setVisibleRange({from,to:last});
+  });
 }
 
 // ── THE READ — interpret the numbers ────────────────────────────────────────
@@ -140,8 +158,9 @@ function renderRead(E,A){
   let head;
   if(dep>0){
     const gone=Math.max(0,dep-bal), pct=Math.round(gone/dep*100);
-    head=`You've funded <b>€${dep.toFixed(0)}</b> of real cash into this account. The balance today is <b>€${bal.toFixed(0)}</b> — `+
-      `<span class="neg">~${pct}% of what you put in is gone</span>. Realised P&L across ${A.n} closed trades is `+
+    head=`You've deposited <b>€${E.deposits.toFixed(0)}</b> and withdrawn <b>€${E.withdrawals.toFixed(0)}</b> — `+
+      `net <b>€${dep.toFixed(0)}</b> of real cash into this account. The balance today is <b>€${bal.toFixed(0)}</b> — `+
+      `<span class="neg">~${pct}% of net funding is gone</span>. Realised P&L across ${A.n} closed trades is `+
       `<span class="neg">${eur2(cum)}</span>. This isn't noise; it's the strategy set not paying.`;
   } else {
     head=`Realised P&L across ${A.n} closed trades is <span class="${cum>=0?'pos':'neg'}">${eur2(cum)}</span>.`;
@@ -187,7 +206,16 @@ function det(title,sub,tag,tagcol,body,open){
 function renderSections(E,A){
   const maxAbs=arr=>Math.max(1,...arr.map(x=>Math.abs(x.total)));
   const bar=(v,mx)=>`<div style="height:4px;border-radius:2px;width:${Math.min(100,Math.abs(v)/mx*100)}%;background:${pc(v)};opacity:.7"></div>`;
-  // when you trade
+  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
+  // when you trade — scoreboard first: best/worst hour & day (n>=3 so one fluke can't win)
+  const hh=h=>String(h).padStart(2,'0')+':00';
+  const hodsA=E.hod.filter(x=>x.n>=3), dowsA=E.dow.filter(x=>x.n>=3);
+  const bH=hodsA.slice().sort((a,b)=>b.total-a.total)[0], wH=hodsA.slice().sort((a,b)=>a.total-b.total)[0];
+  const bD=dowsA.slice().sort((a,b)=>b.total-a.total)[0], wD=dowsA.slice().sort((a,b)=>a.total-b.total)[0];
+  const board=(bH?card('Best hour',hh(bH.hour),eur(bH.total)+' · '+bH.n+' trades','var(--long)'):'')+
+    (wH?card('Worst hour',hh(wH.hour),eur(wH.total)+' · '+wH.n+' trades','var(--short)'):'')+
+    (bD?card('Best day',bD.label,eur(bD.total)+' · '+bD.n+' trades','var(--long)'):'')+
+    (wD?card('Worst day',wD.label,eur(wD.total)+' · '+wD.n+' trades','var(--short)'):'');
   const dmx=maxAbs(E.dow), hmx=maxAbs(E.hod);
   const dowRows=E.dow.filter(x=>x.n).map(x=>`<tr><td>${x.label}</td><td>${x.n}</td>
     <td style="color:${pc(x.total)}">${eur(x.total)}</td><td style="color:${pc(x.avg)}">${eur2(x.avg)}</td><td>${bar(x.total,dmx)}</td></tr>`).join('');
@@ -196,6 +224,7 @@ function renderSections(E,A){
   const P=E.periods, perCard=(lbl,p)=>!p?'':`<div class="an-card"><div class="k">${lbl} · avg</div>`+
     `<div class="v" style="color:${pc(p.avg)}">${eur2(p.avg)}</div><div class="s">best ${p.best?p.best.k+' '+eur(p.best.v):'—'} · worst ${p.worst?eur(p.worst.v):'—'}</div></div>`;
   const timingBody=
+    `<div class="an-grid" style="margin-bottom:14px">${board}</div>`+
     `<div class="an-grid" style="margin-bottom:14px">${perCard('Per day',P.day)}${perCard('Per week',P.week)}${perCard('Per month',P.month)}</div>`+
     `<div class="an-h">By weekday <span style="color:var(--faint);text-transform:none;font-weight:400">— entry day, Bangkok</span></div>`+
     `<table class="an-tbl"><tr><th>Day</th><th>Trades</th><th>Total</th><th>Avg</th><th style="width:30%">·</th></tr>${dowRows}</table>`+
@@ -209,7 +238,6 @@ function renderSections(E,A){
   const durBody=`<table class="an-tbl"><tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>${durRows}</table>`;
 
   // scorecard
-  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
   const perf=`<div class="an-grid">`+
     card('Trades',A.n,A.open?A.open+' open':'')+
     card('Win Rate',A.wr+'%',A.long_wr!=null?`L ${A.long_wr}% · S ${A.short_wr}%`:'')+
@@ -236,13 +264,27 @@ function renderSections(E,A){
     <tr><td>Win Rate</td><td>${A.model_wr!=null?A.model_wr+'%':'—'}</td><td>${A.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
     <tr><td>R:R</td><td>${A.model_rr!=null?A.model_rr+'×':'—'}</td><td>${A.rr!=null?A.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr></table>`;
 
-  const bestH=E.hod.filter(x=>x.n>=3).slice().sort((a,b)=>b.total-a.total)[0];
+  // cash flow — every EUR deposit/withdrawal, the "what did I actually put in" ledger
+  const xf=E.transfers||[];
+  const xfRows=xf.map(t=>`<tr><td>${t.ts}</td><td>${t.type}</td>
+    <td style="color:${pc(t.amount)}">${eur2(t.amount)}</td></tr>`).join('');
+  const nDep=xf.filter(t=>t.amount>0).length, nWd=xf.filter(t=>t.amount<0).length;
+  const cashBody=
+    `<div class="an-grid" style="margin-bottom:14px">`+
+    card('Deposited',eur(E.deposits),nDep+' deposits','var(--long)')+
+    card('Withdrawn',eur(-E.withdrawals),nWd+' withdrawals','var(--short)')+
+    card('Net funded',eur(E.net_deposit),'deposits − withdrawals',pc(E.net_deposit))+
+    (E.cur_bal!=null?card('Balance now','€'+E.cur_bal.toFixed(0),'','var(--ink)'):'')+`</div>`+
+    `<table class="an-tbl"><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${xfRows}</table>`;
+
   document.getElementById('sections').innerHTML=
-    det('When you trade','timing edge — hours &amp; days',bestH?'best '+String(bestH.hour).padStart(2,'0')+':00':'',
+    det('When you trade','timing edge — hours &amp; days',
+        (bH?'best '+hh(bH.hour):'')+(bD?' · '+bD.label:''),
         'var(--long)',timingBody,true)+
     det('How long you hold','duration breakdown — where the edge lives','',
         '',durBody,false)+
-    det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false);
+    det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false)+
+    det('Cash flow','every EUR deposit &amp; withdrawal',eur(E.net_deposit)+' in',pc(E.net_deposit),cashBody,false);
 }
 """
 
