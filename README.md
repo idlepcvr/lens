@@ -440,34 +440,35 @@ missing tools — it's **reps in the journal.** Consistency and commits compound
 FOMO doesn't. This is a craft-persistence project, not a "keep adding surface
 area" project.
 
-## TODO — next session (updated 2026-07-02, ~09:30 session plan)
+## TODO — next session (updated 2026-07-04)
 
-**A. Signal trust / freshness (why the S3 alert felt wrong).** Signals emit on
-CLOSED 1h bars — by decision time price has moved (S3 priced 60,810 while the
-market was already falling). Build: bar-age + live-price-drift line in the
-alert body, and auto-expire a pending signal if price runs >0.5% past entry
-before a decision. Small, high-trust-value.
+**A. Signal trust / freshness — STILL OPEN.** `bar_age_min` is computed but
+only reaches the /desk API payload; the ntfy alert body has NO freshness/drift
+line, and expiry is a flat 180-min timer (`expire_stale_signals`), not the
+">0.5% price ran past entry" rule. Build both: freshness line in
+`_alert_message`, price-drift check in the hourly scan. Small, high-trust-value.
 
-**B. One geometry to rule them all.** Still TWO geometries visible: alerts use
-0.63/1.5 (validated) but /desk's plan block shows board per-strategy geometry
-(e.g. 1.37/4.79). Decide the single source of truth and make every surface
-(desk plan, alert ticket, /audit, goal config) read it. `/audit` page is the
-place that explains it — keep it honest.
+**B. One geometry — STILL OPEN, and /desk help text is now stale** (says
+target +0.95% when the audit validated ~1.5%; board signals still emit
+per-strategy geometry via `_board_geo`). Decide the single source of truth and
+make desk plan / alert ticket / /audit / goal config read it.
 
-**C. Strategy variations NOT yet tested** (the 2026-07-02 audit covered: all
-existing strategies, ~750 context combos, static SL×TP grid — see
-STRATEGY_AUDIT_20260702.md). Still unbucketed: trailing stops / BE-move exit
-sims (the +0.6% BE rule is recommended but unsimulated), per-regime gating
-(only trade S-setups in BULL/SIDEWAYS?), time-based exits, prop 4H variants,
-order-flow features (needs new data).
+**C. Automated strategy search — ENGINE BUILT 2026-07-04** (`app/strategy_search.py`):
+sweeps the full build-your-own space (1h/4h × long/short × trend × candle ×
+MACD × RSI bands × BKK-hour windows) through the real backtest engine, then
+SL×TP geometry on survivors. Split-half filter: profitable in BOTH halves or
+it doesn't rank. Output → `strategy_search.json`. Re-run after data refreshes;
+promote survivors into `backtest_engine.STRATEGIES` so the Monday re-rank
+tracks them on fresh data. Still unbucketed from the 07-02 audit: trailing
+stop / BE-move exit sims, per-regime gating, time-based exits, order-flow
+features (needs new data).
 
-**D. Analytics coherence pass.** /analytics /edge /calendar /overview never
-re-audited after the balance/leverage backfill — verify their numbers against
-the repaired data layer.
+**D. Analytics coherence — MOSTLY DONE** (07-03 sessions rebuilt /analytics,
+/journal, /edge on the repaired data layer; minus-sign + snapshot bugs fixed).
+Residual: /calendar and /overview never explicitly re-checked.
 
-**E. One dashboard click (you):** Parameters → rr_ratio 3.0 → 2.4 (watch
-/audit flip the row to ✓). Then verify tonight's manual short got synced,
-tagged, and reconciled to a signal (or off-playbook-pushed).
+**E. One dashboard click (you):** Parameters → rr_ratio (still 4.0 in config;
+plan said → 2.4) — decide and click, watch /audit flip the row.
 
 ---
 

@@ -1463,6 +1463,11 @@ def _signal_custom(df, i, params):
         return None
     if candle == "bear" and not (row["close"] < row["open"]):
         return None
+    macd = params.get("macd")               # 'bull' | 'bear' (histogram sign)
+    if macd == "bull" and not (row["macd_hist"] > 0):
+        return None
+    if macd == "bear" and not (row["macd_hist"] < 0):
+        return None
     hf, ht = params.get("hour_from"), params.get("hour_to")
     if hf is not None and ht is not None:
         h = (df.index[i].hour + 7) % 24     # Bangkok hour (UTC+7, no DST)
@@ -1470,6 +1475,25 @@ def _signal_custom(df, i, params):
         if not in_win:
             return None
     return params.get("direction", "long")
+
+
+# Mined 2026-07-04 by app.strategy_search (1,596 combos, split-half filter):
+# the ONLY combo positive in both halves. n=39 (just under MIN_N=40) AND
+# best-of-1,596 → assume multiple-comparisons luck until the Monday re-rank
+# confirms it on fresh data. It does rhyme with the live-log edge (≈10:00 BKK
+# entries pay) and the ASIAN_DIP family. Shadow-track only — never alert.
+STRATEGIES["ASIAN_MORNING_LONG_v1"] = {
+    "description": "Asian-morning momentum long: bull 4h bar closing RSI≥60 with MACD hist still <0, BKK 06–11h. Mined 2026-07-04 (+22%/39tr, both halves green, PF 1.23). Shadow — thin, unproven.",
+    "signal_fn": _signal_custom,
+    "timeframe": "4h",
+    "params": {
+        "direction": "long", "candle": "bull", "macd": "bear", "rsi_min": 60,
+        "hour_from": 6, "hour_to": 11,
+        "stop_pct": 0.63, "tp_pct": 1.5, "leverage": 10.0,
+        "commission": 0.0015, "skip_sat": True, "cooldown_bars": 4,
+        "once_per_day": True,
+    },
+}
 
 
 def run_custom(params: dict, months: int = 30, initial_capital: float = 637.0) -> dict:
@@ -1491,6 +1515,7 @@ def run_custom(params: dict, months: int = 30, initial_capital: float = 637.0) -
     if params.get("rsi_min") is not None: bits.append(f"RSI≥{params['rsi_min']:g}")
     if params.get("trend"):  bits.append(f"trend {params['trend']}")
     if params.get("candle"): bits.append(f"{params['candle']} bar")
+    if params.get("macd"):   bits.append(f"MACD {params['macd']}")
     if params.get("hour_from") is not None and params.get("hour_to") is not None:
         bits.append(f"BKK {params['hour_from']:02d}–{params['hour_to']:02d}h")
     bits.append(f"SL {params.get('stop_pct', 1.0):g}% · TP {params.get('tp_pct', 1.5):g}% "

@@ -1442,6 +1442,7 @@ canvas{width:100%;height:200px;display:block}
       <select id="c-tf"><option value="1h">1h bars</option><option value="4h">4h bars</option></select>
       <select id="c-trend"><option value="">trend: any</option><option value="up">trend: up (EMA21&gt;50)</option><option value="down">trend: down (EMA21&lt;50)</option></select>
       <select id="c-candle"><option value="">bar: any</option><option value="bull">bar: bull close</option><option value="bear">bar: bear close</option></select>
+      <select id="c-macd"><option value="">MACD: any</option><option value="bull">MACD: bull (hist&gt;0)</option><option value="bear">MACD: bear (hist&lt;0)</option></select>
     </div>
     <div class="row" style="margin-bottom:12px">
       <label style="font-size:11px;color:var(--t2)">RSI ≤ <input id="c-rsimax" type="number" step="any" placeholder="off" class="c-n"></label>
@@ -1529,7 +1530,7 @@ function runCustom() {{
     months: parseInt(document.getElementById('months').value) || 24,
     initial_capital: parseFloat(document.getElementById('capital').value) || 637,
     timeframe: sel('c-tf'), direction: sel('c-dir'),
-    trend: sel('c-trend'), candle: sel('c-candle'),
+    trend: sel('c-trend'), candle: sel('c-candle'), macd: sel('c-macd'),
     rsi_max: num('c-rsimax'), rsi_min: num('c-rsimin'),
     hour_from: num('c-hf'), hour_to: num('c-ht'),
     stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10
@@ -1774,6 +1775,7 @@ class BtCustomRequest(BaseModel):
     rsi_min: float | None = None
     trend: str | None = None        # up | down
     candle: str | None = None       # bull | bear
+    macd: str | None = None         # bull | bear (histogram sign)
     hour_from: int | None = None    # Bangkok hours, window may wrap midnight
     hour_to: int | None = None
     stop_pct: float = 0.63
