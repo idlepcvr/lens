@@ -276,7 +276,9 @@ def run_search():
         "all": sorted(all_rows, key=lambda r: r["net_pct"], reverse=True)[:300],
     }
     with open("strategy_search.json", "w") as f:
-        json.dump(out, f, indent=1)
+        # numpy scalars (from the ATR-floor path) aren't JSON-serializable
+        json.dump(out, f, indent=1,
+                  default=lambda o: o.item() if hasattr(o, "item") else str(o))
 
     print(f"\n=== DONE in {time.time()-t0:.0f}s — {len(all_rows)} evaluated, "
           f"{len(surv_rows)} split-half survivors, "

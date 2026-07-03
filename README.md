@@ -440,32 +440,31 @@ missing tools — it's **reps in the journal.** Consistency and commits compound
 FOMO doesn't. This is a craft-persistence project, not a "keep adding surface
 area" project.
 
-## TODO — next session (updated 2026-07-04)
+## TODO — next session (updated 2026-07-04 late)
 
-**A. Signal trust / freshness — STILL OPEN.** `bar_age_min` is computed but
-only reaches the /desk API payload; the ntfy alert body has NO freshness/drift
-line, and expiry is a flat 180-min timer (`expire_stale_signals`), not the
-">0.5% price ran past entry" rule. Build both: freshness line in
-`_alert_message`, price-drift check in the hourly scan. Small, high-trust-value.
+**A ✅ DONE 2026-07-04** — alerts carry a "⏱ Live now" price+drift line;
+pending signals auto-expire when price runs >0.5% past entry (before pushing);
+same-idea signals (same direction, entry ±0.5%, approved <6h) auto-approve
+quietly — on /signals, no phone buzz. Verified live on a real repeat S3.
 
-**B. One geometry — STILL OPEN, and /desk help text is now stale** (says
-target +0.95% when the audit validated ~1.5%; board signals still emit
-per-strategy geometry via `_board_geo`). Decide the single source of truth and
-make desk plan / alert ticket / /audit / goal config read it.
+**B ✅ DONE 2026-07-04** — one geometry everywhere: `_board_geo` returns
+SL_PCT/TP_PCT (0.63/1.5); board picks WHICH strategy, never levels; /desk help
+text fixed.
 
-**C. Automated strategy search — ENGINE BUILT 2026-07-04** (`app/strategy_search.py`):
-sweeps the full build-your-own space (1h/4h × long/short × trend × candle ×
-MACD × RSI bands × BKK-hour windows) through the real backtest engine, then
-SL×TP geometry on survivors. Split-half filter: profitable in BOTH halves or
-it doesn't rank. Output → `strategy_search.json`. Re-run after data refreshes;
-promote survivors into `backtest_engine.STRATEGIES` so the Monday re-rank
-tracks them on fresh data. Still unbucketed from the 07-02 audit: trailing
-stop / BE-move exit sims, per-regime gating, time-based exits, order-flow
-features (needs new data).
+**C. Automated strategy search v2 — BUILT + RUN 2026-07-04**
+(`app/strategy_search.py`): ≤3-condition combos across trend/candle/MACD/RSI/
+BKK-sessions/Bollinger/TD-Sequential-9/triple-MA-stack/vol-spike/ATR-regime,
+real engine + 0.03%/side slippage, split-half filter, SL×TP×lev×ATR-floor
+sweep, 7y-binance deep confirmation, Kelly. **Last run: 2 survivors on 1h,
+0 on 4h — results in `strategy_search.json`** (a serialization crash ate the
+first run's output; re-run launched, check the file / re-run if missing:
+`python3 -m app.strategy_search`, ~13 min). NEXT: read the 2 survivors, decide
+promote-to-shadow vs discard; consider F&G / liquidity external feeds; trailing
+stop / BE-move exit sims still unbuilt. Pine export exists: `⧉ Pine` button on
+/edge builder → paste into TradingView.
 
-**D. Analytics coherence — MOSTLY DONE** (07-03 sessions rebuilt /analytics,
-/journal, /edge on the repaired data layer; minus-sign + snapshot bugs fixed).
-Residual: /calendar and /overview never explicitly re-checked.
+**D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
+(484 / −4405.83); /overview prop n=0 correct (book archived 06-30).
 
 **E. One dashboard click (you):** Parameters → rr_ratio (still 4.0 in config;
 plan said → 2.4) — decide and click, watch /audit flip the row.
