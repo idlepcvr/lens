@@ -1,20 +1,32 @@
-"""LENS /analytics — performance & risk dashboard from the hedge trade log.
+"""LENS /analytics — performance dashboard that reads itself.
 
-Pure analytics surface (no charts — those live in the Journal/Calendar trade
-modal). Fetches /api/review/analytics and renders performance, risk-adjusted
-ratios, actual-vs-model, and the duration breakdown that shows where the edge
-lives (long holds carry).
+Leads with THE READ: a plain-language interpretation of the trade log + the one
+iterative move the data argues for. Below it, an equity curve (toggleable series)
+and collapsible sections grouped by question: when you trade, how long you hold,
+the scorecard. Data from /api/review/equity (curve + timing) and
+/api/review/analytics (performance + risk + duration).
 """
 
 from .theme import shell
 
 _CSS = """
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-.an-sec{margin-bottom:20px}
+.an-sec{margin-bottom:16px}
 .an-h{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:0 0 9px;
   border-bottom:1px solid var(--line);padding-bottom:5px}
+/* collapsible section — native <details>, summary is the header */
+details.an-d{margin-bottom:16px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+details.an-d>summary{list-style:none;cursor:pointer;padding:11px 13px;font-size:11px;font-weight:700;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px;user-select:none}
+details.an-d>summary::-webkit-details-marker{display:none}
+details.an-d>summary::before{content:'▸';color:var(--faint);font-size:10px;transition:transform .15s}
+details.an-d[open]>summary::before{transform:rotate(90deg)}
+details.an-d>summary .sub{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px}
+details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700}
+.an-d-body{padding:0 13px 13px}
 .an-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px}
-.an-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.an-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .an-card .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .an-card .v{font-size:19px;font-weight:700;font-family:var(--mono)}
 .an-card .s{font-size:9px;color:var(--faint);margin-top:2px}
@@ -24,57 +36,214 @@ _CSS = """
 .an-tbl td{text-align:right;padding:5px 9px;border-bottom:1px solid var(--line);font-family:var(--mono)}
 .an-tbl tr.hot td{background:rgba(31,217,137,.10)}
 .g{color:var(--long)} .r{color:var(--short)}
+/* THE READ */
+.read{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px}
+.read h3{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin:0 0 10px}
+.read .lede{font-size:14px;line-height:1.5;color:var(--ink);margin:0 0 10px}
+.read ul{margin:0 0 12px;padding-left:18px}
+.read li{font-size:12.5px;line-height:1.55;color:var(--dim);margin-bottom:3px}
+.read li b{color:var(--ink);font-weight:600}
+.read .move{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:11px 13px}
+.read .move .lbl{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.read .move p{margin:0;font-size:13px;line-height:1.5;color:var(--ink)}
+.read .pos{color:var(--long)} .read .neg{color:var(--short)}
+/* equity chart */
+.an-chart-wrap{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px 6px}
+#eqchart{height:300px;width:100%}
+.an-tog{display:flex;gap:16px;font-size:11px;color:var(--dim);margin:2px 2px 8px;flex-wrap:wrap;align-items:center}
+.an-tog label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.an-tog .sw{display:inline-block;width:11px;height:3px;border-radius:2px}
+.an-tog b{font-family:var(--mono);font-weight:700}
 </style>
 """
 
 BODY = """
-<div id="analytics"><div style="padding:30px;color:var(--dim)">Loading analytics…</div></div>
+<div id="read"></div>
+<div class="an-sec">
+  <div class="an-h">Equity Curve</div>
+  <div class="an-chart-wrap">
+    <div class="an-tog">
+      <label><input type="checkbox" id="t-cum" checked><span class="sw" style="background:var(--accent)"></span>Cumulative realised P&amp;L <b id="lg-cum">—</b></label>
+      <label><input type="checkbox" id="t-bal" checked><span class="sw" style="background:var(--dim)"></span>Daily balance <b id="lg-bal">—</b></label>
+    </div>
+    <div id="eqchart"></div>
+  </div>
+</div>
+<div id="sections"><div style="padding:24px;color:var(--dim)">Loading…</div></div>
 """
 
 SCRIPT = r"""
-const eur=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(2);
+const eur=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(0);
+const eur2=v=>v==null?'—':(v>=0?'+':'')+'€'+Math.abs(v).toFixed(2);
 const pc=v=>v>=0?'var(--long)':'var(--short)';
-function render(a){
-  const host=document.getElementById('analytics');
-  if(!a||!a.n){host.innerHTML='<div style="padding:30px;color:var(--dim)">No closed trades yet.</div>';return;}
-  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
-  const perf=`<div class="an-sec"><div class="an-h">Performance · live from trade log</div><div class="an-grid">`+
-    card('Trades',a.n,a.open?a.open+' open':'')+
-    card('Win Rate',a.wr+'%',a.long_wr!=null?`L ${a.long_wr}% · S ${a.short_wr}%`:'')+
-    card('Net P&L',eur(a.total_pnl),'',pc(a.total_pnl))+
-    card('Expectancy',eur(a.expectancy),'per trade',pc(a.expectancy))+
-    card('Avg Win',eur(a.avg_win),'','var(--long)')+
-    card('Avg Loss',eur(-a.avg_loss),'','var(--short)')+
-    card('Actual R:R',a.rr!=null?a.rr+'×':'—','')+
-    card('Profit Factor',a.profit_factor!=null?a.profit_factor:'—','',a.profit_factor>=1?'var(--long)':'var(--short)')+
-    card('Total Fees',eur(-a.total_fees),'','var(--short)')+
-    card('Avg Duration',a.avg_dur_h!=null?a.avg_dur_h+'h':'—','')+
-    `</div></div>`;
-  const risk=`<div class="an-sec"><div class="an-h">Risk-adjusted</div><div class="an-grid">`+
-    card('Sharpe',a.sharpe,'per-trade · ann.',a.sharpe>=0?'var(--long)':'var(--short)')+
-    card('Sortino',a.sortino,'',a.sortino>=0?'var(--long)':'var(--short)')+
-    card('Max DD',eur(-a.max_dd_eur)+(a.max_dd_pct!=null?` · ${a.max_dd_pct}%`:''),'peak→trough','var(--short)')+
-    card('Win Streak',a.win_streak,'','var(--long)')+
-    card('Loss Streak',a.loss_streak,'','var(--short)')+
-    (a.cum_return!=null?card('Cum Return',a.cum_return+'%','',pc(a.cum_return)):card('Cum Return','—','set capital base'))+
-    (a.ann_return!=null?card('Ann Return',a.ann_return+'%','',pc(a.ann_return)):'')+
-    (a.calmar!=null?card('Calmar',a.calmar,''):'')+
-    `</div></div>`;
-  const dWR=a.wr-(a.model_wr||0), dRR=(a.rr||0)-(a.model_rr||0);
-  const avm=`<div class="an-sec"><div class="an-h">Actual vs Model</div><table class="an-tbl">
-    <tr><th>Metric</th><th>Model</th><th>Actual</th><th>Δ</th></tr>
-    <tr><td>Win Rate</td><td>${a.model_wr!=null?a.model_wr+'%':'—'}</td><td>${a.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
-    <tr><td>R:R</td><td>${a.model_rr!=null?a.model_rr+'×':'—'}</td><td>${a.rr!=null?a.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr>
-    </table></div>`;
-  const dur=`<div class="an-sec"><div class="an-h">Trade Duration Breakdown <span style="color:var(--faint);text-transform:none;font-weight:400">— where the edge lives</span></div><table class="an-tbl">
-    <tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>`+
-    a.duration.map(d=>`<tr class="${d.total>0&&d.n>=8?'hot':''}"><td>${d.label}</td><td>${d.n}</td><td>${d.w}</td><td>${d.l}</td>
-      <td style="color:${pc(d.total)}">${eur(d.total)}</td><td style="color:${pc(d.avg)}">${eur(d.avg)}</td></tr>`).join('')+
-    `</table></div>`;
-  host.innerHTML=perf+risk+avm+dur;
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let cumSeries=null, balSeries=null;
+
+Promise.all([
+  fetch('/api/review/equity').then(r=>r.json()),
+  fetch('/api/review/analytics').then(r=>r.json()),
+]).then(([E,A])=>{
+  if(!E||!E.n){document.getElementById('read').innerHTML='<div class="read"><p class="lede">No closed trades yet.</p></div>';return;}
+  drawEquity(E);
+  renderRead(E,A);
+  renderSections(E,A);
+}).catch(e=>{
+  document.getElementById('read').innerHTML='<div class="read"><p class="lede" style="color:var(--short)">Load error: '+e.message+'</p></div>';
+});
+
+// ── equity chart ────────────────────────────────────────────────────────────
+function drawEquity(d){
+  const accent=cssv('--accent')||'#1fd989', dim=cssv('--dim')||'#7a8699', line=cssv('--line')||'#1c2430';
+  const el=document.getElementById('eqchart');
+  const chart=LightweightCharts.createChart(el,{
+    width:el.clientWidth,height:300,
+    layout:{background:{color:'transparent'},textColor:dim,fontFamily:cssv('--mono')||'monospace'},
+    grid:{vertLines:{color:line},horzLines:{color:line}},
+    rightPriceScale:{borderColor:line},timeScale:{borderColor:line,timeVisible:false},
+    crosshair:{mode:0},
+  });
+  cumSeries=chart.addAreaSeries({lineColor:accent,topColor:accent+'44',bottomColor:accent+'05',
+    lineWidth:2,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
+  cumSeries.setData(d.equity.map(p=>({time:p.t,value:p.cum})));
+  if(d.daily&&d.daily.length){
+    balSeries=chart.addLineSeries({color:dim,lineWidth:1,lineStyle:2,priceLineVisible:false,
+      priceFormat:{type:'price',precision:0,minMove:1}});
+    balSeries.setData(d.daily.map(p=>({time:p.t,value:p.bal})));
+    document.getElementById('lg-bal').textContent='€'+d.daily[d.daily.length-1].bal.toFixed(0);
+  }
+  const lc=d.equity[d.equity.length-1].cum, lgc=document.getElementById('lg-cum');
+  lgc.textContent=eur(lc); lgc.style.color=pc(lc);
+  chart.timeScale().fitContent();
+  new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth})).observe(el);
+  document.getElementById('t-cum').onchange=e=>cumSeries&&cumSeries.applyOptions({visible:e.target.checked});
+  document.getElementById('t-bal').onchange=e=>balSeries&&balSeries.applyOptions({visible:e.target.checked});
 }
-fetch('/api/review/analytics').then(r=>r.json()).then(render).catch(e=>{
-  document.getElementById('analytics').innerHTML='<div style="padding:30px;color:var(--short)">Load error: '+e.message+'</div>';});
+
+// ── THE READ — interpret the numbers ────────────────────────────────────────
+function renderRead(E,A){
+  const active=x=>x.n>=3;                       // ignore near-empty buckets
+  const hods=E.hod.filter(active), dows=E.dow.filter(x=>x.n);
+  const bestH=hods.slice().sort((a,b)=>b.total-a.total)[0];
+  const worstH=hods.slice().sort((a,b)=>a.total-b.total)[0];
+  const bestD=dows.slice().sort((a,b)=>b.total-a.total)[0];
+  const worstD=dows.slice().sort((a,b)=>a.total-b.total)[0];
+  const hh=h=>String(h).padStart(2,'0')+':00';
+  // duration edge
+  const dur=(A.duration||[]).filter(x=>x.n);
+  const bleed=dur.filter(x=>x.total<0).sort((a,b)=>a.total-b.total);
+  const carry=dur.filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+  const worstDur=bleed[0], bestDur=carry[0];
+  const bleedSum=bleed.reduce((s,x)=>s+x.total,0);
+
+  // sober headline
+  const dep=E.net_deposit, bal=E.cur_bal, cum=E.cum_pnl;
+  let head;
+  if(dep>0){
+    const gone=Math.max(0,dep-bal), pct=Math.round(gone/dep*100);
+    head=`You've funded <b>€${dep.toFixed(0)}</b> of real cash into this account. The balance today is <b>€${bal.toFixed(0)}</b> — `+
+      `<span class="neg">~${pct}% of what you put in is gone</span>. Realised P&L across ${A.n} closed trades is `+
+      `<span class="neg">${eur2(cum)}</span>. This isn't noise; it's the strategy set not paying.`;
+  } else {
+    head=`Realised P&L across ${A.n} closed trades is <span class="${cum>=0?'pos':'neg'}">${eur2(cum)}</span>.`;
+  }
+
+  const li=[];
+  if(bestH&&worstH) li.push(`<b>Hours matter most.</b> Your money is made entering around <b>${hh(bestH.hour)}</b> `+
+    `(<span class="pos">${eur(bestH.total)}</span>) and lost around <b>${hh(worstH.hour)}</b> (<span class="neg">${eur(worstH.total)}</span>), Bangkok time.`);
+  if(bestD&&worstD&&bestD.label!==worstD.label) li.push(`<b>${bestD.label}</b> is your best weekday `+
+    `(<span class="pos">${eur(bestD.total)}</span>); <b>${worstD.label}</b> is the worst (<span class="neg">${eur(worstD.total)}</span>).`);
+  if(worstDur&&bestDur) li.push(`<b>Hold time splits you.</b> <b>${worstDur.label}</b> trades bleed `+
+    `(<span class="neg">${eur(worstDur.total)}</span>) while <b>${bestDur.label}</b> holds carry (<span class="pos">${eur(bestDur.total)}</span>).`);
+  if(A.profit_factor!=null) li.push(`Profit factor <b>${A.profit_factor}</b> and expectancy <b class="${A.expectancy>=0?'pos':'neg'}">${eur2(A.expectancy)}/trade</b> — `+
+    `${A.profit_factor>=1?'above':'below'} the line you need to grow.`);
+
+  // THE MOVE — the single iterative test the data argues for
+  let move;
+  const greenHrs=hods.filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,3).map(x=>hh(x.hour));
+  if(bleedSum<-200 && greenHrs.length){
+    move=`For the next 2 weeks, run a <b>subtraction test</b>: only take entries in your green windows `+
+      `(<b>${greenHrs.join(', ')}</b>)`+
+      (worstDur?` and stop closing in the <b>${worstDur.label}</b> band — either scratch faster or let it run past that`:'')+
+      `. Skip <b>${worstD?worstD.label:'your worst day'}</b> entirely. Then reopen this page — if the curve flattens, the bleed was timing, not the market.`;
+  } else {
+    move=`The edge is thin but not negative everywhere. Concentrate size into your best hour (<b>${bestH?hh(bestH.hour):'—'}</b>) `+
+      `and weekday (<b>${bestD?bestD.label:'—'}</b>), and treat everything else as sub-scale until it earns more trades.`;
+  }
+
+  document.getElementById('read').innerHTML=
+    `<div class="read"><h3>The Read</h3>`+
+    `<p class="lede">${head}</p>`+
+    `<ul>${li.map(x=>`<li>${x}</li>`).join('')}</ul>`+
+    `<div class="move"><div class="lbl">The move · one iterative test</div><p>${move}</p></div></div>`;
+}
+
+// ── collapsible sections ────────────────────────────────────────────────────
+function det(title,sub,tag,tagcol,body,open){
+  return `<details class="an-d"${open?' open':''}><summary>${title}`+
+    (sub?` <span class="sub">${sub}</span>`:'')+
+    (tag?`<span class="tag" style="color:${tagcol||'var(--dim)'}">${tag}</span>`:'')+
+    `</summary><div class="an-d-body">${body}</div></details>`;
+}
+function renderSections(E,A){
+  const maxAbs=arr=>Math.max(1,...arr.map(x=>Math.abs(x.total)));
+  const bar=(v,mx)=>`<div style="height:4px;border-radius:2px;width:${Math.min(100,Math.abs(v)/mx*100)}%;background:${pc(v)};opacity:.7"></div>`;
+  // when you trade
+  const dmx=maxAbs(E.dow), hmx=maxAbs(E.hod);
+  const dowRows=E.dow.filter(x=>x.n).map(x=>`<tr><td>${x.label}</td><td>${x.n}</td>
+    <td style="color:${pc(x.total)}">${eur(x.total)}</td><td style="color:${pc(x.avg)}">${eur2(x.avg)}</td><td>${bar(x.total,dmx)}</td></tr>`).join('');
+  const hodRows=E.hod.filter(x=>x.n).map(x=>`<tr><td>${String(x.hour).padStart(2,'0')}:00</td><td>${x.n}</td>
+    <td style="color:${pc(x.total)}">${eur(x.total)}</td><td style="color:${pc(x.avg)}">${eur2(x.avg)}</td><td>${bar(x.total,hmx)}</td></tr>`).join('');
+  const P=E.periods, perCard=(lbl,p)=>!p?'':`<div class="an-card"><div class="k">${lbl} · avg</div>`+
+    `<div class="v" style="color:${pc(p.avg)}">${eur2(p.avg)}</div><div class="s">best ${p.best?p.best.k+' '+eur(p.best.v):'—'} · worst ${p.worst?eur(p.worst.v):'—'}</div></div>`;
+  const timingBody=
+    `<div class="an-grid" style="margin-bottom:14px">${perCard('Per day',P.day)}${perCard('Per week',P.week)}${perCard('Per month',P.month)}</div>`+
+    `<div class="an-h">By weekday <span style="color:var(--faint);text-transform:none;font-weight:400">— entry day, Bangkok</span></div>`+
+    `<table class="an-tbl"><tr><th>Day</th><th>Trades</th><th>Total</th><th>Avg</th><th style="width:30%">·</th></tr>${dowRows}</table>`+
+    `<div class="an-h" style="margin-top:14px">By hour <span style="color:var(--faint);text-transform:none;font-weight:400">— entry hour, Bangkok</span></div>`+
+    `<table class="an-tbl"><tr><th>Hour</th><th>Trades</th><th>Total</th><th>Avg</th><th style="width:30%">·</th></tr>${hodRows}</table>`;
+
+  // how long you hold
+  const dur=A.duration||[];
+  const durRows=dur.map(d=>`<tr class="${d.total>0&&d.n>=8?'hot':''}"><td>${d.label}</td><td>${d.n}</td><td>${d.w}</td><td>${d.l}</td>
+    <td style="color:${pc(d.total)}">${eur2(d.total)}</td><td style="color:${pc(d.avg)}">${eur2(d.avg)}</td></tr>`).join('');
+  const durBody=`<table class="an-tbl"><tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>${durRows}</table>`;
+
+  // scorecard
+  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
+  const perf=`<div class="an-grid">`+
+    card('Trades',A.n,A.open?A.open+' open':'')+
+    card('Win Rate',A.wr+'%',A.long_wr!=null?`L ${A.long_wr}% · S ${A.short_wr}%`:'')+
+    card('Net P&L',eur2(A.total_pnl),'',pc(A.total_pnl))+
+    card('Expectancy',eur2(A.expectancy),'per trade',pc(A.expectancy))+
+    card('Avg Win',eur2(A.avg_win),'','var(--long)')+
+    card('Avg Loss',eur2(-A.avg_loss),'','var(--short)')+
+    card('Actual R:R',A.rr!=null?A.rr+'×':'—','')+
+    card('Profit Factor',A.profit_factor!=null?A.profit_factor:'—','',A.profit_factor>=1?'var(--long)':'var(--short)')+
+    card('Total Fees',eur2(-A.total_fees),'','var(--short)')+
+    card('Avg Duration',A.avg_dur_h!=null?A.avg_dur_h+'h':'—','')+`</div>`;
+  const dWR=A.wr-(A.model_wr||0), dRR=(A.rr||0)-(A.model_rr||0);
+  const risk=`<div class="an-h" style="margin-top:14px">Risk-adjusted</div><div class="an-grid">`+
+    card('Sharpe',A.sharpe,'per-trade · ann.',A.sharpe>=0?'var(--long)':'var(--short)')+
+    card('Sortino',A.sortino,'',A.sortino>=0?'var(--long)':'var(--short)')+
+    card('Max DD',eur2(-A.max_dd_eur)+(A.max_dd_pct!=null?` · ${A.max_dd_pct}%`:''),'peak→trough','var(--short)')+
+    card('Win Streak',A.win_streak,'','var(--long)')+
+    card('Loss Streak',A.loss_streak,'','var(--short)')+
+    (A.cum_return!=null?card('Cum Return',A.cum_return+'%','',pc(A.cum_return)):card('Cum Return','—','set capital base'))+
+    (A.ann_return!=null?card('Ann Return',A.ann_return+'%','',pc(A.ann_return)):'')+
+    (A.calmar!=null?card('Calmar',A.calmar,''):'')+`</div>`;
+  const avm=`<div class="an-h" style="margin-top:14px">Actual vs Model</div><table class="an-tbl">
+    <tr><th>Metric</th><th>Model</th><th>Actual</th><th>Δ</th></tr>
+    <tr><td>Win Rate</td><td>${A.model_wr!=null?A.model_wr+'%':'—'}</td><td>${A.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
+    <tr><td>R:R</td><td>${A.model_rr!=null?A.model_rr+'×':'—'}</td><td>${A.rr!=null?A.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr></table>`;
+
+  const bestH=E.hod.filter(x=>x.n>=3).slice().sort((a,b)=>b.total-a.total)[0];
+  document.getElementById('sections').innerHTML=
+    det('When you trade','timing edge — hours &amp; days',bestH?'best '+String(bestH.hour).padStart(2,'0')+':00':'',
+        'var(--long)',timingBody,true)+
+    det('How long you hold','duration breakdown — where the edge lives','',
+        '',durBody,false)+
+    det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false);
+}
 """
 
 ANALYTICS_HTML = shell("/analytics", "Analytics", BODY, script=SCRIPT,

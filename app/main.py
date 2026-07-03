@@ -2011,6 +2011,12 @@ def api_review_analytics():
     return review_analytics()
 
 
+@app.get("/api/review/equity")
+def api_review_equity():
+    from .review import equity_timing
+    return equity_timing()
+
+
 @app.get("/api/review/ohlcv")
 def api_review_ohlcv():
     return get_ohlcv_1h()

@@ -326,6 +326,107 @@ def review_analytics(book: str = None) -> dict:
     }
 
 
+def equity_timing(book: str = None) -> dict:  # book=None → all books, to match review_analytics on the same page
+    """Equity curve + time-of-play breakdowns for the /analytics page.
+
+    Returns:
+      equity  — per closed trade: {t: closed date, cum: cumulative realised P&L,
+                bal: balance_after}. The sobering line from the beginning.
+      daily   — end-of-day balance from daily_snapshots (the smoothed curve).
+      dow     — P&L grouped by weekday of ENTRY (what days pay).
+      hod     — P&L grouped by hour of ENTRY, Bangkok time (what hours pay).
+      periods — avg/best P&L per day, week, month.
+    Hours use a fixed UTC+7 (Bangkok has no DST, so the offset is exact)."""
+    import datetime as _dt
+    conn = sqlite3.connect(DB_PATH)
+    where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
+    params: list = []
+    if book:
+        where += " AND book = ?"; params.append(book)
+    rows = conn.execute(
+        f"SELECT pnl, opened_at, closed_at, balance_after FROM trades "
+        f"WHERE {where} ORDER BY closed_at", params
+    ).fetchall()
+    snaps = conn.execute(
+        "SELECT snapshot_date, eur_balance FROM daily_snapshots "
+        "WHERE eur_balance IS NOT NULL ORDER BY snapshot_date"
+    ).fetchall()
+    # net EUR actually put into the account (deposits − withdrawals) — the real
+    # "how much went in". xbt/eth/fee legs are in-kind noise, EUR is the cash.
+    net_dep = conn.execute(
+        "SELECT COALESCE(SUM(amount),0) FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
+    ).fetchone()[0]
+    conn.close()
+    if not rows:
+        return {"n": 0}
+
+    BKK = _dt.timezone(_dt.timedelta(hours=7))
+    def _parse(s):
+        try:
+            return _dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    # equity curve — cumulative realised P&L per trade. lightweight-charts wants a
+    # strictly-ascending time axis; many trades share a second (partial closes), so
+    # nudge each duplicate +1s to keep it monotonic without shifting the shape.
+    eq, equity, last_ts = 0.0, [], 0
+    for pnl, _o, closed, bal in rows:
+        eq += pnl
+        dt = _parse(closed)
+        ts = int(dt.timestamp()) if dt else last_ts + 1
+        if ts <= last_ts:
+            ts = last_ts + 1
+        last_ts = ts
+        equity.append({"t": ts, "cum": round(eq, 2),
+                       "bal": round(bal, 2) if bal is not None else None})
+
+    # daily balance — midnight-UTC seconds so it shares the equity axis
+    daily = []
+    for d, b in snaps:
+        dt = _parse(d + "T00:00:00+00:00")
+        if dt:
+            daily.append({"t": int(dt.timestamp()), "bal": round(b, 2)})
+
+    # weekday & hour of entry, and per-period sums — one pass over trades
+    dow_pnl = [[0.0, 0] for _ in range(7)]          # [total, count] Mon..Sun
+    hod_pnl = [[0.0, 0] for _ in range(24)]
+    by_day, by_week, by_month = {}, {}, {}
+    for pnl, opened, _c, _b in rows:
+        dt = _parse(opened)
+        if dt:
+            local = dt.astimezone(BKK)
+            dow_pnl[local.weekday()][0] += pnl; dow_pnl[local.weekday()][1] += 1
+            hod_pnl[local.hour][0] += pnl; hod_pnl[local.hour][1] += 1
+            by_day[local.strftime("%Y-%m-%d")] = by_day.get(local.strftime("%Y-%m-%d"), 0.0) + pnl
+            iso = local.isocalendar()
+            wk = f"{iso[0]}-W{iso[1]:02d}"
+            by_week[wk] = by_week.get(wk, 0.0) + pnl
+            mo = local.strftime("%Y-%m")
+            by_month[mo] = by_month.get(mo, 0.0) + pnl
+
+    DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    dow = [{"label": DOW[i], "n": c, "total": round(t, 2),
+            "avg": round(t / c, 2) if c else 0.0} for i, (t, c) in enumerate(dow_pnl)]
+    hod = [{"hour": h, "n": c, "total": round(t, 2),
+            "avg": round(t / c, 2) if c else 0.0} for h, (t, c) in enumerate(hod_pnl)]
+
+    def _period(d):
+        vals = list(d.values())
+        best_k = max(d, key=d.get) if d else None
+        worst_k = min(d, key=d.get) if d else None
+        return {"n": len(vals), "avg": round(sum(vals) / len(vals), 2) if vals else 0.0,
+                "best": {"k": best_k, "v": round(d[best_k], 2)} if best_k else None,
+                "worst": {"k": worst_k, "v": round(d[worst_k], 2)} if worst_k else None}
+    periods = {"day": _period(by_day), "week": _period(by_week), "month": _period(by_month)}
+
+    cur_bal = daily[-1]["bal"] if daily else (equity[-1]["bal"] if equity else None)
+    return {"n": len(rows), "equity": equity, "daily": daily,
+            "dow": dow, "hod": hod, "periods": periods,
+            "net_deposit": round(net_dep, 2), "cur_bal": cur_bal,
+            "cum_pnl": equity[-1]["cum"] if equity else 0.0}
+
+
 def get_ohlcv_1h() -> list:
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
