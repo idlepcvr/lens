@@ -1400,6 +1400,7 @@ canvas{width:100%;height:200px;display:block}
 .hm th.hm-corner,.hm tbody th{text-align:right;color:var(--t2)}
 .hm td.hm-cell{width:56px;height:34px;text-align:center;font-size:11px;border:1px solid var(--b1);color:var(--t1)}
 .hm td.hm-base{outline:2px solid var(--t1);outline-offset:-2px}
+.c-n{width:72px;background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--mono);margin-left:4px}
 </style>"""
 
     body = f"""
@@ -1427,6 +1428,34 @@ canvas{width:100%;height:200px;display:block}
   <button class="run" id="run-btn" onclick="runBacktest()">▶ Run</button>
   <button id="sweep-btn" onclick="runSweep()" title="Re-run this strategy across a grid of stop-loss × take-profit to see if the edge is robust or a lucky single point">⊞ Sweep SL×TP</button>
   <span id="status"></span>
+</div>
+
+<div class="sect closed" id="h-custom" onclick="tog('custom')"><span class="caret">▾</span><span class="ttl">🛠 build your own strategy</span><span class="line"></span></div>
+<div class="sec-body closed" id="s-custom">
+  <div class="card" style="margin-top:8px">
+    <div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.55">
+      Pick entry conditions — every <b>set</b> condition must hold (AND), blank/any = ignored.
+      Runs through the <b>exact same engine</b> as the coded strategies (same fills, fees, discipline gates),
+      over the months &amp; starting balance selected above. Hours are Bangkok time, window may wrap midnight.</div>
+    <div class="row" style="margin-bottom:12px">
+      <select id="c-dir"><option value="long">LONG</option><option value="short">SHORT</option></select>
+      <select id="c-tf"><option value="1h">1h bars</option><option value="4h">4h bars</option></select>
+      <select id="c-trend"><option value="">trend: any</option><option value="up">trend: up (EMA21&gt;50)</option><option value="down">trend: down (EMA21&lt;50)</option></select>
+      <select id="c-candle"><option value="">bar: any</option><option value="bull">bar: bull close</option><option value="bear">bar: bear close</option></select>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <label style="font-size:11px;color:var(--t2)">RSI ≤ <input id="c-rsimax" type="number" step="any" placeholder="off" class="c-n"></label>
+      <label style="font-size:11px;color:var(--t2)">RSI ≥ <input id="c-rsimin" type="number" step="any" placeholder="off" class="c-n"></label>
+      <label style="font-size:11px;color:var(--t2)">BKK hour <input id="c-hf" type="number" min="0" max="23" placeholder="from" class="c-n" style="width:58px">–<input id="c-ht" type="number" min="0" max="23" placeholder="to" class="c-n" style="width:58px"></label>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <label style="font-size:11px;color:var(--t2)">SL % <input id="c-sl" type="number" step="any" value="0.63" class="c-n"></label>
+      <label style="font-size:11px;color:var(--t2)">TP % <input id="c-tp" type="number" step="any" value="1.5" class="c-n"></label>
+      <label style="font-size:11px;color:var(--t2)">Lev × <input id="c-lev" type="number" step="any" value="10" class="c-n" style="width:58px"></label>
+      <button class="run" id="custom-btn" onclick="runCustom()">▶ Backtest it</button>
+    </div>
+    <div style="font-size:10px;color:var(--t3)">Results render in the same scorecard below. Mined in-sample — a green result is a candidate to sweep &amp; forward-test, not a green light.</div>
+  </div>
 </div>
 
 <div id="sweep-wrap" style="display:none">
@@ -1491,6 +1520,37 @@ function runBacktest() {{
     renderResults(d);
   }})
   .catch(function(e) {{ btn.disabled = false; btn.textContent = '▶ Run'; stat.textContent = 'Failed: ' + e; }});
+}}
+
+function runCustom() {{
+  var num = function(id) {{ var v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); }};
+  var sel = function(id) {{ return document.getElementById(id).value || null; }};
+  var body = {{
+    months: parseInt(document.getElementById('months').value) || 24,
+    initial_capital: parseFloat(document.getElementById('capital').value) || 637,
+    timeframe: sel('c-tf'), direction: sel('c-dir'),
+    trend: sel('c-trend'), candle: sel('c-candle'),
+    rsi_max: num('c-rsimax'), rsi_min: num('c-rsimin'),
+    hour_from: num('c-hf'), hour_to: num('c-ht'),
+    stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10
+  }};
+  var btn = document.getElementById('custom-btn');
+  var stat = document.getElementById('status');
+  btn.disabled = true; btn.textContent = '⏳ Running…';
+  stat.textContent = 'Backtesting your strategy…';
+  fetch('/api/backtest/custom', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(body)
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(d) {{
+    btn.disabled = false; btn.textContent = '▶ Backtest it';
+    if (d.error) {{ stat.textContent = 'Error: ' + d.error; return; }}
+    stat.textContent = '';
+    renderResults(d);
+    document.getElementById('results').scrollIntoView({{behavior:'smooth'}});
+  }})
+  .catch(function(e) {{ btn.disabled = false; btn.textContent = '▶ Backtest it'; stat.textContent = 'Failed: ' + e; }});
 }}
 
 function runSweep() {{
@@ -1671,7 +1731,7 @@ function drawChart(curve) {{
 
 @app.get("/backtest")
 def backtest_redirect():
-    return RedirectResponse("/strategy#backtest", status_code=301)
+    return RedirectResponse("/edge#backtest", status_code=301)
 
 
 class BtRunRequest(BaseModel):
@@ -1700,6 +1760,41 @@ def api_backtest_sweep(req: BtRunRequest):
     try:
         from app.backtest_engine import sweep_strategy as _sweep
         return _sweep(req.name, months=req.months, initial_capital=req.initial_capital)
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
+
+
+class BtCustomRequest(BaseModel):
+    months: int = 24
+    initial_capital: float = 637.0
+    timeframe: str = "1h"
+    direction: str = "long"
+    rsi_max: float | None = None
+    rsi_min: float | None = None
+    trend: str | None = None        # up | down
+    candle: str | None = None       # bull | bear
+    hour_from: int | None = None    # Bangkok hours, window may wrap midnight
+    hour_to: int | None = None
+    stop_pct: float = 0.63
+    tp_pct: float = 1.5
+    leverage: float = 10.0
+    cooldown_bars: int = 4
+    once_per_day: bool = True
+    skip_sat: bool = True
+
+
+@app.post("/api/backtest/custom")
+def api_backtest_custom(req: BtCustomRequest):
+    """Backtest a user-built parametric strategy (the /edge 'build your own')."""
+    if req.timeframe not in ("1h", "4h"):
+        return {"error": "timeframe must be 1h or 4h"}
+    if req.direction not in ("long", "short"):
+        return {"error": "direction must be long or short"}
+    try:
+        from app.backtest_engine import run_custom
+        params = req.model_dump(exclude_none=True)
+        return run_custom(params, months=req.months, initial_capital=req.initial_capital)
     except Exception as e:
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
@@ -1762,10 +1857,23 @@ def analytics_page():
     return ANALYTICS_HTML
 
 
+@app.get("/money", response_class=HTMLResponse)
+def money_page():
+    from .money_page import render_page
+    return render_page()
+
+
+@app.get("/api/money")
+def api_money(refresh: bool = Query(False)):
+    from .money_page import money_data
+    return money_data(refresh=refresh)
+
+
 @app.get("/edge", response_class=HTMLResponse)
 def edge_page():
     from .edge_page import render_page
-    return render_page()
+    css, body, script = _backtest_fragment()
+    return render_page(bt_css=css, bt_body=body, bt_script=script)
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
@@ -1783,17 +1891,15 @@ def prop_page():
     return goals_page()
 
 
-@app.get("/strategy", response_class=HTMLResponse)
+# Both boards + the backtest runner live on /edge now (one page, three tenses).
+@app.get("/strategy")
 def strategy_engine():
-    from .prop_views import strategy_page
-    css, body, script = _backtest_fragment()
-    return strategy_page("prop", extra_css=css, extra_body=body, extra_script=script)
+    return RedirectResponse("/edge#board", status_code=301)
 
 
 @app.get("/strategy-hedge")
 def strategy_engine_hedge():
-    # hedge board now lives on /edge (live + simulated, one page)
-    return RedirectResponse("/edge#simulated", status_code=301)
+    return RedirectResponse("/edge#board", status_code=301)
 
 
 @app.get("/risk", response_class=HTMLResponse)

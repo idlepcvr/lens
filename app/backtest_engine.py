@@ -805,6 +805,12 @@ def _signal_live_scalp_v1(df, i, params):
 
 def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
                   initial_capital: float = 637.0) -> dict:
+    # bar duration for hours_held — infer from the data so 1h strategies don't
+    # report 4× their true hold time (was hardcoded ×4)
+    try:
+        bar_hours = (df.index[1] - df.index[0]).total_seconds() / 3600.0
+    except Exception:
+        bar_hours = 4.0
     stop_pct    = params.get("stop_pct",    1.0) / 100
     tp_pct      = params.get("tp_pct",      4.0) / 100
     leverage    = params.get("leverage",   10.0)
@@ -867,7 +873,7 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
                     "pnl_pct":    round(net_pct * 100, 2),
                     "equity":     round(equity, 2),
                     "bars_held":  bars_held,
-                    "hours_held": round(bars_held * 4, 1),
+                    "hours_held": round(bars_held * bar_hours, 1),
                 })
                 in_trade = False
 
@@ -1428,6 +1434,74 @@ def run_strategy(name: str, months: int = 30,
         "trades":      result["trades"],
         "equity_curve": eq_daily.to_dict("records"),
         "params":      strat["params"],
+        "months":      months,
+        "ran_at":      datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ─── Custom strategy — the /edge "build your own" backtester ─────────────────
+
+def _signal_custom(df, i, params):
+    """Parametric entry: every SET condition must hold (AND); unset = ignored.
+    Same fn contract as the coded strategies — called on confirmed bar close."""
+    if i < 60:
+        return None
+    row = df.iloc[i]
+    rsi_max = params.get("rsi_max")
+    if rsi_max is not None and not (row["rsi14"] <= rsi_max):
+        return None
+    rsi_min = params.get("rsi_min")
+    if rsi_min is not None and not (row["rsi14"] >= rsi_min):
+        return None
+    trend = params.get("trend")             # 'up' | 'down'
+    if trend == "up" and not (row["ema21"] > row["ema50"]):
+        return None
+    if trend == "down" and not (row["ema21"] < row["ema50"]):
+        return None
+    candle = params.get("candle")           # 'bull' | 'bear'
+    if candle == "bull" and not (row["close"] > row["open"]):
+        return None
+    if candle == "bear" and not (row["close"] < row["open"]):
+        return None
+    hf, ht = params.get("hour_from"), params.get("hour_to")
+    if hf is not None and ht is not None:
+        h = (df.index[i].hour + 7) % 24     # Bangkok hour (UTC+7, no DST)
+        in_win = (hf <= h <= ht) if hf <= ht else (h >= hf or h <= ht)  # window may wrap midnight
+        if not in_win:
+            return None
+    return params.get("direction", "long")
+
+
+def run_custom(params: dict, months: int = 30, initial_capital: float = 637.0) -> dict:
+    """Backtest a user-built parametric strategy through the exact same engine
+    as the coded ones — same fills, fees, discipline gates, metrics."""
+    tf = params.get("timeframe", "1h")
+    df = load_ohlcv(months=months, timeframe=tf)
+    df = add_indicators(df)
+    result  = _run_backtest(df, _signal_custom, params, initial_capital)
+    metrics = _compute_metrics(result, initial_capital, months)
+
+    eq_df = pd.DataFrame(result["equity_curve"])
+    eq_df["date"] = pd.to_datetime(eq_df["date"])
+    eq_daily = eq_df.set_index("date").resample("1D").last().dropna().reset_index()
+    eq_daily["date"] = eq_daily["date"].dt.strftime("%Y-%m-%d")
+
+    bits = [params.get("direction", "long").upper(), tf]
+    if params.get("rsi_max") is not None: bits.append(f"RSI≤{params['rsi_max']:g}")
+    if params.get("rsi_min") is not None: bits.append(f"RSI≥{params['rsi_min']:g}")
+    if params.get("trend"):  bits.append(f"trend {params['trend']}")
+    if params.get("candle"): bits.append(f"{params['candle']} bar")
+    if params.get("hour_from") is not None and params.get("hour_to") is not None:
+        bits.append(f"BKK {params['hour_from']:02d}–{params['hour_to']:02d}h")
+    bits.append(f"SL {params.get('stop_pct', 1.0):g}% · TP {params.get('tp_pct', 1.5):g}% "
+                f"· {params.get('leverage', 10):g}x")
+    return {
+        "strategy":    "CUSTOM",
+        "description": " · ".join(bits),
+        "metrics":     metrics,
+        "trades":      result["trades"],
+        "equity_curve": eq_daily.to_dict("records"),
+        "params":      params,
         "months":      months,
         "ran_at":      datetime.now(timezone.utc).isoformat(),
     }

@@ -1,13 +1,14 @@
-"""LENS /edge — the strategy page for the hedge book, one question three tenses.
+"""LENS /edge — THE strategy page, one question in three tenses.
 
-PAST      — realised performance per setup family from YOUR live trades
+#past     — realised performance per setup family from YOUR live trades
             (auto-tagged on sync, verdict from expectancy · WR · sample).
-SIMULATED — the coded strategies replayed over the full candle history
-            (the board that used to live at /strategy-hedge, now embedded;
-            that route redirects here).
+#board    — the coded strategies replayed over the full candle history,
+            hedge/prop toggle (was /strategy-hedge + /strategy; both redirect here).
+#backtest — the interactive runner + SL×TP sweep + build-your-own
+            (was /backtest; redirects here).
 
-Live results and backtest ranks are different measurements of the same
-question — "which setups pay?" — so they live on one page.
+Live results, backtest ranks and the runner are different measurements of the
+same question — "which setups pay?" — so they live on one page.
 """
 
 from .theme import shell
@@ -15,9 +16,15 @@ from .theme import shell
 _CSS = """
 <style>
 .ed-sub{color:var(--dim);font-size:12px;margin:2px 0 14px}
-.ed-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:26px 0 4px}
+.ed-anchors{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 18px}
+.ed-anchors a{font-family:var(--mono);font-size:11px;color:var(--dim);text-decoration:none;padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.ed-anchors a:hover{color:var(--ink);border-color:var(--line2)}
+.ed-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:26px 0 4px;scroll-margin-top:70px}
 .ed-h:first-of-type{margin-top:0}
 .ed-hs{color:var(--dim);font-size:12px;margin-bottom:12px}
+.ed-mode{display:flex;gap:5px;margin:0 0 10px}
+.ed-mode button{padding:3px 14px;border:1px solid var(--line2);background:transparent;color:var(--dim);font-size:11px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
+.ed-mode button.on{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:700}
 .ed-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .ed-tbl th{text-align:right;color:var(--dim);font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:9px;letter-spacing:.05em}
 .ed-tbl th:first-child,.ed-tbl td:first-child{text-align:left}
@@ -29,7 +36,7 @@ _CSS = """
 """
 
 _LIVE = """
-<div class="ed-h">Past — your live trades</div>
+<div class="ed-h" id="past">Past — your live trades</div>
 <div class="ed-hs">Realised edge per setup family · auto-tagged on sync · verdict from expectancy · WR · sample</div>
 <div class="panel" style="overflow-x:auto">
   <table class="ed-tbl">
@@ -82,7 +89,24 @@ fetch('/api/review/trades').then(r=>r.json()).then(render).catch(e=>{
 """
 
 
-def render_page() -> str:
+_MODE_JS = r"""
+(function(){
+  const btns=document.querySelectorAll('.ed-mode button');
+  function setMode(m){
+    btns.forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+    document.getElementById('board-hedge').style.display=m==='hedge'?'':'none';
+    document.getElementById('board-prop').style.display=m==='prop'?'':'none';
+    try{localStorage.setItem('edge-board-mode',m);}catch(e){}
+  }
+  btns.forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  let m='hedge'; try{m=localStorage.getItem('edge-board-mode')||'hedge';}catch(e){}
+  setMode(m);
+})();
+"""
+
+
+def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str:
+    """bt_* = the backtest-runner fragment (built in main.py, embedded as #backtest)."""
     from .prop_views import _board, _CSS as PV_CSS
     from .strategy_eval import load_cache
 
@@ -91,24 +115,40 @@ def render_page() -> str:
         rl = d["r_levels"]
         gen = d["generated_at"][:16].replace("T", " ")
         board = (
-            f'<div class="ed-h" id="simulated">Simulated — the rules replayed</div>'
+            f'<div class="ed-h" id="board">Simulated — the rules replayed</div>'
             f'<div class="ed-hs">Same question, no you in it: each coded strategy run over the full '
             f'candle history ({d["span"][0]} → {d["span"][1]}), ranked by net R after {d["fee_pct"]}% '
             f'round-trip fees · first-touch at R = {rl[0]:g}–{rl[-1]:g} · refreshed {gen}. '
+            f'Same engine and scoring for both books, different candidate sets: '
+            f'<b>hedge</b> = 1h bar-context scalp setups, <b>prop</b> = the 4H/1H Asian-dip family. '
             f'<b>thin</b> = the pattern fired &lt;40× in the entire history — too few occurrences to '
-            f'rank (samples can\'t be generated, only more history or a looser pattern creates them). '
-            f'Prop-account board + run-it-yourself backtester → '
-            f'<a href="/strategy" style="color:var(--accent)">Strategy (prop)</a></div>'
-            f'<div class="pv">{_board(d["results"], "hedge", rl)}</div>'
+            f'rank (samples can\'t be generated, only more history or a looser pattern creates them).</div>'
+            f'<div class="ed-mode">'
+            f'<button data-m="hedge">HEDGE</button><button data-m="prop">PROP</button></div>'
+            f'<div class="pv">'
+            f'<div id="board-hedge">{_board(d["results"], "hedge", rl)}</div>'
+            f'<div id="board-prop" style="display:none">{_board(d["results"], "prop", rl)}</div>'
+            f'<div class="panel"><h2>Read</h2><div class="prose">'
+            f'Each cell is <strong>net R per trade</strong> at that target multiple — green = profitable '
+            f'after fees. <strong>score</strong> sums the profitable cells weighted by R, so a strategy '
+            f'that still pays at 3R outranks one that only pays at 1R. Top 3 are highlighted. '
+            f'Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>'
+            f'</div>'
         )
-        head = _CSS + PV_CSS
+        head = _CSS + PV_CSS + bt_css
+        script = SCRIPT + _MODE_JS + bt_script
     else:
-        board = ('<div class="ed-h" id="simulated">Simulated — the rules replayed</div>'
+        board = ('<div class="ed-h" id="board">Simulated — the rules replayed</div>'
                  '<div class="ed-hs">No rankings cached yet — run '
                  '<code>python3 -m app.strategy_eval</code>.</div>')
-        head = _CSS
+        head = _CSS + bt_css
+        script = SCRIPT + bt_script
 
-    body = ('<div class="ed-sub">Which setups pay? Two tenses of one question: what your '
-            'trades actually did, and what the coded rules would have done.</div>'
-            + _LIVE + board)
-    return shell("/edge", "Edge", body, script=SCRIPT, head_extra=head, meta="which setups pay?")
+    anchors = ('<div class="ed-anchors">'
+               '<a href="#past">↓ Past · live results</a>'
+               '<a href="#board">↓ Board · simulated ranks</a>'
+               '<a href="#backtest">↓ Backtest · run &amp; build</a></div>')
+    body = ('<div class="ed-sub">Which setups pay? One page, three tenses: what your trades '
+            'actually did, what the coded rules would have done, and a runner to test the next idea.</div>'
+            + anchors + _LIVE + board + bt_body)
+    return shell("/edge", "Edge", body, script=script, head_extra=head, meta="which setups pay?")

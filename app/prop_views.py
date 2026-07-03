@@ -216,20 +216,6 @@ def _r_cols(rows, r_levels):
     return out
 
 
-# mode -> (route, nav label, page title, blurb)
-_BOARD_META = {
-    "prop": ("/strategy", "Strategy", "Strategy Board — PROP",
-             "Strategies for the <b>prop eval account</b> — the Asian-dip family, scored on the real 4H/1H backtest. "
-             "These are <b>simulated</b> ranks over 7 yrs of candles, not your live results — those live on "
-             '<a href="/edge" style="color:var(--accent)">Edge</a>. '
-             "<b>thin</b> = the pattern fired &lt;40× in the entire history; too few occurrences to trust a rank "
-             "(more samples need more history or a looser pattern, they can't be generated)."),
-    "hedge": ("/strategy-hedge", "Board", "Strategy Board — HEDGE",
-              "Strategies for the <b>hedge book</b> — 1h bar-context scalp setups. Simulated ranks, not live results "
-              '(live = <a href="/edge" style="color:var(--accent)">Edge</a>).'),
-}
-
-
 def _board(results, mode, r_levels):
     ranked = sorted([o for o in results if o["mode"] == mode and not o["thin"]],
                     key=lambda x: x["rank"])
@@ -266,34 +252,7 @@ def _board(results, mode, r_levels):
   </div>"""
 
 
-def strategy_page(mode="prop", extra_css="", extra_body="", extra_script=""):
-    """Board page; extra_* lets /strategy embed the backtest runner below the board."""
-    from .strategy_eval import load_cache
-    path, label, title, blurb = _BOARD_META[mode]
-    d = load_cache()
-    if not d:
-        return shell(path, label,
-                     f'<div class="pv"><h1>{title}</h1><div class="panel">'
-                     'No rankings cached yet. Run <code>python3 -m app.strategy_eval</code> '
-                     'to score every strategy.</div></div>' + extra_body,
-                     head_extra=_CSS + extra_css, script=extra_script, meta="strategy board")
-    rl = d["r_levels"]
-    gen = d["generated_at"][:16].replace("T", " ")
-    sub = (f'{blurb} Ranked after fees. '
-           f'<span style="color:var(--faint)">R = {rl[0]:g}–{rl[-1]:g}, first-touch, net of {d["fee_pct"]}% round-trip · '
-           f'{d["span"][0]} → {d["span"][1]} · refreshed {gen}</span>')
-    body = f"""
-<div class="pv">
-  <h1>{title}</h1>
-  <div class="sub">{sub}</div>
-  {_board(d['results'], mode, rl)}
-  <div class="panel"><h2>Read</h2><div class="prose">
-    Each cell is <strong>net R per trade</strong> at that target multiple — green = profitable after fees.
-    <strong>score</strong> sums the profitable cells weighted by R, so a strategy that still pays at 3R outranks
-    one that only pays at 1R. Top 3 are highlighted.
-    Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>
-</div>{extra_body}"""
-    return shell(path, label, body, head_extra=_CSS + extra_css, script=extra_script, meta="strategy board")
+# strategy_page deleted — both boards render inside /edge (edge_page.render_page).
 
 
 # ── /risk — Risk Engine ───────────────────────────────────────────────────────

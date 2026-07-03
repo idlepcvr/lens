@@ -353,14 +353,18 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
     ).fetchall()
     # EUR cash actually moved — gross deposits, gross withdrawals, and the raw
     # list for the cash-flow table. xbt/eth/fee legs are in-kind noise, EUR is the cash.
+    # biz-account transfers (venue kraken_futures_biz, synced by /money) are the
+    # business book — keep them out of the personal cash-flow numbers here
     dep_in, dep_out = conn.execute(
         "SELECT COALESCE(SUM(CASE WHEN amount>0 THEN amount END),0),"
         "       COALESCE(SUM(CASE WHEN amount<0 THEN -amount END),0)"
         " FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
+        " AND COALESCE(venue,'') <> 'kraken_futures_biz'"
     ).fetchone()
     xfers = conn.execute(
         "SELECT ts, transfer_type, amount FROM transfers "
-        "WHERE asset IN ('eur','ZEUR','EUR') ORDER BY ts DESC"
+        "WHERE asset IN ('eur','ZEUR','EUR')"
+        " AND COALESCE(venue,'') <> 'kraken_futures_biz' ORDER BY ts DESC"
     ).fetchall()
     conn.close()
     if not rows:
