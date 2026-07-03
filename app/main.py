@@ -840,6 +840,13 @@ def _run_kraken_sync(account: str, api_key: str, api_secret: str, last_fill_time
             db_clear_open_fn=clear_synced_open_positions,
             last_fill_time=last_fill_time,
         )
+        # Keep the equity curve fed: one snapshot per day from the balance
+        # timeline (was defined but never called — daily_snapshots sat empty,
+        # so projections/actuals had nothing to read).
+        try:
+            result["snapshots_backfilled"] = _timeline_to_daily_snapshots(result.get("eur_timeline") or [])
+        except Exception:
+            pass
         result.pop("eur_timeline", None)
         # Auto-classify newly-synced closed trades (S1–S5 / VETO / NONE) so
         # setup_tag stays current without a manual backfill call.
@@ -882,46 +889,9 @@ def sync_kraken_result(account: str = "personal"):
     return _kraken_sync_status.get(account, {"running": False, "detail": "No sync run yet"})
 
 
-@app.post("/api/sync/kraken/backfill-balances")
-def backfill_balances(account: str = "personal"):
-    """One-shot repair: recompute balance_before/after + leverage for closed
-    Kraken trades from the (fixed) multi-wallet balance timeline. Existing rows
-    are never touched by the normal sync (dedupe skips them), hence this."""
-    from kraken.futures import Market, User
-    from .database import _conn
-
-    try:
-        api_key, api_secret = kraken_sync.get_api_keys(account)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-    eur_usd     = kraken_sync._get_eur_usd(Market(key=api_key, secret=api_secret))
-    timeline, _ = kraken_sync._build_eur_timeline(User(key=api_key, secret=api_secret), eur_usd)
-    if not timeline:
-        raise HTTPException(status_code=502, detail="Account-log timeline came back empty")
-
-    c = _conn()
-    rows = c.execute(
-        "SELECT id, entry, size, pnl, closed_at FROM trades "
-        "WHERE venue='kraken_futures' AND exit IS NOT NULL AND closed_at IS NOT NULL"
-    ).fetchall()
-    updated = 0
-    for r in rows:
-        after = kraken_sync._balance_at(timeline, kraken_sync._parse_ts(r["closed_at"]))
-        if after is None:
-            continue
-        before = after - (r["pnl"] or 0.0)
-        notional_eur = (r["size"] or 0.0) * (r["entry"] or 0.0) / eur_usd
-        lev = max(1, round(notional_eur / before)) if before > 0 else 1
-        c.execute(
-            "UPDATE trades SET balance_after=?, balance_before=?, leverage=? WHERE id=?",
-            (round(after, 2), round(before, 2), int(lev), r["id"]),
-        )
-        updated += 1
-    c.commit()
-    c.close()
-    return {"trades_seen": len(rows), "updated": updated,
-            "timeline_points": len(timeline), "eur_usd": eur_usd}
+# (The old /api/sync/kraken/backfill-balances repair endpoint is gone: the sync
+# now refreshes existing rows from exchange truth on every run, and the derived
+# before=after−pnl it used would clobber the timeline-sampled balances.)
 
 
 # ─── Sync — Bybit ─────────────────────────────────────────────────────────────

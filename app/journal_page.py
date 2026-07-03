@@ -303,6 +303,7 @@ const usd1=v=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDi
 const eu2=v=>v==null?'—':'€'+Number(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const tri=v=>v===true?'<span class="g">✓</span>':v===false?'<span class="r">✗</span>':'<span class="dim">—</span>';
 const tpsl=(t,k)=>{ if(t[k]!=null) return usd1(t[k]);
+  if((t.book||'hedge')==='prop') return '—';   // Goal plan is the hedge book's, not prop's
   const p=planLvl(t)[k]; return p!=null?`<span class="planlvl" title="not set on trade — expected from Goal plan">${usd1(p)}</span>`:'—'; };
 const COLS=[
   {k:'date',    h:'Date',    sort:'opened_at', cls:'l dim', r:t=>(t.opened_at||'').slice(0,10)},
