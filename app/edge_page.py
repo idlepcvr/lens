@@ -61,7 +61,8 @@ function render(trades){
     const grades=Object.entries(d.byGrade).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
     const sub=grades.length>1?grades.map(([gr,gd])=>
       `<span class="ed-gchip">${gr}: ${gd.n}·${(gd.wins/gd.n*100).toFixed(0)}%·<span style="color:${gd.total>=0?'var(--long)':'var(--short)'}">${gd.total>=0?'+':''}${gd.total.toFixed(0)}€</span></span>`).join(''):'';
-    return `<tr class="main"><td>${k}</td><td>${d.n}</td><td>${wr.toFixed(0)}%</td>
+    const q=k==='(untagged)'?'__none__':k==='VETO'?'VETO:':k.endsWith(' (vetoed)')?k.split(' ')[0]+'|':k;
+    return `<tr class="main"><td><a href="/journal?setup=${encodeURIComponent(q)}" style="color:inherit;text-decoration:none" title="these trades in the journal →">${k} <span style="color:var(--dim);font-size:9px">→</span></a></td><td>${d.n}</td><td>${wr.toFixed(0)}%</td>
       <td style="color:${exp>=0?'var(--long)':'var(--short)'}">${exp>=0?'+':''}${exp.toFixed(0)}€</td>
       <td style="color:${d.total>=0?'var(--long)':'var(--short)'}">${d.total>=0?'+':''}${d.total.toFixed(0)}€</td>
       <td><b style="color:${vc}">${vl}</b></td></tr>`+

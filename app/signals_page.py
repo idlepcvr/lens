@@ -110,7 +110,8 @@ function historyRow(s){
     <div class="kv"><span class="k">proposed</span><span class="v">${fmtTs(s.received_at)}</span></div>
     <div class="kv"><span class="k">decided</span><span class="v">${fmtTs(s.decided_at)}${g?(' · '+g+' later'):''}</span></div>
     <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
-    ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}`;
+    ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}
+    ${s.linked_trade_id?`<div class="kv"><span class="k">trade</span><span class="v"><a href="/journal?trade=${s.linked_trade_id}" style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation()">#${s.linked_trade_id}${s.pnl_eur!=null?` · ${s.pnl_eur>=0?'+':''}€${s.pnl_eur}`:''} — open in journal →</a></span></div>`:''}`;
   return `<tr class="hrow" onclick="toggleRow('${id}')" style="cursor:pointer">
     <td>${s.trigger_type||'?'}</td>
     <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>

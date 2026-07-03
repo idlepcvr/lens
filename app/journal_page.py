@@ -153,7 +153,7 @@ const GRADES=["A","B","C","D","F"];
 const SETUPS=["S1","S2","S3","S4","S5","NONE"];
 let TRADES=[], CANDLES=[], VISIBLE=[], SEL=null;
 const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
-let SORT={k:'opened_at',dir:-1}, GOALLVL=null;
+let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>v==null?'—':(v<0?'-':'+')+'€'+Math.abs(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=(v)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:0});
@@ -209,7 +209,7 @@ async function loadOpenPositions(){
           ${plan}
         </div></div>`;
     }).join('');
-    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span></div><div class="opcards">${cards}</div></div>`;
+    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
   }catch(e){ el.innerHTML=''; }
 }
 async function load(){
@@ -221,6 +221,10 @@ async function load(){
   try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
   const tagsel=$('f-tag'); [...new Set(TRADES.map(t=>t.setup_tag).filter(Boolean))].sort().forEach(tg=>{
     const o=document.createElement('option'); o.value=o.textContent=tg; tagsel.appendChild(o);});
+  // deep-link: /journal?setup=S1 (from /edge) — exact tag if it exists, else prefix match (VETO family)
+  const qset=new URLSearchParams(location.search).get('setup');
+  if(qset){ if([...tagsel.options].some(o=>o.value===qset)) tagsel.value=qset; else TAGPREFIX=qset; }
+  tagsel.onchange=()=>{ TAGPREFIX=null; applyF(); };
   document.querySelectorAll('.jseg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     F[seg.dataset.k]=b.dataset.v; seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); applyF();}));
   renderColMenu();
@@ -235,6 +239,7 @@ function applyF(){
     const tg=t.setup_tag||'';
     if(tag==='__none__' && tg) return false;
     if(tag && tag!=='__none__' && tg!==tag) return false;
+    if(TAGPREFIX && !tg.startsWith(TAGPREFIX)) return false;
     if(F.rsi && t.rsi_zone!==F.rsi) return false;
     if(F.book && (t.book||'hedge')!==F.book) return false;
     if(F.match==='1' && !t.merged_manual) return false;

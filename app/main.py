@@ -166,7 +166,10 @@ def landing():
 /* page-local container width override — match Projection's desktop width */
 .app{max-width:1180px}
 .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 18px}
-.sc{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:13px 16px}
+.sc{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:13px 16px;display:block;text-decoration:none;transition:border-color .12s}
+.sc:hover{border-color:var(--ac)}
+.sc.pend{border-color:var(--am)}
+.sc.pend .sc-n{color:var(--am)}
 .sc-n{font-family:var(--mono);font-size:24px;font-weight:600;color:#fff;line-height:1}
 .sc-l{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-top:6px}
 .main{display:grid;grid-template-columns:248px 1fr;gap:14px;align-items:start;margin-top:18px}
@@ -249,9 +252,9 @@ def landing():
 
     body = f"""
 <div class="strip">
-  <div class="sc"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades</div></div>
-  <div class="sc"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals</div></div>
-  <div class="sc"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending</div></div>
+  <a class="sc" href="/journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
+  <a class="sc" href="/signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
+  <a class="sc {'pend' if pending else ''}" href="/desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
 </div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this dashboard</span><span class="line"></span></div>

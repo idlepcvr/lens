@@ -53,6 +53,8 @@ _CSS = r"""<style>
 .ov .support{display:grid;grid-template-columns:1fr;gap:6px 30px}
 .ov h2{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:14px 0 11px;font-family:var(--mono)}
 .ov h2 .hint{text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400;font-size:11px;margin-left:8px}
+.ov h2 .h2go{float:right;text-transform:none;letter-spacing:0;font-size:11px;color:var(--dim);text-decoration:none}
+.ov h2 .h2go:hover{color:var(--accent)}
 .ov .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px}
 .ov .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px;position:relative;overflow:hidden}
 .ov .card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--line2)}
@@ -97,11 +99,11 @@ def render(book: str = "hedge") -> str:
 
   <div class="support">
     <section>
-      <h2>Performance<span class="hint" id="perf-hint"></span></h2>
+      <h2>Performance<span class="hint" id="perf-hint"></span><a class="h2go" href="{'/prop-ledger' if book == 'prop' else '/analytics'}">{'ledger' if book == 'prop' else 'analytics'} →</a></h2>
       <div class="grid" id="perf"></div>
     </section>
     <section>
-      <h2>Market<span class="hint">BTC · ATR &asymp; 24h min stop</span></h2>
+      <h2>Market<span class="hint">BTC · ATR &asymp; 24h min stop</span><a class="h2go" href="/regime">regime →</a></h2>
       <div class="grid" id="market"></div>
     </section>
   </div>
@@ -173,7 +175,7 @@ function heroHedge(a){
     <div class="hmain">
       <div class="hlbl">Live equity · futures wallet</div>
       <div class="heq">€${money(a.total_eur)}</div>
-      <div class="hsub">unrealised <b class="${u>0?'g':(u<0?'r':'dim')}">${signed(u)}€</b><br>open positions${partial}</div>
+      <div class="hsub">unrealised <b class="${u>0?'g':(u<0?'r':'dim')}">${signed(u)}€</b><br><a href="/journal" style="color:inherit">open positions →</a>${partial}</div>
     </div>
     <div class="hstats">
       <div class="hstat"><div class="k">Available margin</div><div class="v">${a.available_margin!=null?'€'+money(a.available_margin):'—'}</div><div class="n">free to deploy</div></div>
