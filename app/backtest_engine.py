@@ -156,6 +156,39 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["daily_close"] = daily_close.reindex(df.index, method="ffill")
     df["daily_ema50"] = daily_ema50.reindex(df.index, method="ffill")
 
+    # Bollinger (20, 2)
+    sma20 = c.rolling(20).mean()
+    sd20  = c.rolling(20).std()
+    df["bb_upper"] = sma20 + 2 * sd20
+    df["bb_lower"] = sma20 - 2 * sd20
+
+    # TD Sequential setup counts: consecutive closes above/below the close 4 bars
+    # back (the 1–9 count; 9+ = exhaustion zone)
+    up = (c > c.shift(4)).to_numpy()
+    dn = (c < c.shift(4)).to_numpy()
+    td_sell = np.zeros(len(c)); td_buy = np.zeros(len(c))
+    for _i in range(1, len(c)):
+        td_sell[_i] = td_sell[_i - 1] + 1 if up[_i] else 0
+        td_buy[_i]  = td_buy[_i - 1] + 1 if dn[_i] else 0
+    df["td_sell"] = td_sell
+    df["td_buy"]  = td_buy
+
+    # Volume spike vs its own 20-bar average
+    df["vol_spike"] = v > 2 * df["vol_sma20"]
+
+    # ATR regime: current ATR% vs its rolling 500-bar median (no lookahead)
+    atr_pct = df["atr14"] / c
+    df["atr_pctv"] = atr_pct
+    df["atr_medv"] = atr_pct.rolling(500, min_periods=100).median()
+
+    # Cycle-scale: Mayer-style multiples of long daily MAs (2y MA multiplier /
+    # 200-week heatmap idea). Need long history — NaN early in short windows,
+    # which simply makes those conditions never fire there.
+    ma730  = daily_close.rolling(730,  min_periods=365).mean()
+    ma1400 = daily_close.rolling(1400, min_periods=1000).mean()
+    df["mayer2y"]  = (daily_close / ma730).reindex(df.index,  method="ffill")
+    df["mult200w"] = (daily_close / ma1400).reindex(df.index, method="ffill")
+
     # 4H resampled EMAs (for 1H MTF signals — ffill each 4H bar into its 4 child 1H bars)
     h4_close      = c.resample("4h").last()
     df["h4_ema21"] = h4_close.ewm(span=21, adjust=False).mean().reindex(df.index, method="ffill")
@@ -815,9 +848,18 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
     tp_pct      = params.get("tp_pct",      4.0) / 100
     leverage    = params.get("leverage",   10.0)
     commission  = params.get("commission", 0.0015)  # per side
+    slippage    = params.get("slippage_pct", 0.0) / 100   # per side fill cost (market order)
     skip_sat    = params.get("skip_sat",   True)
     cooldown    = params.get("cooldown_bars", 4)
     once_per_day = params.get("once_per_day", True)
+    # ATR floor (0 = off): stop can't be tighter than mult × the entry bar's
+    # ATR% — volatility noise shouldn't be what kicks you out. TP scales to
+    # keep the configured R:R when the floor widens the stop.
+    atr_mult    = params.get("atr_floor_mult", 0.0)
+    rr_cfg      = tp_pct / stop_pct if stop_pct else 0.0
+    atr_arr     = ((df["atr14"] / df["close"]).to_numpy()
+                   if atr_mult and "atr14" in df.columns else None)
+    cost_side   = commission + slippage
 
     equity = initial_capital
     trades = []
@@ -829,6 +871,7 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
     entry_bar_idx = 0
     last_entry_bar = -999
     last_trade_day = None
+    cur_sl, cur_tp = stop_pct, tp_pct   # per-trade geometry (ATR floor may widen)
 
     for i in range(1, len(df)):
         ts = df.index[i]
@@ -837,10 +880,10 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
             hi = df["high"].iloc[i]
             lo = df["low"].iloc[i]
 
-            sl_long  = entry_price * (1 - stop_pct)
-            tp_long  = entry_price * (1 + tp_pct)
-            sl_short = entry_price * (1 + stop_pct)
-            tp_short = entry_price * (1 - tp_pct)
+            sl_long  = entry_price * (1 - cur_sl)
+            tp_long  = entry_price * (1 + cur_tp)
+            sl_short = entry_price * (1 + cur_sl)
+            tp_short = entry_price * (1 - cur_tp)
 
             result = None
             exit_price = 0.0
@@ -858,9 +901,9 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
 
             if result:
                 if result == "win":
-                    net_pct =  tp_pct   * leverage - commission * 2 * leverage
+                    net_pct =  cur_tp * leverage - cost_side * 2 * leverage
                 else:
-                    net_pct = -(stop_pct * leverage + commission * 2 * leverage)
+                    net_pct = -(cur_sl * leverage + cost_side * 2 * leverage)
                 equity *= (1 + net_pct)
                 bars_held = i - entry_bar_idx
                 trades.append({
@@ -901,6 +944,11 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
             entry_bar_idx = i
             last_entry_bar = i
             last_trade_day = trade_day
+            cur_sl, cur_tp = stop_pct, tp_pct
+            if atr_arr is not None and not np.isnan(atr_arr[i]):
+                floor = atr_mult * atr_arr[i]
+                if floor > cur_sl:              # noise floor: widen, keep R:R
+                    cur_sl, cur_tp = floor, floor * rr_cfg
 
         equity_curve.append({"date": ts.isoformat(), "equity": round(equity, 2)})
 
@@ -1468,6 +1516,38 @@ def _signal_custom(df, i, params):
         return None
     if macd == "bear" and not (row["macd_hist"] < 0):
         return None
+    bb = params.get("bb")                   # 'below_lower' | 'above_upper'
+    if bb == "below_lower" and not (row["close"] < row["bb_lower"]):
+        return None
+    if bb == "above_upper" and not (row["close"] > row["bb_upper"]):
+        return None
+    td = params.get("td")                   # 'buy9' | 'sell9' (TD Sequential 9+)
+    if td == "buy9" and not (row["td_buy"] >= 9):
+        return None
+    if td == "sell9" and not (row["td_sell"] >= 9):
+        return None
+    ma = params.get("ma_align")             # 'bull' | 'bear' triple-MA stack
+    if ma == "bull" and not (row["ema50"] > row["ema100"] > row["ema200"]):
+        return None
+    if ma == "bear" and not (row["ema50"] < row["ema100"] < row["ema200"]):
+        return None
+    if params.get("vol_spike") and not bool(row["vol_spike"]):
+        return None
+    ar = params.get("atr_regime")           # 'low' | 'high' vs rolling median
+    if ar and (row["atr_medv"] != row["atr_medv"]):     # NaN guard
+        return None
+    if ar == "low" and not (row["atr_pctv"] < row["atr_medv"]):
+        return None
+    if ar == "high" and not (row["atr_pctv"] >= row["atr_medv"]):
+        return None
+    my_max = params.get("mayer_max")        # cycle gate: 2y-MA multiple
+    if my_max is not None and not (row["mayer2y"] == row["mayer2y"]
+                                   and row["mayer2y"] <= my_max):
+        return None
+    my_min = params.get("mayer_min")
+    if my_min is not None and not (row["mayer2y"] == row["mayer2y"]
+                                   and row["mayer2y"] >= my_min):
+        return None
     hf, ht = params.get("hour_from"), params.get("hour_to")
     if hf is not None and ht is not None:
         h = (df.index[i].hour + 7) % 24     # Bangkok hour (UTC+7, no DST)
@@ -1475,6 +1555,99 @@ def _signal_custom(df, i, params):
         if not in_win:
             return None
     return params.get("direction", "long")
+
+
+def to_pinescript(params: dict) -> str:
+    """Pine v5 strategy from a custom-params dict — the same conditions the
+    engine backtests, portable to TradingView as a visual indicator/strategy.
+    Entry logic mirrors _signal_custom exactly (confirmed-bar close, AND of set
+    conditions); exits mirror _run_backtest (fixed SL/TP %, optional ATR floor
+    that widens the stop and scales TP to keep R:R)."""
+    p = params
+    sl = p.get("stop_pct", 0.63)
+    tp = p.get("tp_pct", 1.5)
+    af = p.get("atr_floor_mult", 0.0)
+    direction = p.get("direction", "long")
+    long_ = direction == "long"
+
+    conds = []
+    if p.get("trend") == "up":    conds.append("ema21 > ema50")
+    if p.get("trend") == "down":  conds.append("ema21 < ema50")
+    if p.get("candle") == "bull": conds.append("close > open")
+    if p.get("candle") == "bear": conds.append("close < open")
+    if p.get("macd") == "bull":   conds.append("macdHist > 0")
+    if p.get("macd") == "bear":   conds.append("macdHist < 0")
+    if p.get("rsi_max") is not None: conds.append(f"rsi <= {p['rsi_max']:g}")
+    if p.get("rsi_min") is not None: conds.append(f"rsi >= {p['rsi_min']:g}")
+    if p.get("bb") == "below_lower": conds.append("close < bbLower")
+    if p.get("bb") == "above_upper": conds.append("close > bbUpper")
+    if p.get("td") == "buy9":     conds.append("tdBuy >= 9")
+    if p.get("td") == "sell9":    conds.append("tdSell >= 9")
+    if p.get("ma_align") == "bull": conds.append("ema50 > ema100 and ema100 > ema200")
+    if p.get("ma_align") == "bear": conds.append("ema50 < ema100 and ema100 < ema200")
+    if p.get("vol_spike"):        conds.append("volume > 2 * volSma")
+    if p.get("atr_regime") == "low":  conds.append("atrPct < atrMed")
+    if p.get("atr_regime") == "high": conds.append("atrPct >= atrMed")
+    if p.get("hour_from") is not None and p.get("hour_to") is not None:
+        hf, ht = p["hour_from"], p["hour_to"]
+        conds.append(f"bkkHour >= {hf} and bkkHour <= {ht}" if hf <= ht
+                     else f"(bkkHour >= {hf} or bkkHour <= {ht})")
+    cond_str = " and ".join(conds) if conds else "true"
+
+    title = " · ".join([direction.upper(), p.get("timeframe", "1h")] + conds[:3])
+    stop_expr = (f"math.max({sl:g} / 100, {af:g} * ta.atr(14) / close)"
+                 if af else f"{sl:g} / 100")
+    rr = tp / sl if sl else 0
+    tp_expr = f"effSl * {rr:.4g}" if af else f"{tp:g} / 100"
+    entry_side = "strategy.long" if long_ else "strategy.short"
+    sl_price = "close * (1 - effSl)" if long_ else "close * (1 + effSl)"
+    tp_price = "close * (1 + effTp)" if long_ else "close * (1 - effTp)"
+
+    return f'''//@version=5
+strategy("LENS · {title}", overlay=true, initial_capital=1000,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=100,
+     commission_type=strategy.commission.percent, commission_value=0.15,
+     process_orders_on_close=true)
+
+// ── indicators (mirror LENS backtest_engine.add_indicators) ──
+ema21  = ta.ema(close, 21)
+ema50  = ta.ema(close, 50)
+ema100 = ta.ema(close, 100)
+ema200 = ta.ema(close, 200)
+[macdLine, macdSignal, macdHist] = ta.macd(close, 12, 26, 9)
+rsi    = ta.rsi(close, 14)
+bbMid  = ta.sma(close, 20)
+bbDev  = 2 * ta.stdev(close, 20)
+bbUpper = bbMid + bbDev
+bbLower = bbMid - bbDev
+volSma = ta.sma(volume, 20)
+atrPct = ta.atr(14) / close
+atrMed = ta.percentile_nearest_rank(atrPct, 500, 50)
+var int tdSell = 0
+var int tdBuy  = 0
+tdSell := close > close[4] ? tdSell + 1 : 0
+tdBuy  := close < close[4] ? tdBuy  + 1 : 0
+bkkHour = hour(time, "Asia/Bangkok")
+isSat   = dayofweek(time, "UTC") == dayofweek.saturday
+
+// ── entry: every set condition must hold on the CONFIRMED bar ──
+entryCond = {cond_str}
+canEnter  = entryCond and not isSat and strategy.position_size == 0 and barstate.isconfirmed
+
+// ── exits: LENS geometry (SL {sl:g}% / TP {tp:g}%{f" · ATR floor {af:g}x, R:R kept" if af else ""}) ──
+effSl = {stop_expr}
+effTp = {tp_expr}
+
+if canEnter
+    strategy.entry("LENS", {entry_side})
+    strategy.exit("LENS-x", "LENS", stop={sl_price}, limit={tp_price})
+
+plotshape(canEnter, style=shape.triangle{"up" if long_ else "down"},
+     location=location.{"belowbar" if long_ else "abovebar"},
+     color=color.{"green" if long_ else "red"}, size=size.small)
+// LENS engine also enforces: once-per-day entry + 4-bar cooldown — approximate
+// here by the single-position rule; expect slightly more Pine entries.
+'''
 
 
 # Mined 2026-07-04 by app.strategy_search (1,596 combos, split-half filter):
@@ -1516,10 +1689,21 @@ def run_custom(params: dict, months: int = 30, initial_capital: float = 637.0) -
     if params.get("trend"):  bits.append(f"trend {params['trend']}")
     if params.get("candle"): bits.append(f"{params['candle']} bar")
     if params.get("macd"):   bits.append(f"MACD {params['macd']}")
+    if params.get("bb"):     bits.append("BB " + ("<lower" if params["bb"] == "below_lower" else ">upper"))
+    if params.get("td"):     bits.append(f"TD {params['td']}")
+    if params.get("ma_align"): bits.append(f"MA-stack {params['ma_align']}")
+    if params.get("vol_spike"): bits.append("vol spike")
+    if params.get("atr_regime"): bits.append(f"{params['atr_regime']}-vol")
+    if params.get("mayer_max") is not None: bits.append(f"2yMA≤{params['mayer_max']:g}")
+    if params.get("mayer_min") is not None: bits.append(f"2yMA≥{params['mayer_min']:g}")
     if params.get("hour_from") is not None and params.get("hour_to") is not None:
         bits.append(f"BKK {params['hour_from']:02d}–{params['hour_to']:02d}h")
-    bits.append(f"SL {params.get('stop_pct', 1.0):g}% · TP {params.get('tp_pct', 1.5):g}% "
-                f"· {params.get('leverage', 10):g}x")
+    geo = f"SL {params.get('stop_pct', 1.0):g}% · TP {params.get('tp_pct', 1.5):g}% · {params.get('leverage', 10):g}x"
+    if params.get("atr_floor_mult"):
+        geo += f" · ATRfloor {params['atr_floor_mult']:g}×"
+    if params.get("slippage_pct"):
+        geo += f" · slip {params['slippage_pct']:g}%"
+    bits.append(geo)
     return {
         "strategy":    "CUSTOM",
         "description": " · ".join(bits),

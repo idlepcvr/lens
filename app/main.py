@@ -25,7 +25,7 @@ from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 
 from .calculator import CalcError, compute_goal, compute_position, compute_projection
@@ -1445,6 +1445,13 @@ canvas{width:100%;height:200px;display:block}
       <select id="c-macd"><option value="">MACD: any</option><option value="bull">MACD: bull (hist&gt;0)</option><option value="bear">MACD: bear (hist&lt;0)</option></select>
     </div>
     <div class="row" style="margin-bottom:12px">
+      <select id="c-bb"><option value="">Bollinger: any</option><option value="below_lower">BB: below lower</option><option value="above_upper">BB: above upper</option></select>
+      <select id="c-td"><option value="">TD seq: any</option><option value="buy9">TD: buy 9+ (exhaustion ↓)</option><option value="sell9">TD: sell 9+ (exhaustion ↑)</option></select>
+      <select id="c-ma"><option value="">MA stack: any</option><option value="bull">MA 50&gt;100&gt;200</option><option value="bear">MA 50&lt;100&lt;200</option></select>
+      <select id="c-ar"><option value="">Vol regime: any</option><option value="low">low vol (ATR&lt;median)</option><option value="high">high vol (ATR≥median)</option></select>
+      <label style="font-size:11px;color:var(--t2)"><input id="c-vs" type="checkbox" style="vertical-align:-2px"> vol spike ≥2×</label>
+    </div>
+    <div class="row" style="margin-bottom:12px">
       <label style="font-size:11px;color:var(--t2)">RSI ≤ <input id="c-rsimax" type="number" step="any" placeholder="off" class="c-n"></label>
       <label style="font-size:11px;color:var(--t2)">RSI ≥ <input id="c-rsimin" type="number" step="any" placeholder="off" class="c-n"></label>
       <label style="font-size:11px;color:var(--t2)">BKK hour <input id="c-hf" type="number" min="0" max="23" placeholder="from" class="c-n" style="width:58px">–<input id="c-ht" type="number" min="0" max="23" placeholder="to" class="c-n" style="width:58px"></label>
@@ -1453,9 +1460,13 @@ canvas{width:100%;height:200px;display:block}
       <label style="font-size:11px;color:var(--t2)">SL % <input id="c-sl" type="number" step="any" value="0.63" class="c-n"></label>
       <label style="font-size:11px;color:var(--t2)">TP % <input id="c-tp" type="number" step="any" value="1.5" class="c-n"></label>
       <label style="font-size:11px;color:var(--t2)">Lev × <input id="c-lev" type="number" step="any" value="10" class="c-n" style="width:58px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Per-side fill cost added to fees — market orders never fill at the ideal price">Slip % <input id="c-slip" type="number" step="any" value="0.03" class="c-n" style="width:64px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Stop can't be tighter than this × the entry bar's ATR% — volatility noise shouldn't stop you out. 0 = off; try 1–1.5">ATR floor × <input id="c-atrf" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
       <button class="run" id="custom-btn" onclick="runCustom()">▶ Backtest it</button>
+      <button id="pine-btn" onclick="exportPine()" title="Export these exact conditions as a TradingView Pine v5 strategy — paste into the Pine editor">⧉ Pine</button>
     </div>
     <div style="font-size:10px;color:var(--t3)">Results render in the same scorecard below. Mined in-sample — a green result is a candidate to sweep &amp; forward-test, not a green light.</div>
+    <pre id="pine-out" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border:1px solid var(--b1);border-radius:6px;font-size:10px;max-height:320px;overflow:auto;white-space:pre"></pre>
   </div>
 </div>
 
@@ -1524,17 +1535,7 @@ function runBacktest() {{
 }}
 
 function runCustom() {{
-  var num = function(id) {{ var v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); }};
-  var sel = function(id) {{ return document.getElementById(id).value || null; }};
-  var body = {{
-    months: parseInt(document.getElementById('months').value) || 24,
-    initial_capital: parseFloat(document.getElementById('capital').value) || 637,
-    timeframe: sel('c-tf'), direction: sel('c-dir'),
-    trend: sel('c-trend'), candle: sel('c-candle'), macd: sel('c-macd'),
-    rsi_max: num('c-rsimax'), rsi_min: num('c-rsimin'),
-    hour_from: num('c-hf'), hour_to: num('c-ht'),
-    stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10
-  }};
+  var body = customBody();
   var btn = document.getElementById('custom-btn');
   var stat = document.getElementById('status');
   btn.disabled = true; btn.textContent = '⏳ Running…';
@@ -1552,6 +1553,40 @@ function runCustom() {{
     document.getElementById('results').scrollIntoView({{behavior:'smooth'}});
   }})
   .catch(function(e) {{ btn.disabled = false; btn.textContent = '▶ Backtest it'; stat.textContent = 'Failed: ' + e; }});
+}}
+
+function customBody() {{
+  var num = function(id) {{ var v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); }};
+  var sel = function(id) {{ return document.getElementById(id).value || null; }};
+  return {{
+    months: parseInt(document.getElementById('months').value) || 24,
+    initial_capital: parseFloat(document.getElementById('capital').value) || 637,
+    timeframe: sel('c-tf'), direction: sel('c-dir'),
+    trend: sel('c-trend'), candle: sel('c-candle'), macd: sel('c-macd'),
+    bb: sel('c-bb'), td: sel('c-td'), ma_align: sel('c-ma'), atr_regime: sel('c-ar'),
+    vol_spike: document.getElementById('c-vs').checked,
+    rsi_max: num('c-rsimax'), rsi_min: num('c-rsimin'),
+    hour_from: num('c-hf'), hour_to: num('c-ht'),
+    stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10,
+    slippage_pct: num('c-slip') !== null ? num('c-slip') : 0.03,
+    atr_floor_mult: num('c-atrf') || 0
+  }};
+}}
+
+function exportPine() {{
+  fetch('/api/backtest/pine', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(customBody())
+  }})
+  .then(function(r) {{ return r.text(); }})
+  .then(function(t) {{
+    var el = document.getElementById('pine-out');
+    el.textContent = t; el.style.display = '';
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function() {{
+      document.getElementById('pine-btn').textContent = '✓ copied';
+      setTimeout(function() {{ document.getElementById('pine-btn').textContent = '⧉ Pine'; }}, 2000);
+    }});
+  }});
 }}
 
 function runSweep() {{
@@ -1776,11 +1811,20 @@ class BtCustomRequest(BaseModel):
     trend: str | None = None        # up | down
     candle: str | None = None       # bull | bear
     macd: str | None = None         # bull | bear (histogram sign)
+    bb: str | None = None           # below_lower | above_upper
+    td: str | None = None           # buy9 | sell9 (TD Sequential 9+)
+    ma_align: str | None = None     # bull | bear (EMA 50/100/200 stack)
+    vol_spike: bool = False         # volume > 2× its 20-bar SMA
+    atr_regime: str | None = None   # low | high (vs rolling median ATR%)
+    mayer_max: float | None = None  # 2y-MA multiple cycle gates
+    mayer_min: float | None = None
     hour_from: int | None = None    # Bangkok hours, window may wrap midnight
     hour_to: int | None = None
     stop_pct: float = 0.63
     tp_pct: float = 1.5
     leverage: float = 10.0
+    slippage_pct: float = 0.03     # per-side market-order fill cost
+    atr_floor_mult: float = 0.0    # stop >= mult × entry-bar ATR% (0 = off)
     cooldown_bars: int = 4
     once_per_day: bool = True
     skip_sat: bool = True
@@ -1800,6 +1844,14 @@ def api_backtest_custom(req: BtCustomRequest):
     except Exception as e:
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
+
+
+@app.post("/api/backtest/pine")
+def api_backtest_pine(req: BtCustomRequest):
+    """TradingView Pine v5 export of a custom strategy — same conditions the
+    engine backtests, as a visual indicator/strategy."""
+    from app.backtest_engine import to_pinescript
+    return PlainTextResponse(to_pinescript(req.model_dump(exclude_none=True)))
 
 
 @app.get("/api/backtest/strategies")

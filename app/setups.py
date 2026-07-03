@@ -461,12 +461,12 @@ def emit_signals(scan: dict) -> list[dict]:
 
 
 def emit_board_signals() -> list[dict]:
-    """Board-driven hedge emit: trade the Strategy Board's top-3 HEDGE strategies,
-    each at its OWN derived geometry — stop = p65 of historical adverse excursion,
-    target = stop × the strategy's board-optimal R. Session/quality discipline
-    still applies. Highest-ranked match wins the bar (one signal), deduped per
-    bar+strategy. No global SL/TP — every level comes from what made money in
-    backtest. Falls back to the legacy S1–S5 emit only if the board has no cache."""
+    """Board-driven hedge emit: trade the Strategy Board's top-3 HEDGE strategies.
+    The board decides WHICH strategy fires; levels are the ONE validated geometry
+    (SL_PCT/TP_PCT — same as S1–S5 alerts, /desk, /audit; unified 2026-07-04).
+    Session/quality discipline still applies. Highest-ranked match wins the bar
+    (one signal), deduped per bar+strategy. Falls back to the legacy S1–S5 emit
+    only if the board has no cache."""
     from . import discipline
     from .backtest_engine import load_ohlcv
     from .database import get_last_non_rejected_signal_for_symbol, insert_signal
@@ -500,10 +500,8 @@ def emit_board_signals() -> list[dict]:
     for mtc in matches:                        # ranked order — first one wins the bar
         name = mtc["name"]
         long_ = mtc["dir"] == "long"
-        sl_pct = geo[name]["sl_pct"]
-        R = geo[name]["target_r"]
-        sl = price * (1 - sl_pct / 100) if long_ else price * (1 + sl_pct / 100)
-        tp = price * (1 + sl_pct * R / 100) if long_ else price * (1 - sl_pct * R / 100)
+        sl = price * (1 - SL_PCT / 100) if long_ else price * (1 + SL_PCT / 100)
+        tp = price * (1 + TP_PCT / 100) if long_ else price * (1 - TP_PCT / 100)
         payload = {
             "signal_id": f"hedge-{name.split(' ')[0]}-{bar_tag}",
             "strategy_name": name,
@@ -515,9 +513,9 @@ def emit_board_signals() -> list[dict]:
             "entry_price": round(price, 1),
             "stop_price": round(sl, 1),
             "target_price": round(tp, 1),
-            "expected_rr": round(R, 2),
+            "expected_rr": round(TP_PCT / SL_PCT, 2),
             "mtf_confluence": [f"board top-{geo[name]['rank']} hedge",
-                               f"stop {sl_pct:.2f}% (p65 MAE)", f"{R:g}R target"],
+                               f"validated geometry {SL_PCT:g}%/{TP_PCT:g}%"],
             "confluence_count": 2,
         }
         reason = discipline.evaluate(
@@ -581,18 +579,10 @@ def _setup_checklists(ctx: BarContext) -> list[dict]:
 
 
 def _board_geo(direction: str) -> tuple[float, float]:
-    """(sl_pct, tp_pct) for the /desk ticket of a direction — pulled from the
-    board's top hedge strategy of that direction, so the desk shows the same
-    money-derived geometry the scanner fires. Falls back to a tight 0.6%/1.2%
-    only if the board has no cache yet."""
-    try:
-        from .strategy_eval import tradeable
-        for b in tradeable("hedge"):
-            if b["dir"] == direction:
-                return b["sl_pct"], round(b["sl_pct"] * b["target_r"], 2)
-    except Exception:
-        pass
-    return 0.6, 1.2
+    """ONE geometry everywhere (decided 2026-07-04): the validated SL_PCT/TP_PCT.
+    The board still decides WHICH strategy fires; it no longer sets levels —
+    per-strategy geometry made desk/alert/audit disagree with each other."""
+    return SL_PCT, TP_PCT
 
 
 def desk_state(refresh: bool = True) -> dict:
@@ -789,6 +779,84 @@ def _trade_shape(sig: dict) -> dict:
     }
 
 
+DRIFT_EXPIRE_PCT = 0.5      # live price this far past entry = the ticket is stale
+AUTO_APPROVE_HOURS = 6      # same idea window (matches /signals zone clustering)
+
+
+def _live_mark() -> Optional[float]:
+    """Live BTC mark from Bybit's public linear ticker — no auth, None on failure."""
+    import json as _json
+    import urllib.request as _rq
+    try:
+        req = _rq.Request(
+            "https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT",
+            headers={"User-Agent": "lens-scanner"})
+        d = _json.loads(_rq.urlopen(req, timeout=8).read())
+        lst = (d.get("result") or {}).get("list") or []
+        p = lst[0].get("lastPrice") or lst[0].get("markPrice") if lst else None
+        return float(p) if p else None
+    except Exception:
+        return None
+
+
+def expire_drifted_signals(live_price: Optional[float]) -> int:
+    """Freshness rule (TODO A): a pending signal whose entry the market already
+    left (>DRIFT_EXPIRE_PCT% away in either direction) is a stale ticket —
+    expire it before it can mislead a decision."""
+    if not live_price:
+        return 0
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT signal_id, entry_price FROM signals WHERE status='pending'").fetchall()
+    n = 0
+    now = datetime.datetime.utcnow().isoformat()
+    for sid, entry in rows:
+        if not entry:
+            continue
+        drift = (live_price / entry - 1) * 100
+        if abs(drift) > DRIFT_EXPIRE_PCT:
+            conn.execute(
+                "UPDATE signals SET status='expired', rejection_reason=?, decided_at=? "
+                "WHERE signal_id=?",
+                (f"auto-expired: price drifted {drift:+.2f}% past entry "
+                 f"({live_price:,.0f} vs {entry:,.0f})", now, sid))
+            n += 1
+    conn.commit()
+    conn.close()
+    return n
+
+
+def auto_approve_same_idea(sig: dict) -> Optional[str]:
+    """If a signal was APPROVED in the last AUTO_APPROVE_HOURS with the same
+    direction and entry within 0.5% (the /signals same-idea cluster rule), this
+    is the trade already said yes to — approve quietly, no phone push.
+    Returns the parent signal_id when auto-approved, else None."""
+    entry = sig.get("entry_price")
+    if not entry:
+        return None
+    cutoff = (datetime.datetime.utcnow()
+              - datetime.timedelta(hours=AUTO_APPROVE_HOURS)).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT signal_id, your_conviction, entry_price FROM signals "
+        "WHERE status='approved' AND direction=? AND decided_at >= ? "
+        "ORDER BY decided_at DESC",
+        (sig.get("direction"), cutoff)).fetchall()
+    parent = next((r for r in rows
+                   if r[2] and abs(entry / r[2] - 1) * 100 <= 0.5), None)
+    if not parent:
+        conn.close()
+        return None
+    conn.execute(
+        "UPDATE signals SET status='approved', your_conviction=?, notes=?, decided_at=? "
+        "WHERE signal_id=? AND status='pending'",
+        (parent[1] or 3, f"auto-approved: same idea as {parent[0]}",
+         datetime.datetime.utcnow().isoformat(), sig["signal_id"]))
+    conn.commit()
+    conn.close()
+    return parent[0]
+
+
 def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
     """Build (title, body, tag-emoji) for a setup push. A deliberately lean
     lock-screen ticket: identity, the three levels, win/lose balance, notional,
@@ -825,6 +893,8 @@ def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
         + L("\U0001F4E5", "Entry (in)", m(s["entry"]))                                       # 📥
         + L("\U0001F3AF", "TP  (out)", f"{m(s['target'])} · +{s['win_move_pct']:.2f}%")      # 🎯
         + L("\U0001F6D1", "SL  (out)", f"{m(s['stop'])} · {MINUS}{s['loss_move_pct']:.2f}%")  # 🛑
+        + (L("⏱", "Live now", f"{m(price)} · {(price / s['entry'] - 1) * 100:+.2f}% vs entry")
+           if price and s.get("entry") else "")
         + "\n"
         + L("\U0001F4C8", "Win bal", f"${m(win_bal)}  (+${m(s['reward_usd'])})")             # 📈
         + L("\U0001F4C9", "Lose bal", f"${m(lose_bal)}  ({MINUS}${m(s['risk_usd'])})")       # 📉
@@ -927,19 +997,33 @@ def run_scan_cli():
     scan_playbook["matches"] = [m for m in scan["matches"]
                                 if m["clean"] and m["setup"] not in board_fired]
     emitted += emit_signals(scan_playbook)
+    # Freshness pass (2026-07-04): drift-expire BEFORE notifying so a stale
+    # ticket never buzzes the phone; same-idea auto-approve so a direction
+    # already said yes to doesn't re-notify (visible on /signals, just quiet).
+    live = _live_mark()
+    drift_expired = expire_drifted_signals(live)
+    auto_approved = 0
     for s in emitted:
-        if s["status"] == "pending":
-            title, body, tag = _alert_message(s)
-            _notify(title, body, signal_id=s["signal_id"], tags=tag)
+        if s["status"] != "pending":
+            continue
+        drift = abs(live / s["entry_price"] - 1) * 100 if (live and s.get("entry_price")) else 0.0
+        if drift > DRIFT_EXPIRE_PCT:
+            continue                         # just drift-expired above — no push
+        if auto_approve_same_idea(s):
+            auto_approved += 1
+            continue                         # same idea already approved — no push
+        title, body, tag = _alert_message(s, price=live)
+        _notify(title, body, signal_id=s["signal_id"], tags=tag)
     tags = backfill_setup_tags(only_untagged=True)
-    expired = expire_stale_signals(older_than_minutes=180)
+    expired = expire_stale_signals(older_than_minutes=180) + drift_expired
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     names = [f"{s['signal_id']}:{s['status']}" for s in emitted] or ["none"]
     from .strategy_eval import tradeable
     book = [b["name"].split(" ")[0] for b in tradeable("hedge")]
     print(f"[{stamp}] bar={scan['bar_ts']} close={scan['close']} rsi={scan['rsi']} "
           f"kz={scan['killzone']} book={book} "
-          f"signals={','.join(names)} tagged={tags['tagged']} expired={expired}")
+          f"signals={','.join(names)} tagged={tags['tagged']} expired={expired} "
+          f"live={live} auto_approved={auto_approved}")
 
 
 def setup_scoreboard() -> dict:
