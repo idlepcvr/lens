@@ -455,13 +455,18 @@ text fixed.
 (`app/strategy_search.py`): ≤3-condition combos across trend/candle/MACD/RSI/
 BKK-sessions/Bollinger/TD-Sequential-9/triple-MA-stack/vol-spike/ATR-regime,
 real engine + 0.03%/side slippage, split-half filter, SL×TP×lev×ATR-floor
-sweep, 7y-binance deep confirmation, Kelly. **Last run: 2 survivors on 1h,
-0 on 4h — results in `strategy_search.json`** (a serialization crash ate the
-first run's output; re-run launched, check the file / re-run if missing:
-`python3 -m app.strategy_search`, ~13 min). NEXT: read the 2 survivors, decide
-promote-to-shadow vs discard; consider F&G / liquidity external feeds; trailing
-stop / BE-move exit sims still unbuilt. Pine export exists: `⧉ Pine` button on
-/edge builder → paste into TradingView.
+sweep, 7y-binance deep confirmation, Kelly. **VERDICT 2026-07-04 (run
+complete, 4,414 evaluated, `strategy_search.json`): 2 split-half survivors
+on 30mo, both collapse on the 7y window (−99.4% / −96.3%), 0 deep-confirmed
+→ discarded as recency artifacts (same failure mode as SMC_SWEEP_v1).**
+Three honest gates (split-half + n≥40 + deep-history), nothing passes: the
+searchable indicator space on BTC holds no robust mechanical edge at this
+geometry. Only dimensions with information left: exit mechanics (trailing
+stop / BE-move sims — unbuilt), external macro feeds (F&G via
+alternative.me, global liquidity — wire a feed before sweeping it),
+order-flow (CVD/delta/OI — needs a new data source). More entry-condition
+combos = more best-of-N luck. Pine export exists: `⧉ Pine` button on /edge
+builder → paste into TradingView.
 
 **D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
 (484 / −4405.83); /overview prop n=0 correct (book archived 06-30).
