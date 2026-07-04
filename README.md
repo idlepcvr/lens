@@ -22,7 +22,7 @@ thinking/measuring tool. You place the trades on Kraken yourself.
 | Strategy audit (geometry + mining, full history) | ✅ 2026-07-02 — `strategies/_research/STRATEGY_AUDIT_20260702.md` |
 | v4 re-mine | ⏳ blocked on ~3 months of tagged live trades |
 
-Detailed build history: `LENS_PLAN.md` + `git log`.
+Build history: `CHANGELOG.md` · roadmap: `LENS_PLAN.md` · commit detail: `git log`.
 
 It started as a "hold winners to 4R" discipline tool. Then we mined the actual
 trade history (464 closed Kraken trades) and the data said something different —
@@ -125,144 +125,35 @@ feature candidates (order flow: CVD, delta, funding, open interest).
 
 ## The pages
 
-Start the server (below), then visit **http://localhost:8765**. The home page
-("/") is a **two-door mode chooser** — the app is split into two systems that
-never share a nav (2026-06-17):
+Home (`/`) is a **two-door mode chooser** — the app is split into two systems
+that never share a nav (2026-06-17). A `◎ PROP | ▤ HEDGE | ⌂` switch sits above
+every nav; switching = jumping to that mode's home (stateless). Each mode shows
+a few **primary chips** in the top bar (`PROP_MAIN` / `HEDGE_MAIN` in
+`theme.py`); the rest drop to a "more" footer — every page stays reachable.
 
-- **PROP** — pass the Kraken Prop eval. Nav: **Overview · Goals · Live ·
-  Signals · Ledger · Income · Strategy · Risk · Survival · Rules · Equity ·
-  Regime · Backtest**.
-- **HEDGE** — discretionary own-money trading (the S1–S5 edge). Nav:
-  **Overview · Dashboard · Goal · Position · Desk · Signals · Calendar ·
-  Analytics · Journal · Edge · Board · Learn**.
+- **PROP** — pass the Kraken Prop eval: **Overview · Goals · Live · Signals ·
+  Ledger · Income · Strategy · Risk · Survival · Rules · Equity · Regime ·
+  Backtest**.
+- **HEDGE** — discretionary own-money trading (the S1–S5 edge): **Overview ·
+  Dashboard · Goal · Position · Desk · Signals · Calendar · Analytics · Journal
+  · Edge · Board · Learn**.
 
-A `◎ PROP | ▤ HEDGE | ⌂` switch sits above every nav; switching = jumping to
-that mode's home (stateless). Each mode shows a few **primary chips** in the
-top bar (`PROP_MAIN` / `HEDGE_MAIN` in `theme.py`); the rest drop to a "more"
-footer — every page stays reachable either way.
+The workhorses: **`/desk`** ("can I enter right now?" — per-direction verdict +
+live S1–S5 checklist + money ticket), **`/signals`** (approve/reject queue,
+same TAKE/SKIP path as the phone alert), **`/edge`** (steerable strategy search:
+Fit → Backtest → Board → Past), **`/journal`** + **`/position`** (the live book),
+**`/prop-desk`** / **`/prop-signals`** / **`/prop-ledger`** (the eval cockpit).
+**`/glossary`** ("Learn") explains every metric in plain English.
 
-### Web UI / design system (2026-06)
-
-A shared, responsive **design system** lives in **`app/theme.py`** — the single
-source of truth for the whole app:
-
-- **`LENS_CSS`** — the dark "cockpit / HUD" theme. Design tokens (surfaces, text,
-  accent + status colors, radii, glow elevation), the type system (Chakra Petch
-  display + JetBrains Mono data), every component class, and responsive rules at
-  680px / 1080px. Served **once** at `/assets/lens.css` and `<link>`ed by every
-  page, so the browser caches it and there is exactly one place to change styling.
-- **`shell(path, label, body, *, script, head_extra, meta)`** — the page
-  template. Wraps any body in the standard head (fonts + favicon + css), the
-  sticky top bar, and the **mode-aware** scroll-chip nav + PROP|HEDGE switch
-  (current page auto-highlighted). Page-specific CSS goes in `head_extra`; JS in `script`.
-- **`FAVICON_SVG`** — the brand mark (a scope / aperture iris; LENS = optics),
-  served at `/assets/favicon.svg`.
-- **`NAV_PROP` / `NAV_HEDGE`** — two lists, one per mode. `page_mode(path)` maps
-  each route to its mode; `nav_html()` renders only that mode's chips. Add a page
-  to the right list once and it appears in that mode's nav.
-
-**To add a page:** `from .theme import shell` → build `body` (+ optional
-`head_extra` CSS that aliases local var names onto shared tokens, e.g.
-`--ac:var(--accent)`) → `return shell("/x", "X", body, ...)`. To restyle the
-**entire** app, edit `LENS_CSS` once.
-
-- **`/style`** — **living style guide.** Renders every token + component straight
-  from `lens.css`, so it's both the design docs and a visual regression check.
-  See also **`BRAND.md`** (logo, voice, palette in one page).
-- **On `shell()`:** every page — they all share the bar/nav and most carry a
-  collapsible "❔ how to read this …" explainer. Unknown routes get a branded
-  404 (same shell; `/api/*` keeps the JSON contract).
-
-Built phone-first (full mobile audit 2026-06-19) — open it on the iPhone
-(Safari → Add to Home Screen for a fullscreen app feel), it reflows for
-iPad / desktop.
+**Design system** — one source of truth in **`app/theme.py`**: `LENS_CSS` (the
+dark HUD theme, served once at `/assets/lens.css`), `shell(...)` (the page
+template — head + top bar + mode-aware nav), and `NAV_PROP` / `NAV_HEDGE` (add a
+page to the right list once and it appears in that mode's nav). **`/style`** is
+the living style guide (every token + component rendered from `lens.css`);
+**`BRAND.md`** is the logo/voice/palette in one page. Built phone-first (full
+mobile audit 2026-06-19) — Safari → Add to Home Screen for a fullscreen feel.
 
 ![Desk — can I enter right now?](docs/desk.png)
-
-### `/desk` — **the live one. "Can I enter right now?"**
-Per-direction verdict (ENTER / BLOCKED / STAND DOWN) with the active vetoes
-spelled out, live S1–S5 condition checklists (✓/✗ per condition), and an
-always-on trade ticket in money: entry/stop/target/R:R, position size from your
-risk €, margin at 10x, and the three outcomes — if target / if +0.7% early
-exit / if stopped (as % of account). A collapsible **"how to read this desk"**
-panel explains it in plain English. When a signal is pending, a thumb-zone
-**TAKE A+ / TAKE / SKIP** bar decides it in place. Refreshes every 60s.
-
-### `/signals` — approve/reject queue
-Scanner-emitted (and Pine-webhook) signals land here as pending, each with
-inline **TAKE A+ (conv 5) / TAKE (conv 3) / SKIP** buttons (same decision path
-as the desk + the ntfy phone alert → `POST /api/signals/{id}/decide`).
-Decisions, conviction, and rejection reasons are stored — skipped signals are
-data too. Click any **recent decision** to expand its **full order ticket**
-(notional, size ₿, margin, win/lose balance, breakeven, liquidation — the same
-`_trade_shape` the alert and desk use). The **❔ what is this page** box now
-explains **proposed vs decided / who decides** (the scanner proposes; either the
-discipline filters auto-reject or *you* decide) and documents every auto-skip
-filter (`filter:saturday`, `filter:bleed_hour_*`, `filter:bad_venue_*`,
-`filter:cooldown_*`) with the historical loss each is based on.
-
-### `/journal` + `/position` — the live book
-The journal absorbed the old `/review` chart workstation (retired in
-`b8e6d10`): every closed fill with entry context + **auto-review**, fed by the
-`/api/review/*` endpoints. `/position` shows live open positions from the
-Kraken sync — the watch-only "what am I holding right now" view.
-
-### `/dashboard` + `/goal` — the 4R planning track (legacy)
-Goal-first ("what does each trade need to do?") and parameter-first ("where do
-locked params land?") calculators with percentile bands, fee-honest R, ruin %.
-`/projection` now redirects to `/goal`.
-
-### `/backtest` — pressure-testing
-Backtest engine over cached OHLCV (includes `LIVE_SCALP_v1`, a baseline that
-reproduces the realized ~42% WR from pure SL/TP geometry — the bar any
-strategy must beat), plus Sharpe/Sortino/Calmar and the SL×TP robustness
-heatmap. The standalone `/montecarlo` page was deleted with the old review
-workstation; Monte Carlo lives on in `/equity` (prop eval sim).
-
-### PROP mode — the eval cockpit, split into engines
-`/prop` is the **Goals hub**: a visual target corridor (floor ── start ──
-target) + the 3 structural upgrades, each linking to its engine page. The
-engines (all fed by one `prop_views.prop_metrics()` so no two views drift):
-**`/strategy`** (WR · R · expectancy R/%), **`/risk`** (risk %/$, stop,
-position-size formula, leverage), **`/survival`** (DD limit · max historical DD ·
-loss-streak stress table · days-to-breach), **`/rules`** (the live constraint
-layer), **`/equity`** (Monte Carlo equity sim from WR+RR — paths, drawdown,
-failure frequency), **`/regime`** (BULL/SIDEWAYS/BEAR + hero WR per regime).
-
-The **live + signals + bookkeeping** set (2026-06-19 / -21):
-- **`/prop-desk`** (Live) — the prop equivalent of `/desk`: evaluates the hero
-  **ASIAN_RSI_DIP_v1** on the freshest closed 4H bar → **ENTER / STAND DOWN**
-  (it only fires on the 00/04 UTC Asian closes; a countdown shows the next
-  window). Carries the full **trade assumptions** to actually place the order —
-  entry, breakeven (after fee), TP, SL, est. liquidation, expected range (ATR),
-  notional / margin / size, **long *and* short**, sized at legal prop leverage
-  (risk % + maintenance-margin inputs recompute live).
-- **`/prop-signals`** (Signals, **2026-06-21**) — the prop review queue, the
-  counterpart to `/signals`. The `app.prop_scan` cron reads the same hero on each
-  4H Asian close and, on ENTER, inserts a prop signal + pushes a phone alert
-  (TAKE/SKIP). Each card shows the prop-legal ticket and a **＋ Log fill to
-  ledger** button that writes an *open* `book='prop'` trade carrying
-  `linked_signal_id` back to the alert — you close it out (exit + pnl) on the
-  ledger. Signal (proposal) and ledger (the equity book of real fills) stay
-  separate records, linked; skips never touch the equity curve.
-- **`/prop-ledger`** (Ledger) — the prop trade book. Log eval trades by hand
-  (`book='prop'`, kept separate from the hedge book) → a running **equity ledger
-  vs the walls**: distance to the $4,850 floor, daily-loss used, progress to the
-  $5,450 target, plus realised analytics (peak/trough, max DD, current DD, time
-  under water, observed loss streak, WR, expectancy, total R). A
-  floor ── you ── target corridor moves with each logged trade.
-- **`/prop-income`** (Income) — the prop end-goal (separate from the hedge goal):
-  a chained **income / FIRE ladder** (rent → salary → company income → trading
-  capital/mo → FAT FIRE), anchor-driven (set one rung, the rest derive by fixed
-  ratios) with the required **Trading AUM** and a live BTC column.
-
-See the **Prop track** section below.
-
-### `/style` — living style guide
-Every design token + component rendered straight from `lens.css` — the design
-docs and a visual regression check in one page. Brand/logo/voice, the full
-colour palette, type scale, spacing, and all components. Written companion:
-**`BRAND.md`**.
 
 ---
 
@@ -352,11 +243,6 @@ trades/mo. It takes **~6 losses in a row** to hit the floor (≈4% odds). The
 hero's edge is regime-dependent — **BULL ~50% WR vs BEAR ~25%** (see `/regime`),
 and with no time limit, waiting for a kinder regime is a free lever.
 
-### Next (later)
-- [ ] **Forward-test** ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
-- [ ] Long game: lift WR via the **HEDGE** discretionary edge (real flush WR ~60%
-      vs 40% mechanical) → the only way past the 89% ceiling.
-
 Full detail: [`strategies/_prop/BREAKOUT_5K_PLAN.md`](strategies/_prop/BREAKOUT_5K_PLAN.md).
 
 **Sources:** thetrustedprop.com/prop-firms/breakout-prop ·
@@ -440,100 +326,21 @@ missing tools — it's **reps in the journal.** Consistency and commits compound
 FOMO doesn't. This is a craft-persistence project, not a "keep adding surface
 area" project.
 
-## TODO — next session (updated 2026-07-04 late)
+## Next
 
-**A ✅ DONE 2026-07-04** — alerts carry a "⏱ Live now" price+drift line;
-pending signals auto-expire when price runs >0.5% past entry (before pushing);
-same-idea signals (same direction, entry ±0.5%, approved <6h) auto-approve
-quietly — on /signals, no phone buzz. Verified live on a real repeat S3.
-
-**B ✅ DONE 2026-07-04** — one geometry everywhere: `_board_geo` returns
-SL_PCT/TP_PCT (0.63/1.5); board picks WHICH strategy, never levels; /desk help
-text fixed.
-
-**C. Automated strategy search v2 — BUILT + RUN 2026-07-04**
-(`app/strategy_search.py`): ≤3-condition combos across trend/candle/MACD/RSI/
-BKK-sessions/Bollinger/TD-Sequential-9/triple-MA-stack/vol-spike/ATR-regime,
-real engine + 0.03%/side slippage, split-half filter, SL×TP×lev×ATR-floor
-sweep, 7y-binance deep confirmation, Kelly. v2 verdict (2026-07-04): 0
-deep-confirmed — but that verdict was scoped to the tight-scalp regime
-(stage 1 filtered everything at 0.63/1.5/10x). **SUPERSEDED BY v3.**
-
-**C. Search v3 — dynamic ATR geometry (`app/strategy_search3.py`), RUN
-2026-07-04, 43,703 evaluated.** Geometry inside stage 1: stop = k×ATR,
-TP = R×stop, risk-normalized 2%/trade (engine: `atr_stop_mult`, `rr`,
-`risk_pct`; self-check `test_atr_stop.py`). Four gates: split-half n≥40 →
-7×7 (k,R) matrix neighbourhood → 7y deep AT OWN GEOMETRY → **beats
-random-entry baseline per-trade on both windows** (gate 4 exists because
-buy-every-bar long at 2.5×ATR is itself green on 7y — drift). **VERDICT:
-374 distinct survivors clear all four gates** (330 long / 44 short; tight
-stops stay dead — fee floor ~0.72R/trade at 0.5% stop vs ~0.1R at 2.5×ATR).
-Three families: 4h trend+MACD momentum longs (1.5×ATR, 3–5R, BKK-evening
-strongest) · 1h dip-buys in bull structure (RSI≤30/BB<lower + MA-stack
-bull, 2.5×ATR, 5R) · SHORT capitulation fades (BB<lower + vol spike —
-biggest edge over baseline, +2.08%/trade). Full report (HTML+MD):
-Kiki `03 - Resources/lens-strategy-search-v3-202607.*`. Results:
-`strategy_search.json` v3. **✅ 2026-07-04: shadow-registered 1 rep per
-family** — `TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
-`CAPITULATION_FADE_SHORT_v3` in `STRATEGIES` (never-alert: setups.py hero
-path doesn't iterate the registry; they surface only in the /strategy
-dropdown's unranked section, like `ASIAN_MORNING_LONG_v1`). **✅ Pine
-exporter speaks `atr_stop_mult`** (k×ATR entry stop, rr×stop TP). Both
-covered by `test_atr_stop.py`.
-
-**✅ 2026-07-04: /edge is now a steerable search, not just a form**
-(`app/search_custom.py`, `POST /api/backtest/search` + `/search/status`).
-Blank builder fields = swept dimensions, set fields = pinned; direction/
-timeframe have an "any (search)" option. Risk envelope entered as ranges
-(ATR-stop k, R, risk %/trade — from–to), swept over the FINE_K×FINE_R matrix
-inside the bounds. Background thread, UI polls, ranked table (robust-first,
-then net%); click a row → loads it into the builder for ▶/⊞/⧉. 8k-eval cap
-returns a "pin more fields" message. Every result row + the single-run
-scorecard carry a **→ Goal** link that opens /goal prefilled with that
-strategy's WR / R / trades-per-week (query-param handoff, no calc changes).
-Verified end-to-end in-browser: TREND family reproduces +67.7% at k1.5/R3,
-goal handoff computes (2.76R, 89d). Same honesty caveat holds — 30mo
-split-half only; deep-7y confirmation stays offline.
-
-NEXT: forward-test ~a month before any promotion (early Aug 2026);
-exit-mechanics sims (trailing/BE-move) = next dimension. Optional: add the
-three shadows to `strategy_eval.PROP_BACKTEST` if the scored board (not just
-the dropdown) should track them — held off as premature promotion. Macro
-feeds / order-flow still need a data source first.
-
-**D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
-(484 / −4405.83); /overview prop n=0 correct (book archived 06-30).
-
-**E. One dashboard click (you):** Parameters → rr_ratio (still 4.0 in config;
-plan said → 2.4) — decide and click, watch /audit flip the row.
-
----
-
-## TODO — standing (updated 2026-07-02)
-
-0. **Actually run the loop.** Still the real bottleneck, not code. Signals
+1. **Actually run the loop.** Still the real bottleneck, not code. Signals
    sitting at ~21, trades still not being taken through it — the build is way
    ahead of the usage. Before ANY new surface area: take the next valid S1–S5
    alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
    the v4 re-mine (~3 months needed).
-1. ~~Strategy R&D session~~ ✅ **DONE 2026-07-02** — full audit at
-   `strategies/_research/STRATEGY_AUDIT_20260702.md`. Headlines: S1 is the
-   only mechanically-alive labeled setup; the 0.63% stop is right but the
-   0.95% target is too tight (real winners run to 1.5-2%); two mined
-   candidates (H12 quiet-uptrend grind, H13 weak-bounce fade) now tracked by
-   the Monday re-rank — promote to shadow signals only if they hold on fresh
-   data for ~a month.
-
-Done 2026-07-02 (see git log for detail):
-- Branded 404 page · `/mvp` **dropped** (covered by `/position` +
-  `/overview-hedge`; `mvp-executor` branch kept as local archive).
-- **Data layer fixed**: balance timeline now reads both cash wallets (account
-  is USD-settled; old code filtered to EUR) *and* account-log pagination
-  actually works (old cursor bug capped history at 1000 entries). Backfill
-  endpoint repaired all 481 closed trades — 0 NULL balances, real leverage.
-- README trued up + restructured (at-a-glance table, screenshots, history
-  trimmed); `prism.env` retired (everything reads `.env`); orphan pages
-  (Style / Sitemap / Health) added to both mode footers.
+2. **Forward-test before any promotion** (~early Aug 2026) — the three v3 search
+   families (`TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
+   `CAPITULATION_FADE_SHORT_v3`) stay shadow-registered until they hold on fresh
+   data; ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
+3. **One dashboard click (you):** Parameters → `rr_ratio` (still 4.0 in config;
+   plan said → 2.4) — decide and click, watch `/audit` flip the row.
+4. **Next dimension:** exit-mechanics sims (trailing / BE-move). Macro feeds /
+   order-flow (CVD, delta, funding, OI) still need a data source first.
 
 ## Status / honesty
 
@@ -558,8 +365,8 @@ Done 2026-07-02 (see git log for detail):
   occurrence of any setup is ~coin-flip — the edge is selection inside the
   context. Funding cost on multi-day holds is not modelled.
 
-Progress + roadmap live in **`LENS_PLAN.md`** (the single source of truth for
-where the build is). Full playbook: `strategies/LENS_EDGE_v3_ICT/FINDINGS.md`.
+Progress + roadmap live in **`LENS_PLAN.md`**; dated build history in
+**`CHANGELOG.md`**. Full playbook: `strategies/LENS_EDGE_v3_ICT/FINDINGS.md`.
 Original system spec: `PRISM-SYSTEM-SPEC (1).md`.
 
 ## Working across machines

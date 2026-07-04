@@ -148,12 +148,12 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str
         script = SCRIPT + fit_script + bt_script
 
     anchors = ('<div class="ed-anchors">'
-               '<a href="#past">↓ Past · live results</a>'
-               '<a href="#board">↓ Board · simulated ranks</a>'
                '<a href="#fit" style="color:var(--accent);border-color:var(--accent)">↓ Fit · goal-constrained sweep</a>'
-               '<a href="#backtest">↓ Backtest · run &amp; build</a></div>')
-    body = ('<div class="ed-sub">Which setups pay? One page, four tenses: what your trades '
-            'actually did, what the coded rules would have done, what shape the strategy must be, '
-            'and a runner to test the next idea.</div>'
-            + anchors + _LIVE + board + fit_body + bt_body)
+               '<a href="#backtest">↓ Backtest · run &amp; build</a>'
+               '<a href="#board">↓ Board · simulated ranks</a>'
+               '<a href="#past">↓ Past · live results</a></div>')
+    body = ('<div class="ed-sub">Which setups pay? One page, four tenses: what shape the strategy '
+            'must be, a runner to test the next idea, what the coded rules would have done, and what '
+            'your trades actually did.</div>'
+            + anchors + fit_body + bt_body + board + _LIVE)
     return shell("/edge", "Edge", body, script=script, head_extra=head, meta="which setups pay?")
