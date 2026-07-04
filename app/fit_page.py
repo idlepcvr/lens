@@ -52,6 +52,15 @@ CSS = r"""<style>
 .fit-env b{color:var(--ink)}
 .fit-env a{font-family:var(--mono);font-size:11px}
 
+/* your-strategy vs envelope comparison */
+.fit-cmp{width:100%;border-collapse:collapse;margin-top:12px;font-size:11.5px}
+.fit-cmp caption{caption-side:top;text-align:left;font-size:12px;color:var(--dim);padding:11px 0 3px}
+.fit-cmp caption .dim{color:var(--faint)}
+.fit-cmp th{text-align:right;color:var(--faint);font-weight:600;padding:5px 9px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:8.5px;letter-spacing:.06em}
+.fit-cmp th:first-child,.fit-cmp td:first-child{text-align:left}
+.fit-cmp td{text-align:right;padding:5px 9px;border-bottom:1px solid var(--line);font-family:var(--mono);color:var(--ink)}
+.fit-cmp td.st{text-align:center} .fit-cmp .dim{color:var(--faint)}
+
 /* heatmap — reuses the .hm grammar from the backtest fragment */
 .fit-hm-head{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
 .fit-hm-title{font-size:14px;font-weight:700;color:var(--ink)}
@@ -80,7 +89,7 @@ BODY = r"""
 <div class="ed-hs">No strategies here, on purpose. Fix the goal (start → target by date) and sweep the sizing &amp; cadence space; the feasible region is where the goal closes <b style="color:var(--ink)">in time, inside Kelly, at ruin ≤ 1%</b>. Whatever you trade next has to land in it.</div>
 
 <details class="fit-help"><summary>❔ how to read this</summary><div class="body">
-This is the inverse of the builder below. The builder searches <b>entry conditions</b> and reports what win rate / frequency they produced. Here those are <b>inputs you sweep</b> — because a win rate is an <i>output</i> of a strategy, not a dial. Each cell asks the goal model one question: at this leverage, cadence, win rate, R:R and stop floor, does the account reach the target by the date, and does the risk it forces stay under the Kelly/drawdown cap? <b class="g">Feasible</b> cells clear both; the <b>envelope</b> is their outer bounds — the shape any real strategy must have to hit this goal. <b class="r">In-sample and model-only</b>: this says what edge you'd <i>need</i>, not that such an edge exists — that's the next step (filtering the real search by this envelope).
+This is the inverse of the builder below. The builder searches <b>entry conditions</b> and reports what win rate / frequency they produced. Here those are <b>inputs you sweep</b> — because a win rate is an <i>output</i> of a strategy, not a dial. Each cell asks the goal model one question: at this leverage, cadence, win rate, R:R and stop floor, does the account reach the target by the date, and does the risk it forces stay under the Kelly/drawdown cap? <b class="g">Feasible</b> cells clear both; the <b>envelope</b> is their outer bounds — the shape any real strategy must have to hit this goal, and the table under it sits <b>your own measured trades</b> next to those bounds so you can see if what you actually trade lives inside the island. <b class="r">In-sample and model-only</b>: this says what edge you'd <i>need</i>, not that such an edge exists — that's the next step (filtering the real search by this envelope).
 </div></details>
 
 <div class="panel fit-panel">
@@ -253,8 +262,34 @@ SCRIPT = r"""
     } else if(o){
       envh='<div class="fit-env">No feasible envelope — nothing in the swept space both reaches the goal in time and stays inside Kelly. The tiles above are the <b>nearest miss</b>. Push the date, cut the target, or loosen the risk caps.</div>';
     }
+    // your real, measured strategy sat next to the envelope — only meaningful when
+    // a feasible island exists to compare against.
+    var m=DATA.measured, cmph='';
+    if(o && Object.keys(env).length && m){
+      var fails=0;
+      var band=function(v,lo,hi){ return v!=null && v>=lo-1e-9 && v<=hi+1e-9; };
+      var rows=[
+        ['Win rate',          pct(env.wr.min)+'–'+pct(env.wr.max),                     m.wr!=null?pct(m.wr):null,               m.wr!=null?band(m.wr,env.wr.min,env.wr.max):null],
+        ['R : R',             env.rr.min.toFixed(1)+'–'+env.rr.max.toFixed(1),         m.rr!=null?m.rr.toFixed(2):null,         m.rr!=null?band(m.rr,env.rr.min,env.rr.max):null],
+        ['Trades / week',     env.freq.min+'–'+env.freq.max,                           m.freq!=null?(''+m.freq):null,          m.freq!=null?band(m.freq,env.freq.min,env.freq.max):null],
+        ['Risk / trade',      m.kelly_cap_pct!=null?'≤ '+m.kelly_cap_pct.toFixed(2)+'%':'—', m.risk_pct!=null?m.risk_pct.toFixed(2)+'%':null, (m.risk_pct!=null&&m.kelly_cap_pct!=null)?m.risk_pct<=m.kelly_cap_pct+1e-9:null],
+        ['Kelly utilization', '< 100%',                                                m.kelly_util!=null?m.kelly_util.toFixed(0)+'%':null, m.kelly_util!=null?m.kelly_util<100:null]
+      ];
+      var trs=rows.map(function(r){
+        if(r[3]===false) fails++;
+        var your=r[2]==null?'<span class="dim">—</span>':r[2];
+        var st=r[3]===null?'<span class="dim">—</span>':(r[3]?'✅':'❌');
+        return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+your+'</td><td class="st">'+st+'</td></tr>';
+      }).join('');
+      var cap=fails===0
+        ? 'Your measured strategy is living <b style="color:var(--long)">inside the feasible island</b>.'
+        : 'Your measured strategy is <b style="color:var(--short)">outside the island</b> on '+fails+' axi'+(fails>1?'es':'s')+'.';
+      cmph='<table class="fit-cmp"><caption>'+cap+' <span class="dim">n='+m.n+' closed trades</span></caption>'+
+        '<thead><tr><th>Metric</th><th>Required envelope</th><th>Your strategy</th><th>Status</th></tr></thead>'+
+        '<tbody>'+trs+'</tbody></table>';
+    }
     el('fit-verdict-wrap').innerHTML='<div class="fit-verdict '+lvl+'"><div class="vi">'+icon+
-      '</div><div style="flex:1"><h3>'+title+'</h3><p>'+msg+'</p>'+opth+envh+'</div></div>';
+      '</div><div style="flex:1"><h3>'+title+'</h3><p>'+msg+'</p>'+opth+envh+cmph+'</div></div>';
     el('fit-heat-wrap').style.display='';
     drawHeat();
   }

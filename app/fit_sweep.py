@@ -17,7 +17,10 @@ FEASIBLE on two gates, both required:
 The joint optimum = the feasible cell with the most risk headroom (opt/used); its
 axis values pin the heatmap slices. The envelope = per-axis bounds of the whole
 feasible set — "any strategy inside these bounds can hit the goal in time at sane
-risk". When nothing is feasible, the nearest miss is surfaced instead.
+risk". When nothing is feasible, the nearest miss is surfaced instead. Alongside
+it, `measured` places YOUR real closed-trade stats (win rate · R:R · cadence ·
+risk/trade) in the same coordinates, so the page can say whether what you
+actually trade lands inside that envelope.
 
 Runs in one background thread, polled by the page. Same start/status/lock
 single-flight shape as search_custom.py. Stage B (filtering the real strategy
@@ -28,7 +31,7 @@ import time
 from datetime import date
 
 from .calculator import CalcError, compute_goal
-from .database import _conn
+from .database import _conn, get_actual_stats
 
 CELL_CAP = 200_000   # refuse bigger grids — tell the user to tighten ranges
 
@@ -220,6 +223,48 @@ def _envelope(feasible: list) -> dict:
     return env
 
 
+def _measured(gp: dict) -> dict | None:
+    """Your REAL strategy, measured from closed trades, in the same coordinates as
+    the envelope — so the page can answer "is what I actually trade inside the
+    feasible island?". Win rate / R:R / cadence come straight from get_actual_stats;
+    risk/trade is the realised account loss on an average loser (|avg loss| ÷
+    balance); the Kelly cap is what MIN(Kelly, DD) allows AT your measured edge
+    (leverage-independent). None when there are no closed trades to measure."""
+    s = get_actual_stats()
+    n = s.get("total_trades") or 0
+    if n < 1:
+        return None
+    wr = (s["actual_wr"] / 100.0) if s.get("actual_wr") is not None else None
+    rr = s.get("actual_rr")
+    freq = s.get("trades_per_week")
+    bal, avg_loss = s.get("current_balance"), s.get("avg_loss_eur")
+    risk_pct = (abs(avg_loss) / bal * 100.0) if (bal and avg_loss) else None
+    kelly_cap = None
+    if wr is not None and rr:
+        try:
+            g = compute_goal(
+                gp["start_balance"], gp["target_balance"], gp["target_date"],
+                trades_per_week=(freq or 1.0), win_rate=wr, rr_ratio=rr, leverage=1.0,
+                max_drawdown_allowed=gp["max_drawdown_allowed"],
+                losses_allowed=gp["losses_allowed"],
+                fractional_kelly=gp["fractional_kelly"],
+                execution_fill_factor=gp["execution_fill_factor"],
+                slippage_pct=gp["slippage_pct"],
+                btc_price_eur=gp["btc_price_eur"],
+                btc_growth_monthly=gp["btc_growth_monthly"],
+            )
+            kelly_cap = g["optimal_risk_pct"]
+        except (CalcError, ArithmeticError, ValueError):
+            kelly_cap = None
+    kelly_util = (risk_pct / kelly_cap * 100.0) if (risk_pct and kelly_cap) else None
+    return {
+        "n": n, "wr": wr, "rr": rr, "freq": freq,
+        "risk_pct":      (round(risk_pct, 2) if risk_pct is not None else None),
+        "kelly_cap_pct": (round(kelly_cap, 2) if kelly_cap is not None else None),
+        "kelly_util":    (round(kelly_util, 1) if kelly_util is not None else None),
+    }
+
+
 def _pick_optimum(cells: list) -> dict | None:
     """The joint optimum, or the nearest miss when nothing is feasible. Layered so
     the fallback degrades along the axis that's failing:
@@ -274,6 +319,7 @@ def evaluate(req: dict, progress=None) -> dict:
         "total": total,
         "weeks_remaining": round(weeks_remaining, 1),
         "envelope": _envelope(feasible),
+        "measured": _measured(gp),
         "goal": {"start_balance": gp["start_balance"],
                  "target_balance": gp["target_balance"],
                  "target_date": gp["target_date"].isoformat()},

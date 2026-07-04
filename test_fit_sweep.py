@@ -46,6 +46,14 @@ assert env, "feasible set → non-empty envelope"
 for k in ("lev", "freq", "wr", "rr", "atr"):
     assert env[k]["min"] <= o[k] <= env[k]["max"], (k, env[k], o[k])
 
+# ── 3b. measured strategy is None (no trades) or a well-shaped dict ──────────
+m = r["measured"]
+assert m is None or (
+    m["n"] >= 1
+    and (m["wr"] is None or 0 <= m["wr"] <= 1)
+    and set(("wr", "rr", "freq", "risk_pct", "kelly_cap_pct", "kelly_util")) <= set(m)
+), m
+
 # ── 4. impossible goal: 1000× in two weeks → no feasible, nearest miss shown ─
 imp = evaluate(_req(target_balance=1_000_000, target_date="2026-07-18"))
 assert imp["feasible_count"] == 0, "1000× in two weeks can't be feasible"
