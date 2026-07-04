@@ -479,11 +479,27 @@ family** — `TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
 path doesn't iterate the registry; they surface only in the /strategy
 dropdown's unranked section, like `ASIAN_MORNING_LONG_v1`). **✅ Pine
 exporter speaks `atr_stop_mult`** (k×ATR entry stop, rr×stop TP). Both
-covered by `test_atr_stop.py`. NEXT: forward-test ~a month before any
-promotion (early Aug 2026); exit-mechanics sims (trailing/BE-move) = next
-dimension. Optional: add the three to `strategy_eval.PROP_BACKTEST` if the
-scored /strategy board (not just the dropdown) should track them — held off
-as premature promotion. Macro feeds / order-flow still need a data source first.
+covered by `test_atr_stop.py`.
+
+**✅ 2026-07-04: /edge is now a steerable search, not just a form**
+(`app/search_custom.py`, `POST /api/backtest/search` + `/search/status`).
+Blank builder fields = swept dimensions, set fields = pinned; direction/
+timeframe have an "any (search)" option. Risk envelope entered as ranges
+(ATR-stop k, R, risk %/trade — from–to), swept over the FINE_K×FINE_R matrix
+inside the bounds. Background thread, UI polls, ranked table (robust-first,
+then net%); click a row → loads it into the builder for ▶/⊞/⧉. 8k-eval cap
+returns a "pin more fields" message. Every result row + the single-run
+scorecard carry a **→ Goal** link that opens /goal prefilled with that
+strategy's WR / R / trades-per-week (query-param handoff, no calc changes).
+Verified end-to-end in-browser: TREND family reproduces +67.7% at k1.5/R3,
+goal handoff computes (2.76R, 89d). Same honesty caveat holds — 30mo
+split-half only; deep-7y confirmation stays offline.
+
+NEXT: forward-test ~a month before any promotion (early Aug 2026);
+exit-mechanics sims (trailing/BE-move) = next dimension. Optional: add the
+three shadows to `strategy_eval.PROP_BACKTEST` if the scored board (not just
+the dropdown) should track them — held off as premature promotion. Macro
+feeds / order-flow still need a data source first.
 
 **D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
 (484 / −4405.83); /overview prop n=0 correct (book archived 06-30).

@@ -80,3 +80,38 @@ assert "effTp = effSl * 3" in pine, pine
 assert "/ 100" not in pine, "fixed-% geometry leaked into an atr_stop script"
 
 print("ok — 3 shadow strategies registered with search-exact params; Pine speaks atr_stop")
+
+# ── /edge search orchestrator: search-space math (offline, no network) ──
+from app.search_custom import plan, _grid, EVAL_CAP, start
+
+# _grid keeps FINE values inside the range, falls back to the ends when none land
+assert _grid([0.5, 1.0, 1.5, 2.5], 1.0, 2.0) == [1.0, 1.5]
+assert _grid([0.5, 1.0], 1.2, 1.2) == [1.2]          # single off-grid point → use it
+
+# pinned slots are fixed; every OTHER slot is swept (blank = search it). one geom cell.
+dirs, tfs, pins, blank, ks, rs, risks, total = plan({
+    "direction": "long", "timeframe": "4h", "trend": "up", "macd": "bull", "vol_spike": True,
+    "k_min": 1.5, "k_max": 1.5, "r_min": 3.0, "r_max": 3.0, "risk_min": 2.0, "risk_max": 2.0})
+assert tfs == ["4h"] and dirs == ["long"]
+assert ks == [1.5] and rs == [3.0] and risks == [2.0]           # one geometry cell
+assert pins == {"trend": "up", "macd": "bull", "vol": True}     # 3 pinned
+assert "trend" not in blank and "candle" in blank and "rsi" in blank  # rest are swept
+assert 1 < total < EVAL_CAP                                     # bounded, non-trivial
+
+# pinning direction + timeframe blank means BOTH get swept
+d2, t2, *_ = plan({"direction": "", "timeframe": "", "risk_min": 2.0, "risk_max": 2.0})
+assert d2 == ["long", "short"] and t2 == ["1h", "4h"]
+
+# fully pinned (all slots off is impossible via UI, but a fully-specified combo → 1 cell)
+_, _, _, blank0, _, _, _, t0 = plan({
+    "direction": "long", "timeframe": "1h", "trend": "up", "candle": "bull", "macd": "bull",
+    "bb": "below_lower", "td": "buy9", "ma_align": "bull", "atr_regime": "high", "vol_spike": True,
+    "rsi_min": 60, "hour_from": 6, "hour_to": 11,
+    "k_min": 2.5, "k_max": 2.5, "r_min": 5.0, "r_max": 5.0, "risk_min": 2.0, "risk_max": 2.0})
+assert blank0 == [] and t0 == 1, (blank0, t0)   # nothing left blank → geometry-only, 1 eval
+
+# blank-everything (only direction pinned) blows past the cap → refuse with a message
+r = start({"direction": "long", "timeframe": "", "k_min": 1.0, "k_max": 2.5,
+           "r_min": 2.0, "r_max": 5.0, "risk_min": 2.0, "risk_max": 2.0})
+assert "error" in r and "too large" in r["error"], r
+print("ok — search plan/grid/cap math holds")

@@ -337,7 +337,15 @@ let debounce;
 FORM.addEventListener("input",()=>{ clearTimeout(debounce); debounce=setTimeout(recompute,250); });
 SAVE_BTN.addEventListener("click",async()=>{ await fetch("/api/config",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(readForm())}); SAVED.classList.add("show"); setTimeout(()=>SAVED.classList.remove("show"),1500); });
 RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config").then(r=>r.json())); recompute(); });
-(async()=>{ populate(await fetch("/api/config").then(r=>r.json())); recompute(); })();
+(async()=>{
+  populate(await fetch("/api/config").then(r=>r.json()));
+  // prefill from an /edge "→ Goal" handoff (?win_rate=..&rr_ratio=..&trades_per_week=..)
+  const qs=new URLSearchParams(location.search);
+  ["win_rate","rr_ratio","trades_per_week","leverage"].forEach(function(k){
+    if(qs.has(k)){ const el=FORM.elements.namedItem(k); if(el) el.value=qs.get(k); }
+  });
+  recompute();
+})();
 
 document.querySelectorAll('#goal-form input:not([type=date])').forEach(function(inp){
   function tryCalc(){ var v=inp.value.trim(); if(!v) return;

@@ -1438,8 +1438,8 @@ canvas{width:100%;height:200px;display:block}
       Runs through the <b>exact same engine</b> as the coded strategies (same fills, fees, discipline gates),
       over the months &amp; starting balance selected above. Hours are Bangkok time, window may wrap midnight.</div>
     <div class="row" style="margin-bottom:12px">
-      <select id="c-dir"><option value="long">LONG</option><option value="short">SHORT</option></select>
-      <select id="c-tf"><option value="1h">1h bars</option><option value="4h">4h bars</option></select>
+      <select id="c-dir"><option value="long">LONG</option><option value="short">SHORT</option><option value="">any (search)</option></select>
+      <select id="c-tf"><option value="1h">1h bars</option><option value="4h">4h bars</option><option value="">any (search)</option></select>
       <select id="c-trend"><option value="">trend: any</option><option value="up">trend: up (EMA21&gt;50)</option><option value="down">trend: down (EMA21&lt;50)</option></select>
       <select id="c-candle"><option value="">bar: any</option><option value="bull">bar: bull close</option><option value="bear">bar: bear close</option></select>
       <select id="c-macd"><option value="">MACD: any</option><option value="bull">MACD: bull (hist&gt;0)</option><option value="bear">MACD: bear (hist&lt;0)</option></select>
@@ -1463,15 +1463,20 @@ canvas{width:100%;height:200px;display:block}
       <label style="font-size:11px;color:var(--t2)" title="Per-side fill cost added to fees — market orders never fill at the ideal price">Slip % <input id="c-slip" type="number" step="any" value="0.03" class="c-n" style="width:64px"></label>
       <label style="font-size:11px;color:var(--t2)" title="Stop can't be tighter than this × the entry bar's ATR% — volatility noise shouldn't stop you out. 0 = off; try 1–1.5">ATR floor × <input id="c-atrf" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
     </div>
+    <div class="row" style="margin-bottom:10px">
+      <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em" title="Dynamic stops scaled to volatility (search-v3 geometry). For a single backtest the LEFT box is used and the SL/TP % boxes above are ignored when ATR stop &gt; 0. For a search, the range is swept.">risk envelope —</span>
+      <label style="font-size:11px;color:var(--t2)" title="Stop = k × the entry bar's ATR. Left = from, right = to. Single backtest uses the LEFT value (0 = off → fixed SL/TP). v3 survivors sit at 1.5–2.5.">ATR stop × <input id="c-atrs-lo" type="number" step="any" value="0" class="c-n" style="width:48px">–<input id="c-atrs-hi" type="number" step="any" value="2.5" class="c-n" style="width:48px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Take-profit = R × the stop distance. Left = from, right = to. v3 survivors use 3–5.">R <input id="c-rr-lo" type="number" step="any" value="2" class="c-n" style="width:44px">–<input id="c-rr-hi" type="number" step="any" value="5" class="c-n" style="width:44px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Risk-normalized sizing: each trade risks this % of equity, leverage = risk ÷ stop capped at Lev. Left = from, right = to (only the two ends are tested — risk scales monotonically). v3 used 2.">Risk %/trade <input id="c-risk-lo" type="number" step="any" value="2" class="c-n" style="width:44px">–<input id="c-risk-hi" type="number" step="any" value="2" class="c-n" style="width:44px"></label>
+    </div>
     <div class="row" style="margin-bottom:12px">
-      <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em" title="The search-v3 geometry: dynamic stops scaled to volatility instead of fixed %. Set ATR stop and the SL/TP % boxes above are ignored.">v3 geometry —</span>
-      <label style="font-size:11px;color:var(--t2)" title="Dynamic stop = this × the entry bar's ATR. Replaces SL/TP % entirely. 0 = off; the v3 survivors use 1.5–2.5">ATR stop × <input id="c-atrs" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
-      <label style="font-size:11px;color:var(--t2)" title="Take-profit = R × the stop distance. v3 survivors use 3–5">R <input id="c-rr" type="number" step="any" placeholder="3" class="c-n" style="width:52px"></label>
-      <label style="font-size:11px;color:var(--t2)" title="Risk-normalized sizing: every trade risks this % of equity — leverage per trade = risk ÷ stop, capped at Lev. Makes wide and tight stops comparable. 0 = off; v3 used 2">Risk %/trade <input id="c-risk" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
-      <button class="run" id="custom-btn" onclick="runCustom()">▶ Backtest it</button>
-      <button id="csweep-btn" onclick="runCustomSweep()" title="Re-run these exact entry conditions across the whole ATR-stop × R grid (the same 7×7 matrix search v3 used) — a real edge is a green neighbourhood, not one lucky cell">⊞ Sweep k×R</button>
+      <button class="run" id="search-btn" onclick="runCustomSearch()" title="Sweep every blank field above (set fields stay pinned) across the whole risk envelope, and rank the condition-sets that survive. Blank direction/timeframe = both are searched too.">🔍 Search blanks</button>
+      <button class="run" id="custom-btn" onclick="runCustom()" title="Backtest ONE exact idea — pick a direction &amp; timeframe, uses the left value of each range">▶ Backtest it</button>
+      <button id="csweep-btn" onclick="runCustomSweep()" title="Re-run these exact entry conditions across the whole ATR-stop × R grid (the 7×7 matrix search v3 used) — a real edge is a green neighbourhood, not one lucky cell">⊞ Sweep k×R</button>
       <button id="pine-btn" onclick="exportPine()" title="Export these exact conditions as a TradingView Pine v5 strategy — paste into the Pine editor">⧉ Pine</button>
     </div>
+    <div id="search-prog" style="display:none;font-size:11px;color:var(--t2);margin-bottom:10px"></div>
+    <div id="search-results" style="display:none;margin-bottom:12px"></div>
     <div style="font-size:10px;color:var(--t3)">Results render in the same scorecard below. Mined in-sample — a green result is a candidate to sweep &amp; forward-test, not a green light.</div>
     <pre id="pine-out" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border:1px solid var(--b1);border-radius:6px;font-size:10px;max-height:320px;overflow:auto;white-space:pre"></pre>
   </div>
@@ -1496,7 +1501,10 @@ canvas{width:100%;height:200px;display:block}
 
 <div id="results" style="display:none">
   <div class="card">
-    <div id="strat-name" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+      <div id="strat-name" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px"></div>
+      <a id="result-goal" href="#" style="font-size:11px;white-space:nowrap" title="Send this backtest's win rate, R and trade frequency to the Goal model">→ Goal model</a>
+    </div>
     <div id="strat-desc" style="font-size:11px;color:var(--faint);margin-bottom:14px"></div>
     <div class="metrics" id="metrics-grid"></div>
     <canvas id="eq-chart"></canvas>
@@ -1543,8 +1551,12 @@ function runBacktest() {{
 
 function runCustom() {{
   var body = customBody();
-  var btn = document.getElementById('custom-btn');
   var stat = document.getElementById('status');
+  if (!body.direction || !body.timeframe) {{
+    stat.textContent = 'Pick a direction & timeframe to backtest one idea — or hit 🔍 Search blanks to sweep them.';
+    return;
+  }}
+  var btn = document.getElementById('custom-btn');
   btn.disabled = true; btn.textContent = '⏳ Running…';
   stat.textContent = 'Backtesting your strategy…';
   fetch('/api/backtest/custom', {{
@@ -1565,10 +1577,15 @@ function runCustom() {{
 function customBody() {{
   var num = function(id) {{ var v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); }};
   var sel = function(id) {{ return document.getElementById(id).value || null; }};
+  var lo = function(id) {{ var v = num(id); return v === null ? null : v; }};
+  var klo = num('c-atrs-lo'), khi = num('c-atrs-hi');
+  var rlo = num('c-rr-lo'),   rhi = num('c-rr-hi');
+  var xlo = num('c-risk-lo'), xhi = num('c-risk-hi');
   return {{
     months: parseInt(document.getElementById('months').value) || 24,
     initial_capital: parseFloat(document.getElementById('capital').value) || 637,
-    timeframe: sel('c-tf'), direction: sel('c-dir'),
+    // dir/tf sent raw so "" (any) survives to the search; single-run guards blank
+    timeframe: document.getElementById('c-tf').value, direction: document.getElementById('c-dir').value,
     trend: sel('c-trend'), candle: sel('c-candle'), macd: sel('c-macd'),
     bb: sel('c-bb'), td: sel('c-td'), ma_align: sel('c-ma'), atr_regime: sel('c-ar'),
     vol_spike: document.getElementById('c-vs').checked,
@@ -1577,8 +1594,100 @@ function customBody() {{
     stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10,
     slippage_pct: num('c-slip') !== null ? num('c-slip') : 0.03,
     atr_floor_mult: num('c-atrf') || 0,
-    atr_stop_mult: num('c-atrs') || 0, rr: num('c-rr'), risk_pct: num('c-risk') || 0
+    // single-run geometry = the FROM (left) values
+    atr_stop_mult: klo || 0, rr: rlo, risk_pct: xlo || 0,
+    // search envelope
+    k_min: klo !== null ? klo : 0, k_max: khi !== null ? khi : 3,
+    r_min: rlo !== null ? rlo : 1, r_max: rhi !== null ? rhi : 5,
+    risk_min: xlo !== null ? xlo : 2, risk_max: xhi !== null ? xhi : 2
   }};
+}}
+
+// Fill the whole form from a params dict (search-result row → editable strategy)
+function fillFromParams(p) {{
+  var setSel = function(id, v) {{ document.getElementById(id).value = (v == null ? '' : v); }};
+  setSel('c-dir', p.direction); setSel('c-tf', p.timeframe);
+  setSel('c-trend', p.trend); setSel('c-candle', p.candle); setSel('c-macd', p.macd);
+  setSel('c-bb', p.bb); setSel('c-td', p.td); setSel('c-ma', p.ma_align); setSel('c-ar', p.atr_regime);
+  document.getElementById('c-vs').checked = !!p.vol_spike;
+  setSel('c-rsimax', p.rsi_max); setSel('c-rsimin', p.rsi_min);
+  setSel('c-hf', p.hour_from); setSel('c-ht', p.hour_to);
+  var k = p.atr_stop_mult || 0, r = p.rr, x = p.risk_pct || 0;
+  setSel('c-atrs-lo', k); setSel('c-atrs-hi', k);
+  setSel('c-rr-lo', r); setSel('c-rr-hi', r);
+  setSel('c-risk-lo', x); setSel('c-risk-hi', x);
+  document.getElementById('h-custom').scrollIntoView({{behavior:'smooth'}});
+}}
+
+var _searchPoll = null;
+function runCustomSearch() {{
+  var btn = document.getElementById('search-btn');
+  var prog = document.getElementById('search-prog');
+  var res = document.getElementById('search-results');
+  btn.disabled = true; btn.textContent = '⏳ Searching…';
+  res.style.display = 'none'; res.innerHTML = '';
+  prog.style.display = ''; prog.textContent = 'Starting…';
+  fetch('/api/backtest/search', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(customBody())
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(d) {{
+    if (d.error) {{ prog.textContent = '⚠ ' + d.error; btn.disabled = false; btn.textContent = '🔍 Search blanks'; return; }}
+    prog.textContent = 'Running ~' + (d.total_est||0).toLocaleString() + ' backtests…';
+    _searchPoll = setInterval(pollSearch, 2000);
+    pollSearch();
+  }})
+  .catch(function(e) {{ prog.textContent = 'Failed: ' + e; btn.disabled = false; btn.textContent = '🔍 Search blanks'; }});
+}}
+
+function pollSearch() {{
+  fetch('/api/backtest/search/status').then(function(r) {{ return r.json(); }}).then(function(d) {{
+    var prog = document.getElementById('search-prog');
+    var pct = d.total ? Math.round(100 * d.done / d.total) : 0;
+    prog.textContent = (d.running ? '⏳ ' : '✓ ') + 'Ran ' + d.done.toLocaleString() + ' / ' +
+      d.total.toLocaleString() + ' (' + pct + '%) · ' + d.found + ' results · showing top ' +
+      Math.min(50, d.top.length);
+    if (d.error) prog.textContent = '⚠ ' + d.error;
+    renderSearch(d);
+    if (!d.running) {{
+      clearInterval(_searchPoll); _searchPoll = null;
+      var btn = document.getElementById('search-btn');
+      btn.disabled = false; btn.textContent = '🔍 Search blanks';
+    }}
+  }});
+}}
+
+function renderSearch(d) {{
+  var res = document.getElementById('search-results');
+  if (!d.top.length) {{ return; }}
+  window._searchTop = d.top; window._searchMonths = d.months;
+  var weeks = (d.months || 30) * 4.345;
+  var h = '<div style="font-size:10px;color:var(--t3);margin:2px 0 8px">Ranked by <b>robust</b> (green = profitable in BOTH halves, n≥40 · 30mo split-half) then net %. Still in-sample — a survivor is a candidate to forward-test, not a green light. <b>Click a row</b> to load it into the builder above.</div>';
+  h += '<div style="overflow-x:auto;max-height:420px;overflow-y:auto"><table><thead><tr>' +
+       '<th>#</th><th>strategy</th><th>tf</th><th>n</th><th>WR</th><th>PF</th><th>net%</th><th>maxDD</th><th>halves</th><th></th></tr></thead><tbody>';
+  d.top.forEach(function(row, i) {{
+    var cls = row.robust ? 'win' : '';
+    h += '<tr style="cursor:pointer" onclick="fillFromParams(window._searchTop['+i+'].params)">' +
+      '<td>' + (i+1) + '</td>' +
+      '<td style="font-size:10px">' + row.desc + '</td>' +
+      '<td>' + row.tf + '</td>' +
+      '<td>' + row.n + '</td>' +
+      '<td>' + row.wr + '%</td>' +
+      '<td>' + row.pf + '</td>' +
+      '<td class="' + cls + '">' + (row.net_pct>=0?'+':'') + row.net_pct + '%</td>' +
+      '<td>' + row.max_dd + '%</td>' +
+      '<td style="font-size:10px">' + (row.half1>=0?'+':'') + row.half1 + ' / ' + (row.half2>=0?'+':'') + row.half2 + '</td>' +
+      '<td><a href="#" onclick="event.stopPropagation();toGoal(' + row.wr + ',' + row.rr + ',' + (row.n/weeks).toFixed(2) + ');return false" title="Send this strategy\\'s stats to the Goal model">→ Goal</a></td>' +
+      '</tr>';
+  }});
+  h += '</tbody></table></div>';
+  res.innerHTML = h; res.style.display = '';
+}}
+
+function toGoal(wrPct, rr, freq) {{
+  var q = 'win_rate=' + (wrPct/100).toFixed(4) + '&rr_ratio=' + rr + '&trades_per_week=' + freq;
+  window.open('/goal?' + q, '_blank');
 }}
 
 function runCustomSweep() {{
@@ -1701,6 +1810,15 @@ function renderResults(d) {{
   document.getElementById('strat-desc').textContent = d.description;
 
   var m = d.metrics;
+  // → Goal link: real WR / R / trade-frequency from this backtest into /goal
+  var gp = d.params || {{}};
+  var gR = gp.rr || (gp.stop_pct ? (gp.tp_pct / gp.stop_pct) : m.avg_r) || 3;
+  var gLink = document.getElementById('result-goal');
+  if (m.win_rate != null) {{
+    gLink.href = '/goal?win_rate=' + (m.win_rate/100).toFixed(4) + '&rr_ratio=' +
+                 (+gR).toFixed(2) + '&trades_per_week=' + (m.trades_per_week||1);
+    gLink.target = '_blank'; gLink.style.display = '';
+  }} else {{ gLink.style.display = 'none'; }}
   var fields = [
     ['win_rate',          'Win Rate',        m.win_rate + '%',     '≥48% = goal'],
     ['profit_factor',     'Profit Factor',   m.profit_factor,      '≥1.5 target'],
@@ -1865,6 +1983,13 @@ class BtCustomRequest(BaseModel):
     cooldown_bars: int = 4
     once_per_day: bool = True
     skip_sat: bool = True
+    # search-mode geometry envelope (blank builder fields = swept dimensions)
+    k_min: float = 0.0
+    k_max: float = 3.0
+    r_min: float = 1.0
+    r_max: float = 5.0
+    risk_min: float = 2.0
+    risk_max: float = 2.0
 
 
 @app.post("/api/backtest/custom")
@@ -1899,6 +2024,27 @@ def api_backtest_custom_sweep(req: BtCustomRequest):
     except Exception as e:
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
+
+
+@app.post("/api/backtest/search")
+def api_backtest_search(req: BtCustomRequest):
+    """Start a background search: blank builder fields are swept, set fields are
+    pinned, geometry ranges bound the k×R×risk envelope. Poll /search/status."""
+    if req.direction not in ("long", "short") and req.direction:
+        return {"error": "direction must be long, short, or blank"}
+    from app.search_custom import start
+    # direction/timeframe: treat the form's non-blank defaults as pins only when
+    # the user actually chose; the builder always sends both, so a blank sweep is
+    # requested via the dedicated fields below. Here both are always pins unless
+    # the client sent them empty — the UI sends "" to mean "sweep".
+    body = req.model_dump()
+    return start(body)
+
+
+@app.get("/api/backtest/search/status")
+def api_backtest_search_status():
+    from app.search_custom import status
+    return status()
 
 
 @app.post("/api/backtest/pine")
