@@ -193,5 +193,69 @@ def run_search():
               "dynamic geometry included, this space holds no robust edge.")
 
 
+def rescore_baselines():
+    """Gate 4 — beat random entry. Wide-stop LONGs ride BTC drift: on the 7y
+    window buy-every-bar at 2.5×ATR is itself split-half green, so 'deep
+    confirmed' alone over-credits longs. Rescore every survivor against the
+    every-bar baseline at its own (tf, k, R) on both windows; a survivor only
+    counts if its per-trade expectancy beats the baseline's on BOTH."""
+    with open("strategy_search.json") as f:
+        out = json.load(f)
+    surv = out["survivors"]
+    regimes = sorted({(s["tf"], s["direction"], s["k"], s["rr"]) for s in surv})
+    every = lambda d: (lambda df, i, p: d if i >= 60 else None)
+    per_trade = lambda ev: (ev["half1"] + ev["half2"]) / ev["n"] if ev and ev["n"] else None
+
+    base = {}
+    for window, months, exch in (("w30", MONTHS, None), ("deep", 84, "binance")):
+        for tf in sorted({t for t, *_ in regimes}):
+            df = _load(tf, months, exchange=exch)
+            mid = df.index[len(df) // 2].isoformat()
+            for t, d, k, r in regimes:
+                if t != tf:
+                    continue
+                ev = _eval(_run_backtest(df, every(d), _geo(k, r), CAPITAL), mid)
+                base[(window, t, d, k, r)] = ev
+                print(f"baseline {window} {t} {d} k={k} R={r}: "
+                      f"net {ev['net_pct'] if ev else '—'}%", flush=True)
+
+    for s in surv:
+        key = (s["tf"], s["direction"], s["k"], s["rr"])
+        b30, bdeep = base[("w30", *key)], base[("deep", *key)]
+        s["baseline_30"] = {"net_pct": b30["net_pct"], "exp_t": round(per_trade(b30), 3)} if b30 else None
+        s["baseline_deep"] = {"net_pct": bdeep["net_pct"], "exp_t": round(per_trade(bdeep), 3)} if bdeep else None
+        e30 = per_trade(s) - (per_trade(b30) or 0.0) if per_trade(s) is not None else None
+        dp = s.get("deep")
+        edeep = (per_trade(dp) - (per_trade(bdeep) or 0.0)) if dp and per_trade(dp) is not None else None
+        s["edge_30"] = round(e30, 3) if e30 is not None else None
+        s["edge_deep"] = round(edeep, 3) if edeep is not None else None
+        s["beats_baseline"] = bool(s.get("deep_confirmed")
+                                   and e30 is not None and e30 > 0
+                                   and edeep is not None and edeep > 0)
+
+    out["survivors"] = sorted(surv, key=lambda s: (s.get("beats_baseline", False),
+                                                   s.get("deep_confirmed", False),
+                                                   s.get("green_cells", 0) or 0,
+                                                   s["net_pct"]), reverse=True)
+    out["baselines"] = [{"window": w, "tf": t, "direction": d, "k": k, "rr": r, **ev}
+                        for (w, t, d, k, r), ev in base.items() if ev]
+    out["final_survivors"] = sum(1 for s in surv if s.get("beats_baseline"))
+    with open("strategy_search.json", "w") as f:
+        json.dump(out, f, indent=1,
+                  default=lambda o: o.item() if hasattr(o, "item") else str(o))
+    print(f"\n=== gate 4: {out['final_survivors']} of {len(surv)} survivors "
+          f"beat their random-entry baseline on both windows ===", flush=True)
+    top = [s for s in out["survivors"] if s.get("beats_baseline")][:25]
+    for s in top:
+        print(f"edge30 {s['edge_30']:>6} edgeDeep {s['edge_deep']:>6} "
+              f"net {s['net_pct']:>6}% deep {s['deep']['net_pct']:>7}% "
+              f"n={s['n']:>4}  {s['desc']}")
+
+
 if __name__ == "__main__":
-    run_search()
+    import sys
+    if "--rescore" in sys.argv:
+        rescore_baselines()
+    else:
+        run_search()
+        rescore_baselines()

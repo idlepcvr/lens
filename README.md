@@ -455,18 +455,29 @@ text fixed.
 (`app/strategy_search.py`): ≤3-condition combos across trend/candle/MACD/RSI/
 BKK-sessions/Bollinger/TD-Sequential-9/triple-MA-stack/vol-spike/ATR-regime,
 real engine + 0.03%/side slippage, split-half filter, SL×TP×lev×ATR-floor
-sweep, 7y-binance deep confirmation, Kelly. **VERDICT 2026-07-04 (run
-complete, 4,414 evaluated, `strategy_search.json`): 2 split-half survivors
-on 30mo, both collapse on the 7y window (−99.4% / −96.3%), 0 deep-confirmed
-→ discarded as recency artifacts (same failure mode as SMC_SWEEP_v1).**
-Three honest gates (split-half + n≥40 + deep-history), nothing passes: the
-searchable indicator space on BTC holds no robust mechanical edge at this
-geometry. Only dimensions with information left: exit mechanics (trailing
-stop / BE-move sims — unbuilt), external macro feeds (F&G via
-alternative.me, global liquidity — wire a feed before sweeping it),
-order-flow (CVD/delta/OI — needs a new data source). More entry-condition
-combos = more best-of-N luck. Pine export exists: `⧉ Pine` button on /edge
-builder → paste into TradingView.
+sweep, 7y-binance deep confirmation, Kelly. v2 verdict (2026-07-04): 0
+deep-confirmed — but that verdict was scoped to the tight-scalp regime
+(stage 1 filtered everything at 0.63/1.5/10x). **SUPERSEDED BY v3.**
+
+**C. Search v3 — dynamic ATR geometry (`app/strategy_search3.py`), RUN
+2026-07-04, 43,703 evaluated.** Geometry inside stage 1: stop = k×ATR,
+TP = R×stop, risk-normalized 2%/trade (engine: `atr_stop_mult`, `rr`,
+`risk_pct`; self-check `test_atr_stop.py`). Four gates: split-half n≥40 →
+7×7 (k,R) matrix neighbourhood → 7y deep AT OWN GEOMETRY → **beats
+random-entry baseline per-trade on both windows** (gate 4 exists because
+buy-every-bar long at 2.5×ATR is itself green on 7y — drift). **VERDICT:
+374 distinct survivors clear all four gates** (330 long / 44 short; tight
+stops stay dead — fee floor ~0.72R/trade at 0.5% stop vs ~0.1R at 2.5×ATR).
+Three families: 4h trend+MACD momentum longs (1.5×ATR, 3–5R, BKK-evening
+strongest) · 1h dip-buys in bull structure (RSI≤30/BB<lower + MA-stack
+bull, 2.5×ATR, 5R) · SHORT capitulation fades (BB<lower + vol spike —
+biggest edge over baseline, +2.08%/trade). Full report (HTML+MD):
+Kiki `03 - Resources/lens-strategy-search-v3-202607.*`. Results:
+`strategy_search.json` v3. NEXT: shadow-register 1 rep per family (never
+alert) for Monday re-ranks; forward-test ~a month before any promotion;
+extend Pine exporter to speak `atr_stop_mult`; exit-mechanics sims
+(trailing/BE-move) = next dimension. Macro feeds / order-flow still need
+a data source first.
 
 **D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
 (484 / −4405.83); /overview prop n=0 correct (book archived 06-30).
