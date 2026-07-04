@@ -856,9 +856,17 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
     # ATR% — volatility noise shouldn't be what kicks you out. TP scales to
     # keep the configured R:R when the floor widens the stop.
     atr_mult    = params.get("atr_floor_mult", 0.0)
-    rr_cfg      = tp_pct / stop_pct if stop_pct else 0.0
+    # ATR stop (0 = off): fully dynamic geometry — stop = mult × entry-bar ATR%
+    # (replaces stop_pct entirely), TP = rr × stop. First-principles sizing:
+    # the exit distance scales with the market's actual range.
+    atr_stop    = params.get("atr_stop_mult", 0.0)
+    rr_cfg      = params.get("rr") or (tp_pct / stop_pct if stop_pct else 0.0)
+    # Risk-normalized sizing (0 = off): risk the same % of equity per trade
+    # regardless of stop width — per-trade leverage = risk / stop, capped at
+    # `leverage`. Makes wide- and tight-stop geometries comparable in R terms.
+    risk_pct    = params.get("risk_pct", 0.0) / 100
     atr_arr     = ((df["atr14"] / df["close"]).to_numpy()
-                   if atr_mult and "atr14" in df.columns else None)
+                   if (atr_mult or atr_stop) and "atr14" in df.columns else None)
     cost_side   = commission + slippage
 
     equity = initial_capital
@@ -872,6 +880,7 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
     last_entry_bar = -999
     last_trade_day = None
     cur_sl, cur_tp = stop_pct, tp_pct   # per-trade geometry (ATR floor may widen)
+    cur_lev = leverage                  # per-trade leverage (risk_pct may shrink)
 
     for i in range(1, len(df)):
         ts = df.index[i]
@@ -901,9 +910,9 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
 
             if result:
                 if result == "win":
-                    net_pct =  cur_tp * leverage - cost_side * 2 * leverage
+                    net_pct =  cur_tp * cur_lev - cost_side * 2 * cur_lev
                 else:
-                    net_pct = -(cur_sl * leverage + cost_side * 2 * leverage)
+                    net_pct = -(cur_sl * cur_lev + cost_side * 2 * cur_lev)
                 equity *= (1 + net_pct)
                 bars_held = i - entry_bar_idx
                 trades.append({
@@ -945,10 +954,14 @@ def _run_backtest(df: pd.DataFrame, signal_fn, params: dict,
             last_entry_bar = i
             last_trade_day = trade_day
             cur_sl, cur_tp = stop_pct, tp_pct
-            if atr_arr is not None and not np.isnan(atr_arr[i]):
+            atr_ok = atr_arr is not None and not np.isnan(atr_arr[i]) and atr_arr[i] > 0
+            if atr_stop and atr_ok:             # dynamic: stop = k×ATR, TP = rr×stop
+                cur_sl, cur_tp = atr_stop * atr_arr[i], atr_stop * atr_arr[i] * rr_cfg
+            elif atr_mult and atr_ok:
                 floor = atr_mult * atr_arr[i]
                 if floor > cur_sl:              # noise floor: widen, keep R:R
                     cur_sl, cur_tp = floor, floor * rr_cfg
+            cur_lev = min(leverage, risk_pct / cur_sl) if risk_pct and cur_sl else leverage
 
         equity_curve.append({"date": ts.isoformat(), "equity": round(equity, 2)})
 
