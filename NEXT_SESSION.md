@@ -116,6 +116,22 @@ region any strategy must land in.
   contain the optimum; (4) CalcError cells don't kill the run.
 - Verify in the running app (`start.sh`, :8765/edge#fit) with the real config.
 
+## Style (match the house, don't invent)
+
+- Read `BRAND.md` + `app/theme.py` first. LENS is an instrument cluster: flat
+  gauge readouts, no hype. All colors/typography via the `shell()` CSS vars
+  (`--panel/--line/--accent/--long/--short/--amber/--dim`, `--mono` for numbers).
+- The section header/sub must use the existing `.ed-h`/`.ed-hs` classes and the
+  anchor-pill pattern already on /edge — it should read as a fourth tense of the
+  same page, not a bolted-on widget.
+- Optimal card = the /goal `verdict` banner component (danger/warn/ok variants),
+  not a new card style. Form inputs = the existing builder's range-input idiom
+  (`c-n` boxes, lo–hi pairs). Heatmap = the existing `#sweep-wrap` renderer,
+  restyled by data only.
+- Every metric/section gets the one-line plain-language "how to read this"
+  treatment the rest of /edge uses (hover titles + a collapsed ❔ help block),
+  in the same voice: honest about in-sample limits, no green-light language.
+
 ## Explicitly out of scope
 
 - Stage B (filtering strategy-search results by the envelope) — next session.
