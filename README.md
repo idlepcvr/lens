@@ -473,11 +473,17 @@ strongest) · 1h dip-buys in bull structure (RSI≤30/BB<lower + MA-stack
 bull, 2.5×ATR, 5R) · SHORT capitulation fades (BB<lower + vol spike —
 biggest edge over baseline, +2.08%/trade). Full report (HTML+MD):
 Kiki `03 - Resources/lens-strategy-search-v3-202607.*`. Results:
-`strategy_search.json` v3. NEXT: shadow-register 1 rep per family (never
-alert) for Monday re-ranks; forward-test ~a month before any promotion;
-extend Pine exporter to speak `atr_stop_mult`; exit-mechanics sims
-(trailing/BE-move) = next dimension. Macro feeds / order-flow still need
-a data source first.
+`strategy_search.json` v3. **✅ 2026-07-04: shadow-registered 1 rep per
+family** — `TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
+`CAPITULATION_FADE_SHORT_v3` in `STRATEGIES` (never-alert: setups.py hero
+path doesn't iterate the registry; they surface only in the /strategy
+dropdown's unranked section, like `ASIAN_MORNING_LONG_v1`). **✅ Pine
+exporter speaks `atr_stop_mult`** (k×ATR entry stop, rr×stop TP). Both
+covered by `test_atr_stop.py`. NEXT: forward-test ~a month before any
+promotion (early Aug 2026); exit-mechanics sims (trailing/BE-move) = next
+dimension. Optional: add the three to `strategy_eval.PROP_BACKTEST` if the
+scored /strategy board (not just the dropdown) should track them — held off
+as premature promotion. Macro feeds / order-flow still need a data source first.
 
 **D ✅ VERIFIED 2026-07-04** — /calendar + /overview-hedge match DB exactly
 (484 / −4405.83); /overview prop n=0 correct (book archived 06-30).

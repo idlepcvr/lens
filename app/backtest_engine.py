@@ -1580,6 +1580,7 @@ def to_pinescript(params: dict) -> str:
     sl = p.get("stop_pct", 0.63)
     tp = p.get("tp_pct", 1.5)
     af = p.get("atr_floor_mult", 0.0)
+    ast = p.get("atr_stop_mult", 0.0)   # fully dynamic stop = k×ATR(entry), replaces fixed %
     direction = p.get("direction", "long")
     long_ = direction == "long"
 
@@ -1608,10 +1609,23 @@ def to_pinescript(params: dict) -> str:
     cond_str = " and ".join(conds) if conds else "true"
 
     title = " · ".join([direction.upper(), p.get("timeframe", "1h")] + conds[:3])
-    stop_expr = (f"math.max({sl:g} / 100, {af:g} * ta.atr(14) / close)"
-                 if af else f"{sl:g} / 100")
-    rr = tp / sl if sl else 0
-    tp_expr = f"effSl * {rr:.4g}" if af else f"{tp:g} / 100"
+    # Exit geometry, in priority order:
+    #  · atr_stop_mult set → stop = k×ATR(entry bar), TP = rr × stop (fully dynamic)
+    #  · atr_floor_mult set → fixed % stop, widened to an ATR floor, R:R kept
+    #  · else → fixed stop%/tp%
+    # effSl/effTp are read at the entry bar when strategy.exit fixes the price, so
+    # the ATR is captured at entry (not recalculated per bar).
+    if ast:
+        rr_cfg = p.get("rr") or (tp / sl if sl else 0)
+        stop_expr, tp_expr = f"{ast:g} * ta.atr(14) / close", f"effSl * {rr_cfg:g}"
+        geo_note = f"{ast:g}×ATR stop · {rr_cfg:g}R"
+    elif af:
+        stop_expr = f"math.max({sl:g} / 100, {af:g} * ta.atr(14) / close)"
+        tp_expr = f"effSl * {(tp / sl if sl else 0):.4g}"
+        geo_note = f"SL {sl:g}% / TP {tp:g}% · ATR floor {af:g}x, R:R kept"
+    else:
+        stop_expr, tp_expr = f"{sl:g} / 100", f"{tp:g} / 100"
+        geo_note = f"SL {sl:g}% / TP {tp:g}%"
     entry_side = "strategy.long" if long_ else "strategy.short"
     sl_price = "close * (1 - effSl)" if long_ else "close * (1 + effSl)"
     tp_price = "close * (1 + effTp)" if long_ else "close * (1 - effTp)"
@@ -1647,7 +1661,7 @@ isSat   = dayofweek(time, "UTC") == dayofweek.saturday
 entryCond = {cond_str}
 canEnter  = entryCond and not isSat and strategy.position_size == 0 and barstate.isconfirmed
 
-// ── exits: LENS geometry (SL {sl:g}% / TP {tp:g}%{f" · ATR floor {af:g}x, R:R kept" if af else ""}) ──
+// ── exits: LENS geometry ({geo_note}) ──
 effSl = {stop_expr}
 effTp = {tp_expr}
 
@@ -1678,6 +1692,63 @@ STRATEGIES["ASIAN_MORNING_LONG_v1"] = {
         "stop_pct": 0.63, "tp_pct": 1.5, "leverage": 10.0,
         "commission": 0.0015, "skip_sat": True, "cooldown_bars": 4,
         "once_per_day": True,
+    },
+}
+
+
+# ── search-v3 gate-4 survivors — SHADOW TRACK ONLY, NEVER ALERT ──────────────
+# Mined 2026-07-04 by app.strategy_search3 (dynamic k×ATR geometry, risk-
+# normalized 2%/trade, 5x lev cap, 0.03%/side slippage). One representative per
+# family of the 402 gate-4 survivors. These are registered so the Monday re-rank
+# / prop-desk can track them on fresh data — NOT for promotion or alerting.
+# No promotion before ~1 month of forward data (early Aug 2026). The phone-alert
+# path (app/setups.py hero setups) never iterates STRATEGIES, so registration
+# alone is inert. Params reproduce the search's own evaluation path exactly
+# (strategy_search3.RISK merged with the survivor combo); see test_atr_stop.py.
+
+# Family A — 4h trend-momentum long. 30mo: n=64, wr 40.6, PF 1.63, +67.7%,
+# dd 19.2, halves +49.6/+7.2. Deep 7y: n=149, PF 1.42, +125.5%. Edge over the
+# random long baseline +1.045%/trade (baseline itself −34.9%).
+STRATEGIES["TREND_MOMO_VOLSPIKE_v3"] = {
+    "description": "Trend-momentum long (v3 shadow): 4h EMA21>EMA50 uptrend, MACD hist >0, volume spike. 1.5×ATR stop, 3R target, 2%/trade risk. Mined 2026-07-04, gate-4 survivor. SHADOW — never alert, no promotion before ~Aug 2026.",
+    "signal_fn": _signal_custom,
+    "timeframe": "4h",
+    "params": {
+        "direction": "long", "timeframe": "4h", "trend": "up", "macd": "bull",
+        "vol_spike": True, "atr_stop_mult": 1.5, "rr": 3.0,
+        "risk_pct": 2.0, "leverage": 5.0, "slippage_pct": 0.03,
+        "stop_pct": 1.0, "tp_pct": 2.0,
+    },
+}
+
+# Family B — 1h dip-buy in bull structure. 30mo: n=46, wr 28.3, PF 1.62,
+# +50.8%, dd 19.4, halves +18.8/+28.9. Deep 7y: n=147, PF 1.32, +88.3% but
+# dd 52.5 — deep drawdown, watch it. Low win-rate / high-R geometry.
+STRATEGIES["DIP_BB_MASTACK_v3"] = {
+    "description": "Dip-buy long (v3 shadow): 1h close below lower Bollinger, EMA50>100>200 bull stack, high-vol regime. 2.5×ATR stop, 5R target, 2%/trade risk. Mined 2026-07-04, gate-4 survivor. Deep-history dd 52.5%. SHADOW — never alert, no promotion before ~Aug 2026.",
+    "signal_fn": _signal_custom,
+    "timeframe": "1h",
+    "params": {
+        "direction": "long", "timeframe": "1h", "bb": "below_lower",
+        "ma_align": "bull", "atr_regime": "high", "atr_stop_mult": 2.5, "rr": 5.0,
+        "risk_pct": 2.0, "leverage": 5.0, "slippage_pct": 0.03,
+        "stop_pct": 1.0, "tp_pct": 2.0,
+    },
+}
+
+# Family C — 1h short capitulation fade. 30mo: n=40, wr 50.0, PF 2.08, +70.0%,
+# dd 12.7, halves +43.1/+13.5. Deep 7y: n=85, PF 1.40, +57.3%. Edge over the
+# random short baseline +2.083%/trade (baseline SHORT loses −99.3%) — the
+# biggest per-trade edge in the whole v3 run.
+STRATEGIES["CAPITULATION_FADE_SHORT_v3"] = {
+    "description": "Capitulation-fade short (v3 shadow): 1h green bar closing below lower Bollinger on a volume spike. 1.5×ATR stop, 3R target, 2%/trade risk. Mined 2026-07-04, gate-4 survivor — biggest per-trade edge in the run (+2.08%/trade vs a −99% random short). SHADOW — never alert, no promotion before ~Aug 2026.",
+    "signal_fn": _signal_custom,
+    "timeframe": "1h",
+    "params": {
+        "direction": "short", "timeframe": "1h", "candle": "bull",
+        "bb": "below_lower", "vol_spike": True, "atr_stop_mult": 1.5, "rr": 3.0,
+        "risk_pct": 2.0, "leverage": 5.0, "slippage_pct": 0.03,
+        "stop_pct": 1.0, "tp_pct": 2.0,
     },
 }
 

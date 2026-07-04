@@ -53,3 +53,30 @@ assert wide["trades"][0]["pnl_pct"] > tight["trades"][0]["pnl_pct"], (
     "wide stop should net more at equal risk — fee drag scales with leverage")
 
 print("ok — atr_stop geometry, risk-normalized leverage, fee-drag ordering all hold")
+
+# ── shadow strategies (search-v3 survivors) — registered params must equal the
+# search's own evaluation path: RISK ∪ the survivor combo from strategy_search.json.
+# Offline + deterministic (net_pct reproduction was verified once at registration;
+# it drifts with the wall-clock 30mo window so it is not asserted here). ──
+import json
+from app.backtest_engine import STRATEGIES, to_pinescript
+from app.strategy_search3 import RISK
+
+_j = json.load(open("strategy_search.json"))
+_by_desc = {s["desc"]: s["params"] for s in _j["survivors"]}
+SHADOWS = {
+    "TREND_MOMO_VOLSPIKE_v3":     "LONG · 4h · trend up · MACD bull · vol spike · 1.5×ATR stop · 3.0R",
+    "DIP_BB_MASTACK_v3":          "LONG · 1h · BB <lower · MA-stack bull · high-vol · 2.5×ATR stop · 5.0R",
+    "CAPITULATION_FADE_SHORT_v3": "SHORT · 1h · bull bar · BB <lower · vol spike · 1.5×ATR stop · 3.0R",
+}
+for name, desc in SHADOWS.items():
+    assert name in STRATEGIES, f"{name} not registered"
+    assert STRATEGIES[name]["params"] == {**RISK, **_by_desc[desc]}, name
+
+# Pine exporter speaks atr_stop_mult: dynamic ATR stop, no fixed-% lines.
+pine = to_pinescript(STRATEGIES["TREND_MOMO_VOLSPIKE_v3"]["params"])
+assert "effSl = 1.5 * ta.atr(14) / close" in pine, pine
+assert "effTp = effSl * 3" in pine, pine
+assert "/ 100" not in pine, "fixed-% geometry leaked into an atr_stop script"
+
+print("ok — 3 shadow strategies registered with search-exact params; Pine speaks atr_stop")
