@@ -1458,6 +1458,42 @@ def sweep_strategy(name: str, months: int = 30, initial_capital: float = 637.0,
             "cells": cells}
 
 
+def sweep_custom(params: dict, months: int = 30, initial_capital: float = 637.0,
+                 ks: list | None = None, rrs: list | None = None) -> dict:
+    """k×R robustness sweep for a custom-params strategy: re-run the same entry
+    conditions across a grid of atr_stop_mult × rr — the /edge counterpart of
+    the v3 search's stage-2 matrix, and the ATR-geometry sibling of
+    sweep_strategy's SL×TP grid. One OHLCV load, same engine, same cells shape
+    so the /edge heatmap renders it unchanged."""
+    ks  = ks  or [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0]   # = strategy_search3 FINE_K
+    rrs = rrs or [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]    # = strategy_search3 FINE_R
+    tf = params.get("timeframe", "1h")
+    df = add_indicators(load_ohlcv(months=months, timeframe=tf))
+
+    cells = []
+    for k in ks:
+        for r in rrs:
+            res = _run_backtest(df, _signal_custom,
+                                {**params, "atr_stop_mult": k, "rr": r}, initial_capital)
+            m = _compute_metrics(res, initial_capital, months)
+            pf = m.get("profit_factor")
+            cells.append({
+                "stop": k, "tp": r, "r": r,
+                "n": m.get("n", 0),
+                "win_rate": m.get("win_rate", 0),
+                "net_pct": m.get("net_pct", 0),
+                "sharpe": m.get("sharpe", 0),
+                "sortino": m.get("sortino", 0),
+                "calmar": m.get("calmar", 0),
+                "max_dd": m.get("max_drawdown_pct", 0),
+                "pf": (None if pf in (float("inf"), None) else pf),
+            })
+    return {"months": months, "stops": ks, "tps": rrs,
+            "base_stop": params.get("atr_stop_mult") or None,
+            "base_tp": params.get("rr") or None,
+            "grid": "k_rr", "cells": cells}
+
+
 def run_strategy(name: str, months: int = 30,
                  initial_capital: float = 637.0,
                  exchange_id: str | None = None,

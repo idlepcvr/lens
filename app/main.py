@@ -1462,7 +1462,14 @@ canvas{width:100%;height:200px;display:block}
       <label style="font-size:11px;color:var(--t2)">Lev × <input id="c-lev" type="number" step="any" value="10" class="c-n" style="width:58px"></label>
       <label style="font-size:11px;color:var(--t2)" title="Per-side fill cost added to fees — market orders never fill at the ideal price">Slip % <input id="c-slip" type="number" step="any" value="0.03" class="c-n" style="width:64px"></label>
       <label style="font-size:11px;color:var(--t2)" title="Stop can't be tighter than this × the entry bar's ATR% — volatility noise shouldn't stop you out. 0 = off; try 1–1.5">ATR floor × <input id="c-atrf" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <span style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em" title="The search-v3 geometry: dynamic stops scaled to volatility instead of fixed %. Set ATR stop and the SL/TP % boxes above are ignored.">v3 geometry —</span>
+      <label style="font-size:11px;color:var(--t2)" title="Dynamic stop = this × the entry bar's ATR. Replaces SL/TP % entirely. 0 = off; the v3 survivors use 1.5–2.5">ATR stop × <input id="c-atrs" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Take-profit = R × the stop distance. v3 survivors use 3–5">R <input id="c-rr" type="number" step="any" placeholder="3" class="c-n" style="width:52px"></label>
+      <label style="font-size:11px;color:var(--t2)" title="Risk-normalized sizing: every trade risks this % of equity — leverage per trade = risk ÷ stop, capped at Lev. Makes wide and tight stops comparable. 0 = off; v3 used 2">Risk %/trade <input id="c-risk" type="number" step="any" value="0" class="c-n" style="width:58px"></label>
       <button class="run" id="custom-btn" onclick="runCustom()">▶ Backtest it</button>
+      <button id="csweep-btn" onclick="runCustomSweep()" title="Re-run these exact entry conditions across the whole ATR-stop × R grid (the same 7×7 matrix search v3 used) — a real edge is a green neighbourhood, not one lucky cell">⊞ Sweep k×R</button>
       <button id="pine-btn" onclick="exportPine()" title="Export these exact conditions as a TradingView Pine v5 strategy — paste into the Pine editor">⧉ Pine</button>
     </div>
     <div style="font-size:10px;color:var(--t3)">Results render in the same scorecard below. Mined in-sample — a green result is a candidate to sweep &amp; forward-test, not a green light.</div>
@@ -1473,7 +1480,7 @@ canvas{width:100%;height:200px;display:block}
 <div id="sweep-wrap" style="display:none">
   <div class="card">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-      <div style="font-size:14px;font-weight:700;color:var(--t1)">Robustness sweep — SL × TP</div>
+      <div id="sweep-title" style="font-size:14px;font-weight:700;color:var(--t1)">Robustness sweep — SL × TP</div>
       <select id="sweep-metric" onchange="colorHeatmap()" style="padding:6px 12px">
         <option value="net_pct">colour by: Net return %</option>
         <option value="sharpe">colour by: Sharpe</option>
@@ -1569,8 +1576,31 @@ function customBody() {{
     hour_from: num('c-hf'), hour_to: num('c-ht'),
     stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10,
     slippage_pct: num('c-slip') !== null ? num('c-slip') : 0.03,
-    atr_floor_mult: num('c-atrf') || 0
+    atr_floor_mult: num('c-atrf') || 0,
+    atr_stop_mult: num('c-atrs') || 0, rr: num('c-rr'), risk_pct: num('c-risk') || 0
   }};
+}}
+
+function runCustomSweep() {{
+  var btn = document.getElementById('csweep-btn');
+  var stat = document.getElementById('status');
+  btn.disabled = true; btn.textContent = '⏳ Sweeping…';
+  stat.textContent = 'Sweeping ATR-stop × R grid (49 backtests, one data load)…';
+  document.getElementById('sweep-wrap').style.display = 'none';
+  fetch('/api/backtest/custom-sweep', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(customBody())
+  }})
+  .then(function(r) {{ return r.json(); }})
+  .then(function(d) {{
+    btn.disabled = false; btn.textContent = '⊞ Sweep k×R';
+    if (d.error) {{ stat.textContent = 'Sweep error: ' + d.error; return; }}
+    stat.textContent = '';
+    window._sweep = d; buildHeatmap(d);
+    document.getElementById('sweep-wrap').style.display = '';
+    document.getElementById('sweep-wrap').scrollIntoView({{behavior:'smooth'}});
+  }})
+  .catch(function(e) {{ btn.disabled = false; btn.textContent = '⊞ Sweep k×R'; stat.textContent = 'Sweep failed: ' + e; }});
 }}
 
 function exportPine() {{
@@ -1611,17 +1641,21 @@ function runSweep() {{
 }}
 
 function buildHeatmap(d) {{
+  var kr = d.grid === 'k_rr';   // ATR-geometry sweep vs classic SL×TP
+  var corner = kr ? 'k×ATR ╲ R' : 'SL ╲ TP', rs = kr ? '×' : '%', cs = kr ? 'R' : '%';
+  document.getElementById('sweep-title').textContent =
+    kr ? 'Robustness sweep — ATR stop × R' : 'Robustness sweep — SL × TP';
   var map = {{}};
   d.cells.forEach(function(c) {{ map[c.stop + '|' + c.tp] = c; }});
-  var h = '<table class="hm"><thead><tr><th class="hm-corner">SL ╲ TP</th>';
-  d.tps.forEach(function(tp) {{ h += '<th>' + tp + '%</th>'; }});
+  var h = '<table class="hm"><thead><tr><th class="hm-corner">' + corner + '</th>';
+  d.tps.forEach(function(tp) {{ h += '<th>' + tp + cs + '</th>'; }});
   h += '</tr></thead><tbody>';
   d.stops.forEach(function(sp) {{
-    h += '<tr><th>' + sp + '%</th>';
+    h += '<tr><th>' + sp + rs + '</th>';
     d.tps.forEach(function(tp) {{
       var c = map[sp + '|' + tp] || {{}};
       var base = (sp === d.base_stop && tp === d.base_tp) ? ' hm-base' : '';
-      var tip = 'SL ' + sp + '% / TP ' + tp + '% · R ' + (c.r||'') + ' · n=' + (c.n||0) +
+      var tip = (kr ? 'stop ' + sp + '×ATR / TP ' + tp + 'R' : 'SL ' + sp + '% / TP ' + tp + '% · R ' + (c.r||'')) + ' · n=' + (c.n||0) +
                 ' · WR ' + (c.win_rate||0) + '% · Sharpe ' + (c.sharpe||0) +
                 ' · Sortino ' + (c.sortino||0) + ' · net ' + (c.net_pct||0) + '% · maxDD ' + (c.max_dd||0) + '%';
       h += '<td class="hm-cell' + base + '" data-k="' + sp + '|' + tp + '" title="' + tip + '"></td>';
@@ -1825,6 +1859,9 @@ class BtCustomRequest(BaseModel):
     leverage: float = 10.0
     slippage_pct: float = 0.03     # per-side market-order fill cost
     atr_floor_mult: float = 0.0    # stop >= mult × entry-bar ATR% (0 = off)
+    atr_stop_mult: float = 0.0     # dynamic stop = k × entry-bar ATR% (0 = off; replaces SL/TP %)
+    rr: float | None = None        # TP = rr × stop (with atr_stop_mult)
+    risk_pct: float = 0.0          # risk-normalized sizing: %equity/trade, lev = risk/stop capped (0 = off)
     cooldown_bars: int = 4
     once_per_day: bool = True
     skip_sat: bool = True
@@ -1841,6 +1878,24 @@ def api_backtest_custom(req: BtCustomRequest):
         from app.backtest_engine import run_custom
         params = req.model_dump(exclude_none=True)
         return run_custom(params, months=req.months, initial_capital=req.initial_capital)
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "trace": traceback.format_exc()}
+
+
+@app.post("/api/backtest/custom-sweep")
+def api_backtest_custom_sweep(req: BtCustomRequest):
+    """k×R geometry sweep of a user-built strategy — the v3 search's stage-2
+    matrix, on demand from the /edge builder. Same cells shape as the SL×TP
+    sweep so the heatmap renders it unchanged."""
+    if req.timeframe not in ("1h", "4h"):
+        return {"error": "timeframe must be 1h or 4h"}
+    if req.direction not in ("long", "short"):
+        return {"error": "direction must be long or short"}
+    try:
+        from app.backtest_engine import sweep_custom
+        return sweep_custom(req.model_dump(exclude_none=True),
+                            months=req.months, initial_capital=req.initial_capital)
     except Exception as e:
         import traceback
         return {"error": str(e), "trace": traceback.format_exc()}
