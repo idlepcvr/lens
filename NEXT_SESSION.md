@@ -118,6 +118,12 @@ region any strategy must land in.
 
 ## Style (match the house, don't invent)
 
+**Visual target: `docs/fit-mock.png`** — a Lucky-approved full-page mock of the
+section (anchor pill, range form + goal-param chips, feasible verdict card with
+the six-readout optimal set + envelope sentence, heatmap with metric/axes
+dropdowns and the outlined optimum in a green island). Build to that picture;
+its numbers are illustrative, its layout is the contract.
+
 - Read `BRAND.md` + `app/theme.py` first. LENS is an instrument cluster: flat
   gauge readouts, no hype. All colors/typography via the `shell()` CSS vars
   (`--panel/--line/--accent/--long/--short/--amber/--dim`, `--mono` for numbers).
