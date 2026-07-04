@@ -20,7 +20,7 @@ Routes:
   POST   /api/signals/{signal_id}/decide → approve / reject (week 4 wire-up)
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
@@ -2044,6 +2044,57 @@ def api_backtest_search(req: BtCustomRequest):
 @app.get("/api/backtest/search/status")
 def api_backtest_search_status():
     from app.search_custom import status
+    return status()
+
+
+# ─── /edge #fit — goal-constrained parameter sweep (Stage A) ──────────────────
+
+class FitRequest(BaseModel):
+    # swept-axis ranges (any omitted → app.fit_sweep defaults; freq hi → hist avg)
+    lev_min:  float | None = None
+    lev_max:  float | None = None
+    freq_min: float | None = None
+    freq_max: float | None = None
+    wr_min:   float | None = None
+    wr_max:   float | None = None
+    rr_min:   float | None = None
+    rr_max:   float | None = None
+    atr_min:  float | None = None      # ATR floor as a price-move fraction
+    atr_max:  float | None = None
+    # fixed goal params (page prefills from /api/config)
+    start_balance:         float
+    target_balance:        float
+    target_date:           date
+    max_drawdown_allowed:  float = 0.50
+    losses_allowed:        int   = 20
+    fractional_kelly:      float = 1.0 / 6.0
+    execution_fill_factor: float = 1.0
+    slippage_pct:          float = 0.0
+    btc_price_eur:         float | None = None
+    btc_growth_monthly:    float = 0.04
+
+
+@app.get("/api/fit/defaults")
+def api_fit_defaults():
+    """Prefill payload for the Fit form: live config goal params + the historical
+    weekly trade frequency (the trades/week axis ceiling)."""
+    from app.fit_sweep import historical_freq_per_week
+    return {"config": get_lens_config(),
+            "freq_per_week": historical_freq_per_week()}
+
+
+@app.post("/api/fit/run")
+def api_fit_run(req: FitRequest):
+    """Start the background parameter sweep. Poll /api/fit/status."""
+    from app.fit_sweep import start
+    body = req.model_dump()
+    body["target_date"] = req.target_date.isoformat()
+    return start({k: v for k, v in body.items() if v is not None})
+
+
+@app.get("/api/fit/status")
+def api_fit_status():
+    from app.fit_sweep import status
     return status()
 
 

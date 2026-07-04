@@ -109,6 +109,9 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str
     """bt_* = the backtest-runner fragment (built in main.py, embedded as #backtest)."""
     from .prop_views import _board, _CSS as PV_CSS
     from .strategy_eval import load_cache
+    from .fit_page import fragment as _fit_fragment
+
+    fit_css, fit_body, fit_script = _fit_fragment()
 
     d = load_cache()
     if d:
@@ -135,20 +138,22 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str
             f'Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>'
             f'</div>'
         )
-        head = _CSS + PV_CSS + bt_css
-        script = SCRIPT + _MODE_JS + bt_script
+        head = _CSS + PV_CSS + fit_css + bt_css
+        script = SCRIPT + _MODE_JS + fit_script + bt_script
     else:
         board = ('<div class="ed-h" id="board">Simulated — the rules replayed</div>'
                  '<div class="ed-hs">No rankings cached yet — run '
                  '<code>python3 -m app.strategy_eval</code>.</div>')
-        head = _CSS + bt_css
-        script = SCRIPT + bt_script
+        head = _CSS + fit_css + bt_css
+        script = SCRIPT + fit_script + bt_script
 
     anchors = ('<div class="ed-anchors">'
                '<a href="#past">↓ Past · live results</a>'
                '<a href="#board">↓ Board · simulated ranks</a>'
+               '<a href="#fit" style="color:var(--accent);border-color:var(--accent)">↓ Fit · goal-constrained sweep</a>'
                '<a href="#backtest">↓ Backtest · run &amp; build</a></div>')
-    body = ('<div class="ed-sub">Which setups pay? One page, three tenses: what your trades '
-            'actually did, what the coded rules would have done, and a runner to test the next idea.</div>'
-            + anchors + _LIVE + board + bt_body)
+    body = ('<div class="ed-sub">Which setups pay? One page, four tenses: what your trades '
+            'actually did, what the coded rules would have done, what shape the strategy must be, '
+            'and a runner to test the next idea.</div>'
+            + anchors + _LIVE + board + fit_body + bt_body)
     return shell("/edge", "Edge", body, script=script, head_extra=head, meta="which setups pay?")
