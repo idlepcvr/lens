@@ -9,6 +9,7 @@ and the buggy per-period € projections are omitted. /dashboard is left untouch
 """
 
 from .theme import shell
+from .goal_hero import HERO_CSS, HERO_HTML, HERO_JS
 
 CSS = r"""<style>
 :root{
@@ -47,23 +48,7 @@ CSS = r"""<style>
 .btn.p{background:var(--adim);color:var(--ac)}
 .calc-tip{font-size:9px;color:var(--t3);font-family:var(--mono)}
 .metrics{display:flex;flex-direction:column;gap:10px}
-/* verdict banner */
-.verdict{border-radius:10px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
-.verdict .vi{font-size:20px;line-height:1;margin-top:1px}
-.verdict h3{font-size:15px;font-weight:600;margin:0 0 4px}
-.verdict p{font-size:12.5px;line-height:1.5;margin:0}
-.verdict.danger{background:var(--short-d);border:1px solid var(--re);color:var(--re)}
-.verdict.warn{background:rgba(224,175,104,.10);border:1px solid var(--am);color:var(--am)}
-.verdict.ok{background:rgba(115,218,202,.09);border:1px solid var(--gr);color:var(--gr)}
-.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-@media(max-width:960px){.hero{grid-template-columns:repeat(2,1fr)}}
-.hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
-.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.hcard.pos::after{background:var(--gr)}.hcard.neg::after{background:var(--re)}
-.hcard.warn::after{background:var(--am)}.hcard.blue::after{background:var(--ac)}
-.hbig{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}
-.hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
-.hsub{font-size:10px;color:var(--t3);margin-top:3px}
+/* hero + status line come from goal_hero.HERO_CSS (shared with /dashboard), appended below */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:640px){.grid2{grid-template-columns:1fr}}
 .card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px 15px}
@@ -96,7 +81,7 @@ CSS = r"""<style>
 .st .pos{color:var(--gr)}.st .neg{color:var(--re)}.st .warn{color:var(--am)}
 .st .cur{font-weight:800}
 .st-note{font-size:10px;color:var(--t3);margin-top:7px;line-height:1.4}
-</style>"""
+""" + HERO_CSS + r"""</style>"""
 
 BODY = r"""
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this page</span><span class="line"></span></div>
@@ -150,13 +135,7 @@ BODY = r"""
   </div>
 
   <div class="metrics">
-    <div id="verdict" class="verdict"><div class="vi">…</div><div><h3>computing…</h3><p>enter your parameters</p></div></div>
-    <div class="hero">
-      <div class="hcard blue"><div class="hbig" id="h-ttg">—</div><div class="hlbl">Time to goal</div><div class="hsub" id="h-ttg-sub">—</div></div>
-      <div class="hcard" id="hc-r"><div class="hbig" id="h-r">—</div><div class="hlbl">Actual R<a class="qh" href="/glossary#truerr" target="_blank" rel="noopener" title="what is this?">?</a></div><div class="hsub" id="h-r-sub">after fees</div></div>
-      <div class="hcard" id="hc-ev"><div class="hbig" id="h-ev">—</div><div class="hlbl">EV / trade<a class="qh" href="/glossary#ev" target="_blank" rel="noopener" title="what is this?">?</a></div><div class="hsub" id="h-ev-sub">geo drift</div></div>
-      <div class="hcard" id="hc-ror"><div class="hbig" id="h-ror">—</div><div class="hlbl">Risk of ruin</div><div class="hsub" id="h-ror-sub">—</div></div>
-    </div>
+""" + HERO_HTML + r"""
     <div class="grid2">
       <div class="card"><div class="card-title">Required growth to hit goal</div><div class="kv" id="r-growth"></div></div>
       <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
@@ -195,42 +174,25 @@ const fmtPct4=v=>(v==null)?"—":v.toFixed(4)+"%";
 const fmtNum=v=>(v==null)?"—":v.toLocaleString("en-US",{maximumFractionDigits:2});
 const fmtInt=v=>(v==null)?"—":Math.round(v).toLocaleString();
 const fmtEur=v=>(v==null)?"—":"€"+v.toLocaleString("en-US",{maximumFractionDigits:0});
+// projected arrival at your ACTUAL geometric drift (weeks from today) → a real date
+function projDate(weeks){ if(weeks==null||!isFinite(weeks))return null; const d=new Date(); d.setDate(d.getDate()+Math.round(weeks*7)); return d; }
+const fmtMY=d=>d?d.toLocaleDateString("en-GB",{month:"short",year:"numeric"}):"—";
 function row(k,v,cls=""){ return `<div class="k">${k}</div><div class="v ${cls}">${v}</div>`; }
 
 function render(g){
   const used=g.risk_per_trade??0, opt=g.optimal_risk_pct??0, ror=g.risk_of_ruin??0;
   const over=opt>0?used/opt:Infinity;
+  const start=Number(FORM.elements.start_balance.value)||null;
   const tgt=Number(FORM.elements.target_balance.value)||null;
-  const date=FORM.elements.target_date.value||"the target date";
+  const eurOf=p=>(start!=null&&p!=null)?fmtEur(p/100*start):null;              // % of account → €
+  const withEur=p=>fmtPct(p)+(eurOf(p)?" ("+eurOf(p)+")":"");                  // "16.40% (€820)"
 
-  // ── verdict banner ──────────────────────────────────────────────
-  let lvl,icon,title,msg;
-  if(ror>5||over>3){
-    lvl="danger"; icon="⛔"; title="Goal infeasible at sane risk";
-    msg=`Hitting ${tgt?("€"+fmtInt(tgt)):"the target"} by ${date} needs ${fmtPct(g.monthly_rate)}/mo growth. The only way the math closes is risking ${fmtPct(used)} per trade — ${isFinite(over)?over.toFixed(1)+"×":"∞"} over the ${fmtPct(opt)} optimal (Kelly). Risk of ruin ${fmtPct(ror)}; losses to ruin: ${fmtInt(g.losses_to_ruin)}${g.losses_to_ruin===1?" — a single max loss can end the account.":"."}`;
-  } else if(ror>1||over>1.5){
-    lvl="warn"; icon="⚠️"; title="Reachable, but over optimal risk";
-    msg=`Used risk ${fmtPct(used)} is ${isFinite(over)?over.toFixed(1)+"×":"∞"} the ${fmtPct(opt)} optimal. Risk of ruin ${fmtPct(ror)}. You're leaning on leverage — trim risk or push the date out to de-risk.`;
-  } else {
-    lvl="ok"; icon="✅"; title="Within safe risk";
-    msg=`Used risk ${fmtPct(used)} sits at/under the ${fmtPct(opt)} optimal. Risk of ruin ${fmtPct(ror)} (${g.ror_label}). This goal/date pair is reachable at sane sizing.`;
-  }
-  document.getElementById("verdict").className="verdict "+lvl;
-  document.getElementById("verdict").innerHTML=`<div class="vi">${icon}</div><div><h3>${title}</h3><p>${msg}</p></div>`;
-
-  // ── hero ────────────────────────────────────────────────────────
-  document.getElementById("h-ttg").textContent=g.days_remaining!=null?fmtInt(g.days_remaining)+"d":"—";
-  document.getElementById("h-ttg-sub").textContent=g.weeks_remaining!=null?(g.weeks_remaining.toFixed(1)+"w · "+g.months_remaining?.toFixed(1)+"mo"):"";
-  const ar=g.actual_rr; const rCls=ar>=3.5?"pos":ar>=2.5?"warn":"neg";
-  document.getElementById("hc-r").className="hcard "+rCls;
-  document.getElementById("h-r").textContent=ar!=null?ar.toFixed(2)+"R":"—";
-  document.getElementById("h-r-sub").textContent="vs "+fmtPct(g.underlying_win_pct)+" TP";
-  document.getElementById("hc-ev").className="hcard "+((g.per_trade_ev??0)>=0?"pos":"neg");
-  document.getElementById("h-ev").textContent=g.per_trade_ev!=null?((g.per_trade_ev>=0?"+":"")+g.per_trade_ev.toFixed(2)+"%"):"—";
-  document.getElementById("h-ev-sub").textContent=g.geometric_drift!=null?("drift "+(g.geometric_drift>=0?"+":"")+g.geometric_drift.toFixed(2)+"%"):"";
-  document.getElementById("hc-ror").className="hcard "+(ror<=1?"pos":ror<=5?"warn":"neg");
-  document.getElementById("h-ror").textContent=fmtPct(ror);
-  document.getElementById("h-ror-sub").textContent=g.ror_label??"";
+  // ── sufficiency: at your ACTUAL geometric drift, do you reach goal in-window? ──
+  // trades_needed vs total_trades ⟺ weeks_to_goal_actual vs weeks_remaining (same drift).
+  const timeShort=g.trades_needed>g.total_trades;
+  const insufficient=timeShort;
+  const projD=projDate(g.weeks_to_goal_actual);
+  renderPillars(g);   // four-pillar hero + status line (shared with /dashboard, goal_hero.py)
 
   // ── required growth | per-trade ─────────────────────────────────
   document.getElementById("r-growth").innerHTML=
@@ -242,13 +204,14 @@ function render(g){
     + row("EV current / trade",fmtPct4(g.per_trade_ev), g.per_trade_ev>=g.per_trade_ev_required?"pos":"neg")
     + row("TP / SL move",fmtPct(g.underlying_win_pct)+" / "+fmtPct(g.underlying_loss_pct)+(g.atr_adjusted?" (ATR↑)":""))
     + row("Actual R",fmtNum(g.actual_rr))
-    + row("Trades needed",fmtInt(g.trades_needed)+' <span class="v dim">/ '+fmtInt(g.total_trades)+" window</span>");
+    + row("Trades needed",fmtInt(g.trades_needed)+' <span class="v dim">/ '+fmtInt(g.total_trades)+" window</span>", timeShort?"neg":"pos")
+    + row("Projected arrival", projD?fmtMY(projD):"never (drift ≤ 0)", insufficient?"neg":"pos");
 
   // ── Risk & Kelly card ───────────────────────────────────────────
   document.getElementById("rk-row").innerHTML=
       `<div class="rk-cell"><div class="l">Optimal risk</div><div class="n" style="color:var(--gr)">${fmtPct(opt)}</div><div class="s">⅙ Kelly / DD cap</div></div>`
     + `<div class="rk-arrow">→</div>`
-    + `<div class="rk-cell"><div class="l" style="color:var(--re)">Used risk / trade</div><div class="n" style="color:var(--re)">${fmtPct(used)}</div><div class="s" style="color:var(--re)">${isFinite(over)?over.toFixed(1)+"× over":"—"}</div></div>`
+    + `<div class="rk-cell"><div class="l" style="color:var(--re)">Used risk / trade</div><div class="n" style="color:var(--re)">${fmtPct(used)}</div><div class="s" style="color:var(--re)">${eurOf(used)?eurOf(used)+" · ":""}${isFinite(over)?over.toFixed(1)+"× over":"—"}</div></div>`
     + `<div class="rk-arrow"></div>`
     + `<div class="rk-cell"><div class="l">DD-implied lev</div><div class="n">${g.dd_implied_leverage!=null?fmtNum(g.dd_implied_leverage)+"×":"—"}</div><div class="s">vs ${fmtNum(g.leverage)}× used</div></div>`;
   document.getElementById("rk-explain").innerHTML=
@@ -264,8 +227,8 @@ function render(g){
     + row("Risk of ruin",fmtPct(ror), ror<=1?"pos":ror<=5?"warn":"neg")
     + row("Wins to breakeven",fmtInt(g.wins_to_breakeven));
   document.getElementById("r-acct").innerHTML=
-      row("Gain / win","+"+fmtPct(g.acct_gain_win),"pos")
-    + row("Loss / loss","−"+fmtPct(g.acct_loss_loss),"neg")
+      row("Gain / win","+"+withEur(g.acct_gain_win),"pos")
+    + row("Loss / loss","−"+withEur(g.acct_loss_loss),"neg")
     + row("Geom drift",(g.geometric_drift>=0?"+":"")+fmtPct(g.geometric_drift), g.geometric_drift>0?"pos":"neg")
     + row("Fill factor",g.execution_fill_factor!=null?g.execution_fill_factor.toFixed(1)+"%":"—",(g.execution_fill_factor??100)<100?"warn":"dim")
     + row("Slippage / trade",fmtPct4(g.slippage_pct),(g.slippage_pct??0)>0?"warn":"dim")
@@ -366,7 +329,7 @@ function tbtcApply(){
 }
 TBTC.addEventListener("input",tbtcApply);
 TBTC.addEventListener("keydown",function(e){ if(e.key==="Enter"){ tbtcApply(); e.preventDefault(); } });
-"""
+""" + HERO_JS
 
 
 def render() -> str:
