@@ -52,6 +52,7 @@ from .models import (
     SignalIngest, SignalDecision, SignalResponse,
 )
 from . import bybit_sync, kraken_sync
+from .goal_hero import HERO_CSS, HERO_HTML, HERO_JS
 from .review import get_enriched_trades, get_ohlcv_1h
 
 
@@ -209,17 +210,7 @@ def landing():
 .btn.p:hover{filter:brightness(1.3)}
 .calc-tip{font-size:9px;color:var(--t4);font-family:var(--mono)}
 .metrics{display:flex;flex-direction:column;gap:14px}
-.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-@media(max-width:960px){.hero{grid-template-columns:repeat(2,1fr)}}
-.hcard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
-.hcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.hcard.pos::after{background:linear-gradient(90deg,var(--gr),#73daca)}
-.hcard.neg::after{background:linear-gradient(90deg,var(--re),#c04060)}
-.hcard.warn::after{background:linear-gradient(90deg,var(--am),#ff9e64)}
-.hcard.blue::after{background:linear-gradient(90deg,var(--ac),#bb9af7)}
-.hbig{font-family:var(--mono);font-size:20px;font-weight:700;color:#fff;margin-top:4px;line-height:1}
-.hlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-top:9px}
-.hsub{font-size:10px;color:var(--t3);margin-top:3px}
+/* hero + status line come from goal_hero.HERO_CSS (shared with /goal), appended below */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:640px){.grid2{grid-template-columns:1fr}}
 .card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:15px 17px}
@@ -248,7 +239,7 @@ def landing():
 .ep .m.post{color:var(--gr)}.ep .m.patch{color:var(--am)}.ep .m.del{color:var(--re)}
 .ep .path{font-family:var(--mono);font-size:11.5px}
 .ep .desc{font-size:11px;color:var(--t3);margin-left:auto}
-</style>"""
+""" + HERO_CSS + r"""</style>"""
 
     body = f"""
 <div class="strip">
@@ -261,7 +252,7 @@ def landing():
 <div class="sec-body closed" id="s-help"><div class="help-body">
 <h4>what this page is</h4>A <b>live goal-and-risk calculator</b>, not a trade log. Type your account + strategy assumptions into <b>Parameters</b> (left) and every metric recomputes instantly. It answers: <b>given these numbers, do I reach the target — and what's the risk of blowing up before I get there?</b>
 <h4>the only inputs are the parameters</h4>Start €, target €, target date, win rate, R:R, leverage, trades/week, drawdown limits. Every field is a calculator — type <code>300*0.1</code> and hit <b>↵</b> to get <code>30</code>. <b>Apply</b> saves them as your defaults; <b>Reload</b> pulls the last saved set.
-<h4>the four hero cards</h4><b class="a">Actual R</b> = reward ÷ risk after fees — the one lever you fully control. <b>EV / trade</b> = expected geometric drift per trade; must be <b class="g">positive</b> or the account bleeds. <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Days to goal</b> = time at this pace.
+<h4>the four hero cards</h4>Each answers one goal question and passes or fails: <b>On time?</b> = does your edge reach the target inside the window (projected arrival vs deadline). <b>Edge / trade</b> = is per-trade EV at least what the goal needs (green only when it clears the bar). <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Risk sizing</b> = used risk vs the Kelly/DD optimal. Detail (Actual R, geometric drift) is in the cards below.
 <h4>the metric cards</h4>Break the model down: time-to-goal, required growth rates, the per-trade EV model, Kelly sizing, account impact per win/loss, risk analytics (Sharpe, profit factor, ruin), €-growth projections, and a BTC / Monte-Carlo band (P05 / P50 / P95 outcomes).
 <h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/goal">Goal</a> (equity curve + projection over time).
 </div></div>
@@ -321,28 +312,7 @@ def landing():
   <div class="metrics">
     <div class="sect metrics-hd" id="h-results" onclick="tog('results')"><span class="caret">▾</span><span class="ttl">Goal model — results</span><span class="line"></span></div>
     <div class="sec-body" id="s-results">
-    <div class="hero">
-      <div class="hcard blue" id="hc-r">
-        <div class="hbig" id="h-r">—</div>
-        <div class="hlbl">Actual R</div>
-        <div class="hsub" id="h-r-sub">after fees</div>
-      </div>
-      <div class="hcard" id="hc-ev">
-        <div class="hbig" id="h-ev">—</div>
-        <div class="hlbl">EV / trade</div>
-        <div class="hsub" id="h-ev-sub">geo drift</div>
-      </div>
-      <div class="hcard" id="hc-ror">
-        <div class="hbig" id="h-ror">—</div>
-        <div class="hlbl">Risk of ruin</div>
-        <div class="hsub" id="h-ror-sub">—</div>
-      </div>
-      <div class="hcard blue">
-        <div class="hbig" id="h-ttg">—</div>
-        <div class="hlbl">Days to goal</div>
-        <div class="hsub" id="h-ttg-sub">—</div>
-      </div>
-    </div>
+{HERO_HTML}
 
     <div id="vol-card" class="volcard hide"></div>
 
@@ -435,24 +405,7 @@ function render(g) {{
   const eurOf = p => (_bal && p != null) ? "€" + (_bal * p / 100).toLocaleString("en-US",{{maximumFractionDigits:2}}) : "—";
   const balAfter = p => (_bal && p != null) ? "€" + (_bal * (1 + p / 100)).toLocaleString("en-US",{{maximumFractionDigits:0}}) : "—";
 
-  const ar = g.actual_rr;
-  const rCls = ar >= 3.5 ? 'pos' : ar >= 2.5 ? 'warn' : 'neg';
-  document.getElementById('hc-r').className = 'hcard ' + rCls;
-  document.getElementById('h-r').textContent = ar != null ? ar.toFixed(2) + 'R' : '—';
-  document.getElementById('h-r-sub').textContent = 'vs ' + fmtPct(g.underlying_win_pct) + ' TP';
-
-  const evCls = (g.per_trade_ev ?? 0) >= 0 ? 'pos' : 'neg';
-  document.getElementById('hc-ev').className = 'hcard ' + evCls;
-  document.getElementById('h-ev').textContent = g.per_trade_ev != null ? ((g.per_trade_ev >= 0 ? '+' : '') + g.per_trade_ev.toFixed(3) + '%') : '—';
-  document.getElementById('h-ev-sub').textContent = g.geometric_drift != null ? ('drift ' + (g.geometric_drift >= 0 ? '+' : '') + g.geometric_drift.toFixed(3) + '%') : '';
-
-  const rorVal = g.risk_of_ruin ?? 0;
-  document.getElementById('hc-ror').className = 'hcard ' + (rorVal <= 5 ? 'pos' : rorVal <= 20 ? 'warn' : 'neg');
-  document.getElementById('h-ror').textContent = g.risk_of_ruin != null ? g.risk_of_ruin.toFixed(2) + '%' : '—';
-  document.getElementById('h-ror-sub').textContent = g.ror_label ?? '';
-
-  document.getElementById('h-ttg').textContent = g.days_remaining != null ? Math.round(g.days_remaining).toLocaleString() + 'd' : '—';
-  document.getElementById('h-ttg-sub').textContent = g.weeks_remaining != null ? (g.weeks_remaining.toFixed(1) + 'w · ' + (g.months_remaining?.toFixed(1)) + 'mo') : '';
+  renderPillars(g);   // four-pillar hero + status line (shared with /goal, goal_hero.py)
 
   document.getElementById("r-time").innerHTML =
       row("Days remaining",   fmtInt(g.days_remaining))
@@ -646,7 +599,7 @@ function renderVol(g) {{
 ATR_AUTO.addEventListener("change", applyAtrAuto);
 ATR_MULT.addEventListener("input", () => {{ clearTimeout(volDeb); volDeb = setTimeout(refreshVol, 350); }});
 refreshVol();
-"""
+""" + HERO_JS
 
     return shell("/dashboard", "Plan", body, script=script, head_extra=css, meta="goal model")
 
