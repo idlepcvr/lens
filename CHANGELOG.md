@@ -6,6 +6,62 @@ detail is in `git log`.
 
 ---
 
+## 2026-07-09
+
+**The Goal Ladder is finished.** The whole NEXT_SESSION build, phases C1 → C6,
+in the ratified order. The plan is now caged: it can only change through a
+versioned amendment with a reason, and everything else derives from it.
+
+**C5 · Scenario ladder** (`/goal`). A win-rate × realized-R grid, client-side.
+Each cell is EV in R and the monthly % it implies at the current risk and
+cadence; the amber line is the breakeven frontier `WR = (1+feeR)/(1+R)`. Two
+pins — **M**easured (ledger) and **P**lan (typed) — make the gap between what
+he claims and what he's shown a single glance. Today: M at 39.3%/1.31R, P at
+39.5%/3.0R.
+
+**C3 · Projection cone** (`app/cone.py`, `/analytics`). P10/P25/P50/P75/P90
+bootstrapped from realized EUR P&L, 2000 paths, anchored monthly (daily
+re-anchoring hides drift), running to the next milestone's derived date. n<30
+falls back to plan params and badges itself. One status word — AHEAD / ON /
+BEHIND / OFF-PLAN — computed in one place and quoted by /analytics, /goal,
+/calendar and /journal.
+⚠️ Two ledger traps found here: `trades.balance_after` is **not** account equity
+(70 of 489 rows imply |return| > 60%, dozens exactly −100%), and normalizing P&L
+by the daily snapshot flips the sign of the mean depending on the outlier cap.
+The cone therefore bootstraps EUR P&L directly and rescales by one robust
+scalar. Don't reintroduce per-trade returns from `balance_after`.
+
+**C3 · Stack projection** (`app/stack_proj.py`, `/goal`). Dates the 5 BTC and
+50 BTC rungs, measured vs plan, under bear/base/bull CAGRs. Personal equity
+compounds; the prop leg is a linear payout stream (payout × take-home − burn).
+No funded account → payout €0 → surplus is −burn and the stack drains.
+⚠️ **Bear lands first**: rungs are in BTC, so EUR income buys more coin cheap.
+A bull run pushes a BTC target *further* away. Counterintuitive, and correct.
+
+**Stage B · The envelope filters the search.** Fit persists its feasible envelope
+(`fit_envelope` table) on every sweep; `/edge` scores each search result against
+it by normalized distance — 0 = inside = FITS, near-misses rank lower and name
+the axis they fail. "Feasible only" toggle; stale (>7d) or empty envelopes
+disable it rather than filter on dead numbers. Empty corridor gets the plain
+verdict plus the nearest miss. Only wr/rr/freq are scored per row: every backtest
+runs at a fixed 5× leverage, so that check is page-level.
+
+**C4 · Regime realism** (`app/realism.py`). Counts days in the last 90 whose
+range cleared the required TP move — overall and *within the current regime* —
+and holds the offered setups/week against the needed trades/week:
+**OFFERED** (≥1.5×) / **TIGHT** (0.75–1.5×) / **STARVED** (<0.75×). It
+immediately caught the pathology it was written for: a "feasible" optimum needing
+a 7.50% move 7.5× a week, which SIDEWAYS offered on **1 of the last 90 days**.
+
+**C6 · Surfacing.** `/goal` ladder hero (stage, next rung, progress, status word,
+coverage). "Income complete" fires on 6 consecutive months of engine cash flow ≥
+burn — not 4% withdrawal math. The honest bar is printed: at the current €5,000
+funded size, covering €2,800/mo needs **~70%/mo**. Prop payouts count €0 —
+evaluation P&L isn't cash. Calendar carries month-end P50 vs actual; journal
+carries the status word beside the execution grade.
+
+---
+
 ## 2026-07-04
 
 **Alerts got situational awareness.** Alerts carry a "⏱ Live now" price+drift

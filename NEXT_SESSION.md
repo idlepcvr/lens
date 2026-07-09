@@ -1,5 +1,30 @@
 # NEXT SESSION — LENS
 
+> ## ✅ BUILT — 2026-07-09. Every phase below shipped; see CHANGELOG.
+>
+> C1+C2 `44cfb85` · C5 `def9ea2` · C3 cone `520fb81` · Stage B `3fb4eee` ·
+> C4 `5dbc7d8` · C6 `e77e71f` · C3 stack projection `a220aa7`.
+>
+> Three things were built differently than specced, on purpose:
+> · **Coverage counts €0 prop payouts.** Evaluation P&L isn't cash and there's no
+>   funded account; counting it would let a paper account pay the rent.
+> · **The journal has no weekly-review row**, so the status word went in its
+>   header rather than inventing the row.
+> · **The cone bootstraps EUR P&L, not per-trade returns.** `trades.balance_after`
+>   is not account equity on this ledger (70/489 rows imply |return| > 60%).
+>
+> Open follow-ups, in order:
+> 1. **Log a stack snapshot** on `/goal` — until then milestone dates and the
+>    stack projection have nothing to derive from.
+> 2. Forward-test the live loop (README `## Next` item 1) — still outranks
+>    anything below.
+> 3. C4's day-range proxy ignores intraday path; upgrade to session-window ranges
+>    only if the badge misleads in practice.
+>
+> *Everything below is the original 2026-07-06 spec, kept for provenance.*
+
+---
+
 *Handoff file. Opus briefs the problem → **Fable decides the design** → Opus
 executes it. **Fable made all calls below on 2026-07-06** (inside the closing
 Fable window). Opus: build in the phase order at the bottom, verify each phase
