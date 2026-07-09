@@ -1713,6 +1713,16 @@ function fitCell(row) {{
     '">' + f.axis + ' ' + f.needs + '</span>';
 }}
 
+// C4 — a strategy can be robust in-sample and still need a move the market
+// rarely makes. Colour by supply-vs-need, always carrying the two numbers.
+var RCOL = {{OFFERED: 'var(--long)', TIGHT: 'var(--amber)', STARVED: 'var(--short)'}};
+function realCell(row) {{
+  var R = row.realism;
+  if (!R) return '<span style="color:var(--t3)">—</span>';
+  return '<span style="color:' + RCOL[R.badge] + ';font-weight:700" title="' + R.text + '">' +
+    R.badge + '</span>';
+}}
+
 function renderSearch(d) {{
   var res = document.getElementById('search-results');
   var usable = envNote(d.env);
@@ -1740,7 +1750,7 @@ function renderSearch(d) {{
   var h = '<div style="font-size:10px;color:var(--t3);margin:2px 0 8px">Ranked by <b>fit</b> (inside the envelope first), then <b>robust</b> (green = profitable in BOTH halves, n≥40 · 30mo split-half), then net %. Still in-sample — a survivor is a candidate to forward-test, not a green light. <b>Click a row</b> to load it into the builder above.' +
     (usable ? ' <b>' + d.fits_count + '</b> of ' + d.found + ' land inside the envelope.' : '') + '</div>';
   h += '<div style="overflow-x:auto;max-height:420px;overflow-y:auto"><table><thead><tr>' +
-       '<th>#</th><th>strategy</th><th>tf</th><th>n</th><th>/wk</th><th>WR</th><th>PF</th><th>net%</th><th>maxDD</th><th>halves</th><th>fit</th><th></th></tr></thead><tbody>';
+       '<th>#</th><th>strategy</th><th>tf</th><th>n</th><th>/wk</th><th>WR</th><th>PF</th><th>net%</th><th>maxDD</th><th>halves</th><th>fit</th><th title="Does the market actually offer this strategy\\'s take-profit move often enough to feed its cadence?">on offer</th><th></th></tr></thead><tbody>';
   rows.forEach(function(row, i) {{
     var cls = row.robust ? 'win' : '';
     h += '<tr style="cursor:pointer" onclick="fillFromParams(window._searchTop['+i+'].params)">' +
@@ -1755,6 +1765,7 @@ function renderSearch(d) {{
       '<td>' + row.max_dd + '%</td>' +
       '<td style="font-size:10px">' + (row.half1>=0?'+':'') + row.half1 + ' / ' + (row.half2>=0?'+':'') + row.half2 + '</td>' +
       '<td style="font-size:10px">' + fitCell(row) + '</td>' +
+      '<td style="font-size:10px">' + realCell(row) + '</td>' +
       '<td><a href="#" onclick="event.stopPropagation();toGoal(' + row.wr + ',' + row.rr + ',' + (row.n/weeks).toFixed(2) + ');return false" title="Send this strategy\\'s stats to the Goal model">→ Goal</a></td>' +
       '</tr>';
   }});

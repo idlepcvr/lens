@@ -375,6 +375,15 @@ def _worker(req: dict):
                 _state["done"], _state["total"] = done, total
         result = evaluate(req, progress=prog)
         save_envelope(result)      # Stage B handoff — the /edge search reads this
+        # C4 — is the optimum's required move actually on offer in this regime?
+        # Kept out of evaluate() so the sweep core stays pure math, offline.
+        o = result.get("optimum")
+        if o:
+            from .realism import badge
+            try:
+                result["realism"] = badge(o["win_pct"], o["freq"])
+            except Exception:
+                result["realism"] = None
         with _lock:
             _state["result"] = result
     except Exception as e:

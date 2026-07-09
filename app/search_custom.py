@@ -235,6 +235,21 @@ def annotate(rows: list, env_row: dict | None) -> list:
     return rows
 
 
+def _realism(rows: list) -> None:
+    """C4 — does the market actually offer each row's TP move often enough to
+    feed its cadence? Its stop is k×ATR on its own timeframe, so its required
+    move is k×ATR%×R. Best-effort: a dead candle feed must not break the search."""
+    try:
+        from .realism import badge, row_move_pct
+    except Exception:
+        return
+    for r in rows:
+        try:
+            r["realism"] = badge(row_move_pct(r["k"], r["rr"], r["tf"]), r.get("freq"))
+        except Exception:
+            r["realism"] = None
+
+
 def status() -> dict:
     from .fit_sweep import latest_envelope
     env_row = latest_envelope()
@@ -246,6 +261,7 @@ def status() -> dict:
     rows.sort(key=lambda x: ((x.get("fit") or {}).get("fits", False) if usable else False,
                              x["robust"], x["net_pct"]), reverse=True)
     top = rows[:50]
+    _realism(top)   # C4 — only the rows we ship; the badge costs a candle load
     env_meta = None
     if env_row:
         lev = env_row["envelope"].get("lev")

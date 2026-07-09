@@ -51,6 +51,12 @@ CSS = r"""<style>
 .fit-env{font-size:12px;color:var(--dim);line-height:1.6;border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
 .fit-env b{color:var(--ink)}
 .fit-env a{font-family:var(--mono);font-size:11px}
+/* C4 — regime realism: feasible on paper vs on offer in the market */
+.fit-real{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:11px;font-size:11.5px;color:var(--dim)}
+.rbadge{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.1em;padding:2px 7px;border-radius:4px}
+.rbadge.OFFERED{color:var(--long);border:1px solid var(--long)}
+.rbadge.TIGHT{color:var(--amber);border:1px solid var(--amber)}
+.rbadge.STARVED{color:var(--short);border:1px solid var(--short)}
 
 /* your-strategy vs envelope comparison */
 .fit-cmp{width:100%;border-collapse:collapse;margin-top:12px;font-size:11.5px}
@@ -288,8 +294,19 @@ SCRIPT = r"""
         '<thead><tr><th>Metric</th><th>Required envelope</th><th>Your strategy</th><th>Status</th></tr></thead>'+
         '<tbody>'+trs+'</tbody></table>';
     }
+    // C4 — the envelope may be populated on paper and starved in the market
+    var R=DATA.realism, realh='';
+    if(o && R){
+      realh='<div class="fit-real"><span class="rbadge '+R.badge+'">'+R.badge+'</span>'+
+        '<span>The optimum needs a <b style="color:var(--ink)">'+R.move_pct.toFixed(2)+'%</b> move '+
+        R.needs+'× a week. In the current <b style="color:var(--ink)">'+R.regime+'</b> regime the market '+
+        'offered that on '+R.hit+' of the last '+R.days+' days — <b style="color:var(--ink)">~'+R.offers+'/wk</b>'+
+        (R.badge==='STARVED'?' — the corridor exists on paper, not on the tape.'
+         :R.badge==='TIGHT'?' — barely enough; a quiet fortnight breaks it.'
+         :' — the market is handing you more setups than the plan needs.')+'</span></div>';
+    }
     el('fit-verdict-wrap').innerHTML='<div class="fit-verdict '+lvl+'"><div class="vi">'+icon+
-      '</div><div style="flex:1"><h3>'+title+'</h3><p>'+msg+'</p>'+opth+envh+cmph+'</div></div>';
+      '</div><div style="flex:1"><h3>'+title+'</h3><p>'+msg+'</p>'+opth+envh+realh+cmph+'</div></div>';
     el('fit-heat-wrap').style.display='';
     drawHeat();
   }
