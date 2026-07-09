@@ -82,6 +82,12 @@ CSS = r"""<style>
 .st .cur{font-weight:800}
 .st-note{font-size:10px;color:var(--t3);margin-top:7px;line-height:1.4}
 /* plan panel — locked plan, amendment log, milestone ladder, stack snapshot */
+.card.fold>.card-title{cursor:pointer;user-select:none}
+.card.fold .pcaret{display:inline-block;transition:transform .2s}
+.card.fold.col .pcaret{transform:rotate(-90deg)}
+.card.fold.col .fold-body{display:none}
+.fold-sum{font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3);margin-left:8px;font-family:var(--mono);font-size:10.5px;display:none}
+.card.fold.col .fold-sum{display:inline}
 .plan-line{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-bottom:10px}
 .plan-line b{color:var(--am)}
 .mrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;font-size:11.5px;padding:2.5px 0}
@@ -194,37 +200,6 @@ BODY = r"""
   <div class="metrics">
 """ + HERO_HTML + r"""
     <div class="grid2">
-      <div class="card">
-        <div class="card-title">The plan <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><a href="#" id="amend-toggle" style="color:var(--t3)">amend</a></span></div>
-        <div class="plan-line" id="plan-line">—</div>
-        <div class="kv" id="plan-kv"></div>
-        <div class="amend" id="amend-box">
-          <div class="lbl">Goal BTC / date</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            <input type="text" inputmode="decimal" id="am-goal-btc">
-            <input type="date" id="am-goal-date">
-          </div>
-          <div class="lbl">Monthly burn €</div>
-          <input type="text" inputmode="decimal" id="am-burn">
-          <div class="lbl">Reason (min 20 chars — this is the cage)</div>
-          <textarea id="am-reason" placeholder="Why does the plan change? Recorded forever."></textarea>
-          <button type="button" class="btn p" id="am-save">Amend plan</button>
-          <span class="calc-tip" id="am-msg"></span>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Milestone ladder <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3)" id="stack-now">—</span></div>
-        <div class="lhero" id="lhero" style="display:none"></div>
-        <div class="cov-note" id="cov-note" style="display:none"></div>
-        <div id="ladder"></div>
-        <div class="stale" id="stack-stale" style="display:none"></div>
-        <div class="snapf">
-          <input type="date" id="sn-date"><input type="text" inputmode="decimal" id="sn-btc" placeholder="BTC total">
-          <button type="button" class="btn" id="sn-save">Log</button>
-        </div>
-      </div>
-    </div>
-    <div class="grid2">
       <div class="card"><div class="card-title">Required growth to hit goal</div><div class="kv" id="r-growth"></div></div>
       <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
     </div>
@@ -252,6 +227,47 @@ BODY = r"""
       <div class="card-title">Scenario ladder — win rate × realized R</div>
       <div class="slwrap"><table class="slad" id="sladder"></table></div>
       <div class="st-note" id="slad-note"></div>
+    </div>
+    <div class="card fold col" id="ladder-card">
+      <div class="card-title">
+        <span class="pcaret">▾</span> Milestone ladder
+        <span class="fold-sum" id="ladder-sum"></span>
+        <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3)" id="stack-now">—</span>
+      </div>
+      <div class="fold-body">
+        <div class="lhero" id="lhero" style="display:none"></div>
+        <div class="cov-note" id="cov-note" style="display:none"></div>
+        <div id="ladder"></div>
+        <div class="stale" id="stack-stale" style="display:none"></div>
+        <div class="snapf">
+          <input type="date" id="sn-date"><input type="text" inputmode="decimal" id="sn-btc" placeholder="BTC total">
+          <button type="button" class="btn" id="sn-save">Log</button>
+        </div>
+      </div>
+    </div>
+    <div class="card fold col" id="plan-card">
+      <div class="card-title">
+        <span class="pcaret">▾</span> The plan
+        <span class="fold-sum" id="plan-sum"></span>
+        <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><a href="#" id="amend-toggle" style="color:var(--t3)">amend</a></span>
+      </div>
+      <div class="fold-body">
+        <div class="plan-line" id="plan-line">—</div>
+        <div class="kv" id="plan-kv"></div>
+        <div class="amend" id="amend-box">
+          <div class="lbl">Goal BTC / date</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <input type="text" inputmode="decimal" id="am-goal-btc">
+            <input type="date" id="am-goal-date">
+          </div>
+          <div class="lbl">Monthly burn €</div>
+          <input type="text" inputmode="decimal" id="am-burn">
+          <div class="lbl">Reason (min 20 chars — this is the cage)</div>
+          <textarea id="am-reason" placeholder="Why does the plan change? Recorded forever."></textarea>
+          <button type="button" class="btn p" id="am-save">Amend plan</button>
+          <span class="calc-tip" id="am-msg"></span>
+        </div>
+      </div>
     </div>
     <div id="err" class="err hide"></div>
   </div>
@@ -479,6 +495,7 @@ function renderLadder(L){
   LADDER=L; const p=L.plan;
   document.getElementById("plan-line").innerHTML=
     `<b>v${p.version}</b> · amended ${L.amendments} time${L.amendments===1?"":"s"} · last: ${L.last_reason||"—"}`;
+  document.getElementById("plan-sum").textContent=`v${p.version} · ${p.goal_btc} BTC by ${p.goal_date}`;
   document.getElementById("plan-kv").innerHTML=
       row("Goal",`${p.goal_btc} BTC by ${p.goal_date}`)
     + row("North star",`${p.north_star_btc} BTC by ${p.north_star_date}`,"dim")
@@ -493,6 +510,9 @@ function renderLadder(L){
     `<div class="mrow ${m.done?"done":""} ${i===nextIdx?"next":""}"><span class="mb">${m.done?"✓ ":""}${m.btc} ₿</span>`
     +`<span class="ml">${m.label}</span><span class="md">${m.date?fmtD(m.date):(m.done?"reached":"—")}</span></div>`).join("");
   document.getElementById("stack-now").textContent=L.stack?`${L.stack.btc_total} ₿ @ ${L.stack.date}`:"no snapshot";
+  const nx=L.milestones[nextIdx], dn=L.milestones.filter(m=>m.done);
+  document.getElementById("ladder-sum").textContent=
+    `${dn.length?dn[dn.length-1].label:"Pre-seed"} → next ${nx?`${nx.btc} ₿ ${nx.label}`:"—"}`;
   const st=document.getElementById("stack-stale");
   if(L.stack_stale){ st.style.display="block";
     st.textContent=L.stack?`⚠ stack snapshot is ${L.stack_age_days} days old — log this month's total.`
@@ -566,7 +586,11 @@ function renderStackProj(S){
 }
 async function loadStackProj(){ renderStackProj(await fetch("/api/goal/stack").then(r=>r.json())); }
 loadStackProj();
-document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); document.getElementById("amend-box").classList.toggle("open"); });
+document.querySelectorAll(".card.fold>.card-title").forEach(h=>
+  h.addEventListener("click",()=>h.parentElement.classList.toggle("col")));
+document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation();
+  document.getElementById("plan-card").classList.remove("col");
+  document.getElementById("amend-box").classList.toggle("open"); });
 document.getElementById("am-save").addEventListener("click",async()=>{
   const msg=document.getElementById("am-msg");
   const body={reason:document.getElementById("am-reason").value,
