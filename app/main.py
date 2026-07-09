@@ -1066,6 +1066,13 @@ def api_cone_status():
     return cone.status()
 
 
+@app.get("/api/excursion")
+def api_excursion():
+    """MAE/MFE summary — is a low realized R an exit problem or a selection problem?"""
+    from . import excursion
+    return excursion.summary()
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()

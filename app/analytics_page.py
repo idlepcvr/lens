@@ -104,12 +104,13 @@ Promise.all([
   fetch('/api/review/equity').then(r=>r.json()),
   fetch('/api/review/analytics').then(r=>r.json()),
   fetch('/api/cone').then(r=>r.json()).catch(()=>null),
-]).then(([E,A,C])=>{
+  fetch('/api/excursion').then(r=>r.json()).catch(()=>null),
+]).then(([E,A,C,X])=>{
   if(!E||!E.n){document.getElementById('read').innerHTML='<div class="read"><p class="lede">No closed trades yet.</p></div>';return;}
   drawEquity(E);
   drawCone(C);
   renderRead(E,A);
-  renderSections(E,A);
+  renderSections(E,A,X);
 }).catch(e=>{
   document.getElementById('read').innerHTML='<div class="read"><p class="lede" style="color:var(--short)">Load error: '+e.message+'</p></div>';
 });
@@ -248,7 +249,7 @@ function det(title,sub,tag,tagcol,body,open){
     (tag?`<span class="tag" style="color:${tagcol||'var(--dim)'}">${tag}</span>`:'')+
     `</summary><div class="an-d-body">${body}</div></details>`;
 }
-function renderSections(E,A){
+function renderSections(E,A,X){
   const maxAbs=arr=>Math.max(1,...arr.map(x=>Math.abs(x.total)));
   const bar=(v,mx)=>`<div style="height:4px;border-radius:2px;width:${Math.min(100,Math.abs(v)/mx*100)}%;background:${pc(v)};opacity:.7"></div>`;
   const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
@@ -322,12 +323,36 @@ function renderSections(E,A){
     (E.cur_bal!=null?card('Balance now','€'+E.cur_bal.toFixed(0),'','var(--ink)'):'')+`</div>`+
     `<table class="an-tbl"><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${xfRows}</table>`;
 
+  // ── MAE / MFE — exits or selection? ──
+  const pct=v=>v==null?'—':v.toFixed(2)+'%';
+  let exBody='', exHead='', exCol='';
+  if(X&&X.n){
+    const sel=X.verdict.startsWith('SELECTION'), exi=X.verdict.startsWith('EXITS');
+    exHead=X.verdict.split(' — ')[0]; exCol=sel||exi?'var(--short)':'var(--dim)';
+    exBody=`<div class="an-grid">`+
+      card('Median MFE',pct(X.median_mfe_pct),'best move offered','var(--long)')+
+      card('Median MAE',pct(X.median_mae_pct),'worst heat taken','var(--short)')+
+      card('Capture on winners',X.median_capture_on_winners!=null?(100*X.median_capture_on_winners).toFixed(0)+'%':'—','of the best move banked','var(--long)')+
+      card('MFE on losers',pct(X.median_mfe_on_losers_pct),'how far losers ran your way','var(--short)')+
+      card('Never reached TP',X.pct_never_reached_tp+'%','of all trades, vs 0.95% target','var(--short)')+
+      card('Losers that touched TP',X.pct_losers_that_touched_tp+'%','giveback rate','var(--dim)')+
+      `</div>`+
+      `<p class="s" style="margin-top:10px;color:var(--dim);line-height:1.5">`+
+      `<b style="color:${exCol}">${X.verdict}</b><br>`+
+      `Capture is the fraction of the best available move banked on trades that worked; `+
+      `it is meaningless on losers, so it is measured on winners only. Excursions are `+
+      `percent of entry, not R — no trade in the ledger carries a stop, so there is no `+
+      `risk denominator to divide by. ${X.n_5m} of ${X.n} trades measured at 5m resolution, `+
+      `the rest at 1h.</p>`;
+  }
+
   document.getElementById('sections').innerHTML=
     det('When you trade','timing edge — hours &amp; days',
         (bH?'best '+hh(bH.hour):'')+(bD?' · '+bD.label:''),
         'var(--long)',timingBody,true)+
     det('How long you hold','duration breakdown — where the edge lives','',
         '',durBody,false)+
+    (exBody?det('Excursions','MAE / MFE — exits or selection?',exHead,exCol,exBody,false):'')+
     det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false)+
     det('Cash flow','every EUR deposit &amp; withdrawal',eur(E.net_deposit)+' in',pc(E.net_deposit),cashBody,false);
 }
