@@ -273,6 +273,9 @@ def status() -> dict:
         _cache.update(key=key, val={
             "status": d.get("status"), "source": d.get("source"), "badge": d.get("badge"),
             "n": d.get("n"), "now": d.get("now"), "month_end": d.get("month_end"),
+            # anchor_cum turns the month-end P50 (a cumulative figure) into a
+            # month P&L target the calendar can hold against its own month total
+            "anchor": d.get("anchor"), "anchor_cum": d.get("anchor_cum"),
         })
     return _cache["val"]
 

@@ -364,7 +364,11 @@ function renderColMenu(){
 }
 function renderTable(){
   const n=VISIBLE.length, w=VISIBLE.filter(t=>t.pnl>0).length, tot=VISIBLE.reduce((s,t)=>s+t.pnl,0);
-  $('jr-stat').innerHTML=`<b>${n}</b> trades · WR <b>${n?(w/n*100).toFixed(0):0}%</b> · net <b style="color:${tot>=0?'var(--long)':'var(--short)'}">${eur(tot)}</b>`;
+  // "executed correctly" and "on plan" are different questions — show both. The
+  // grades below score execution; the cone's status word scores the plan.
+  const sw=window.CONE_STATUS;
+  const swh=sw?` · vs plan <b style="color:${sw==='AHEAD'||sw==='ON'?'var(--long)':sw==='BEHIND'?'var(--amber)':'var(--short)'}">${sw}</b>`:'';
+  $('jr-stat').innerHTML=`<b>${n}</b> trades · WR <b>${n?(w/n*100).toFixed(0):0}%</b> · net <b style="color:${tot>=0?'var(--long)':'var(--short)'}">${eur(tot)}</b>`+swh;
   applySort();
   const cols=COLS.filter(c=>VIS_COLS.includes(c.k));
   $('jr-head').innerHTML='<tr>'+cols.map(c=>`<th ${c.sort?`data-k="${c.sort}"`:''} class="${SORT.k===c.sort?(SORT.dir>0?'sa':'sd'):''}">${c.h}</th>`).join('')+'</tr>';
@@ -503,6 +507,13 @@ async function syncKraken(){
   setTimeout(()=>{ b.textContent=t; b.disabled=false; },2500);
 }
 load();
+
+// C6 — the cone's status word, next to the execution grades. "Executed correctly"
+// and "on plan" are different questions; the journal should answer both.
+fetch('/api/cone/status').then(function(r){return r.json()}).then(function(d){
+  window.CONE_STATUS=d.status;
+  if(typeof applyF==='function') applyF();
+}).catch(function(){});
 """
 
 JOURNAL_HTML = shell("/journal", "Journal", BODY, script=SCRIPT, head_extra=_CSS, meta="what did I do?")

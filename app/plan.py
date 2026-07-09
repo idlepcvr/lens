@@ -52,6 +52,12 @@ MIN_REASON = 20
 STALE_DAYS = 40          # snapshot older than this → nag on the goal hero
 MEASURED_MIN_N = 30      # below this the ledger can't speak; "Use measured" stays greyed out
 
+# "Income complete" fires on 6 consecutive months of coverage ≥ 1.0 — the
+# doctrine's stress-test rule 3, NOT 4%-withdrawal math on a stack you hold.
+COVERAGE_STREAK = 6
+PAYOUT_SHARE = 0.80      # prop take-home after the firm's split
+LENS_BOOK = "hedge"      # the personal account; prop_* books are evaluations, not cash
+
 
 def _row(r):
     d = dict(r)
@@ -191,6 +197,122 @@ def ladder() -> dict:
         "stack_age_days": _age_days(snap["date"]) if snap else None,
         "stack_stale": (_age_days(snap["date"]) > STALE_DAYS) if snap else True,
         "snapshots": snapshots(),
+    }
+
+
+# ─── C6 · Coverage — does the engine pay the bills yet? ──────────────────────
+
+def _month_key(d: date) -> str:
+    return d.strftime("%Y-%m")
+
+
+def _prev_months(n: int, today: date = None) -> list[str]:
+    """The last `n` COMPLETE months, oldest → newest. The current month is
+    excluded: a month that's three days old always looks like a shortfall."""
+    today = today or date.today()
+    y, m = today.year, today.month
+    out = []
+    for _ in range(n):
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+        out.append(f"{y:04d}-{m:02d}")
+    return out[::-1]
+
+
+def monthly_engine_flow(n: int = COVERAGE_STREAK) -> list[dict]:
+    """Engine cash flow per complete month = LENS realized P&L + prop payouts.
+
+    Prop *payouts* are cash; prop *evaluation* P&L is not, so evaluation books are
+    excluded — counting them would let a paper account pay the rent. There is no
+    payouts table yet, so `payout` is 0 until a funded account starts paying.
+    """
+    months = _prev_months(n)
+    c = _conn()
+    rows = c.execute(
+        "SELECT substr(closed_at,1,7) AS m, COALESCE(SUM(pnl),0) AS pnl "
+        "FROM trades WHERE pnl IS NOT NULL AND closed_at IS NOT NULL AND book = ? "
+        "GROUP BY m", (LENS_BOOK,)
+    ).fetchall()
+    c.close()
+    by_month = {r["m"]: r["pnl"] for r in rows}
+    return [{"month": m, "lens": round(by_month.get(m, 0.0), 2), "payout": 0.0,
+             "flow": round(by_month.get(m, 0.0), 2)} for m in months]
+
+
+def coverage() -> dict:
+    """Coverage ratio = monthly engine cash flow ÷ monthly burn. The trailing-3mo
+    figure averages the flow to a MONTHLY rate first — a 3-month total over a
+    1-month burn would read 3× too high."""
+    p = active_plan()
+    burn = p["burn_monthly_eur"] or 0.0
+    flow = monthly_engine_flow()
+    for f in flow:
+        f["ratio"] = round(f["flow"] / burn, 3) if burn else None
+
+    last3 = flow[-3:]
+    t3 = (sum(f["flow"] for f in last3) / len(last3) / burn) if (burn and last3) else None
+
+    streak = 0
+    for f in reversed(flow):
+        if f["ratio"] is not None and f["ratio"] >= 1.0:
+            streak += 1
+        else:
+            break
+
+    # The honest bar: what the funded account must return monthly to cover burn.
+    # Same-currency assumption (EUR burn vs the eval account's units) — a ~1.08
+    # EURUSD would move this ~8%, which never changes the verdict here.
+    acct = 0.0
+    try:
+        from .database import get_prop_eval
+        acct = float(get_prop_eval().get("account") or 0.0)
+    except Exception:
+        pass
+    req_pct = (burn / (acct * PAYOUT_SHARE) * 100.0) if (acct and burn) else None
+
+    return {
+        "burn_monthly_eur": burn,
+        "months": flow,
+        "trailing3": round(t3, 3) if t3 is not None else None,
+        "streak": streak, "streak_needed": COVERAGE_STREAK,
+        "income_complete": streak >= COVERAGE_STREAK,
+        "funded_account": acct, "payout_share": PAYOUT_SHARE,
+        "required_monthly_pct": round(req_pct, 2) if req_pct is not None else None,
+    }
+
+
+def hero() -> dict:
+    """Everything the /goal ladder hero shows: stage, next rung + derived date,
+    progress, the C3 status word, and the coverage ratio."""
+    L = ladder()
+    ms = L["milestones"]
+    done = [m for m in ms if m["done"]]
+    nxt = next((m for m in ms if not m["done"]), None)
+    cur = L["stack"]["btc_total"] if L["stack"] else None
+
+    prev_btc = done[-1]["btc"] if done else 0.0
+    pct = None
+    if cur is not None and nxt and nxt["btc"] > prev_btc:
+        pct = max(0.0, min(100.0, (cur - prev_btc) / (nxt["btc"] - prev_btc) * 100.0))
+
+    try:
+        from .cone import status as cone_status
+        cs = cone_status()
+    except Exception:
+        cs = {}
+
+    return {
+        "stage": done[-1]["label"] if done else "Pre-seed",
+        "stage_btc": prev_btc,
+        "next": nxt,
+        "stack_btc": cur,
+        "goal_btc": L["plan"]["goal_btc"],
+        "progress_pct": round(pct, 1) if pct is not None else None,
+        "overall_pct": round(cur / L["plan"]["goal_btc"] * 100, 2) if cur else None,
+        "status": cs.get("status"), "status_source": cs.get("source"),
+        "stack_stale": L["stack_stale"], "stack_age_days": L["stack_age_days"],
+        "coverage": coverage(),
     }
 
 

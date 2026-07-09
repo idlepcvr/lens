@@ -1037,6 +1037,13 @@ def api_goal_measured(days: Optional[int] = Query(None, description="window; omi
     return plan.measured(days)
 
 
+@app.get("/api/goal/hero")
+def api_goal_hero():
+    """C6 — stage, next rung, progress, the C3 status word, and coverage."""
+    from . import plan
+    return plan.hero()
+
+
 @app.get("/api/cone")
 def api_cone():
     """Projection cone on cumulative realized P&L + the status word (C3)."""

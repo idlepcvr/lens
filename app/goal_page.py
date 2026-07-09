@@ -102,6 +102,24 @@ CSS = r"""<style>
 .msrc{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:0 3px;border-radius:3px}
 .msrc.typed{color:var(--t3);border:1px solid var(--b2)}
 .msrc.measured{color:var(--gr);border:1px solid var(--gr)}
+/* ladder hero (C6) — stage · next rung · progress · status word · coverage */
+.lhero{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px;align-items:center;
+  background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+@media(max-width:640px){.lhero{grid-template-columns:1fr}}
+.lhero .lh-l{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.16em;color:var(--t3);margin-bottom:3px}
+.lhero .lh-v{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t1);line-height:1.2}
+.lhero .lh-s{font-size:9.5px;color:var(--t3);margin-top:2px}
+.lbar{height:4px;border-radius:2px;background:var(--b1);margin-top:6px;overflow:hidden}
+.lbar span{display:block;height:100%;background:var(--ac)}
+.sword{font-family:var(--mono);font-size:9.5px;font-weight:800;letter-spacing:.1em;padding:2px 6px;border-radius:4px}
+.sword.AHEAD,.sword.ON{color:var(--gr);border:1px solid var(--gr)}
+.sword.BEHIND{color:var(--am);border:1px solid var(--am)}
+.sword.OFF-PLAN{color:var(--re);border:1px solid var(--re)}
+.cov-note{font-size:10px;color:var(--t3);line-height:1.5;margin-top:8px;border-top:1px solid var(--b1);padding-top:7px}
+.cov-note b{color:var(--t1)}
+.cov-m{display:flex;gap:3px;margin-top:5px}
+.cov-m i{flex:1;height:3px;border-radius:1px;background:var(--b2)}
+.cov-m i.ok{background:var(--gr)} .cov-m i.no{background:var(--re);opacity:.55}
 /* scenario ladder — WR × R, monthly % big / EV small, breakeven frontier drawn */
 .slwrap{overflow-x:auto}
 .slad{border-collapse:collapse;font-family:var(--mono)}
@@ -196,6 +214,8 @@ BODY = r"""
       </div>
       <div class="card">
         <div class="card-title">Milestone ladder <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3)" id="stack-now">—</span></div>
+        <div class="lhero" id="lhero" style="display:none"></div>
+        <div class="cov-note" id="cov-note" style="display:none"></div>
         <div id="ladder"></div>
         <div class="stale" id="stack-stale" style="display:none"></div>
         <div class="snapf">
@@ -475,7 +495,37 @@ function renderLadder(L){
                           :"⚠ no stack snapshot — milestone dates need one to be derived."; }
   else st.style.display="none";
 }
-async function loadLadder(){ renderLadder(await fetch("/api/plan").then(r=>r.json())); }
+async function loadLadder(){ renderLadder(await fetch("/api/plan").then(r=>r.json())); loadHero(); }
+
+// ── C6 · ladder hero — stage, next rung, the C3 status word, coverage ────────
+function renderHero(H){
+  const box=document.getElementById("lhero"), note=document.getElementById("cov-note");
+  const C=H.coverage, n=H.next;
+  box.style.display="grid";
+  box.innerHTML=
+     `<div><div class="lh-l">Stage</div><div class="lh-v">${H.stage}</div>`
+    +`<div class="lh-s">${H.stack_btc!=null?H.stack_btc+" ₿ · "+(H.overall_pct??0)+"% of goal":"no stack snapshot"}</div>`
+    +(H.progress_pct!=null?`<div class="lbar"><span style="width:${H.progress_pct}%"></span></div>`:"")+`</div>`
+    +`<div><div class="lh-l">Next rung</div><div class="lh-v">${n?n.btc+" ₿ · "+n.label:"—"}</div>`
+    +`<div class="lh-s">${n&&n.date?fmtD(n.date):"date needs a snapshot"}${H.progress_pct!=null?" · "+H.progress_pct+"% there":""}</div></div>`
+    +`<div><div class="lh-l">Vs plan</div><div class="lh-v">${H.status?`<span class="sword ${H.status}">${H.status}</span>`:"—"}</div>`
+    +`<div class="lh-s">coverage ${C.trailing3!=null?(C.trailing3*100).toFixed(0)+"%":"—"} of burn · ${C.streak}/${C.streak_needed} mo</div></div>`;
+
+  // the honest bar: what the funded account must return monthly to cover burn —
+  // so the UI never lets 5–9%/mo become the silent assumption
+  const bars=C.months.map(m=>`<i class="${m.ratio>=1?"ok":"no"}" title="${m.month}: ${fmtEur(m.flow)} vs ${fmtEur(C.burn_monthly_eur)} burn"></i>`).join("");
+  note.style.display="block";
+  note.innerHTML=
+     `<b>Income complete</b> fires on ${C.streak_needed} consecutive months of engine cash flow ≥ burn `
+    +`(${fmtEur(C.burn_monthly_eur)}/mo) — not on 4% withdrawal math. Streak: <b>${C.streak}</b>.`
+    +`<div class="cov-m">${bars}</div>`
+    +(C.required_monthly_pct!=null
+      ? `<div style="margin-top:5px">At the current funded size <b>${fmtEur(C.funded_account)}</b> × ${(C.payout_share*100).toFixed(0)}% take-home, `
+        +`covering burn needs <b style="color:${C.required_monthly_pct>10?"var(--re)":"var(--t1)"}">~${C.required_monthly_pct}%/mo</b>.</div>`
+      : "")
+    +`<div style="margin-top:4px;color:var(--t3)">Prop payouts: <b>€0</b> — evaluation P&amp;L isn't cash, so it doesn't count toward coverage.</div>`;
+}
+async function loadHero(){ try{ renderHero(await fetch("/api/goal/hero").then(r=>r.json())); }catch(e){} }
 document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); document.getElementById("amend-box").classList.toggle("open"); });
 document.getElementById("am-save").addEventListener("click",async()=>{
   const msg=document.getElementById("am-msg");

@@ -120,7 +120,7 @@ BODY = """
 
 SCRIPT = r"""
 const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
-let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[];
+let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[], CONE=null;
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -131,7 +131,9 @@ async function load(){
   // /api/trades = full trade incl review fields + is_open + ISO dates (primary).
   // /api/review/trades = indicator context at entry (bar/4H trend/RSI/move) — merged
   // in by id so the modal matches the /review page's richness.
-  const [tr,er,ca]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades'),fetch('/api/review/ohlcv')]);
+  const [tr,er,ca,co]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades'),fetch('/api/review/ohlcv'),
+    fetch('/api/cone/status').catch(()=>null)]);
+  CONE=co&&co.ok?await co.json():null;
   const j=await tr.json(); let ej=[]; try{ej=await er.json();}catch(e){}
   try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
   const ctx={}; (Array.isArray(ej)?ej:(ej.trades||[])).forEach(t=>ctx[t.id]={
@@ -188,7 +190,17 @@ function renderSide(){
   let h=`<div class="cal-sum"><div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">${new Date(MONTH+'-01').toLocaleDateString('en',{month:'long',year:'numeric'})}</div>`;
   h+=`<div class="row"><span class="lbl">Net P&L</span><span class="val ${mPnl>=0?'g':'r'}">${mPnl>=0?'+':''}${eur(mPnl)}</span></div>`;
   h+=`<div class="row"><span class="lbl">Trades</span><span class="val">${mT}</span></div>`;
-  h+=`<div class="row"><span class="lbl">Win Rate</span><span class="val">${mT?(mW/mT*100).toFixed(1)+'%':'—'}</span></div></div>`;
+  h+=`<div class="row"><span class="lbl">Win Rate</span><span class="val">${mT?(mW/mT*100).toFixed(1)+'%':'—'}</span></div>`;
+  // C6 — month-end P50 target vs actual, coloured by the cone's status word.
+  // Only the CURRENT month has a target: the cone is anchored to its first day.
+  if(CONE&&CONE.month_end&&CONE.anchor_cum!=null&&MONTH===CONE.anchor.slice(0,7)){
+    const target=CONE.month_end.p50-CONE.anchor_cum;
+    const col=CONE.status==='AHEAD'||CONE.status==='ON'?'var(--long)':CONE.status==='BEHIND'?'var(--amber)':'var(--short)';
+    h+=`<div class="row" title="Monte-Carlo P50 for ${CONE.month_end.date}, anchored ${CONE.anchor}"><span class="lbl">Vs plan (P50)</span>`+
+       `<span class="val" style="color:${col}">${mPnl>=0?'+':''}${eur(mPnl)} / ${target>=0?'+':''}${eur(target)}</span></div>`;
+    h+=`<div class="row"><span class="lbl">Status</span><span class="val" style="color:${col};font-weight:700">${CONE.status}</span></div>`;
+  }
+  h+=`</div>`;
   const pd=SELDAY?dm[SELDAY]:(HOVDAY?dm[HOVDAY]:null);
   if(pd&&pd.trades.length){
     h+=`<div class="cal-day-h"><span class="ttl">${new Date(pd.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</span>`;
