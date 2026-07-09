@@ -7,7 +7,9 @@ was never on offer)? Capture = realized / MFE separates them.
 Excursions are in PERCENT OF ENTRY, not in R. `trades.sl` is NULL on all 497
 closed rows, so there is no per-trade risk denominator to divide by and an
 R-multiple here would be invented. Percent-of-entry is the underlying move,
-which is what the geometry (0.63% SL / 0.95% TP) is already quoted in.
+which is what the geometry (`setups.SL_PCT` / `setups.TP_PCT`) is already quoted
+in. Read those constants; never re-pin a literal here — this module graded the
+book against a retired 0.95% TP for as long as it existed.
 
 ponytail: a candle that straddles the entry (or the exit) contributes its whole
 high/low, so both excursions are very slightly overstated at the edges. At 5m
@@ -119,13 +121,19 @@ def excursions(limit: Optional[int] = None) -> list[dict]:
     return out
 
 
-def summary(rows: Optional[list[dict]] = None, tp_pct: float = 0.95) -> dict:
+def summary(rows: Optional[list[dict]] = None,
+            tp_pct: Optional[float] = None, sl_pct: Optional[float] = None) -> dict:
     """Medians, not means: excursion distributions have long right tails.
 
-    tp_pct is the mined take-profit geometry (0.95% underlying). It is the bar the
-    excursions are held against — a TP the median trade never reaches is not a
-    target, it's a wish.
+    tp_pct/sl_pct default to the LIVE geometry in `setups`, never to a literal.
+    They were pinned at the old 0.95% TP here while `setups.TP_PCT` had already
+    moved to 1.5%, so the panel graded the book against a target it no longer
+    trades. The bar the excursions are held against has to be the bar in use — a
+    TP the median trade never reaches is not a target, it's a wish.
     """
+    from .setups import SL_PCT, TP_PCT      # lazy: setups is heavy, and imports this
+    tp_pct = TP_PCT if tp_pct is None else tp_pct
+    sl_pct = SL_PCT if sl_pct is None else sl_pct
     rows = excursions() if rows is None else rows
     if not rows:
         return {"n": 0}
@@ -152,6 +160,8 @@ def summary(rows: Optional[list[dict]] = None, tp_pct: float = 0.95) -> dict:
         "pct_losers_that_touched_tp": round(
             100 * sum(r["mfe_pct"] >= tp_pct for r in losses) / len(losses), 1) if losses else None,
         "verdict": _verdict(cap_med, mfe_losers),
+        "tp_pct": tp_pct, "sl_pct": sl_pct,
+        "reach": reachability(tp_pct, sl_pct, rows=rows),
     }
 
 
@@ -169,6 +179,51 @@ def _verdict(cap: Optional[float], mfe_losers: Optional[float]) -> str:
     if cap < 0.5 and mfe_losers >= 0.5:
         return "EXITS — the move was there on losers, you didn't take it"
     return "MIXED — neither exits nor selection dominates"
+
+
+def reachability(win_move_pct: float, loss_move_pct: float, rows: Optional[list[dict]] = None,
+                 fee_r: float = 0.112, min_n: int = 30) -> Optional[dict]:
+    """Can this geometry win at all, given the moves the market has actually made?
+
+    `reach` is the share of closed trades whose price EVER travelled the required
+    TP move. Because you cannot win a trade whose target is never touched, reach is
+    a CEILING on win rate — and it is a generous one: it ignores whether the stop
+    was hit first, so the true ceiling is lower still.
+
+    Hold that ceiling against the win rate the geometry needs to break even,
+    WR* = (1 + fee_R) / (1 + R) where R = TP/SL. If the ceiling sits below WR*, no
+    amount of entry skill makes the setup profitable — the target is out of reach.
+
+    This is a STANDING VERDICT on the book, not a per-alert signal. It reads only
+    the geometry, so for a fixed TP/SL it returns the same word on every trade —
+    every plausible cell of a 3×5 TP/SL sweep came back STARVED on 2026-07-09.
+    It was briefly wired to the ntfy alert title; that made an alarm that fires
+    100% of the time. Keep it on /analytics, where a verdict is read once.
+
+    ponytail: `reach` is measured over the trades he TOOK, at the holds he chose,
+    so it is conditioned on his selection rather than on the market at large. That
+    is the right conditioning for "is this book's geometry survivable?" and the
+    wrong one for "does this edge exist anywhere?". Don't reuse it for the latter.
+    """
+    if not win_move_pct or not loss_move_pct or win_move_pct <= 0 or loss_move_pct <= 0:
+        return None
+    rows = excursions() if rows is None else rows
+    if len(rows) < min_n:
+        return None
+    hit = sum(r["mfe_pct"] >= win_move_pct for r in rows)
+    reach = hit / len(rows)
+    rr = win_move_pct / loss_move_pct
+    breakeven_wr = (1.0 + fee_r) / (1.0 + rr)
+    ratio = reach / breakeven_wr if breakeven_wr else None
+    word = "OFFERED" if ratio >= 1.25 else "TIGHT" if ratio >= 1.0 else "STARVED"
+    return {
+        "badge": word, "ratio": round(ratio, 2),
+        "reach": round(reach, 4), "breakeven_wr": round(breakeven_wr, 4),
+        "n": len(rows), "hit": hit, "rr": round(rr, 3),
+        "move_pct": round(win_move_pct, 3),
+        "text": (f"ceiling {reach:.0%} · breakeven needs {breakeven_wr:.0%} "
+                 f"({hit}/{len(rows)} fills ever reached {win_move_pct:.2f}%)"),
+    }
 
 
 if __name__ == "__main__":

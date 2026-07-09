@@ -349,12 +349,20 @@ area" project.
    families (`TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
    `CAPITULATION_FADE_SHORT_v3`) stay shadow-registered until they hold on fresh
    data; ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
-3. **Reconcile the two goals** (you, one decision). `lens_config` = €55k by
-   Dec 2026; `goal_plan` v1 = 50 BTC by Dec 2028. `rr_ratio` is now **3.0** —
-   the old plan said 2.4, the Goal Ladder's Plan pin assumes 3.0. Three numbers,
-   three sources. Settle which target is live, then make the app say one thing.
-4. **Next dimension:** exit-mechanics sims (trailing / BE-move). Macro feeds /
-   order-flow (CVD, delta, funding, OI) still need a data source first.
+3. **Retire the dead engine target** (you, one number). Settled 2026-07-09: the
+   live goal is **50 BTC by 2028-12-31** (`goal_plan` v1). That is not in conflict
+   with `lens_config` — they are the two levels the design separated on purpose:
+   `goal_plan` tracks the total BTC stack, `lens_config.target_balance` tracks
+   engine equity, and `rr_ratio` already reads 3.0 in both. What *is* stale is the
+   engine target itself: `start_balance €73` → `target_balance €55,000` by
+   `2026-12-31`, off a live balance of ~€758. It feeds the /edge Fit sweep and
+   `compute_goal`, so every feasibility verdict is measured against a number
+   nobody ratified. Pick an engine-equity target and date, or delete the goal.
+4. **Next dimension:** macro feeds / order-flow (CVD, delta, funding, OI) — needs
+   a data source first. ~~Exit-mechanics sims (trailing / BE-move)~~ **retired
+   2026-07-09:** capture on winners is 85% and 84.5% of trades never reach the
+   1.5% TP. Nothing is being given back at the exit; the moves aren't there. Exit
+   sims would tune a stage that isn't leaking. See the Excursions panel.
 
 ## Status / honesty
 

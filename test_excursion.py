@@ -75,4 +75,39 @@ fake = [
 s = ex.summary(fake)
 assert s["median_capture_on_winners"] == 0.9, "losers must not drag capture negative"
 
-print("ok — 15 checks passed")
+# The panel grades against the LIVE geometry, never a stale literal.
+from app.setups import SL_PCT, TP_PCT
+assert (s["tp_pct"], s["sl_pct"]) == (TP_PCT, SL_PCT), "summary must track setups' geometry"
+
+
+# reachability: a win-rate CEILING held against the fee-adjusted breakeven WR.
+# rr = 1.5/0.63 = 2.381 -> breakeven = 1.112/3.381 = 32.9%.
+def _rows(hits, n=100, move=2.0):
+    """n rows, `hits` of which ran >= 2.0% in favour (so >= any tp we test)."""
+    return [{"mfe_pct": move if i < hits else 0.1, "mae_pct": 0.5,
+             "realized_pct": 0.0, "capture": None, "pnl": 0, "resolution": "5m"}
+            for i in range(n)]
+
+
+starved = ex.reachability(1.5, 0.63, rows=_rows(10))    # ceiling 10% vs 32.9%
+assert starved["badge"] == "STARVED", starved
+assert starved["hit"] == 10 and starved["n"] == 100, starved
+assert abs(starved["breakeven_wr"] - 0.3289) < 1e-3, starved
+
+tight = ex.reachability(1.5, 0.63, rows=_rows(40))      # 40% -> ratio 1.22
+assert tight["badge"] == "TIGHT", tight
+
+offered = ex.reachability(1.5, 0.63, rows=_rows(60))    # 60% -> ratio 1.82
+assert offered["badge"] == "OFFERED", offered
+
+# A wider TP lowers the breakeven bar but drops the ceiling faster — that trade-off
+# is the whole finding, so pin it: same book, same stop, strictly worse ratio.
+assert (ex.reachability(3.0, 0.63, rows=_rows(40, move=2.0))["ratio"]
+        < tight["ratio"]), "a target past every MFE cannot improve the ratio"
+
+# Guards: too few trades to measure, and degenerate geometry.
+assert ex.reachability(1.5, 0.63, rows=_rows(3, n=5)) is None, "min_n guard"
+assert ex.reachability(0, 0.63, rows=_rows(40)) is None
+assert ex.reachability(1.5, 0, rows=_rows(40)) is None
+
+print("ok — 25 checks passed")

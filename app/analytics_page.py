@@ -334,9 +334,19 @@ function renderSections(E,A,X){
       card('Median MAE',pct(X.median_mae_pct),'worst heat taken','var(--short)')+
       card('Capture on winners',X.median_capture_on_winners!=null?(100*X.median_capture_on_winners).toFixed(0)+'%':'—','of the best move banked','var(--long)')+
       card('MFE on losers',pct(X.median_mfe_on_losers_pct),'how far losers ran your way','var(--short)')+
-      card('Never reached TP',X.pct_never_reached_tp+'%','of all trades, vs 0.95% target','var(--short)')+
+      card('Never reached TP',X.pct_never_reached_tp+'%','of all trades, vs '+X.tp_pct+'% target','var(--short)')+
       card('Losers that touched TP',X.pct_losers_that_touched_tp+'%','giveback rate','var(--dim)')+
       `</div>`+
+      (X.reach?`<p class="s" style="margin-top:10px;line-height:1.5">`+
+        `<b style="color:${X.reach.badge==='STARVED'?'var(--short)':'var(--long)'}">`+
+        `${X.reach.badge} — win-rate ceiling ${(100*X.reach.reach).toFixed(0)}% `+
+        `vs ${(100*X.reach.breakeven_wr).toFixed(0)}% needed to break even</b><br>`+
+        `<span style="color:var(--dim)">At the live ${X.tp_pct}% TP / ${X.sl_pct}% SL `+
+        `(${X.reach.rr}R), only ${X.reach.hit} of ${X.reach.n} fills ever travelled far `+
+        `enough to win — and that ignores whether the stop was hit first, so the true `+
+        `ceiling is lower. Fees push breakeven to ${(100*X.reach.breakeven_wr).toFixed(0)}%. `+
+        `A ceiling under the breakeven line means no amount of entry skill makes this `+
+        `geometry pay.</span></p>`:'')+
       `<p class="s" style="margin-top:10px;color:var(--dim);line-height:1.5">`+
       `<b style="color:${exCol}">${X.verdict}</b><br>`+
       `Capture is the fraction of the best available move banked on trades that worked; `+
