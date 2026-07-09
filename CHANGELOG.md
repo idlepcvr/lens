@@ -8,6 +8,18 @@ detail is in `git log`.
 
 ## 2026-07-09
 
+**G3 · The signal loop is instrumented.** Exchange fills now claim the nearest
+approved, unclaimed signal whose decision precedes them (`_link_signal`, both
+sync paths). One signal → one trade, so a split order's second fill can't take
+credit twice; a hand-logged link is never re-pointed.
+⚠️ The spec's 1% entry box was wrong — trade 550 sits **1.12%** off its signal's
+quoted price, and symbol equality matches *nothing* (trades carry `BTC/USD:USD`,
+signals `BTCUSDT.P`). Tolerance is 2.5%, symbol is deliberately unmatched.
+⚠️ Backfill made **1** link: coverage is 2 → **3 of 499**. G3's ≥90% target is
+not reachable by backfill and never was — the ledger is full of trades taken
+*outside* the loop. Only forward flow can move that number, which makes coverage
+a usage metric, not a code one.
+
 **The Goal Ladder is finished.** The whole NEXT_SESSION build, phases C1 → C6,
 in the ratified order. The plan is now caged: it can only change through a
 versioned amendment with a reason, and everything else derives from it.
