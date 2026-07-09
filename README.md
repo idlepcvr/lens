@@ -9,18 +9,26 @@ thinking/measuring tool. You place the trades on Kraken yourself.
 
 ![Home — pick a machine](docs/home.png)
 
-## At a glance (2026-07-02)
+## At a glance (2026-07-09)
 
 | Piece | State |
 |---|---|
 | **The loop** (scan → alert → decide → trade → sync → tag) | ✅ live — 4 crons firing, phone buttons work |
-| PROP track (eval cockpit, 6 engine pages + live desk/signals/ledger) | ✅ built · eval **not yet bought** |
+| PROP track (eval cockpit, 6 engine pages + live desk/signals/ledger) | ✅ built · **5k eval ran 22–27 Jun and failed** (7 trades, −€150.55, 5 of 7 in VETO contexts) · archived `prop_arch_20260630_175919` |
+| Aug 200k eval | ⛔ **no-go, 2026-07-09** — barrier MC (`eval_mc.py`) puts the pass rate at 1.5% on the measured edge |
 | HEDGE track (S1–S5 edge, desk/signals/journal/position) | ✅ built |
 | Data layer (fills, balances, leverage, equity curve) | ✅ fixed 2026-07-02 — full account-log history, 0 NULL balances |
+| Goal Ladder (locked plan · milestones · cone · realism badge) | ✅ 2026-07-09 · ⛔ **blocked on a stack snapshot** — milestone dates and the stack projection can't derive without one |
 | Design system (`theme.py`, one CSS, branded 404) | ✅ done |
-| Signals / trades through the loop since go-live | 21 signals · **2 of 13 trades via the loop; 11 bypassed it (9 in VETO contexts) ← the actual bottleneck** |
+| Signals / trades through the loop since go-live | 51 signals (22 approved) · **3 of 499 trades carry a signal link** — auto-linking landed 2026-07-09 (G3), so the number can only climb on *new* trades. ← still the actual bottleneck |
 | Strategy audit (geometry + mining, full history) | ✅ 2026-07-02 — `strategies/_research/STRATEGY_AUDIT_20260702.md` |
 | v4 re-mine | ⏳ blocked on ~3 months of tagged live trades |
+
+> ⚠️ **The app is carrying two goals that disagree.** `lens_config` targets
+> **€55,000 by 2026-12-31** (the legacy 4H/4R track); `goal_plan` v1 targets
+> **50 BTC by 2028-12-31** (ratified 2026-07-06). Both render on `/goal` at once —
+> the hero paces to the first, the milestone ladder to the second. The Dec-2026
+> target is what produces the *"Annual +101,109,671%"* row. Pick one.
 
 Build history: `CHANGELOG.md` · roadmap: `LENS_PLAN.md` · commit detail: `git log`.
 
@@ -328,17 +336,23 @@ area" project.
 
 ## Next
 
-1. **Actually run the loop.** Still the real bottleneck, not code. Signals
-   sitting at ~21, trades still not being taken through it — the build is way
-   ahead of the usage. Before ANY new surface area: take the next valid S1–S5
-   alert on Kraken, let it auto-tag on sync, accumulate tagged live trades toward
-   the v4 re-mine (~3 months needed).
+0. **Log a stack snapshot on `/goal`** (you, two minutes). Milestone dates and
+   the stack projection derive from nothing until this exists. Blocks the whole
+   Goal Ladder.
+1. **Actually run the loop.** Still the real bottleneck, not code. 51 signals
+   logged, 3 of 499 trades carry a signal link — the build is way ahead of the
+   usage. Before ANY new surface area: take the next valid S1–S5 alert on Kraken,
+   let it auto-tag on sync, accumulate tagged live trades toward the v4 re-mine
+   (~3 months needed). G3's ≥90% link-coverage target only applies to trades
+   taken *from now on*; backfill can't reach it, and no amount of code can.
 2. **Forward-test before any promotion** (~early Aug 2026) — the three v3 search
    families (`TREND_MOMO_VOLSPIKE_v3` / `DIP_BB_MASTACK_v3` /
    `CAPITULATION_FADE_SHORT_v3`) stay shadow-registered until they hold on fresh
    data; ASIAN_RSI_DIP_v1 @ 0.5% on demo before paying the €20.
-3. **One dashboard click (you):** Parameters → `rr_ratio` (still 4.0 in config;
-   plan said → 2.4) — decide and click, watch `/audit` flip the row.
+3. **Reconcile the two goals** (you, one decision). `lens_config` = €55k by
+   Dec 2026; `goal_plan` v1 = 50 BTC by Dec 2028. `rr_ratio` is now **3.0** —
+   the old plan said 2.4, the Goal Ladder's Plan pin assumes 3.0. Three numbers,
+   three sources. Settle which target is live, then make the app say one thing.
 4. **Next dimension:** exit-mechanics sims (trailing / BE-move). Macro feeds /
    order-flow (CVD, delta, funding, OI) still need a data source first.
 
