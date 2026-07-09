@@ -81,6 +81,27 @@ CSS = r"""<style>
 .st .pos{color:var(--gr)}.st .neg{color:var(--re)}.st .warn{color:var(--am)}
 .st .cur{font-weight:800}
 .st-note{font-size:10px;color:var(--t3);margin-top:7px;line-height:1.4}
+/* plan panel — locked plan, amendment log, milestone ladder, stack snapshot */
+.plan-line{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-bottom:10px}
+.plan-line b{color:var(--am)}
+.mrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;font-size:11.5px;padding:2.5px 0}
+.mrow .mb{font-family:var(--mono);color:var(--t1);min-width:44px}
+.mrow .ml{color:var(--t2)}
+.mrow .md{font-family:var(--mono);font-size:10.5px;color:var(--t3)}
+.mrow.done .mb,.mrow.done .ml{color:var(--gr)}
+.mrow.next{background:var(--s2);border-radius:5px;padding:4px 6px;margin:1px -6px}
+.mrow.next .ml{color:var(--t1);font-weight:600}
+.stale{color:var(--am);font-size:10.5px;margin-top:8px}
+.amend{border-top:1px solid var(--b1);margin-top:12px;padding-top:11px;display:none}
+.amend.open{display:block}
+.amend input,.amend textarea{width:100%;box-sizing:border-box;background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;margin-bottom:6px}
+.amend textarea{font-family:inherit;resize:vertical;min-height:52px}
+.amend .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:var(--t3);margin-bottom:3px}
+.snapf{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:10px}
+.snapf input{background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:5px 8px;border-radius:5px;font-family:var(--mono);font-size:11.5px;min-width:0}
+.msrc{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:0 3px;border-radius:3px}
+.msrc.typed{color:var(--t3);border:1px solid var(--b2)}
+.msrc.measured{color:var(--gr);border:1px solid var(--gr)}
 """ + HERO_CSS + r"""</style>"""
 
 BODY = r"""
@@ -106,10 +127,15 @@ BODY = r"""
           <div class="frow frow-date"><label>Target date</label><input type="date" name="target_date"></div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Trading</div>
-          <div class="frow"><label>Win rate (0–1)</label><input type="text" inputmode="decimal" name="win_rate"></div>
-          <div class="frow"><label>R:R ratio</label><input type="text" inputmode="decimal" name="rr_ratio"></div>
+          <div class="frow"><label>Win rate (0–1) <span class="msrc typed" id="src-win_rate">typed</span></label><input type="text" inputmode="decimal" name="win_rate"></div>
+          <div class="frow"><label>R:R ratio <span class="msrc typed" id="src-rr_ratio">typed</span></label><input type="text" inputmode="decimal" name="rr_ratio"></div>
           <div class="frow"><label>Leverage</label><input type="text" inputmode="decimal" name="leverage"></div>
-          <div class="frow"><label>Trades / week</label><input type="text" inputmode="decimal" name="trades_per_week"></div>
+          <div class="frow"><label>Trades / week <span class="msrc typed" id="src-trades_per_week">typed</span></label><input type="text" inputmode="decimal" name="trades_per_week"></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:7px">
+            <button type="button" class="btn" id="measured-btn" disabled>Use measured</button>
+            <button type="button" class="btn" id="measured-win" title="window">all</button>
+          </div>
+          <div class="calc-tip" id="measured-note" style="margin-top:5px">—</div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Risk</div>
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
@@ -136,6 +162,35 @@ BODY = r"""
 
   <div class="metrics">
 """ + HERO_HTML + r"""
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">The plan <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0"><a href="#" id="amend-toggle" style="color:var(--t3)">amend</a></span></div>
+        <div class="plan-line" id="plan-line">—</div>
+        <div class="kv" id="plan-kv"></div>
+        <div class="amend" id="amend-box">
+          <div class="lbl">Goal BTC / date</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <input type="text" inputmode="decimal" id="am-goal-btc">
+            <input type="date" id="am-goal-date">
+          </div>
+          <div class="lbl">Monthly burn €</div>
+          <input type="text" inputmode="decimal" id="am-burn">
+          <div class="lbl">Reason (min 20 chars — this is the cage)</div>
+          <textarea id="am-reason" placeholder="Why does the plan change? Recorded forever."></textarea>
+          <button type="button" class="btn p" id="am-save">Amend plan</button>
+          <span class="calc-tip" id="am-msg"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Milestone ladder <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0;color:var(--t3)" id="stack-now">—</span></div>
+        <div id="ladder"></div>
+        <div class="stale" id="stack-stale" style="display:none"></div>
+        <div class="snapf">
+          <input type="date" id="sn-date"><input type="text" inputmode="decimal" id="sn-btc" placeholder="BTC total">
+          <button type="button" class="btn" id="sn-save">Log</button>
+        </div>
+      </div>
+    </div>
     <div class="grid2">
       <div class="card"><div class="card-title">Required growth to hit goal</div><div class="kv" id="r-growth"></div></div>
       <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
@@ -317,6 +372,83 @@ document.querySelectorAll('#goal-form input:not([type=date])').forEach(function(
   inp.addEventListener('blur',tryCalc);
   inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ tryCalc(); e.preventDefault(); } });
 });
+
+// ── Plan panel: locked plan + amendment log + milestone ladder + stack snapshot ──
+const fmtD=s=>s?new Date(s).toLocaleDateString("en-GB",{month:"short",year:"numeric"}):"—";
+let LADDER=null;
+function renderLadder(L){
+  LADDER=L; const p=L.plan;
+  document.getElementById("plan-line").innerHTML=
+    `<b>v${p.version}</b> · amended ${L.amendments} time${L.amendments===1?"":"s"} · last: ${L.last_reason||"—"}`;
+  document.getElementById("plan-kv").innerHTML=
+      row("Goal",`${p.goal_btc} BTC by ${p.goal_date}`)
+    + row("North star",`${p.north_star_btc} BTC by ${p.north_star_date}`,"dim")
+    + row("Monthly burn",fmtEur(p.burn_monthly_eur))
+    + row("Price scenarios",`${p.price_scenarios.bear}% / +${p.price_scenarios.base}% / +${p.price_scenarios.bull}% p.a.`,"dim");
+  document.getElementById("am-goal-btc").value=p.goal_btc;
+  document.getElementById("am-goal-date").value=p.goal_date;
+  document.getElementById("am-burn").value=p.burn_monthly_eur;
+
+  const nextIdx=L.milestones.findIndex(m=>!m.done);
+  document.getElementById("ladder").innerHTML=L.milestones.map((m,i)=>
+    `<div class="mrow ${m.done?"done":""} ${i===nextIdx?"next":""}"><span class="mb">${m.done?"✓ ":""}${m.btc} ₿</span>`
+    +`<span class="ml">${m.label}</span><span class="md">${m.date?fmtD(m.date):(m.done?"reached":"—")}</span></div>`).join("");
+  document.getElementById("stack-now").textContent=L.stack?`${L.stack.btc_total} ₿ @ ${L.stack.date}`:"no snapshot";
+  const st=document.getElementById("stack-stale");
+  if(L.stack_stale){ st.style.display="block";
+    st.textContent=L.stack?`⚠ stack snapshot is ${L.stack_age_days} days old — log this month's total.`
+                          :"⚠ no stack snapshot — milestone dates need one to be derived."; }
+  else st.style.display="none";
+}
+async function loadLadder(){ renderLadder(await fetch("/api/plan").then(r=>r.json())); }
+document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); document.getElementById("amend-box").classList.toggle("open"); });
+document.getElementById("am-save").addEventListener("click",async()=>{
+  const msg=document.getElementById("am-msg");
+  const body={reason:document.getElementById("am-reason").value,
+              goal_btc:Number(document.getElementById("am-goal-btc").value),
+              goal_date:document.getElementById("am-goal-date").value,
+              burn_monthly_eur:Number(document.getElementById("am-burn").value)};
+  const r=await fetch("/api/plan/amend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok){ msg.textContent=typeof d.detail==="string"?d.detail:"failed"; msg.style.color="var(--re)"; return; }
+  msg.textContent="amended ✓"; msg.style.color="var(--gr)";
+  document.getElementById("am-reason").value="";
+  renderLadder(d); document.getElementById("amend-box").classList.remove("open");
+});
+document.getElementById("sn-save").addEventListener("click",async()=>{
+  const d=document.getElementById("sn-date").value, b=Number(document.getElementById("sn-btc").value);
+  if(!d||!Number.isFinite(b)||b<=0) return;
+  renderLadder(await fetch("/api/stack",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({date:d,btc_total:b})}).then(r=>r.json()));
+  document.getElementById("sn-btc").value="";
+});
+document.getElementById("sn-date").value=new Date().toISOString().slice(0,10);
+
+// ── "Use measured": the ledger's own WR / R / frequency, never silently mixed with typed ──
+let MEAS=null, MEAS_DAYS=null;
+function markSrc(measured){ ["win_rate","rr_ratio","trades_per_week"].forEach(k=>{
+  const el=document.getElementById("src-"+k); el.textContent=measured?"measured":"typed";
+  el.className="msrc "+(measured?"measured":"typed"); }); }
+async function loadMeasured(){
+  MEAS=await fetch("/api/goal/measured"+(MEAS_DAYS?"?days="+MEAS_DAYS:"")).then(r=>r.json());
+  const btn=document.getElementById("measured-btn"), note=document.getElementById("measured-note");
+  const ok=MEAS.n&&MEAS.enough&&MEAS.rr_ratio!=null;
+  btn.disabled=!ok;
+  note.innerHTML=!MEAS.n ? "no closed trades"
+    : ok ? `n=${MEAS.n} · WR ${(MEAS.win_rate*100).toFixed(1)}% · R ${MEAS.rr_ratio} · ${MEAS.trades_per_week}/wk · fees ${MEAS.fee_r}R/trade`
+         : `n=${MEAS.n}, need ${MEAS.min_n}+`;
+}
+document.getElementById("measured-win").addEventListener("click",async e=>{
+  MEAS_DAYS=MEAS_DAYS?null:90; e.target.textContent=MEAS_DAYS?"90d":"all"; await loadMeasured(); });
+document.getElementById("measured-btn").addEventListener("click",()=>{
+  if(!MEAS||!MEAS.enough) return;
+  FORM.elements.win_rate.value=MEAS.win_rate;
+  FORM.elements.rr_ratio.value=MEAS.rr_ratio;
+  FORM.elements.trades_per_week.value=MEAS.trades_per_week;
+  markSrc(true); recompute();
+});
+FORM.addEventListener("input",()=>markSrc(false));
+loadLadder(); loadMeasured();
 
 // Target BTC helper — type a BTC count → fills Target € at TODAY's price (price cancels).
 const TBTC=document.getElementById("target_btc");

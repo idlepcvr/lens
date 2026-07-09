@@ -177,6 +177,32 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_proj_actuals_plan ON projection_actuals(plan_id);
 
+        -- Goal ladder: append-only plan versions + manual total-stack snapshots.
+        -- Never UPDATE or DELETE a goal_plan row; amend = insert a new version.
+        CREATE TABLE IF NOT EXISTS goal_plan (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            version           INTEGER NOT NULL,
+            created_at        TEXT    NOT NULL,
+            north_star_btc    REAL    NOT NULL,
+            north_star_date   TEXT    NOT NULL,
+            goal_btc          REAL    NOT NULL,
+            goal_date         TEXT    NOT NULL,
+            milestones        TEXT    NOT NULL,   -- JSON [{btc,label}]
+            price_scenarios   TEXT    NOT NULL,   -- JSON {bear,base,bull} annual %
+            burn_monthly_eur  REAL    NOT NULL,
+            amendment_reason  TEXT,
+            active            INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS stack_snapshot (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            date        TEXT    NOT NULL,
+            btc_total   REAL    NOT NULL,
+            note        TEXT,
+            created_at  TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_stack_date ON stack_snapshot(date);
+
         -- Single-row config (id=1) — drives goal/position calculator defaults
         CREATE TABLE IF NOT EXISTS lens_config (
             id                      INTEGER PRIMARY KEY,

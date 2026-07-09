@@ -988,6 +988,55 @@ def audit_report():
     return FileResponse(path, media_type="text/html")
 
 
+# ─── Goal ladder: locked plan + amendment log + stack snapshots ──────────────
+
+class PlanAmend(BaseModel):
+    reason:            str
+    north_star_btc:    Optional[float] = None
+    north_star_date:   Optional[str] = None
+    goal_btc:          Optional[float] = None
+    goal_date:         Optional[str] = None
+    milestones:        Optional[list] = None
+    price_scenarios:   Optional[dict] = None
+    burn_monthly_eur:  Optional[float] = None
+
+
+class StackSnapshot(BaseModel):
+    date:       str
+    btc_total:  float
+    note:       Optional[str] = None
+
+
+@app.get("/api/plan")
+def api_plan():
+    from . import plan
+    return plan.ladder()
+
+
+@app.post("/api/plan/amend")
+def api_plan_amend(req: PlanAmend):
+    from . import plan
+    changes = {k: v for k, v in req.model_dump(exclude={"reason"}).items() if v is not None}
+    try:
+        plan.amend(changes, req.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return plan.ladder()
+
+
+@app.post("/api/stack")
+def api_stack_snapshot(req: StackSnapshot):
+    from . import plan
+    plan.add_snapshot(req.date, req.btc_total, req.note)
+    return plan.ladder()
+
+
+@app.get("/api/goal/measured")
+def api_goal_measured(days: Optional[int] = Query(None, description="window; omit = all time")):
+    from . import plan
+    return plan.measured(days)
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()
