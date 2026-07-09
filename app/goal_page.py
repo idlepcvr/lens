@@ -102,6 +102,19 @@ CSS = r"""<style>
 .msrc{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:0 3px;border-radius:3px}
 .msrc.typed{color:var(--t3);border:1px solid var(--b2)}
 .msrc.measured{color:var(--gr);border:1px solid var(--gr)}
+/* scenario ladder — WR × R, monthly % big / EV small, breakeven frontier drawn */
+.slwrap{overflow-x:auto}
+.slad{border-collapse:collapse;font-family:var(--mono)}
+.slad th{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);padding:4px 6px;text-align:center}
+.slad th.rh{text-align:right}
+.slad td{width:66px;height:40px;text-align:center;border:1px solid var(--b1);position:relative}
+.slad td .m{font-size:12.5px;font-weight:700;color:var(--t1);line-height:1.1}
+.slad td .e{font-size:8.5px;color:var(--t3)}
+/* the frontier: the last profitable row in each column — its bottom edge IS breakeven WR */
+.slad td.fr{border-bottom:2px solid var(--am)}
+.slpin{position:absolute;top:1px;right:1px;font-size:7.5px;font-weight:900;letter-spacing:.04em;padding:0 2px;border-radius:2px;color:#0b0f15}
+.slpin.meas{background:var(--gr)}
+.slpin.plan{background:var(--am);top:1px;right:auto;left:1px}
 """ + HERO_CSS + r"""</style>"""
 
 BODY = r"""
@@ -211,6 +224,11 @@ BODY = r"""
       <div class="card"><div class="card-title">R-target scenarios</div><div class="st" id="r-rtgt"></div>
         <div class="st-note">What each reward:risk target yields after fees (WR held). R is the lever you control — exit discipline. ← = your current R:R.</div></div>
     </div>
+    <div class="card">
+      <div class="card-title">Scenario ladder — win rate × realized R</div>
+      <div class="slwrap"><table class="slad" id="sladder"></table></div>
+      <div class="st-note" id="slad-note"></div>
+    </div>
     <div id="err" class="err hide"></div>
   </div>
 </div>
@@ -304,7 +322,64 @@ function render(g){
       +`</div></div>`;
   }
   document.getElementById("r-mc").innerHTML=mc;
+  LAST_G=g; renderScenarioLadder(g);
   ERR.classList.add("hide");
+}
+
+// ── Scenario ladder — the 2-D sibling of the sensitivity tables ──────────────
+// Cell EV is in R units: WR×(1+R) − 1 − feeR. Monthly % = (1 + risk×EV)^tpm − 1.
+// Breakeven WR = (1+feeR)/(1+R) — drawn as the boundary between red and green.
+let LAST_G=null;
+const SL_WRS=[0.25,0.30,0.35,0.40,0.45,0.50,0.55];
+const SL_RS=[1,1.5,2,2.5,3,3.5,4];
+function nearestIdx(arr,v){ if(v==null||!isFinite(v))return -1;
+  if(v<arr[0]-1e-9||v>arr[arr.length-1]+1e-9) return -1;   // off-grid: don't pretend
+  let bi=0; arr.forEach((x,i)=>{ if(Math.abs(x-v)<Math.abs(arr[bi]-v)) bi=i; }); return bi; }
+function renderScenarioLadder(g){
+  const T=document.getElementById("sladder"), NOTE=document.getElementById("slad-note");
+  if(!T||!g) return;
+  const riskPct=g.risk_per_trade;
+  if(!(riskPct>0)){ T.innerHTML=""; NOTE.textContent="Needs a positive risk/trade to scale."; return; }
+  const feeR=(g.friction_pct*g.leverage)/riskPct;   // per-trade friction, in units of one R
+  const risk=riskPct/100;
+  const tpw=Number(FORM.elements.trades_per_week.value)||0, tpm=tpw*52/12;
+  const monthly=(wr,R)=>{ const ev=wr*(1+R)-1-feeR; const base=1+risk*ev;
+    return {ev, m: base<=0 ? -1 : Math.pow(base,tpm)-1}; };
+
+  const mi=[nearestIdx(SL_WRS, MEAS&&MEAS.enough?MEAS.win_rate:null),
+            nearestIdx(SL_RS,  MEAS&&MEAS.enough?MEAS.rr_ratio:null)];
+  const pi=[nearestIdx(SL_WRS, Number(FORM.elements.win_rate.value)),
+            nearestIdx(SL_RS,  Number(FORM.elements.rr_ratio.value))];
+
+  let h='<thead><tr><th class="rh">WR ╲ R</th>'+SL_RS.map(r=>`<th>${r.toFixed(1)}R</th>`).join("")+"</tr></thead><tbody>";
+  SL_WRS.forEach((wr,i)=>{
+    h+=`<tr><th class="rh">${(wr*100).toFixed(0)}%</th>`;
+    SL_RS.forEach((R,j)=>{
+      const {ev,m}=monthly(wr,R);
+      const be=(1+feeR)/(1+R);                                  // breakeven WR for this column
+      const below=SL_WRS[i-1];                                  // the row under this one
+      const frontier = wr>=be && (i===0 || below<be) ? " fr" : "";
+      const t=Math.max(-1,Math.min(1,m/0.20));                  // ±20%/mo saturates the colour
+      const bg=`hsla(${t>=0?150:5},72%,45%,${(0.08+0.45*Math.abs(t)).toFixed(3)})`;
+      const pins=(i===mi[0]&&j===mi[1]?'<span class="slpin meas">M</span>':"")
+                +(i===pi[0]&&j===pi[1]?'<span class="slpin plan">P</span>':"");
+      h+=`<td class="${frontier.trim()}" style="background:${bg}" title="WR ${(wr*100).toFixed(0)}% · ${R}R → EV ${ev.toFixed(3)}R/trade, ${(m*100).toFixed(1)}%/mo at ${riskPct.toFixed(2)}% risk × ${tpm.toFixed(1)} trades/mo">`
+        +`${pins}<div class="m">${m<=-1?"−100%":(m>=0?"+":"")+(m*100).toFixed(1)+"%"}</div><div class="e">${ev>=0?"+":""}${ev.toFixed(2)}R</div></td>`;
+    });
+    h+="</tr>";
+  });
+  T.innerHTML=h+"</tbody>";
+
+  const off=x=>x<0?" <b style='color:var(--am)'>off-grid</b>":"";
+  const measTxt = (MEAS&&MEAS.enough)
+    ? `<span class="msrc measured">M</span> measured: WR ${(MEAS.win_rate*100).toFixed(1)}% · R ${MEAS.rr_ratio} (n=${MEAS.n})${off(mi[0])}${off(mi[1])}`
+    : `<span class="msrc measured">M</span> measured: ${MEAS&&MEAS.n?`n=${MEAS.n}, need ${MEAS.min_n}+`:"no closed trades"}`;
+  NOTE.innerHTML=
+    `Monthly % big, EV small — at ${riskPct.toFixed(2)}% risk/trade, ${tpm.toFixed(1)} trades/mo, fee drag ${feeR.toFixed(3)}R/trade. `
+    +`The <b style="color:var(--am)">amber line</b> is the breakeven frontier: below it no R saves you.<br>`
+    +`${measTxt} &nbsp;·&nbsp; <span class="msrc typed" style="border-color:var(--am);color:var(--am)">P</span> plan: `
+    +`WR ${(Number(FORM.elements.win_rate.value)*100).toFixed(1)}% · R ${Number(FORM.elements.rr_ratio.value).toFixed(2)}${off(pi[0])}${off(pi[1])}. `
+    +`The gap between the two pins is the distance between what you claim and what you've shown.`;
 }
 
 async function recompute(){
@@ -437,6 +512,7 @@ async function loadMeasured(){
   note.innerHTML=!MEAS.n ? "no closed trades"
     : ok ? `n=${MEAS.n} · WR ${(MEAS.win_rate*100).toFixed(1)}% · R ${MEAS.rr_ratio} · ${MEAS.trades_per_week}/wk · fees ${MEAS.fee_r}R/trade`
          : `n=${MEAS.n}, need ${MEAS.min_n}+`;
+  if(LAST_G) renderScenarioLadder(LAST_G);   // the M pin lands once the ledger has spoken
 }
 document.getElementById("measured-win").addEventListener("click",async e=>{
   MEAS_DAYS=MEAS_DAYS?null:90; e.target.textContent=MEAS_DAYS?"90d":"all"; await loadMeasured(); });
