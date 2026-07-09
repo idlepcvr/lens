@@ -521,6 +521,67 @@ def delete_trade(trade_id: int) -> bool:
     return cur.rowcount > 0
 
 
+# Signal→fill linkage. Ground truth from the two rows linked by hand:
+# the fill lands 15s–10min after decided_at, and its entry sits up to 1.12% off
+# the signal's quoted price (different venues quote different books). So the key
+# is decision-precedes-fill + direction; entry is only a sanity guard, wide
+# enough to admit that 1.12% and tight enough to reject a cross-symbol signal
+# quoting a 24%-away price.
+# ponytail: symbol is deliberately NOT matched — trades carry BTC/USD:USD and
+# signals carry BTCUSDT.P for the same instrument. LENS is BTC-only; add a
+# symbol predicate the day a second instrument exists, not before.
+_SIGNAL_WINDOW_DAYS = 0.25    # 6h: a decision older than this didn't cause this fill
+_SIGNAL_ENTRY_TOL   = 0.025   # 2.5%
+
+
+def _link_signal(c, trade_id: int, direction: str, entry: float, opened_at: str) -> Optional[str]:
+    """Claim the nearest approved, unclaimed signal whose decision precedes this
+    fill. One signal → one trade: the claim is guarded by linked_trade_id IS NULL
+    so two fills of a split order can't both take credit for the same signal.
+    Returns the signal_id claimed, or None. Never raises — a missed link must
+    not fail a sync."""
+    if not (direction and entry and opened_at):
+        return None
+    # a hand-logged link is truth; never re-point it or burn a signal on it
+    cur = c.execute("SELECT linked_signal_id FROM trades WHERE id = ?", (trade_id,)).fetchone()
+    if cur is None or cur["linked_signal_id"]:
+        return None
+    row = c.execute("""
+        SELECT signal_id FROM signals
+         WHERE status = 'approved' AND direction = ?
+           AND linked_trade_id IS NULL AND decided_at IS NOT NULL
+           AND julianday(?) >= julianday(decided_at)
+           AND julianday(?) - julianday(decided_at) <= ?
+           AND entry_price > 0 AND ABS(? - entry_price) / entry_price < ?
+      ORDER BY julianday(decided_at) DESC LIMIT 1
+    """, (direction, opened_at, opened_at, _SIGNAL_WINDOW_DAYS,
+          entry, _SIGNAL_ENTRY_TOL)).fetchone()
+    if not row:
+        return None
+    sid = row["signal_id"]
+    c.execute("UPDATE signals SET linked_trade_id = ? "
+              "WHERE signal_id = ? AND linked_trade_id IS NULL", (trade_id, sid))
+    c.execute("UPDATE trades SET linked_signal_id = ? "
+              "WHERE id = ? AND linked_signal_id IS NULL", (sid, trade_id))
+    return sid
+
+
+def backfill_signal_links() -> int:
+    """One-shot: link historical fills the same way sync now does. Oldest fill
+    first, so when two fills of one order contend for a signal the earlier one
+    claims it. Returns links made. Idempotent."""
+    c = _conn()
+    rows = c.execute(
+        "SELECT id, direction, entry, opened_at FROM trades "
+        "WHERE linked_signal_id IS NULL AND entry > 0 ORDER BY opened_at"
+    ).fetchall()
+    n = sum(bool(_link_signal(c, r["id"], r["direction"], r["entry"], r["opened_at"]))
+            for r in rows)
+    c.commit()
+    c.close()
+    return n
+
+
 def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
     """Used by kraken_sync + bybit_sync — dedups on kraken_order_id column
     (reused as a generic exchange_order_id for both venues)."""
@@ -597,6 +658,8 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
                 trade_dict.get("order_type"), trade_dict.get("funding_cost"),
                 trade_dict.get("fill_uuid"), trade_dict.get("fill_count"), twin["id"],
             ))
+            _link_signal(c, twin["id"], trade_dict["direction"],
+                         trade_dict["entry"], opened_iso)
             c.commit()
             row = c.execute("SELECT * FROM trades WHERE id = ?", (twin["id"],)).fetchone()
             c.close()
@@ -635,6 +698,8 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
         trade_dict.get("fill_uuid"),
         trade_dict.get("fill_count"),
     ))
+    _link_signal(c, cur.lastrowid, trade_dict["direction"], trade_dict["entry"],
+                 _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat())
     c.commit()
     row = c.execute("SELECT * FROM trades WHERE id = ?", (cur.lastrowid,)).fetchone()
     c.close()
