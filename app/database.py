@@ -194,6 +194,18 @@ def init_db():
             active            INTEGER NOT NULL DEFAULT 0
         );
 
+        -- Stage B: the Fit sweep's feasible envelope, handed to the /edge search.
+        -- One row per completed sweep; the search reads the newest and nudges for a
+        -- re-run past FIT_STALE_DAYS rather than silently filtering on old numbers.
+        CREATE TABLE IF NOT EXISTS fit_envelope (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at  TEXT    NOT NULL,
+            goal        TEXT    NOT NULL,   -- JSON goal-params snapshot
+            envelope    TEXT    NOT NULL,   -- JSON {axis: {min,max}} — {} when nothing was feasible
+            optimum     TEXT,               -- JSON the joint optimum (or nearest miss)
+            feasible_count INTEGER NOT NULL DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS stack_snapshot (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             date        TEXT    NOT NULL,

@@ -1491,6 +1491,12 @@ canvas{width:100%;height:200px;display:block}
       <button id="csweep-btn" onclick="runCustomSweep()" title="Re-run these exact entry conditions across the whole ATR-stop × R grid (the 7×7 matrix search v3 used) — a real edge is a green neighbourhood, not one lucky cell">⊞ Sweep k×R</button>
       <button id="pine-btn" onclick="exportPine()" title="Export these exact conditions as a TradingView Pine v5 strategy — paste into the Pine editor">⧉ Pine</button>
     </div>
+    <div class="row" style="margin-bottom:10px;gap:10px">
+      <label id="feas-lbl" style="font-size:11px;color:var(--t2);display:inline-flex;align-items:center;gap:6px;cursor:pointer"
+             title="Keep only the strategies whose win rate, R:R and cadence land inside the feasible envelope from the Fit sweep above.">
+        <input type="checkbox" id="feas-only" disabled> Feasible only</label>
+      <span id="feas-note" style="font-size:10px;color:var(--t3)">run the Fit sweep to get an envelope</span>
+    </div>
     <div id="search-prog" style="display:none;font-size:11px;color:var(--t2);margin-bottom:10px"></div>
     <div id="search-results" style="display:none;margin-bottom:12px"></div>
     <div style="font-size:10px;color:var(--t3)">Results render in the same scorecard below. Mined in-sample — a green result is a candidate to sweep &amp; forward-test, not a green light.</div>
@@ -1665,6 +1671,7 @@ function pollSearch() {{
       d.total.toLocaleString() + ' (' + pct + '%) · ' + d.found + ' results · showing top ' +
       Math.min(50, d.top.length);
     if (d.error) prog.textContent = '⚠ ' + d.error;
+    window._lastSearch = d;
     renderSearch(d);
     if (!d.running) {{
       clearInterval(_searchPoll); _searchPoll = null;
@@ -1674,32 +1681,96 @@ function pollSearch() {{
   }});
 }}
 
+// ── Stage B: the Fit envelope filters the real search ───────────────────────
+function envNote(env) {{
+  var lbl = document.getElementById('feas-note'), box = document.getElementById('feas-only');
+  if (!env) {{ box.disabled = true; box.checked = false;
+    lbl.textContent = 'run the Fit sweep to get an envelope'; return false; }}
+  if (env.stale) {{ box.disabled = true; box.checked = false;
+    lbl.innerHTML = '<span style="color:var(--amber)">envelope is ' + env.age_days +
+      ' days old — <a href="#fit">re-run Fit</a> before filtering on it</span>'; return false; }}
+  if (!env.usable) {{ box.disabled = true; box.checked = false;
+    lbl.innerHTML = '<span style="color:var(--short)">last sweep found <b>no feasible envelope</b> — ' +
+      'nothing to filter by. Push the date, cut the target, or loosen the risk caps.</span>'; return false; }}
+  var e = env.envelope;
+  var s = 'envelope: WR ' + (e.wr.min*100).toFixed(0) + '–' + (e.wr.max*100).toFixed(0) + '% · R ' +
+    e.rr.min.toFixed(1) + '–' + e.rr.max.toFixed(1) + ' · ' + e.freq.min + '–' + e.freq.max +
+    '/wk · ' + env.feasible_count.toLocaleString() + ' feasible cells · ' + env.age_days + 'd old';
+  if (!env.leverage_ok && e.lev)
+    s += ' — ⚠ every backtest runs at ' + env.search_leverage + '× leverage, outside the envelope\\'s ' +
+         e.lev.min + '–' + e.lev.max + '×';
+  box.disabled = false; lbl.textContent = s;
+  if (!env.leverage_ok) lbl.style.color = 'var(--amber)'; else lbl.style.color = 'var(--t3)';
+  return true;
+}}
+
+function fitCell(row) {{
+  if (!row.fit) return '<span style="color:var(--t3)">—</span>';
+  if (row.fit.fits) return '<span class="win" style="font-weight:700">FITS</span>';
+  var f = row.fit.fails[0];
+  return '<span style="color:var(--t3)" title="' +
+    row.fit.fails.map(function(x) {{ return x.axis + ': needs ' + x.needs + ', has ' + x.has; }}).join(' · ') +
+    '">' + f.axis + ' ' + f.needs + '</span>';
+}}
+
 function renderSearch(d) {{
   var res = document.getElementById('search-results');
+  var usable = envNote(d.env);
+  var feasOnly = usable && document.getElementById('feas-only').checked;
   if (!d.top.length) {{ return; }}
-  window._searchTop = d.top; window._searchMonths = d.months;
+  var rows = feasOnly ? d.top.filter(function(r) {{ return r.fit && r.fit.fits; }}) : d.top;
+
+  // the empty corridor — the most valuable state this page has, so say it plainly
+  if (feasOnly && !rows.length) {{
+    var near = d.top.slice().sort(function(a, b) {{
+      return ((a.fit&&a.fit.dist)||1e9) - ((b.fit&&b.fit.dist)||1e9); }})[0];
+    var miss = '';
+    if (near && near.fit) miss = ' Nearest miss: <b>' + near.desc + '</b> (fails on ' +
+      near.fit.fails.map(function(x) {{ return x.axis + ': needs ' + x.needs + ', has ' + x.has; }}).join('; ') + ').';
+    res.innerHTML = '<div style="border:1px solid var(--short);background:var(--short-d);color:var(--short);' +
+      'border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.55">' +
+      '<b>The corridor is empty</b> — nothing in the strategy library fits this envelope. ' +
+      'At these constraints the goal is not reachable with anything you can currently trade.' + miss +
+      '</div>';
+    res.style.display = ''; return;
+  }}
+
+  window._searchTop = rows; window._searchMonths = d.months;
   var weeks = (d.months || 30) * 4.345;
-  var h = '<div style="font-size:10px;color:var(--t3);margin:2px 0 8px">Ranked by <b>robust</b> (green = profitable in BOTH halves, n≥40 · 30mo split-half) then net %. Still in-sample — a survivor is a candidate to forward-test, not a green light. <b>Click a row</b> to load it into the builder above.</div>';
+  var h = '<div style="font-size:10px;color:var(--t3);margin:2px 0 8px">Ranked by <b>fit</b> (inside the envelope first), then <b>robust</b> (green = profitable in BOTH halves, n≥40 · 30mo split-half), then net %. Still in-sample — a survivor is a candidate to forward-test, not a green light. <b>Click a row</b> to load it into the builder above.' +
+    (usable ? ' <b>' + d.fits_count + '</b> of ' + d.found + ' land inside the envelope.' : '') + '</div>';
   h += '<div style="overflow-x:auto;max-height:420px;overflow-y:auto"><table><thead><tr>' +
-       '<th>#</th><th>strategy</th><th>tf</th><th>n</th><th>WR</th><th>PF</th><th>net%</th><th>maxDD</th><th>halves</th><th></th></tr></thead><tbody>';
-  d.top.forEach(function(row, i) {{
+       '<th>#</th><th>strategy</th><th>tf</th><th>n</th><th>/wk</th><th>WR</th><th>PF</th><th>net%</th><th>maxDD</th><th>halves</th><th>fit</th><th></th></tr></thead><tbody>';
+  rows.forEach(function(row, i) {{
     var cls = row.robust ? 'win' : '';
     h += '<tr style="cursor:pointer" onclick="fillFromParams(window._searchTop['+i+'].params)">' +
       '<td>' + (i+1) + '</td>' +
       '<td style="font-size:10px">' + row.desc + '</td>' +
       '<td>' + row.tf + '</td>' +
       '<td>' + row.n + '</td>' +
+      '<td>' + (row.freq != null ? row.freq : '—') + '</td>' +
       '<td>' + row.wr + '%</td>' +
       '<td>' + row.pf + '</td>' +
       '<td class="' + cls + '">' + (row.net_pct>=0?'+':'') + row.net_pct + '%</td>' +
       '<td>' + row.max_dd + '%</td>' +
       '<td style="font-size:10px">' + (row.half1>=0?'+':'') + row.half1 + ' / ' + (row.half2>=0?'+':'') + row.half2 + '</td>' +
+      '<td style="font-size:10px">' + fitCell(row) + '</td>' +
       '<td><a href="#" onclick="event.stopPropagation();toGoal(' + row.wr + ',' + row.rr + ',' + (row.n/weeks).toFixed(2) + ');return false" title="Send this strategy\\'s stats to the Goal model">→ Goal</a></td>' +
       '</tr>';
   }});
   h += '</tbody></table></div>';
   res.innerHTML = h; res.style.display = '';
 }}
+
+// re-filter without re-running the search
+document.addEventListener('DOMContentLoaded', function() {{
+  var box = document.getElementById('feas-only');
+  if (box) box.addEventListener('change', function() {{
+    if (window._lastSearch) renderSearch(window._lastSearch);
+  }});
+  fetch('/api/backtest/search/status').then(function(r) {{ return r.json(); }})
+    .then(function(d) {{ envNote(d.env); }}).catch(function() {{}});
+}});
 
 function toGoal(wrPct, rr, freq) {{
   var q = 'win_rate=' + (wrPct/100).toFixed(4) + '&rr_ratio=' + rr + '&trades_per_week=' + freq;
@@ -2112,6 +2183,14 @@ def api_fit_run(req: FitRequest):
 def api_fit_status():
     from app.fit_sweep import status
     return status()
+
+
+@app.get("/api/fit/envelope")
+def api_fit_envelope():
+    """The newest saved feasible envelope (Stage B) + its age. `null` before the
+    first sweep — the /edge search shows a 'run Fit first' nudge on that."""
+    from app.fit_sweep import latest_envelope
+    return latest_envelope()
 
 
 @app.post("/api/backtest/pine")

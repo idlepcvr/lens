@@ -140,6 +140,8 @@ def _worker(req: dict):
                                     "desc": f"{_describe(d, active, tf)} · {k:g}×ATR · {r:g}R · {risk:g}% risk",
                                     "params": p, "tf": tf, "direction": d,
                                     "k": float(k), "rr": float(r), "risk": float(risk),
+                                    # trades/week over the tested window — the envelope's cadence axis
+                                    "freq": round(int(ev["n"]) / (months * 4.345), 2),
                                     # cast off numpy scalars — json.dumps can't serialize them (the v2 gotcha)
                                     "n": int(ev["n"]), "wr": float(ev["wr"]), "pf": float(ev["pf"]),
                                     "net_pct": float(ev["net_pct"]), "max_dd": float(ev["max_dd"]),
@@ -174,9 +176,91 @@ def start(req: dict) -> dict:
     return {"started": True, "total_est": total}
 
 
+# ─── Stage B: score each result against the Fit envelope ─────────────────────
+#
+# Scored distance, not a hard box. "How close" is the useful information and a
+# hard box throws it away — a strategy failing win rate by 1 point is a different
+# animal from one failing by 15. Distance 0 on every axis = FITS.
+#
+# Only the axes the search actually varies are scored: win rate, R:R, cadence.
+# Every backtest runs at the fixed 5× leverage of strategy_search3.RISK, so a
+# leverage axis would pass or fail all 8,000 rows identically — that check belongs
+# at the page level, once, not per row (SEARCH_LEVERAGE below).
+SEARCH_LEVERAGE = RISK["leverage"]
+_AXES = (
+    #  key     envelope key   label            row value
+    ("wr",    "wr",   "win rate",     lambda r: r["wr"] / 100.0),
+    ("rr",    "rr",   "R:R",          lambda r: r["rr"]),
+    ("freq",  "freq", "trades/week",  lambda r: r.get("freq")),
+)
+
+
+def _span(lo: float, hi: float) -> float:
+    """Normalizer for one axis. A degenerate envelope (one feasible cell → lo==hi)
+    would divide by zero, so fall back to a tenth of the bound's magnitude."""
+    return (hi - lo) or max(abs(hi), 1e-6) * 0.1
+
+
+def _fmt(axis: str, v: float) -> str:
+    return f"{v*100:.0f}%" if axis == "wr" else f"{v:g}"
+
+
+def score_row(row: dict, env: dict) -> dict:
+    """Per-axis normalized distance outside the envelope; 0 = inside."""
+    dist, fails = 0.0, []
+    for key, ekey, label, get in _AXES:
+        v = get(row)
+        b = env.get(ekey)
+        if v is None or not b:
+            continue
+        lo, hi = b["min"], b["max"]
+        if v < lo:
+            d, need = (lo - v) / _span(lo, hi), f"≥ {_fmt(key, lo)}"
+        elif v > hi:
+            d, need = (v - hi) / _span(lo, hi), f"≤ {_fmt(key, hi)}"
+        else:
+            continue
+        dist += d
+        fails.append({"axis": label, "needs": need, "has": _fmt(key, v), "d": round(d, 3)})
+    return {"dist": round(dist, 3), "fits": not fails, "fails": fails}
+
+
+def annotate(rows: list, env_row: dict | None) -> list:
+    """Attach `fit` to every row. A stale or empty envelope annotates nothing —
+    filtering on numbers nobody re-derived is worse than not filtering."""
+    if not env_row or env_row["stale"] or not env_row["envelope"]:
+        return rows
+    for r in rows:
+        r["fit"] = score_row(r, env_row["envelope"])
+    return rows
+
+
 def status() -> dict:
+    from .fit_sweep import latest_envelope
+    env_row = latest_envelope()
     with _lock:
-        rows = sorted(_state["rows"], key=lambda x: (x["robust"], x["net_pct"]), reverse=True)[:50]
+        rows = list(_state["rows"])
+    annotate(rows, env_row)
+    usable = bool(env_row and not env_row["stale"] and env_row["envelope"])
+    # near-misses still rank, just lower: FITS first, then the usual robust/net sort
+    rows.sort(key=lambda x: ((x.get("fit") or {}).get("fits", False) if usable else False,
+                             x["robust"], x["net_pct"]), reverse=True)
+    top = rows[:50]
+    env_meta = None
+    if env_row:
+        lev = env_row["envelope"].get("lev")
+        env_meta = {
+            "created_at": env_row["created_at"], "age_days": env_row["age_days"],
+            "stale": env_row["stale"], "usable": usable,
+            "feasible_count": env_row["feasible_count"],
+            "envelope": env_row["envelope"],
+            # every backtest here runs at this leverage — one page-level check
+            "search_leverage": SEARCH_LEVERAGE,
+            "leverage_ok": (lev is None) or (lev["min"] <= SEARCH_LEVERAGE <= lev["max"]),
+        }
+    with _lock:
         return {"running": _state["running"], "done": _state["done"],
                 "total": _state["total"], "error": _state["error"],
-                "months": _state["months"], "found": len(_state["rows"]), "top": rows}
+                "months": _state["months"], "found": len(_state["rows"]),
+                "top": top, "env": env_meta,
+                "fits_count": sum(1 for r in rows if (r.get("fit") or {}).get("fits"))}

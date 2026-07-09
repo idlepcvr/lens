@@ -26,14 +26,16 @@ Runs in one background thread, polled by the page. Same start/status/lock
 single-flight shape as search_custom.py. Stage B (filtering the real strategy
 search by this envelope) is deliberately NOT here.
 """
+import json
 import threading
 import time
-from datetime import date
+from datetime import date, datetime
 
 from .calculator import CalcError, compute_goal
 from .database import _conn, get_actual_stats
 
 CELL_CAP = 200_000   # refuse bigger grids — tell the user to tighten ranges
+STALE_DAYS = 7       # an envelope older than this stops filtering and asks for a re-run
 
 # Swept-axis defaults (lo, hi, step). Every bound is user-editable in the form;
 # these only seed it. trades/week hi is replaced by the live historical average.
@@ -169,6 +171,9 @@ def _eval_cell(lev, freq, wr, rr, atr, weeks_remaining, gp) -> dict | None:
         "ev_req": float(g["per_trade_ev_required"]),
         "drift": float(g["geometric_drift"]),
         "actual_rr": float(g["actual_rr"]),
+        # the TP price move this cell needs — C4's realism check asks the market
+        # how often it actually offers a day with that much range
+        "win_pct": float(g["underlying_win_pct"]),
         "weeks_to_goal": (round(float(wtg), 1) if wtg is not None else None),
         "closes": bool(closes),
         "sane": bool(sane),
@@ -217,10 +222,47 @@ def _envelope(feasible: list) -> dict:
     if not feasible:
         return {}
     env = {}
-    for k in ("lev", "freq", "wr", "rr", "atr"):
+    for k in ("lev", "freq", "wr", "rr", "atr", "win_pct"):
         vals = [c[k] for c in feasible]
         env[k] = {"min": min(vals), "max": max(vals)}
     return env
+
+
+# ─── Stage B: persist the envelope so the real search can consume it ─────────
+
+def save_envelope(result: dict) -> None:
+    """One row per completed sweep. Empty envelopes are saved too — "nothing was
+    feasible" is a finding the search should be able to show, not a missing row."""
+    c = _conn()
+    c.execute(
+        "INSERT INTO fit_envelope (created_at, goal, envelope, optimum, feasible_count) "
+        "VALUES (?,?,?,?,?)",
+        (datetime.utcnow().isoformat(), json.dumps(result["goal"]),
+         json.dumps(result["envelope"]), json.dumps(result["optimum"]),
+         result["feasible_count"]),
+    )
+    c.commit()
+    c.close()
+
+
+def latest_envelope() -> dict | None:
+    """The newest saved envelope, with its age. `stale` past STALE_DAYS: the
+    search then nudges for a re-run instead of filtering on old numbers."""
+    c = _conn()
+    r = c.execute("SELECT * FROM fit_envelope ORDER BY id DESC LIMIT 1").fetchone()
+    c.close()
+    if not r:
+        return None
+    try:
+        age = (datetime.utcnow() - datetime.fromisoformat(r["created_at"])).days
+    except ValueError:
+        age = 999
+    return {
+        "created_at": r["created_at"], "age_days": age, "stale": age > STALE_DAYS,
+        "goal": json.loads(r["goal"]), "envelope": json.loads(r["envelope"]),
+        "optimum": json.loads(r["optimum"]) if r["optimum"] else None,
+        "feasible_count": r["feasible_count"],
+    }
 
 
 def _measured(gp: dict) -> dict | None:
@@ -332,6 +374,7 @@ def _worker(req: dict):
             with _lock:
                 _state["done"], _state["total"] = done, total
         result = evaluate(req, progress=prog)
+        save_envelope(result)      # Stage B handoff — the /edge search reads this
         with _lock:
             _state["result"] = result
     except Exception as e:
