@@ -1037,6 +1037,20 @@ def api_goal_measured(days: Optional[int] = Query(None, description="window; omi
     return plan.measured(days)
 
 
+@app.get("/api/cone")
+def api_cone():
+    """Projection cone on cumulative realized P&L + the status word (C3)."""
+    from . import cone
+    return cone.cone()
+
+
+@app.get("/api/cone/status")
+def api_cone_status():
+    """Just the status word and the numbers behind it — for the pages that quote it."""
+    from . import cone
+    return cone.status()
+
+
 @app.get("/api/config")
 def get_config():
     return get_lens_config()

@@ -58,6 +58,16 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .an-rng button{padding:2px 9px;border:1px solid var(--line2);background:transparent;color:var(--dim);
   font-size:10px;border-radius:4px;cursor:pointer;font-family:var(--mono)}
 .an-rng button.on{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:700}
+/* projection cone — the honesty surface */
+.cone-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim);
+  background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 11px;margin:0 0 9px}
+.cone-word{font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.09em;padding:2px 7px;border-radius:4px}
+.cone-word.AHEAD,.cone-word.ON{color:var(--long);border:1px solid var(--long)}
+.cone-word.BEHIND{color:var(--amber);border:1px solid var(--amber)}
+.cone-word.OFF-PLAN{color:var(--short);border:1px solid var(--short)}
+.cone-bar .badge{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.cone-bar .badge.plan{color:var(--amber)}
+.cone-bar .sp{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
 </style>
 """
 
@@ -65,10 +75,12 @@ BODY = """
 <div id="read"></div>
 <div class="an-sec">
   <div class="an-h">Equity Curve</div>
+  <div id="cone-bar" style="display:none"></div>
   <div class="an-chart-wrap">
     <div class="an-tog">
       <label><input type="checkbox" id="t-cum" checked><span class="sw" style="background:var(--accent)"></span>Cumulative realised P&amp;L <b id="lg-cum">—</b></label>
       <label><input type="checkbox" id="t-bal" checked><span class="sw" style="background:var(--dim)"></span>Daily balance <b id="lg-bal">—</b></label>
+      <label><input type="checkbox" id="t-cone" checked><span class="sw" style="background:var(--amber)"></span>Projection cone <b id="lg-cone">—</b></label>
       <div class="an-rng" id="rng">
         <button data-d="7">1W</button><button data-d="30">1M</button><button data-d="91">3M</button>
         <button data-d="182">6M</button><button data-d="ytd">YTD</button><button data-d="365">1Y</button>
@@ -86,25 +98,57 @@ const eur=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(0);
 const eur2=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(2);
 const pc=v=>v>=0?'var(--long)':'var(--short)';
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-let cumSeries=null, balSeries=null;
+let cumSeries=null, balSeries=null, coneSeries=[], CHART=null, CONE_END=0;
 
 Promise.all([
   fetch('/api/review/equity').then(r=>r.json()),
   fetch('/api/review/analytics').then(r=>r.json()),
-]).then(([E,A])=>{
+  fetch('/api/cone').then(r=>r.json()).catch(()=>null),
+]).then(([E,A,C])=>{
   if(!E||!E.n){document.getElementById('read').innerHTML='<div class="read"><p class="lede">No closed trades yet.</p></div>';return;}
   drawEquity(E);
+  drawCone(C);
   renderRead(E,A);
   renderSections(E,A);
 }).catch(e=>{
   document.getElementById('read').innerHTML='<div class="read"><p class="lede" style="color:var(--short)">Load error: '+e.message+'</p></div>';
 });
 
+// ── projection cone (C3) — bands on the same cum-P&L axis as the equity curve ──
+function drawCone(C){
+  const box=document.getElementById('cone-bar');
+  if(!C||!C.n||!CHART){ document.getElementById('t-cone').closest('label').style.display='none'; return; }
+  const amber=cssv('--amber')||'#f6ad3c', faint=cssv('--faint')||'#4a5568';
+  // P50 solid, the quartiles dashed, the P10/P90 tails dotted — spread reads as depth
+  const spec=[['p90',faint,3],['p75',amber,2],['p50',amber,0],['p25',amber,2],['p10',faint,3]];
+  coneSeries=spec.map(([k,color,style])=>{
+    const s=CHART.addLineSeries({color,lineWidth:k==='p50'?2:1,lineStyle:style,
+      priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,
+      priceFormat:{type:'price',precision:0,minMove:1}});
+    s.setData(C.points.map(p=>({time:p.t,value:p[k]})));
+    return s;
+  });
+  document.getElementById('t-cone').onchange=e=>coneSeries.forEach(s=>s.applyOptions({visible:e.target.checked}));
+  document.getElementById('lg-cone').textContent=eur(C.now.p50)+' P50';
+  CONE_END=C.points[C.points.length-1].t;
+
+  const w=C.status, N=C.now;
+  box.className='cone-bar'; box.style.display='';
+  box.innerHTML=
+    `<span class="cone-word ${w}">${w}</span>`+
+    `<span>Realised <b style="color:var(--ink)">${eur2(N.cum)}</b> vs a P25–P75 band of `+
+    `<b style="color:var(--ink)">${eur(N.p25)} … ${eur(N.p75)}</b> for today.</span>`+
+    `<span class="badge ${C.source==='plan'?'plan':''}">${C.badge}</span>`+
+    `<span class="sp">anchored ${C.anchor} · €${C.base_balance} base · ${C.paths} paths · `+
+    `→ ${C.horizon} (${C.milestone})</span>`;
+  CHART.timeScale().fitContent();   // the cone extends past the last trade
+}
+
 // ── equity chart ────────────────────────────────────────────────────────────
 function drawEquity(d){
   const accent=cssv('--accent')||'#1fd989', dim=cssv('--dim')||'#7a8699', line=cssv('--line')||'#1c2430';
   const el=document.getElementById('eqchart');
-  const chart=LightweightCharts.createChart(el,{
+  const chart=CHART=LightweightCharts.createChart(el,{
     width:el.clientWidth,height:300,
     layout:{background:{color:'transparent'},textColor:dim,fontFamily:cssv('--mono')||'monospace'},
     grid:{vertLines:{color:line},horzLines:{color:line}},
@@ -126,14 +170,15 @@ function drawEquity(d){
   new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth})).observe(el);
   document.getElementById('t-cum').onchange=e=>cumSeries&&cumSeries.applyOptions({visible:e.target.checked});
   document.getElementById('t-bal').onchange=e=>balSeries&&balSeries.applyOptions({visible:e.target.checked});
-  // range selector — last data point anchors the window
+  // range selector — last data point anchors the window; the cone's horizon
+  // extends `to`, otherwise every range but ALL would clip the projection off
   const last=d.equity[d.equity.length-1].t;
   document.querySelectorAll('#rng button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#rng button').forEach(x=>x.classList.toggle('on',x===b));
     const v=b.dataset.d;
     if(v==='all'){chart.timeScale().fitContent();return;}
     const from=v==='ytd'?Date.UTC(new Date(last*1000).getUTCFullYear(),0,1)/1000:last-(+v)*86400;
-    chart.timeScale().setVisibleRange({from,to:last});
+    chart.timeScale().setVisibleRange({from,to:Math.max(last,CONE_END||0)});
   });
 }
 
