@@ -245,6 +245,10 @@ BODY = r"""
         <div class="st-note">What each reward:risk target yields after fees (WR held). R is the lever you control — exit discipline. ← = your current R:R.</div></div>
     </div>
     <div class="card">
+      <div class="card-title">Stack projection — when the rungs land</div>
+      <div id="stackproj"></div>
+    </div>
+    <div class="card">
       <div class="card-title">Scenario ladder — win rate × realized R</div>
       <div class="slwrap"><table class="slad" id="sladder"></table></div>
       <div class="st-note" id="slad-note"></div>
@@ -526,6 +530,42 @@ function renderHero(H){
     +`<div style="margin-top:4px;color:var(--t3)">Prop payouts: <b>€0</b> — evaluation P&amp;L isn't cash, so it doesn't count toward coverage.</div>`;
 }
 async function loadHero(){ try{ renderHero(await fetch("/api/goal/hero").then(r=>r.json())); }catch(e){} }
+
+// ── Stack projection — engine → BTC at the three price scenarios ─────────────
+function renderStackProj(S){
+  const box=document.getElementById("stackproj");
+  if(!S||S.stack==null){
+    box.innerHTML=`<div class="st-note">${S&&S.reason?S.reason:"—"}</div>`; return; }
+  const SC=["bear","base","bull"];
+  const cell=d=>d?`<span>${d}</span>`:`<span style="color:var(--re)">never</span>`;
+  const src=k=>k==="measured"
+    ? `<span class="msrc measured">M</span> measured`
+    : `<span class="msrc typed" style="border-color:var(--am);color:var(--am)">P</span> plan`;
+  let body="";
+  ["measured","plan"].forEach(k=>{
+    const R=S.rows[k]; if(!R) return;
+    S.targets.forEach((t,i)=>{
+      // server keys are Python floats ("5.0"); JS String(5.0) is "5"
+      const r=R.rungs[t.toFixed(1)];
+      body+=`<span class="lc">${i===0?src(k):""}</span>`
+        +`<span class="lc" style="color:var(--t1)">${t} ₿</span>`
+        +SC.map(sc=>cell(r[sc])).join("");
+    });
+    body+=`<span class="lc" style="grid-column:1/-1;color:var(--t3);font-size:9.5px;padding-bottom:5px">`
+      +`WR ${(R.win_rate*100).toFixed(1)}% · R ${Number(R.rr).toFixed(2)} · ${R.trades_per_week}/wk · risk ${R.risk_pct}%/trade`
+      +`${k==="measured"?` <span style="color:var(--re)">(n=${R.n})</span>`:" (typed)"}</span>`;
+  });
+  const head=`<span class="sh lc">source</span><span class="sh lc">rung</span>`
+    +SC.map(sc=>`<span class="sh">${sc} ${S.scenarios[sc]>0?"+":""}${S.scenarios[sc]}%</span>`).join("");
+  box.innerHTML=
+     `<div class="st" style="grid-template-columns:1.3fr .6fr 1fr 1fr 1fr">${head}${body}</div>`
+    +`<div class="st-note">Stack <b>${S.stack} ₿</b> @ ${S.stack_date} · BTC ${fmtEur(S.price_eur)} · burn ${fmtEur(S.burn_monthly_eur)}/mo.<br>`
+    +`${S.note}<br>`
+    +`<b>Bear lands first</b> — the rungs are denominated in BTC, so EUR income buys more coin when the price is low. `
+    +`A bull run makes a BTC target <i>harder</i> to reach from fiat earnings, not easier.</div>`;
+}
+async function loadStackProj(){ renderStackProj(await fetch("/api/goal/stack").then(r=>r.json())); }
+loadStackProj();
 document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); document.getElementById("amend-box").classList.toggle("open"); });
 document.getElementById("am-save").addEventListener("click",async()=>{
   const msg=document.getElementById("am-msg");

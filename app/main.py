@@ -1044,6 +1044,14 @@ def api_goal_hero():
     return plan.hero()
 
 
+@app.get("/api/goal/stack")
+def api_goal_stack():
+    """Stack projection: when 5 BTC and 50 BTC land, measured vs plan, under the
+    plan's three price scenarios."""
+    from . import stack_proj
+    return stack_proj.payload()
+
+
 @app.get("/api/cone")
 def api_cone():
     """Projection cone on cumulative realized P&L + the status word (C3)."""
