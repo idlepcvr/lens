@@ -50,10 +50,15 @@ _CSS = r"""<style>
 
 
 def position_page(book: str = "hedge") -> str:
+    sub = ('Entry → full trade: levels, sizing, risk — long &amp; short. Sized off <b>live eval equity</b> '
+           'at the firm\'s fixed risk — see <a href="/rules" style="color:var(--accent)">Rules</a>. Only the entry and direction are yours to choose.'
+           if book == "prop" else
+           'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
+           '<a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
     body = r"""
 <div class="pz">
   <h1>Position</h1>
-  <div class="sub">Entry → full trade: levels, sizing, risk — long &amp; short. Params from your <a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.</div>
+  <div class="sub">""" + sub + r"""</div>
 
   <form id="pf" onsubmit="return false">
     <div class="frow">
@@ -61,8 +66,8 @@ def position_page(book: str = "hedge") -> str:
       <div class="lf"><label>Direction</label>
         <div class="seg"><button type="button" id="d-long" class="on long" onclick="setDir('long')">▲ long</button><button type="button" id="d-short" class="short" onclick="setDir('short')">▼ short</button></div>
       </div>
-      <div class="lf"><label>Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
-      <div class="lf"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
+      <div class="lf" id="f-bal"><label>Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
+      <div class="lf" id="f-btc"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
     </div>
     <div class="frow" style="margin-bottom:0" id="book-preset-row">
       <div class="lf"><label>Book preset</label>
@@ -292,7 +297,10 @@ if(START_BOOK==='prop') setBook('prop');
                 "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
     script = f"const PROP={json.dumps(prop_def)};\nconst START_BOOK=\"{book}\";\n" + script
     # /prop-position keeps the PROP nav + preselects the Prop tab (see theme.NAV_PROP).
-    # On the prop page there's no hedge sizing — lock the book, hide the toggle.
+    # On the prop page there's no hedge sizing — lock the book, hide the toggle AND
+    # the hedge-only inputs (€ balance, € price, override panel): the eval is sized
+    # server-side off live eval equity at the firm's fixed risk, nothing to type.
     path = "/prop-position" if book == "prop" else "/position"
-    head = _CSS + ("<style>#book-preset-row{display:none}</style>" if book == "prop" else "")
+    head = _CSS + ("<style>#book-preset-row,#f-bal,#f-btc,#advtog,#adv{display:none!important}</style>"
+                   if book == "prop" else "")
     return shell(path, "Position", body, script=script, head_extra=head, meta="size the trade")

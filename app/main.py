@@ -688,14 +688,15 @@ def api_prop_position(entry: float, direction: str = "long"):
     if not loss_pct:
         raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
     # size off the CURRENT eval equity (realized ledger), not the nominal start
-    equity = prop_ledger_data().get("equity") or prop_config()["account"]
+    nominal = prop_config()["account"]
+    equity = prop_ledger_data().get("equity") or nominal
     long_ = direction == "long"
     stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
     target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
     t = prop_ticket(entry, stop, target, long_, account=equity)
     t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
              win_rate_pct=round(wr, 1), direction=direction,
-             account_nominal=PROP_NOMINAL)
+             account_nominal=nominal)
     return t
 
 
@@ -2247,6 +2248,10 @@ class FitRequest(BaseModel):
     slippage_pct:          float = 0.0
     btc_price_eur:         float | None = None
     btc_growth_monthly:    float = 0.04
+    # prop: risk is FIXED by the plan (fraction, 0.005 = 0.5%), not derived;
+    # book routes the measured pin to the prop ledger instead of hedge trades
+    risk_per_trade:        float | None = None
+    book:                  str | None = None
 
 
 @app.get("/api/fit/defaults")
@@ -2271,7 +2276,24 @@ def api_fit_defaults(book: str = "hedge"):
                "max_drawdown_allowed": rule["max_dd_pct"] / 100.0,
                "losses_allowed": max(1, int((rule["max_dd_pct"] / 100.0) / (risk / 100.0))),
                "leverage": rule["max_leverage"],
-               "btc_growth_monthly": 0.0}
+               # eval reality: limit fills (no slip, full size), ¼-Kelly advisory,
+               # a USD account that doesn't ride BTC, and risk FIXED by the plan
+               "execution_fill_factor": 1.0,
+               "slippage_pct": 0.0,
+               "fractional_kelly": 0.25,
+               "btc_price_eur": None,
+               "btc_growth_monthly": 0.0,
+               "risk_per_trade": risk / 100.0}
+        # freq ceiling = the BASKET's real cadence, not the hedge ledger's
+        freq = historical_freq_per_week()
+        try:
+            from app.prop_goal import _basket_geometry
+            geo = _basket_geometry()
+            if geo:
+                freq = round(geo["trades_per_month"] / 4.345, 2)
+        except Exception:
+            pass
+        return {"config": cfg, "freq_per_week": freq}
     return {"config": cfg, "freq_per_week": historical_freq_per_week()}
 
 
@@ -2698,6 +2720,27 @@ def api_prop_signals(limit: int = Query(300, ge=1, le=2000)):
     the whole tradeable basket surfaces — not just the hero."""
     from .prop_scan import prop_ticket
     sigs = get_signals(id_prefix="prop-", limit=limit)
+    for sg in sigs:
+        try:
+            if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
+                sg["ticket"] = prop_ticket(
+                    sg["entry_price"], sg["stop_price"], sg["target_price"],
+                    sg["direction"] == "long")
+        except Exception:
+            pass
+    return {"signals": sigs}
+
+
+@app.get("/api/prop/signals/hedge")
+def api_prop_signals_hedge(limit: int = Query(20, ge=1, le=100)):
+    """Recent HEDGE-book signals, re-sized to the eval account — the display-level
+    crossover: if the hedge fires, this shows what taking the same levels on the
+    eval would look like at the firm's fixed risk. Sizing only — these strategies
+    are NOT in the eval backtest, so nothing here feeds the pass-rate math (the
+    priced hybrid was rejected 2026-07-11 and stays rejected)."""
+    from .prop_scan import prop_ticket
+    sigs = [s for s in get_signals(limit=limit * 4)
+            if not (s.get("signal_id") or "").startswith("prop-")][:limit]
     for sg in sigs:
         try:
             if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):

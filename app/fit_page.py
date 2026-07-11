@@ -167,9 +167,10 @@ SCRIPT = r"""
   var AXLBL = {lev:'leverage', freq:'trades/wk', wr:'win rate', rr:'R:R', atr:'ATR floor'};
   var el=function(id){return document.getElementById(id)};
   var pct=function(x){return (x*100).toFixed(0)+'%'};
-  var CUR=(typeof FIT_BOOK!=='undefined'&&FIT_BOOK==='prop')?'$':'€';   // eval is USD, hedge is EUR
+  var PROP=(typeof FIT_BOOK!=='undefined'&&FIT_BOOK==='prop');
+  var CUR=PROP?'$':'€';   // eval is USD, hedge is EUR
   var eur=function(x){return CUR+Math.round(x).toLocaleString('en-US')};
-  var DATA=null;
+  var DATA=null, PROP_RISK=null;
 
   // ── prefill goal params + historical frequency ──────────────────────────
   function prefill(d){
@@ -181,7 +182,21 @@ SCRIPT = r"""
     set('fit-fill', c.execution_fill_factor); set('fit-slip', c.slippage_pct);
     set('fit-btcpx', c.btc_price_eur); set('fit-btcg', c.btc_growth_monthly);
     if(d.freq_per_week){ el('fit-freq-hi').value=d.freq_per_week;
-      el('fit-freq-note').textContent='yr avg '+d.freq_per_week; }
+      el('fit-freq-note').textContent=(PROP?'basket avg ':'yr avg ')+d.freq_per_week; }
+    if(PROP){
+      PROP_RISK=c.risk_per_trade||0.005;
+      // the firm fixes everything but the date and the strategy shape:
+      // lock the goal inputs, cap the leverage axis at the firm's max,
+      // and blank the BTC fields (a USD eval doesn't ride BTC).
+      if(c.leverage) el('fit-lev-hi').value=c.leverage;
+      el('fit-btcpx').value=''; el('fit-btcg').value=c.btc_growth_monthly||0;
+      ['fit-start','fit-target','fit-dd','fit-losses','fit-kelly','fit-fill','fit-slip','fit-btcpx','fit-btcg']
+        .forEach(function(id){ el(id).readOnly=true; el(id).style.opacity=.55; });
+      var note=document.createElement('div');
+      note.style.cssText='grid-column:1/-1;font-size:10px;color:var(--amber)';
+      note.textContent='⚿ Fixed by the firm + your plan (risk '+(PROP_RISK*100).toFixed(2)+'%/trade) — only the target date is yours to move.';
+      document.querySelector('.fit-gform').prepend(note);
+    }
     chips();
   }
   function chips(){
@@ -190,7 +205,9 @@ SCRIPT = r"""
     el('fit-chip-date').textContent='by '+(el('fit-date').value||'—');
     el('fit-chip-kelly').textContent=(+el('fit-kelly').value||0).toFixed(3)+' Kelly';
     el('fit-chip-dd').textContent='DD '+pct(+el('fit-dd').value||0);
-    el('fit-chip-slip').textContent='slip '+((+el('fit-slip').value||0)*100).toFixed(2)+'%';
+    el('fit-chip-slip').textContent=PROP&&PROP_RISK
+      ? 'risk '+(PROP_RISK*100).toFixed(2)+'% fixed'
+      : 'slip '+((+el('fit-slip').value||0)*100).toFixed(2)+'%';
   }
   ['fit-start','fit-target','fit-date','fit-kelly','fit-dd','fit-slip'].forEach(function(id){
     el(id).addEventListener('input',chips);
@@ -210,7 +227,8 @@ SCRIPT = r"""
       max_drawdown_allowed:num('fit-dd'), losses_allowed:num('fit-losses'),
       fractional_kelly:num('fit-kelly'), execution_fill_factor:num('fit-fill'),
       slippage_pct:num('fit-slip'), btc_price_eur:num('fit-btcpx'),
-      btc_growth_monthly:num('fit-btcg')
+      btc_growth_monthly:num('fit-btcg'),
+      risk_per_trade:PROP?PROP_RISK:null, book:PROP?'prop':null
     };
   }
 
@@ -290,7 +308,7 @@ SCRIPT = r"""
       }).join('');
       var cap=fails===0
         ? 'Your measured strategy is living <b style="color:var(--long)">inside the feasible island</b>.'
-        : 'Your measured strategy is <b style="color:var(--short)">outside the island</b> on '+fails+' axi'+(fails>1?'es':'s')+'.';
+        : 'Your measured strategy is <b style="color:var(--short)">outside the island</b> on '+fails+' ax'+(fails>1?'es':'is')+'.';
       cmph='<table class="fit-cmp"><caption>'+cap+' <span class="dim">n='+m.n+' closed trades</span></caption>'+
         '<thead><tr><th>Metric</th><th>Required envelope</th><th>Your strategy</th><th>Status</th></tr></thead>'+
         '<tbody>'+trs+'</tbody></table>';

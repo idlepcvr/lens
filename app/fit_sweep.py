@@ -118,6 +118,10 @@ def _goal_params(req: dict) -> dict:
         "slippage_pct":          float(req.get("slippage_pct", 0.0)),
         "btc_price_eur":         req.get("btc_price_eur"),
         "btc_growth_monthly":    float(req.get("btc_growth_monthly", 0.04)),
+        # prop: the firm's plan FIXES risk/trade (fraction, e.g. 0.005) — the sweep
+        # then asks "what shape passes at this risk" instead of deriving risk.
+        "risk_per_trade":        (float(req["risk_per_trade"])
+                                  if req.get("risk_per_trade") else None),
     }
 
 
@@ -140,6 +144,7 @@ def _eval_cell(lev, freq, wr, rr, atr, weeks_remaining, gp) -> dict | None:
             fractional_kelly=gp["fractional_kelly"],
             execution_fill_factor=gp["execution_fill_factor"],
             slippage_pct=gp["slippage_pct"],
+            risk_per_trade=gp["risk_per_trade"],
             min_underlying_stop_pct=(atr if atr > 0 else None),
             btc_price_eur=gp["btc_price_eur"],
             btc_growth_monthly=gp["btc_growth_monthly"],
@@ -265,22 +270,33 @@ def latest_envelope() -> dict | None:
     }
 
 
-def _measured(gp: dict) -> dict | None:
+def _measured(gp: dict, book: str = None) -> dict | None:
     """Your REAL strategy, measured from closed trades, in the same coordinates as
     the envelope — so the page can answer "is what I actually trade inside the
     feasible island?". Win rate / R:R / cadence come straight from get_actual_stats;
     risk/trade is the realised account loss on an average loser (|avg loss| ÷
     balance); the Kelly cap is what MIN(Kelly, DD) allows AT your measured edge
-    (leverage-independent). None when there are no closed trades to measure."""
-    s = get_actual_stats()
-    n = s.get("total_trades") or 0
-    if n < 1:
-        return None
-    wr = (s["actual_wr"] / 100.0) if s.get("actual_wr") is not None else None
-    rr = s.get("actual_rr")
-    freq = s.get("trades_per_week")
-    bal, avg_loss = s.get("current_balance"), s.get("avg_loss_eur")
-    risk_pct = (abs(avg_loss) / bal * 100.0) if (bal and avg_loss) else None
+    (leverage-independent). None when there are no closed trades to measure.
+
+    book='prop' → measure the PROP ledger only (plan.measured), and risk/trade is
+    the plan's fixed risk — never the hedge book's €-balance artefact."""
+    if book == "prop":
+        from . import plan as P
+        m = P.measured(book="prop")
+        if not m.get("n"):
+            return None
+        risk_pct = (gp["risk_per_trade"] * 100.0) if gp.get("risk_per_trade") else None
+        wr, rr, freq, n = m["win_rate"], m.get("rr_ratio"), m.get("trades_per_week"), m["n"]
+    else:
+        s = get_actual_stats()
+        n = s.get("total_trades") or 0
+        if n < 1:
+            return None
+        wr = (s["actual_wr"] / 100.0) if s.get("actual_wr") is not None else None
+        rr = s.get("actual_rr")
+        freq = s.get("trades_per_week")
+        bal, avg_loss = s.get("current_balance"), s.get("avg_loss_eur")
+        risk_pct = (abs(avg_loss) / bal * 100.0) if (bal and avg_loss) else None
     kelly_cap = None
     if wr is not None and rr:
         try:
@@ -361,7 +377,7 @@ def evaluate(req: dict, progress=None) -> dict:
         "total": total,
         "weeks_remaining": round(weeks_remaining, 1),
         "envelope": _envelope(feasible),
-        "measured": _measured(gp),
+        "measured": _measured(gp, book=req.get("book")),
         "goal": {"start_balance": gp["start_balance"],
                  "target_balance": gp["target_balance"],
                  "target_date": gp["target_date"].isoformat()},
