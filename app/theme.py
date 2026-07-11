@@ -33,6 +33,7 @@ NAV_PROP = [
     ("/overview", "Overview"),
     ("/prop-dashboard", "Plan"),
     ("/prop-goal", "Goal"),
+    ("/prop-cone", "Cone"),
     ("/prop-position", "Position"),
     ("/prop-desk", "Desk"),
     ("/prop-signals", "Signals"),
@@ -40,15 +41,12 @@ NAV_PROP = [
     ("/prop-analytics", "Analytics"),
     ("/prop-journal", "Journal"),
     ("/prop-edge", "Edge"),
-    ("/prop", "Goals board"),
+    ("/prop", "Engines"),
     ("/prop-ledger", "Ledger"),
     ("/prop-income", "Income"),
-    ("/strategy", "Strategy"),
-    ("/risk", "Risk"),
-    ("/survival", "Survival"),
-    ("/rules", "Rules"),
-    ("/equity", "Equity"),
-    ("/regime", "Regime"),
+    # Strategy / Risk / Survival / Rules / Equity / Regime deliberately have no
+    # nav entry — they're the engine cards on /prop. Their pages still render
+    # with the prop nav (page_mode defaults to prop).
 ]
 NAV_HEDGE = [
     ("/overview-hedge", "Overview"),

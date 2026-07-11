@@ -161,7 +161,7 @@ def dashboard_page() -> str:
   <div class="sect2">performance · all prop attempts</div>
   {perf}
 
-  <div class="sect2">goal model · will this basket pass? · <a href="/prop-goal" class="ac">full cone →</a></div>
+  <div class="sect2">goal model · will this basket pass? · <a href="/prop-cone" class="ac">full cone →</a></div>
   {_goal_section(d['goal'])}
 
   <div class="sect2">signals by strategy</div>
@@ -169,7 +169,8 @@ def dashboard_page() -> str:
 
   <div class="sect2">engines</div>
   <div class="links">
-    <a class="lk" href="/prop-goal"><b>Goal →</b><span>time-to-target cone · basket picker</span></a>
+    <a class="lk" href="/prop-goal"><b>Goal →</b><span>goal model · risk &amp; Kelly</span></a>
+    <a class="lk" href="/prop-cone"><b>Cone →</b><span>pass odds · basket picker</span></a>
     <a class="lk" href="/prop-ledger"><b>Ledger →</b><span>equity vs the walls · past attempts</span></a>
     <a class="lk" href="/prop-desk"><b>Desk →</b><span>can I enter now?</span></a>
     <a class="lk" href="/prop-signals"><b>Queue →</b><span>pending signals</span></a>

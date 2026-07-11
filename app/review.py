@@ -382,25 +382,45 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
         f"SELECT pnl, opened_at, closed_at, balance_after FROM trades "
         f"WHERE {where} ORDER BY closed_at", list(params)
     ).fetchall()
-    snaps = conn.execute(
-        "SELECT snapshot_date, eur_balance FROM daily_snapshots "
-        "WHERE eur_balance IS NOT NULL ORDER BY snapshot_date"
-    ).fetchall()
-    # EUR cash actually moved — gross deposits, gross withdrawals, and the raw
-    # list for the cash-flow table. xbt/eth/fee legs are in-kind noise, EUR is the cash.
-    # biz-account transfers (venue kraken_futures_biz, synced by /money) are the
-    # business book — keep them out of the personal cash-flow numbers here
-    dep_in, dep_out = conn.execute(
-        "SELECT COALESCE(SUM(CASE WHEN amount>0 THEN amount END),0),"
-        "       COALESCE(SUM(CASE WHEN amount<0 THEN -amount END),0)"
-        " FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
-        " AND COALESCE(venue,'') <> 'kraken_futures_biz'"
-    ).fetchone()
-    xfers = conn.execute(
-        "SELECT ts, transfer_type, amount FROM transfers "
-        "WHERE asset IN ('eur','ZEUR','EUR')"
-        " AND COALESCE(venue,'') <> 'kraken_futures_biz' ORDER BY ts DESC"
-    ).fetchall()
+    is_prop = bool(book) and book.startswith("prop")
+    if is_prop:
+        # Prop cash reality: eval FEES are the only real money — eval P&L is paper
+        # and there are no payouts yet. Hedge Kraken transfers/daily balances are
+        # foreign data on this book, so they're replaced wholesale.
+        snaps, dep_in, dep_out, xfers = [], 0.0, 0.0, []
+        cur = conn.execute(
+            "SELECT eval_name, account, fee FROM prop_eval_state WHERE id=1").fetchone()
+        arch = conn.execute(
+            "SELECT eval_name, account, fee, created_at FROM prop_eval_archive "
+            "ORDER BY created_at").fetchall()
+        attempts = ([{"ts": (a[3] or "")[:10], "eval": a[0], "account": a[1],
+                      "fee": a[2] or 0.0, "status": "archived"} for a in arch]
+                    + ([{"ts": None, "eval": cur[0], "account": cur[1],
+                         "fee": cur[2] or 0.0, "status": "live"}] if cur else []))
+        prop_cash = {"attempts": attempts,
+                     "fees_total": round(sum(a["fee"] for a in attempts), 2),
+                     "payouts": 0.0}
+    else:
+        prop_cash = None
+        snaps = conn.execute(
+            "SELECT snapshot_date, eur_balance FROM daily_snapshots "
+            "WHERE eur_balance IS NOT NULL ORDER BY snapshot_date"
+        ).fetchall()
+        # EUR cash actually moved — gross deposits, gross withdrawals, and the raw
+        # list for the cash-flow table. xbt/eth/fee legs are in-kind noise, EUR is the cash.
+        # biz-account transfers (venue kraken_futures_biz, synced by /money) are the
+        # business book — keep them out of the personal cash-flow numbers here
+        dep_in, dep_out = conn.execute(
+            "SELECT COALESCE(SUM(CASE WHEN amount>0 THEN amount END),0),"
+            "       COALESCE(SUM(CASE WHEN amount<0 THEN -amount END),0)"
+            " FROM transfers WHERE asset IN ('eur','ZEUR','EUR')"
+            " AND COALESCE(venue,'') <> 'kraken_futures_biz'"
+        ).fetchone()
+        xfers = conn.execute(
+            "SELECT ts, transfer_type, amount FROM transfers "
+            "WHERE asset IN ('eur','ZEUR','EUR')"
+            " AND COALESCE(venue,'') <> 'kraken_futures_biz' ORDER BY ts DESC"
+        ).fetchall()
     conn.close()
     if not rows:
         return {"n": 0}
@@ -466,10 +486,17 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
     periods = {"day": _period(by_day), "week": _period(by_week), "month": _period(by_month)}
 
     cur_bal = daily[-1]["bal"] if daily else (equity[-1]["bal"] if equity else None)
+    if is_prop:
+        try:
+            from .prop_ledger import prop_ledger_data
+            cur_bal = prop_ledger_data().get("equity")   # live eval equity, USD
+        except Exception:
+            cur_bal = None
     return {"n": len(rows), "equity": equity, "daily": daily,
             "dow": dow, "hod": hod, "periods": periods,
             "deposits": round(dep_in, 2), "withdrawals": round(dep_out, 2),
             "net_deposit": round(dep_in - dep_out, 2), "cur_bal": cur_bal,
+            "prop_cash": prop_cash,
             "transfers": [{"ts": t[:10], "type": ty, "amount": round(a, 2)}
                           for t, ty, a in xfers],
             "cum_pnl": equity[-1]["cum"] if equity else 0.0}

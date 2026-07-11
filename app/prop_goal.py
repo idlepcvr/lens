@@ -595,7 +595,8 @@ function renderModel(m){
     + kv('Account','$'+money(m.account))
     + kv('Target','$'+money(m.target)+' · +'+m.target_pct+'%','g')
     + kv('Floor','$'+money(m.floor)+' · −'+m.dd_pct+'%','r')
-    + kv('Daily wall','−'+m.daily_pct+'%/day','r')
+    + kv('Daily wall','−'+m.daily_pct+'%/day = $'+money(m.account*m.daily_pct/100)
+         +' <span class="dim">· '+Math.floor(m.daily_pct/m.used_risk_pct)+' stops @ $'+money(m.risk_usd)+'</span>','r')
     + kv('Risk / trade',m.used_risk_pct+'% · $'+money(m.risk_usd))
     + kv('Stop · lev',m.stop_price_pct+'% · '+m.leverage+'×')
     + kv('Leverage cap',m.max_leverage+'×','dim')
@@ -700,5 +701,5 @@ load(); loadModel(); loadBaskets();
 
 
 def goal_page() -> str:
-    return shell("/prop-goal", "Goal", BODY, script=SCRIPT, head_extra=_CSS,
+    return shell("/prop-cone", "Eval Cone", BODY, script=SCRIPT, head_extra=_CSS,
                  meta="when do I hit target?")

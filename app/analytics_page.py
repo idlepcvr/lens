@@ -206,7 +206,15 @@ function renderRead(E,A){
   // sober headline
   const dep=E.net_deposit, bal=E.cur_bal, cum=E.cum_pnl;
   let head;
-  if(dep>0){
+  if(E.prop_cash){
+    // prop book: the only real cash is eval fees. Eval P&L is paper.
+    const P=E.prop_cash, past=P.attempts.filter(a=>a.status!=='live').length;
+    head=`You've paid <b>$${P.fees_total.toFixed(0)}</b> in eval fees across <b>${P.attempts.length}</b> attempt${P.attempts.length===1?'':'s'}`+
+      (past?` — <span class="neg">${past} failed</span>, one live`:'')+
+      `. That fee is the only real cash; eval P&L is paper until a payout. `+
+      (bal!=null?`Current eval equity <b>$${bal.toFixed(0)}</b>. `:'')+
+      `Realised paper P&L across ${A.n} closed prop trades (all attempts) is <span class="${cum>=0?'pos':'neg'}">${eur2(cum)}</span>.`;
+  } else if(dep>0){
     const gone=Math.max(0,dep-bal), pct=Math.round(gone/dep*100);
     head=`You've deposited <b>€${E.deposits.toFixed(0)}</b> and withdrawn <b>€${E.withdrawals.toFixed(0)}</b> — `+
       `net <b>€${dep.toFixed(0)}</b> of real cash into this account. The balance today is <b>€${bal.toFixed(0)}</b> — `+
@@ -229,7 +237,11 @@ function renderRead(E,A){
   // THE MOVE — the single iterative test the data argues for
   let move;
   const greenHrs=hods.filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,3).map(x=>hh(x.hour));
-  if(bleedSum<-200 && greenHrs.length){
+  if(E.prop_cash && A.n<30){
+    move=`n=${A.n} closed prop trades is too small to read a timing edge from — any best-hour/worst-day split here is noise. `+
+      `Execute the basket as designed and revisit once the ledger has 30+; the numbers that matter now are on `+
+      `<a href="/prop-cone" class="ac">the cone</a> (pass odds) and <a href="/prop-ledger" class="ac">the ledger</a> (distance to the walls).`;
+  } else if(bleedSum<-200 && greenHrs.length){
     move=`For the next 2 weeks, run a <b>subtraction test</b>: only take entries in your green windows `+
       `(<b>${greenHrs.join(', ')}</b>)`+
       (worstDur?` and stop closing in the <b>${worstDur.label}</b> band — either scratch faster or let it run past that`:'')+
@@ -314,18 +326,39 @@ function renderSections(E,A,X){
     <tr><td>Win Rate</td><td>${A.model_wr!=null?A.model_wr+'%':'—'}</td><td>${A.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
     <tr><td>R:R</td><td>${A.model_rr!=null?A.model_rr+'×':'—'}</td><td>${A.rr!=null?A.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr></table>`;
 
-  // cash flow — every EUR deposit/withdrawal, the "what did I actually put in" ledger
-  const xf=E.transfers||[];
-  const xfRows=xf.map(t=>`<tr><td>${t.ts}</td><td>${t.type}</td>
-    <td style="color:${pc(t.amount)}">${eur2(t.amount)}</td></tr>`).join('');
-  const nDep=xf.filter(t=>t.amount>0).length, nWd=xf.filter(t=>t.amount<0).length;
-  const cashBody=
-    `<div class="an-grid" style="margin-bottom:14px">`+
-    card('Deposited',eur(E.deposits),nDep+' deposits','var(--long)')+
-    card('Withdrawn',eur(-E.withdrawals),nWd+' withdrawals','var(--short)')+
-    card('Net funded',eur(E.net_deposit),'deposits − withdrawals',pc(E.net_deposit))+
-    (E.cur_bal!=null?card('Balance now','€'+E.cur_bal.toFixed(0),'','var(--ink)'):'')+`</div>`+
-    `<table class="an-tbl"><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${xfRows}</table>`;
+  // cash flow — hedge: every EUR deposit/withdrawal. prop: eval fees, the only
+  // real cash (eval P&L is paper; hedge Kraken transfers don't belong here).
+  let cashBody, cashTitle, cashSub, cashTag;
+  if(E.prop_cash){
+    const P=E.prop_cash;
+    const aRows=P.attempts.map(a=>`<tr><td>${a.ts||'—'}</td>
+      <td>${a.eval} · $${(a.account||0).toLocaleString()}</td>
+      <td>${a.status==='live'?'<span class="g">live</span>':'<span class="r">failed / archived</span>'}</td>
+      <td style="color:var(--short)">−$${(a.fee||0).toFixed(0)}</td></tr>`).join('');
+    cashBody=
+      `<div class="an-grid" style="margin-bottom:14px">`+
+      card('Fees paid','$'+P.fees_total.toFixed(0),P.attempts.length+' attempts','var(--short)')+
+      card('Payouts','$'+P.payouts.toFixed(0),'none yet — eval P&L is paper','var(--dim)')+
+      card('Net real cash','−$'+(P.fees_total-P.payouts).toFixed(0),'fees − payouts','var(--short)')+
+      (E.cur_bal!=null?card('Eval equity now','$'+E.cur_bal.toFixed(0),'paper','var(--ink)'):'')+`</div>`+
+      `<table class="an-tbl"><tr><th>Date</th><th>Eval</th><th>Status</th><th>Fee</th></tr>${aRows}</table>`;
+    cashTitle='Eval spend'; cashSub='fees — the only real cash';
+    cashTag='−$'+P.fees_total.toFixed(0);
+  } else {
+    const xf=E.transfers||[];
+    const xfRows=xf.map(t=>`<tr><td>${t.ts}</td><td>${t.type}</td>
+      <td style="color:${pc(t.amount)}">${eur2(t.amount)}</td></tr>`).join('');
+    const nDep=xf.filter(t=>t.amount>0).length, nWd=xf.filter(t=>t.amount<0).length;
+    cashBody=
+      `<div class="an-grid" style="margin-bottom:14px">`+
+      card('Deposited',eur(E.deposits),nDep+' deposits','var(--long)')+
+      card('Withdrawn',eur(-E.withdrawals),nWd+' withdrawals','var(--short)')+
+      card('Net funded',eur(E.net_deposit),'deposits − withdrawals',pc(E.net_deposit))+
+      (E.cur_bal!=null?card('Balance now','€'+E.cur_bal.toFixed(0),'','var(--ink)'):'')+`</div>`+
+      `<table class="an-tbl"><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${xfRows}</table>`;
+    cashTitle='Cash flow'; cashSub='every EUR deposit &amp; withdrawal';
+    cashTag=eur(E.net_deposit)+' in';
+  }
 
   // ── MAE / MFE — exits or selection? ──
   const pct=v=>v==null?'—':v.toFixed(2)+'%';
@@ -368,7 +401,7 @@ function renderSections(E,A,X){
         '',durBody,false)+
     (exBody?det('Excursions','MAE / MFE — exits or selection?',exHead,exCol,exBody,false):'')+
     det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false)+
-    det('Cash flow','every EUR deposit &amp; withdrawal',eur(E.net_deposit)+' in',pc(E.net_deposit),cashBody,false);
+    det(cashTitle,cashSub,cashTag,E.prop_cash?'var(--short)':pc(E.net_deposit),cashBody,false);
 }
 """
 
@@ -379,7 +412,7 @@ def render(book: str = "hedge") -> str:
     other = "prop" if book == "hedge" else "hedge"
     path = "/prop-analytics" if book == "prop" else "/analytics"
     eval_cone = ('' if book != "prop"
-                 else ' · <a href="/prop-goal" class="ac">eval projection cone → /prop-goal</a>')
+                 else ' · <a href="/prop-cone" class="ac">eval projection cone → /prop-cone</a>')
     body = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
             f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
             f'<a href="{"/analytics" if book == "prop" else "/prop-analytics"}" class="ac">'

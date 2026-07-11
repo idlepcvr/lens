@@ -676,24 +676,31 @@ def _prop_moves() -> tuple:
 
 
 @app.get("/api/prop/position")
-def api_prop_position(entry: float, direction: str = "long"):
-    """Prop-rule sizing for a manual entry: risk RISK% of the $5k eval ÷ stop,
+def api_prop_position(entry: float, direction: str = "long",
+                      risk: Optional[float] = Query(None, gt=0, le=10, description="risk %/trade override"),
+                      rr: Optional[float] = Query(None, gt=0, le=20, description="target R override (rescales TP)"),
+                      lev: Optional[float] = Query(None, gt=0, le=10, description="leverage cap override"),
+                      balance: Optional[float] = Query(None, gt=0, description="eval balance $ override")):
+    """Prop-rule sizing for a manual entry: risk RISK% of the eval ÷ stop,
     leverage capped at the firm's max. Stop/target derived from the prop hero
     strategy's measured average move, then run through prop_ticket (same math as
-    the signal ticket and the eval ledger)."""
+    the signal ticket and the eval ledger). risk/rr/lev/balance override the plan
+    per-trade — what-if sizing, the saved plan is untouched."""
     from .prop_scan import prop_ticket
     from .prop_ledger import prop_ledger_data
     from .prop_views import prop_config
     win_pct, loss_pct, wr = _prop_moves()
     if not loss_pct:
         raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
+    if rr:
+        win_pct = loss_pct * rr        # keep the strategy's stop, rescale the target
     # size off the CURRENT eval equity (realized ledger), not the nominal start
     nominal = prop_config()["account"]
-    equity = prop_ledger_data().get("equity") or nominal
+    equity = balance or prop_ledger_data().get("equity") or nominal
     long_ = direction == "long"
     stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
     target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
-    t = prop_ticket(entry, stop, target, long_, account=equity)
+    t = prop_ticket(entry, stop, target, long_, account=equity, risk=risk, max_lev=lev)
     t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
              win_rate_pct=round(wr, 1), direction=direction,
              account_nominal=nominal)
@@ -2598,15 +2605,22 @@ def prop_dashboard_page():
 @app.get("/prop-goal", response_class=HTMLResponse)
 def prop_goal_page():
     """Exact clone of the hedge /goal (same page, same panels), fed the prop
-    config row + prop measured stats. The old cone/checks page → /prop-goal-old."""
+    config row + prop measured stats. The MC cone/checks page → /prop-cone."""
     from .goal_page import render
     return render("prop")
 
 
-@app.get("/prop-goal-old", response_class=HTMLResponse)
-def prop_goal_old_page():
+@app.get("/prop-cone", response_class=HTMLResponse)
+def prop_cone_page():
+    """The eval Monte-Carlo cone: pass odds, milestone ladder, basket picker.
+    Was /prop-goal-old — renamed once /prop-goal became the /goal clone."""
     from .prop_goal import goal_page
     return goal_page()
+
+
+@app.get("/prop-goal-old")
+def prop_goal_old_redirect():
+    return RedirectResponse("/prop-cone", status_code=301)
 
 
 @app.get("/api/prop/goal")

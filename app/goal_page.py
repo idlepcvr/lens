@@ -473,9 +473,10 @@ SAVE_BTN.addEventListener("click",async()=>{ await fetch("/api/config"+BQ,{metho
 RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config"+BQ).then(r=>r.json())); recompute(); });
 (async()=>{
   populate(await fetch("/api/config"+BQ).then(r=>r.json()));
-  // prefill from an /edge "→ Goal" handoff (?win_rate=..&rr_ratio=..&trades_per_week=..)
+  // prefill from an /edge "→ Goal" handoff (?win_rate=..&rr_ratio=..&trades_per_week=..
+  // — the Fit link also carries the goal itself: start/target/date)
   const qs=new URLSearchParams(location.search);
-  ["win_rate","rr_ratio","trades_per_week","leverage"].forEach(function(k){
+  ["win_rate","rr_ratio","trades_per_week","leverage","start_balance","target_balance","target_date"].forEach(function(k){
     if(qs.has(k)){ const el=FORM.elements.namedItem(k); if(el) el.value=qs.get(k); }
   });
   recompute();

@@ -73,21 +73,25 @@ def prop_tradeable() -> list[tuple[str, float]]:
 
 
 def prop_ticket(entry: float, stop: float, target: float, long_: bool,
-                strategy: str = PROP_STRATEGY, account: float = None) -> dict:
+                strategy: str = PROP_STRATEGY, account: float = None,
+                risk: float = None, max_lev: float = None) -> dict:
     """Prop-legal order ticket from a signal's levels — same sizing math as
     prop_desk_state (risk% of the eval account, leverage capped at the firm's
     5x). Deterministic from entry/stop/target, so it recomputes identically for a
     live pending signal or a historical one on the review page. `account`/risk/plan
-    default to the active eval config; pass the live eval equity to size off it."""
+    default to the active eval config; pass the live eval equity to size off it.
+    `risk` (%) / `max_lev` override the plan for what-if sizing on /prop-position."""
     cfg = prop_config()
-    EVAL, RISK = cfg["eval_name"], cfg["risk"]
+    EVAL = cfg["eval_name"]
+    RISK = risk if risk is not None else cfg["risk"]
     if account is None:
         account = cfg["account"]
     rule = EVALS[EVAL]
+    cap = max_lev if max_lev is not None else rule["max_leverage"]
     fee_rt = rule.get("commission_per_side", 0.0004) * 2
     stop_pct = abs(entry - stop) / entry * 100 if entry else 0.0
     tp_pct = abs(target - entry) / entry * 100 if entry else 0.0
-    lev, actual_risk = _legal_leverage(stop_pct, RISK, rule["max_leverage"])
+    lev, actual_risk = _legal_leverage(stop_pct, RISK, cap)
     risk_usd = account * RISK / 100.0
     notional = risk_usd / (stop_pct / 100.0) if stop_pct else 0.0
     size_btc = notional / entry if entry else 0.0
@@ -107,7 +111,7 @@ def prop_ticket(entry: float, stop: float, target: float, long_: bool,
         "breakeven": round(breakeven, 1), "liq": round(liq, 1) if liq else None,
         "stop_pct": round(stop_pct, 2), "tp_pct": round(tp_pct, 2),
         "rr": round(tp_pct / stop_pct, 2) if stop_pct else 0.0,
-        "max_leverage": rule["max_leverage"],
+        "max_leverage": cap,
         "eval": EVAL, "strategy": strategy,
     }
 

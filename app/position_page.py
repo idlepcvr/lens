@@ -51,7 +51,8 @@ _CSS = r"""<style>
 
 def position_page(book: str = "hedge") -> str:
     sub = ('Entry → full trade: levels, sizing, risk — long &amp; short. Sized off <b>live eval equity</b> '
-           'at the firm\'s fixed risk — see <a href="/rules" style="color:var(--accent)">Rules</a>. Only the entry and direction are yours to choose.'
+           'at the plan\'s risk — see <a href="/rules" style="color:var(--accent)">Rules</a>. '
+           'Override risk %, R:R or the leverage cap below for a per-trade what-if; the saved plan is untouched.'
            if book == "prop" else
            'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
            '<a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
@@ -66,7 +67,7 @@ def position_page(book: str = "hedge") -> str:
       <div class="lf"><label>Direction</label>
         <div class="seg"><button type="button" id="d-long" class="on long" onclick="setDir('long')">▲ long</button><button type="button" id="d-short" class="short" onclick="setDir('short')">▼ short</button></div>
       </div>
-      <div class="lf" id="f-bal"><label>Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
+      <div class="lf" id="f-bal"><label id="bal-label">Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
       <div class="lf" id="f-btc"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
     </div>
     <div class="frow" style="margin-bottom:0" id="book-preset-row">
@@ -77,10 +78,10 @@ def position_page(book: str = "hedge") -> str:
     <button type="button" class="advtog" id="advtog" onclick="toggleAdv()">▸ override risk inputs</button>
     <div class="adv hide" id="adv">
       <div class="frow" style="margin-bottom:0">
-        <div class="lf"><label>Win rate <span class="hint">0–1</span></label><input id="o-wr" type="text" inputmode="decimal" placeholder="from config"></div>
+        <div class="lf" id="f-wr"><label>Win rate <span class="hint">0–1</span></label><input id="o-wr" type="text" inputmode="decimal" placeholder="from config"></div>
         <div class="lf"><label>R:R ratio</label><input id="o-rr" type="text" inputmode="decimal" placeholder="from config"></div>
-        <div class="lf"><label>Leverage</label><input id="o-lev" type="text" inputmode="decimal" placeholder="from config"></div>
-        <div class="lf"><label>Risk/trade <span class="hint">0–1 dec</span></label><input id="o-risk" type="text" inputmode="decimal" placeholder="auto (EV)"></div>
+        <div class="lf"><label id="lev-label">Leverage</label><input id="o-lev" type="text" inputmode="decimal" placeholder="from config"></div>
+        <div class="lf"><label>Risk/trade <span class="hint" id="risk-hint">0–1 dec</span></label><input id="o-risk" type="text" inputmode="decimal" placeholder="auto (EV)"></div>
         <div class="lf"><label>Daily vol σ <span class="hint">auto from ATR feed</span></label><input id="o-std" type="text" inputmode="decimal" placeholder="0.0356"></div>
       </div>
     </div>
@@ -107,13 +108,18 @@ function setDir(d){ dir=d; $('d-long').classList.toggle('on',d==='long'); $('d-s
 function toggleAdv(){ const a=$('adv'); a.classList.toggle('hide'); $('advtog').textContent=(a.classList.contains('hide')?'▸':'▾')+' override risk inputs'; }
 function setBook(b){
   book=b; $('b-hedge').classList.toggle('on',b==='hedge'); $('b-prop').classList.toggle('on',b==='prop');
-  // Prop sizes by the firm's rule server-side ($5k eval, 0.5% risk, 5x cap) — the
-  // override panel + balance are hedge-only, so grey them out in prop mode.
-  const hedgeOnly = b==='hedge';
-  $('o-wr').disabled=$('o-rr').disabled=$('o-lev').disabled=$('o-risk').disabled=$('p-bal').disabled=!hedgeOnly;
+  const prop = b==='prop';
+  // Prop sizes by the firm's rule server-side, but risk %, R:R (rescales TP),
+  // leverage cap and the eval balance are per-trade overridable. Win-rate and
+  // daily σ only feed the hedge goal model — greyed out in prop mode.
+  $('o-wr').disabled=$('o-std').disabled=prop;
+  $('o-rr').disabled=$('o-lev').disabled=$('o-risk').disabled=$('p-bal').disabled=false;
+  $('bal-label').textContent = prop?'Eval balance $':'Balance €';
+  $('lev-label').textContent = prop?'Leverage cap':'Leverage';
+  $('risk-hint').textContent = prop?'% · 0.5':'0–1 dec';
   $('pf').style.opacity=1;
-  if(hedgeOnly){ if(HEDGE_BAL!=null) $('p-bal').value=HEDGE_BAL; }
-  else { $('o-lev').value=''; $('o-risk').value=''; }
+  if(!prop){ if(HEDGE_BAL!=null) $('p-bal').value=HEDGE_BAL; }
+  else { $('p-bal').value=''; $('p-bal').placeholder='live eval equity'; $('o-lev').value=''; $('o-risk').value=''; }
   calc();
 }
 
@@ -205,10 +211,16 @@ function render(g, p, pl, bal, btcE){
 }
 
 async function calcProp(entry){
+  const q=new URLSearchParams({entry:entry, direction:dir});
+  const ov=(id)=>{ const v=parseFloat($(id).value); return (isFinite(v)&&v>0)?v:null; };
+  const bal=ov('p-bal'), rk=ov('o-risk'), rr=ov('o-rr'), lv=ov('o-lev');
+  if(bal)q.set('balance',bal); if(rk)q.set('risk',rk); if(rr)q.set('rr',rr); if(lv)q.set('lev',lv);
   try{
-    const r=await fetch('/api/prop/position?entry='+entry+'&direction='+dir);
+    const r=await fetch('/api/prop/position?'+q);
     if(!r.ok){ throw new Error((await r.json()).detail||'prop error'); }
-    $('err').classList.add('hide'); renderProp(await r.json());
+    const t=await r.json();
+    if(!bal) $('p-bal').placeholder=t.account;   // live eval equity, visible before you override
+    $('err').classList.add('hide'); renderProp(t);
   }catch(e){ $('err').textContent=String(e.message||e); $('err').classList.remove('hide'); }
 }
 
@@ -297,10 +309,10 @@ if(START_BOOK==='prop') setBook('prop');
                 "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
     script = f"const PROP={json.dumps(prop_def)};\nconst START_BOOK=\"{book}\";\n" + script
     # /prop-position keeps the PROP nav + preselects the Prop tab (see theme.NAV_PROP).
-    # On the prop page there's no hedge sizing — lock the book, hide the toggle AND
-    # the hedge-only inputs (€ balance, € price, override panel): the eval is sized
-    # server-side off live eval equity at the firm's fixed risk, nothing to type.
+    # On the prop page there's no hedge sizing — lock the book and hide the
+    # hedge-only inputs (BTC € price, win-rate override). Balance (eval $) and the
+    # risk/R:R/leverage-cap overrides stay: per-trade what-ifs against the plan.
     path = "/prop-position" if book == "prop" else "/position"
-    head = _CSS + ("<style>#book-preset-row,#f-bal,#f-btc,#advtog,#adv{display:none!important}</style>"
+    head = _CSS + ("<style>#book-preset-row,#f-btc,#f-wr{display:none!important}</style>"
                    if book == "prop" else "")
     return shell(path, "Position", body, script=script, head_extra=head, meta="size the trade")
