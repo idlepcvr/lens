@@ -172,13 +172,15 @@ def prop_ledger_data(live: bool = True) -> dict:
 
 def archive_summaries() -> list:
     """Past eval attempts: one row per archived run, scored under the params it
-    actually ran with (from prop_eval_archive)."""
+    actually ran with (from prop_eval_archive). `net` folds in the entry fee — a
+    run that "only" lost the fee still cost you the fee."""
     from .database import get_prop_archives, prop_archive_books
     metas = {m["tag"]: m for m in get_prop_archives()}
     cfg = prop_config()                       # fallback for runs archived pre-metadata
     out = []
     for tag in prop_archive_books():
-        meta = metas.get(tag) or {"account": cfg["account"], "risk": cfg["risk"], "eval_name": cfg["eval_name"]}
+        meta = metas.get(tag) or {"account": cfg["account"], "risk": cfg["risk"],
+                                  "eval_name": cfg["eval_name"], "fee": 0.0}
         ts = [t for t in get_trades(limit=20000, book=tag) if t.pnl is not None]
         if not ts:
             continue
@@ -200,8 +202,11 @@ def archive_summaries() -> list:
         out.append({
             "tag": tag, "eval_name": meta["eval_name"], "account": acct,
             "n_trades": len(ts), "final_equity": round(eq, 2),
+            # pnl is PAPER — eval equity is never yours, pass or fail. The only cash
+            # that ever moved is the fee, so that's the only thing summed as cost.
             "pnl": round(eq - acct, 2), "max_dd_pct": round(maxdd * 100, 2),
             "verdict": verdict, "span": span,
+            "fee": round(meta.get("fee") or 0.0, 2),
         })
     return out
 
@@ -358,7 +363,8 @@ def ledger_page() -> str:
     <div class="grid2">
       <div class="lf"><label>Account size $</label><input id="nev-acct" type="number" step="any" value="5000"></div>
       <div class="lf"><label>Risk / trade %</label><input id="nev-risk" type="number" step="any" value="0.5"></div>
-      <div class="lf full"><label>Plan</label><select id="nev-plan"></select></div>
+      <div class="lf"><label>Fee paid $</label><input id="nev-fee" type="number" step="any" value="0"></div>
+      <div class="lf"><label>Plan</label><select id="nev-plan"></select></div>
       <div class="lf full"><div id="nev-preview" class="sub" style="font-size:11px;margin:0"></div></div>
     </div>
     <div class="acts">
@@ -583,7 +589,7 @@ let NEV_PLANS={};
 async function newEval(){
   const d=await fetch('/api/prop/config').then(r=>r.json());
   NEV_PLANS=d.plans||{};
-  $('nev-acct').value=d.config.account; $('nev-risk').value=d.config.risk;
+  $('nev-acct').value=d.config.account; $('nev-risk').value=d.config.risk; $('nev-fee').value=0;
   $('nev-plan').innerHTML=Object.entries(NEV_PLANS).map(([k,v])=>
     `<option value="${k}">${k} — +${v.profit_target_pct}% target · ${v.max_dd_pct}% DD · ${v.daily_loss_pct}% daily</option>`).join('');
   $('nev-plan').value=d.config.eval_name;
@@ -598,9 +604,10 @@ function nevPreview(){
 function closeNewEval(){ $('nev-ovl').classList.remove('on'); }
 async function submitNewEval(){
   const account=parseFloat($('nev-acct').value), risk=parseFloat($('nev-risk').value), eval_name=$('nev-plan').value;
+  const fee=parseFloat($('nev-fee').value)||0;
   if(!account||!risk){ alert('account and risk required'); return; }
-  if(!confirm('Start new eval at $'+account.toLocaleString()+'? Current run is archived.')) return;
-  const r=await fetch('/api/prop/new-eval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account,risk,eval_name})});
+  if(!confirm('Start new eval at $'+account.toLocaleString()+' (fee $'+fee+')? Current run is archived.')) return;
+  const r=await fetch('/api/prop/new-eval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account,risk,eval_name,fee})});
   if(!r.ok){ alert('failed to start new eval'); return; }
   const d=await r.json(); closeNewEval(); ARCH_LOADED=false; alert('New eval started — '+d.archived+' trade(s) archived.'); load();
 }
@@ -612,7 +619,11 @@ async function loadArchives(force){
     const d=await fetch('/api/prop/archives').then(r=>r.json());
     const a=d.archives||[];
     $('acount').textContent=a.length?('· '+a.length):'';
-    if(!a.length){ $('archives').innerHTML='<div class="empty">No past attempts yet. Starting a new eval archives the current run here.</div>'; return; }
+    const cost=`<div class="sub" style="font-size:11px;margin:8px 0 0">
+      <b>${d.attempts}</b> attempt(s) incl. the live one · <b class="red">$${money(d.spent)}</b> paid in fees
+      <span class="dim">(current eval $${money(d.active_fee)})</span>.
+      Eval P&amp;L below is <b>paper</b> — it never settles to you. Fees are the only cash that moved.</div>`;
+    if(!a.length){ $('archives').innerHTML='<div class="empty">No past attempts yet. Starting a new eval archives the current run here.</div>'+cost; return; }
     const vc={passed:'g',failed:'r',incomplete:'dim'};
     const rows=a.map(x=>`<tr>
       <td class="dim">${x.span||'—'}</td>
@@ -622,10 +633,11 @@ async function loadArchives(force){
       <td class="${x.pnl>=0?'g':'r'}">${x.pnl>=0?'+':''}$${money(x.pnl)}</td>
       <td>$${money(x.final_equity)}</td>
       <td class="dim">−${x.max_dd_pct}%</td>
+      <td class="r">${x.fee?('−$'+money(x.fee)):'—'}</td>
       <td class="${vc[x.verdict]||'dim'}">${x.verdict.toUpperCase()}</td></tr>`).join('');
     $('archives').innerHTML=`<div class="sb-wrap"><table>
-      <tr><th>span</th><th>plan</th><th>start</th><th>trades</th><th>pnl</th><th>final</th><th>maxdd</th><th>verdict</th></tr>
-      ${rows}</table></div>`;
+      <tr><th>span</th><th>plan</th><th>start</th><th>trades</th><th>paper pnl</th><th>final</th><th>maxdd</th><th>fee</th><th>verdict</th></tr>
+      ${rows}</table></div>`+cost;
   }catch(e){ $('archives').innerHTML='<div class="empty" style="color:var(--amber)">failed to load</div>'; }
 }
 

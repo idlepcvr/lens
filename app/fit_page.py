@@ -167,7 +167,8 @@ SCRIPT = r"""
   var AXLBL = {lev:'leverage', freq:'trades/wk', wr:'win rate', rr:'R:R', atr:'ATR floor'};
   var el=function(id){return document.getElementById(id)};
   var pct=function(x){return (x*100).toFixed(0)+'%'};
-  var eur=function(x){return '€'+Math.round(x).toLocaleString('en-US')};
+  var CUR=(typeof FIT_BOOK!=='undefined'&&FIT_BOOK==='prop')?'$':'€';   // eval is USD, hedge is EUR
+  var eur=function(x){return CUR+Math.round(x).toLocaleString('en-US')};
   var DATA=null;
 
   // ── prefill goal params + historical frequency ──────────────────────────
@@ -355,11 +356,16 @@ SCRIPT = r"""
     return ''+v;
   }
 
-  fetch('/api/fit/defaults').then(function(r){return r.json()}).then(prefill).catch(function(){});
+  // prop eval is USD → relabel the € goal inputs to $ (values come from the eval)
+  if(FIT_BOOK==='prop'){ document.querySelectorAll('.fit-gf label').forEach(function(l){ l.textContent=l.textContent.replace('€','$'); }); }
+  fetch('/api/fit/defaults?book='+FIT_BOOK).then(function(r){return r.json()}).then(prefill).catch(function(){});
 })();
 """
 
 
-def fragment():
-    """Return (css, body, script) for embedding in /edge."""
-    return CSS, BODY, SCRIPT
+def fragment(book: str = "hedge"):
+    """Return (css, body, script) for embedding in /edge. `book` picks the goal the
+    sweep is constrained by: hedge = the BTC-stack goal, prop = the eval (+target%
+    before -DD%). It only changes the prefilled defaults; the sweep math is the same."""
+    script = (f'var FIT_BOOK={book!r};\n'.replace("'", '"')) + SCRIPT
+    return CSS, BODY, script

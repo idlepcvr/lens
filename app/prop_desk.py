@@ -18,10 +18,18 @@ import pandas as pd
 
 from .backtest_engine import STRATEGIES, add_indicators, load_ohlcv
 from .prop_eval import EVALS, _legal_leverage
-from .prop_views import HERO, EVAL, ACCOUNT, RISK
+from .prop_views import HERO, prop_config
 from .theme import shell
 
-_TF_MS = 14_400_000  # 4h
+# Bar length per timeframe. The desk drops a still-forming last bar, so this MUST
+# match the strategy's own timeframe — a 4h constant on a 1h strategy discards the
+# freshest closed bar and reads a stale one.
+_TF_MS_BY_TF = {"5m": 300_000, "15m": 900_000, "1h": 3_600_000,
+                "4h": 14_400_000, "1d": 86_400_000}
+
+
+def _tf_ms(tf: str) -> int:
+    return _TF_MS_BY_TF.get(tf, 14_400_000)
 
 
 def _next_asian_close(now: datetime.datetime) -> datetime.datetime:
@@ -36,6 +44,29 @@ def _next_asian_close(now: datetime.datetime) -> datetime.datetime:
             if t > now:
                 cands.append(t)
     return min(cands)
+
+
+def _stand_down_reason(strategy, asian_family, is_asian, up, down, dbull, dbear,
+                       rsi, rsi_prv, daily_ema50):
+    """The FIRST unmet gate, in plain words. Ordered outermost-first (session →
+    daily trend → 4H trend → trigger) so it names the thing actually blocking the
+    trade, not the last condition that happened to be false."""
+    if asian_family and not is_asian:
+        return "not an Asian bar — the setup only evaluates the 00:00 / 04:00 UTC closes"
+    if asian_family:
+        if not dbull and not dbear:
+            return "daily trend flat — no directional bias to trade with"
+        if dbull and not up:
+            return "daily is bullish but 4H trend hasn't turned up (EMA21 below EMA50)"
+        if dbear and not down:
+            return "daily is bearish but 4H trend hasn't turned down (EMA21 above EMA50)"
+        lvl = f" (needs a daily close above ${daily_ema50:,.0f})" if daily_ema50 and dbear else ""
+        if dbull:
+            return (f"trend aligned long, waiting on the RSI dip-recovery: "
+                    f"needs prev < 40 then ≥ 40, now {rsi_prv} → {rsi}")
+        return (f"daily is bearish{lvl}, so longs are gated; the short needs an RSI "
+                f"fade from > 60 down through 60, now {rsi_prv} → {rsi}")
+    return f"{strategy}: entry conditions not met on this bar"
 
 
 def _checklist(is_asian, up, down, dbull, dbear, rsi, rsi_prv):
@@ -61,6 +92,10 @@ def prop_desk_state(refresh: bool = True, strategy: str = HERO) -> dict:
     strat = STRATEGIES[strategy]
     params = strat["params"]
     tf = strat.get("timeframe") or "4h"
+    # Live eval params, not the import-time defaults — the desk must size to the
+    # account you actually bought, or every ticket on it is half the real trade.
+    cfg = prop_config()
+    EVAL, ACCOUNT, RISK = cfg["eval_name"], cfg["account"], cfg["risk"]
     rule = EVALS[EVAL]
 
     # Fresh bars (incremental fetch); on failure load_ohlcv still returns cache.
@@ -68,11 +103,12 @@ def prop_desk_state(refresh: bool = True, strategy: str = HERO) -> dict:
     if df is None or len(df) < 61:
         return {"error": "not enough bars"}
 
+    tf_ms = _tf_ms(tf)
     now = datetime.datetime.now(datetime.timezone.utc)
     now_ms = int(now.timestamp() * 1000)
     i = len(df) - 1
     last_ms = int(df.index[-1].value // 1_000_000)
-    if last_ms + _TF_MS > now_ms:   # drop a still-forming last bar if present
+    if last_ms + tf_ms > now_ms:    # drop a still-forming last bar if present
         i -= 1
     ts = df.index[i]
     bar_ms = int(ts.value // 1_000_000)
@@ -144,22 +180,32 @@ def prop_desk_state(refresh: bool = True, strategy: str = HERO) -> dict:
                   "liq": _liq(False, lev)},
     }
 
+    # Asian-session framing only describes the ASIAN_* family. For any other
+    # strategy the hour gate and the hero's condition rows are meaningless, so we
+    # omit them rather than render a checklist that belongs to a different setup.
+    asian_family = strategy.startswith("ASIAN_")
     nxt = _next_asian_close(now)
     return {
-        "strategy": strategy, "eval": EVAL,
+        "strategy": strategy, "eval": EVAL, "tf": tf,
+        "asian_family": asian_family,
         "bar_ts": ts.isoformat(),
-        "bar_age_min": max(0, int((now_ms - (bar_ms + _TF_MS)) / 60000)),
+        "bar_age_min": max(0, int((now_ms - (bar_ms + tf_ms)) / 60000)),
+        "stale_after_min": int(tf_ms / 60000 * 1.25),
         "close": round(price, 1),
         "account": ACCOUNT, "risk_pct": RISK,
         "is_asian": is_asian, "hour": hour,
-        "next_asian_iso": nxt.isoformat(),
-        "next_asian_in_min": int((nxt - now).total_seconds() / 60),
+        "next_asian_iso": nxt.isoformat() if asian_family else None,
+        "next_asian_in_min": int((nxt - now).total_seconds() / 60) if asian_family else None,
         "direction": direction, "shown_dir": shown,
         "trend": "up" if up else "down" if down else "flat",
         "verdict": "enter" if direction else "stand_down",
+        # why it stood down, in the strategy's own terms — so silence is legible
+        "stand_down_reason": None if direction else _stand_down_reason(
+            strategy, asian_family, is_asian, up, down, dbull, dbear, rsi, rsi_prv,
+            float(df["daily_ema50"].iloc[i]) if not pd.isna(df["daily_ema50"].iloc[i]) else None),
         "context": {"rsi": rsi, "rsi_prv": rsi_prv, "up4h": up, "down4h": down,
                     "daily_bull": dbull, "daily_bear": dbear, "hour": hour},
-        "checklist": _checklist(is_asian, up, down, dbull, dbear, rsi, rsi_prv),
+        "checklist": _checklist(is_asian, up, down, dbull, dbear, rsi, rsi_prv) if asian_family else None,
         "sizing": {
             "leverage": round(lev, 2), "actual_risk_pct": round(actual_risk, 2),
             "risk_usd": round(risk_usd, 2), "notional": round(notional, 2),
@@ -195,6 +241,8 @@ function chip(l,v,c){ return `<div class="chip ${c||''}">${l} <b>${v}</b></div>`
 function secHead(id,t){ return `<div class="sect" id="h-${id}" onclick="tog('${id}')"><span class="caret">▾</span><span class="ttl">${t}</span><span class="line"></span></div>`; }
 function tog(id){ $('h-'+id).classList.toggle('closed'); $('s-'+id).classList.toggle('closed'); }
 function fmtClock(min){ if(min<60) return min+'m'; const h=Math.floor(min/60); return h+'h '+(min%60)+'m'; }
+// Bangkok = UTC+7, no DST. Show both so the UTC bar times aren't a mental-math tax.
+function bkk(iso){ const d=new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z'); return new Date(d.getTime()+7*3600000).toISOString().slice(11,16); }
 
 function render(d){
   if(d.error){ $('body').innerHTML = `<div class="skeleton" style="color:var(--amber)">${d.error}</div>`; return; }
@@ -207,7 +255,7 @@ function render(d){
   let h = `<div class="tape">
     <div class="px">$${d.close.toLocaleString()}<span class="c"> BTC</span></div>
     <div class="meta">
-      4H bar <b>${d.bar_ts.slice(11,16)}</b> UTC<br>
+      4H bar <b>${d.bar_ts.slice(11,16)}</b> UTC · <b>${bkk(d.bar_ts)}</b> BKK<br>
       <span class="${stale?'stale':''}">${stale?'⚠ stale · ':''}closed <b>${d.bar_age_min}m</b> ago</span><br>
       eval wallet <b>$${d.account.toLocaleString()}</b> · risk <b>${d.risk_pct}%</b>
     </div>
@@ -233,7 +281,7 @@ function render(d){
       <span class="g-setup">ASIAN_RSI_DIP</span>
     </div>
     <div class="verdict">${enter?'ENTER':'STAND DOWN'}</div>
-    <div class="verdict-sub">${sub}<br><span style="color:var(--faint)">4H bar closed ${d.bar_ts.slice(11,16)} UTC · ${d.bar_age_min}m ago · trend ${d.trend}</span></div>`;
+    <div class="verdict-sub">${sub}<br><span style="color:var(--faint)">4H bar closed ${d.bar_ts.slice(11,16)} UTC (${bkk(d.bar_ts)} BKK) · ${d.bar_age_min}m ago · trend ${d.trend}</span></div>`;
 
   // ticket (reference when not ENTER)
   h += `<div class="ticket ${enter?'':'dim'}">
@@ -260,7 +308,7 @@ function render(d){
     + chip('RSI prev', c.rsi_prv==null?'—':c.rsi_prv)
     + chip('4H trend', d.trend, d.trend==='up'?'good':d.trend==='down'?'bad':'')
     + chip('daily', c.daily_bull?'bull':c.daily_bear?'bear':'flat', c.daily_bull?'good':c.daily_bear?'bad':'')
-    + chip('bar hour', c.hour+':00 UTC', d.is_asian?'good':'')
+    + chip('bar hour', c.hour+':00 UTC · '+((c.hour+7)%24)+':00 BKK', d.is_asian?'good':'')
     + `</div></div>`;
 
   // checklist for shown direction
@@ -274,7 +322,7 @@ function render(d){
   h += secHead('asm','📐 trade assumptions') + `<div class="sec-body" id="s-asm"><div id="asm-body"></div></div>`;
 
   // next window
-  h += `<div class="panel" style="margin-top:14px"><div class="kv"><span class="k">next Asian close</span><span class="v">${d.next_asian_iso.slice(11,16)} UTC · in ${fmtClock(d.next_asian_in_min)}</span></div></div>`;
+  h += `<div class="panel" style="margin-top:14px"><div class="kv"><span class="k">next Asian close</span><span class="v">${d.next_asian_iso.slice(11,16)} UTC (${bkk(d.next_asian_iso)} BKK) · in ${fmtClock(d.next_asian_in_min)}</span></div></div>`;
 
   $('body').innerHTML = h;
   wireSizer(d);

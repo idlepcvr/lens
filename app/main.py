@@ -20,7 +20,9 @@ Routes:
   POST   /api/signals/{signal_id}/decide → approve / reject (week 4 wire-up)
 """
 
+import time
 from datetime import date, datetime
+from functools import lru_cache
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
@@ -120,12 +122,12 @@ def home():
 <b>PROP</b> is the money-maker right now: pass the €20 eval, scale to $200k.
 <b>HEDGE</b> is your own-money discretionary edge (S1–S5 setups + vetoes).</p>
 <div class="choose">
-  <a class="door prop" href="/prop">
+  <a class="door prop" href="/prop-dashboard">
     <div class="ic">◎</div>
     <div class="sub">Pass the eval</div>
     <h2>PROP</h2>
-    <p>Kraken Prop · 5k Advanced · 0.5% risk · survive the 3% floor, hit +9%.
-       One mechanical strategy. Cockpit · Survival · Backtest.</p>
+    <p>Kraken Prop · $10k Advanced · 0.5% risk · survive the 3% floor, hit +9%.
+       Goal · Ledger · Desk · Queue · Survival.</p>
     <div class="go">ENTER →</div>
   </a>
   <a class="door hedge" href="/dashboard">
@@ -142,8 +144,12 @@ def home():
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def landing():
-    trades  = get_trades(limit=5000)
-    sigs    = get_signals(limit=5000)
+    # Scoped to the hedge book. This counted EVERY book, so its trade count was
+    # hedge + every prop attempt, and prop signals landed in the hedge queue —
+    # against the front door's own "two machines, they never mix".
+    trades  = get_trades(limit=5000, book="hedge")
+    sigs    = [s for s in get_signals(limit=5000)
+               if not str(s.get("signal_id", "")).startswith("prop-")]
     pending = [s for s in sigs if s["status"] == "pending"]
     by_strat: dict = {}
     for s in sigs:
@@ -703,9 +709,10 @@ def list_trades(
     direction: Optional[str] = Query(None),
     result:    Optional[str] = Query(None),
     period:    Optional[int] = Query(None),
+    book:      Optional[str] = Query(None, description="'hedge', 'prop' (live eval) or 'prop*' (all attempts)"),
 ):
     trades = get_trades(limit=limit, offset=offset, venue=venue,
-                        direction=direction, result=result, period=period)
+                        direction=direction, result=result, period=period, book=book)
     return {"trades": trades, "count": len(trades), "limit": limit, "offset": offset}
 
 
@@ -1032,9 +1039,10 @@ def api_stack_snapshot(req: StackSnapshot):
 
 
 @app.get("/api/goal/measured")
-def api_goal_measured(days: Optional[int] = Query(None, description="window; omit = all time")):
+def api_goal_measured(days: Optional[int] = Query(None, description="window; omit = all time"),
+                      book: Optional[str] = Query(None, description="prop = all eval attempts")):
     from . import plan
-    return plan.measured(days)
+    return plan.measured(days, book=book)
 
 
 @app.get("/api/goal/hero")
@@ -1073,17 +1081,53 @@ def api_excursion():
     return excursion.summary()
 
 
+def _seed_prop_goal_config() -> dict:
+    """First-run defaults for the prop goal config (lens_config row 2): the live
+    eval's walls + the active basket's backtest geometry. After seeding it's a
+    normal editable config — Apply/Reload on /prop-goal work exactly like hedge."""
+    import datetime as _dt
+    from .prop_views import prop_config
+    from .prop_eval import EVALS
+    pc = prop_config()
+    rule = EVALS[pc["eval_name"]]
+    acct, risk = pc["account"], pc["risk"]
+    seed = {
+        "start_balance": acct,
+        "target_balance": round(acct * (1 + rule["profit_target_pct"] / 100), 2),
+        "target_date": (_dt.date.today() + _dt.timedelta(days=45)).isoformat(),
+        "max_drawdown_allowed": rule["max_dd_pct"] / 100.0,
+        "losses_allowed": max(1, int((rule["max_dd_pct"] / 100.0) / (risk / 100.0))),
+        "leverage": rule["max_leverage"],
+        "fractional_kelly": 0.25, "execution_fill_factor": 1.0, "slippage_pct": 0.0,
+        "btc_growth_monthly": 0.0,
+        "win_rate": 0.5, "rr_ratio": 3.0, "trades_per_week": 2.0,   # overwritten below when geometry exists
+    }
+    try:
+        from .prop_goal import _basket_geometry
+        geo = _basket_geometry()
+        if geo:
+            seed["win_rate"] = round(geo["win_rate"], 4)
+            seed["rr_ratio"] = round(geo["rr"], 2)
+            seed["trades_per_week"] = round(geo["trades_per_month"] / 4.345, 2)
+    except Exception:
+        pass
+    return upsert_lens_config(seed, row_id=2)
+
+
 @app.get("/api/config")
-def get_config():
+def get_config(book: str = "hedge"):
+    if book == "prop":
+        return get_lens_config(2) or _seed_prop_goal_config()
     return get_lens_config()
 
 
 @app.patch("/api/config")
-def patch_config(data: ConfigUpdate):
+def patch_config(data: ConfigUpdate, book: str = "hedge"):
+    row_id = 2 if book == "prop" else 1
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
-        return get_lens_config()
-    return upsert_lens_config(updates)
+        return get_lens_config(row_id)
+    return upsert_lens_config(updates, row_id=row_id)
 
 
 # ─── Balance snapshot (all accounts → daily_snapshots) ───────────────────────
@@ -1133,12 +1177,23 @@ def snapshot_balance():
     return _fetch_all_balances()
 
 
+@lru_cache(maxsize=4)
+def _eur_usd_hourly(hour_bucket: int) -> float:
+    # ponytail: hour-bucketed lru_cache = one FX HTTP call per hour, built-in 1.10 fallback
+    from .bybit_sync import _get_eur_usdt
+    return _get_eur_usdt()
+
+
 @app.get("/api/volatility")
 def api_volatility(mult: float = 0.5):
     """Live BTC ATR(14d) + the noise floor a stop must clear (ATR × mult).
-    Feeds the dashboard's ATR auto-floor toggle."""
+    Feeds the dashboard's ATR auto-floor toggle. btc_eur feeds the goal pages'
+    auto BTC-price fill."""
     from .volatility import fetch_volatility
-    return fetch_volatility(noise_mult=mult)
+    v = fetch_volatility(noise_mult=mult)
+    if v.get("btc_usd"):
+        v["btc_eur"] = round(v["btc_usd"] / _eur_usd_hourly(int(time.time() // 3600)), 2)
+    return v
 
 
 @app.get("/api/positions/live")
@@ -2195,12 +2250,29 @@ class FitRequest(BaseModel):
 
 
 @app.get("/api/fit/defaults")
-def api_fit_defaults():
-    """Prefill payload for the Fit form: live config goal params + the historical
-    weekly trade frequency (the trades/week axis ceiling)."""
+def api_fit_defaults(book: str = "hedge"):
+    """Prefill payload for the Fit form: goal params + the historical weekly trade
+    frequency (the trades/week axis ceiling). `book='prop'` swaps the hedge BTC-stack
+    goal for the EVAL goal — start=eval account, target=+profit_target%, floor=-max_dd%,
+    horizon=45d, and btc_growth=0 (an eval account is USD, it doesn't ride BTC)."""
     from app.fit_sweep import historical_freq_per_week
-    return {"config": get_lens_config(),
-            "freq_per_week": historical_freq_per_week()}
+    cfg = get_lens_config()
+    if book == "prop":
+        import datetime
+        from app.prop_views import prop_config
+        from app.prop_eval import EVALS
+        pc = prop_config()
+        rule = EVALS[pc["eval_name"]]
+        acct, risk = pc["account"], pc["risk"]
+        cfg = {**cfg,
+               "start_balance": acct,
+               "target_balance": round(acct * (1 + rule["profit_target_pct"] / 100), 2),
+               "target_date": (datetime.date.today() + datetime.timedelta(days=45)).isoformat(),
+               "max_drawdown_allowed": rule["max_dd_pct"] / 100.0,
+               "losses_allowed": max(1, int((rule["max_dd_pct"] / 100.0) / (risk / 100.0))),
+               "leverage": rule["max_leverage"],
+               "btc_growth_monthly": 0.0}
+    return {"config": cfg, "freq_per_week": historical_freq_per_week()}
 
 
 @app.post("/api/fit/run")
@@ -2259,10 +2331,11 @@ def overview_page_hedge():
 
 
 @app.get("/position", response_class=HTMLResponse)
-def position_page_route():
-    """Entry + direction → SL/TP/liq levels and size in ₿/€ (uses /api/position)."""
+def position_page_route(book: str = "hedge"):
+    """Entry + direction → SL/TP/liq levels and size in ₿/€ (uses /api/position).
+    Shared page: `book` preselects its Hedge|Prop tab and keeps that mode's nav."""
     from .position_page import position_page
-    return position_page()
+    return position_page(book)
 
 
 @app.get("/sitemap", response_class=HTMLResponse)
@@ -2280,15 +2353,15 @@ def sitemap_route():
 
 
 @app.get("/journal", response_class=HTMLResponse)
-def journal_page():
-    from .journal_page import JOURNAL_HTML
-    return JOURNAL_HTML
+def journal_page(book: str = "hedge"):
+    from .journal_page import render
+    return render(book)
 
 
 @app.get("/analytics", response_class=HTMLResponse)
-def analytics_page():
-    from .analytics_page import ANALYTICS_HTML
-    return ANALYTICS_HTML
+def analytics_page(book: str = "hedge"):
+    from .analytics_page import render
+    return render(book)
 
 
 @app.get("/money", response_class=HTMLResponse)
@@ -2304,19 +2377,52 @@ def api_money(refresh: bool = Query(False)):
 
 
 @app.get("/edge", response_class=HTMLResponse)
-def edge_page():
+def edge_page(book: str = "hedge"):
     from .edge_page import render_page
     css, body, script = _backtest_fragment()
-    return render_page(bt_css=css, bt_body=body, bt_script=script)
+    return render_page(bt_css=css, bt_body=body, bt_script=script, book=book)
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-def calendar_page():
-    from .calendar_page import CALENDAR_HTML
-    return CALENDAR_HTML
+def calendar_page(book: str = "hedge"):
+    from .calendar_page import render
+    return render(book)
+
+
+# ── Prop twins: same render, book hard-locked to prop, own URL + nav entry.
+# Not clones — one render each, so hedge and prop can never drift. See theme.NAV_PROP.
+@app.get("/prop-journal", response_class=HTMLResponse)
+def prop_journal_page():
+    from .journal_page import render
+    return render("prop")
+
+
+@app.get("/prop-analytics", response_class=HTMLResponse)
+def prop_analytics_page():
+    from .analytics_page import render
+    return render("prop")
+
+
+@app.get("/prop-position", response_class=HTMLResponse)
+def prop_position_page():
+    from .position_page import position_page
+    return position_page("prop")
+
+
+@app.get("/prop-edge", response_class=HTMLResponse)
+def prop_edge_page():
+    from .edge_page import render_page
+    css, body, script = _backtest_fragment()
+    return render_page(bt_css=css, bt_body=body, bt_script=script, book="prop")
+
+
+@app.get("/prop-calendar", response_class=HTMLResponse)
+def prop_calendar_page():
+    from .calendar_page import render
+    return render("prop")
 
 
 @app.get("/prop", response_class=HTMLResponse)
@@ -2429,6 +2535,7 @@ class PropEvalParams(BaseModel):
     account: float
     risk: float
     eval_name: str
+    fee: float = 0.0
 
 
 @app.get("/api/prop/config")
@@ -2452,15 +2559,86 @@ def api_prop_new_eval(params: PropEvalParams):
     if params.eval_name not in EVALS:
         raise HTTPException(status_code=422, detail=f"unknown plan {params.eval_name}")
     archived = archive_prop_trades(meta=prop_config())   # stamp the run's params before re-tag
-    cfg = set_prop_eval(params.account, params.risk, params.eval_name)
+    cfg = set_prop_eval(params.account, params.risk, params.eval_name, params.fee)
     return {"archived": archived, "config": cfg}
+
+
+class PropBasket(BaseModel):
+    basket: list[str]
+
+
+@app.get("/prop-dashboard", response_class=HTMLResponse)
+def prop_dashboard_page():
+    from .prop_dashboard import dashboard_page
+    return dashboard_page()
+
+
+@app.get("/prop-goal", response_class=HTMLResponse)
+def prop_goal_page():
+    """Exact clone of the hedge /goal (same page, same panels), fed the prop
+    config row + prop measured stats. The old cone/checks page → /prop-goal-old."""
+    from .goal_page import render
+    return render("prop")
+
+
+@app.get("/prop-goal-old", response_class=HTMLResponse)
+def prop_goal_old_page():
+    from .prop_goal import goal_page
+    return goal_page()
+
+
+@app.get("/api/prop/goal")
+def api_prop_goal():
+    """Time-to-target cone for the active basket under the live eval walls."""
+    from .prop_goal import cone
+    return cone()
+
+
+@app.get("/api/prop/goal/model")
+def api_prop_goal_model():
+    """The /prop-goal metrics panel: the hedge goal engine fed the eval's FIXED
+    risk and 3% floor, so `risk_of_ruin` becomes P(touching the floor)."""
+    from .prop_goal import model
+    return model()
+
+
+@app.get("/api/prop/baskets")
+def api_prop_baskets():
+    """Candidate baskets scored on speed vs survival, so the trade-off is visible
+    before it's chosen."""
+    from .prop_goal import basket_options
+    from .prop_views import prop_config
+    return {"options": basket_options(), "fee": prop_config().get("fee") or 0.0}
+
+
+@app.post("/api/prop/basket")
+def api_prop_set_basket(p: PropBasket):
+    """Swap which strategies the scanner may fire. Not a new eval — the running
+    account/risk/fee are untouched."""
+    from .database import set_prop_basket
+    from .backtest_engine import STRATEGIES
+    unknown = [n for n in p.basket if n not in STRATEGIES]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"not backtest strategies: {unknown}")
+    if not p.basket:
+        raise HTTPException(status_code=422, detail="basket cannot be empty")
+    return {"config": set_prop_basket(p.basket)}
 
 
 @app.get("/api/prop/archives")
 def api_prop_archives():
-    """Past eval attempts, scored under the params each ran with."""
+    """Past eval attempts + lifetime fee spend (archived runs plus the live one —
+    the active eval's fee is already paid, so it counts against the tally)."""
     from .prop_ledger import archive_summaries
-    return {"archives": archive_summaries()}
+    from .prop_views import prop_config
+    archives = archive_summaries()
+    active_fee = prop_config().get("fee") or 0.0
+    return {
+        "archives": archives,
+        "attempts": len(archives) + 1,
+        "spent": round(sum(a["fee"] for a in archives) + active_fee, 2),
+        "active_fee": round(active_fee, 2),
+    }
 
 
 @app.get("/api/prop/positions/open")
@@ -2515,9 +2693,11 @@ def api_prop_open_positions():
 
 @app.get("/api/prop/signals")
 def api_prop_signals(limit: int = Query(300, ge=1, le=2000)):
-    """Prop hero signals (ASIAN_RSI_DIP_v1), each with the prop-legal ticket."""
-    from .prop_scan import PROP_STRATEGY, prop_ticket
-    sigs = get_signals(strategy=PROP_STRATEGY, limit=limit)
+    """Every prop signal (all prop-* strategies the scanner fired), each with the
+    prop-legal ticket. Scoped by the `prop-` signal_id prefix, not by strategy, so
+    the whole tradeable basket surfaces — not just the hero."""
+    from .prop_scan import prop_ticket
+    sigs = get_signals(id_prefix="prop-", limit=limit)
     for sg in sigs:
         try:
             if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
@@ -2548,20 +2728,21 @@ def prop_income_page():
 
 
 @app.get("/api/review/trades")
-def api_review_trades():
-    return get_enriched_trades()
+def api_review_trades(book: str = None):
+    return get_enriched_trades(book)
 
 
 @app.get("/api/review/analytics")
-def api_review_analytics():
+def api_review_analytics(book: str = None):
+    """book='hedge' | 'prop' (all prop attempts incl. archives) | omit for all books."""
     from .review import review_analytics
-    return review_analytics()
+    return review_analytics(book)
 
 
 @app.get("/api/review/equity")
-def api_review_equity():
+def api_review_equity(book: str = None):
     from .review import equity_timing
-    return equity_timing()
+    return equity_timing(book)
 
 
 @app.get("/api/review/ohlcv")

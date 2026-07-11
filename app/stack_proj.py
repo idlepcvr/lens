@@ -103,8 +103,9 @@ def rungs(stack_btc: float, price_eur: float, balance_eur: float, burn_eur: floa
 
 
 def payload() -> dict:
-    """Both rows against the live plan, ledger and config. `stack: null` when no
-    snapshot exists — nothing to project from, and we won't invent a holding."""
+    """Both rows against the live plan, ledger and config. No snapshot? Project
+    from 0 ₿ held (stated on the card) rather than refuse — the engine, burn and
+    price scenarios still date the rungs. No config price? Use live spot in EUR."""
     from .database import get_actual_stats, get_lens_config
     from . import plan as P
 
@@ -114,14 +115,23 @@ def payload() -> dict:
     stats = get_actual_stats()
 
     price = cfg.get("btc_price_eur")
+    if not price:
+        try:
+            from .volatility import fetch_volatility
+            from .bybit_sync import _get_eur_usdt
+            usd = fetch_volatility()["btc_usd"]
+            price = round(usd / _get_eur_usdt(), 2) if usd else None
+        except Exception:
+            price = None
     bal = stats.get("current_balance") or cfg.get("start_balance")
-    if not snap or not price or not bal:
+    if not price or not bal:
         return {"stack": None,
-                "reason": "log a stack snapshot (and a BTC price) to date the rungs"}
+                "reason": "no BTC price (config or live) and no balance — can't project"}
 
+    stack_btc = snap["btc_total"] if snap else 0.0
     burn = pl["burn_monthly_eur"] or 0.0
     scen = {k: pl["price_scenarios"][k] for k in ("bear", "base", "bull")}
-    common = dict(stack_btc=snap["btc_total"], price_eur=price, balance_eur=bal,
+    common = dict(stack_btc=stack_btc, price_eur=price, balance_eur=bal,
                   burn_eur=burn, scenarios=scen)
 
     rows = {}
@@ -153,12 +163,16 @@ def payload() -> dict:
                        trades_per_week=cfg["trades_per_week"], risk_frac=risk_frac, **common),
     }
 
-    return {"stack": snap["btc_total"], "stack_date": snap["date"], "price_eur": price,
+    note = ("No funded account: prop payouts are €0, so the monthly surplus is "
+            "−burn and the stack is drained until the engine covers it.")
+    if not snap:
+        note = ("No stack snapshot logged — projecting from 0 ₿ held; log one on "
+                "the Milestone ladder card to refine. " + note)
+    return {"stack": stack_btc, "stack_date": snap["date"] if snap else "unlogged",
+            "price_eur": price,
             "balance_eur": bal, "burn_monthly_eur": burn, "scenarios": scen,
             "prop_payout_eur": 0.0, "payout_share": PAYOUT_SHARE,
-            "targets": [5.0, 50.0], "rows": rows,
-            "note": "No funded account: prop payouts are €0, so the monthly surplus is "
-                    "−burn and the stack is drained until the engine covers it."}
+            "targets": [5.0, 50.0], "rows": rows, "note": note}
 
 
 if __name__ == "__main__":   # ponytail: one runnable check

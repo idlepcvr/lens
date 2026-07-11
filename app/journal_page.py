@@ -169,6 +169,9 @@ async function goalLevels(){
 }
 async function loadOpenPositions(){
   const el=document.getElementById('open-pos');
+  // /api/positions/live reads the live Kraken HEDGE account. The prop eval has no
+  // readable API, so its open position is the logged fill on /prop-ledger.
+  if(BOOK==='prop'){ el.innerHTML='<div class="sub" style="font-size:11px;color:var(--dim)">Open prop positions live on <a href="/prop-ledger" class="ac">/prop-ledger</a> — the eval account has no readable API.</div>'; return; }
   try{
     const [d,lvl]=await Promise.all([fetch('/api/positions/live').then(r=>r.json()), goalLevels()]);
     const ps=d.positions||[];
@@ -215,7 +218,7 @@ async function loadOpenPositions(){
 async function load(){
   loadOpenPositions();
   GOALLVL=await goalLevels();
-  const [tr,ca]=await Promise.all([fetch('/api/review/trades'),fetch('/api/review/ohlcv')]);
+  const [tr,ca]=await Promise.all([fetch('/api/review/trades?book='+BOOK),fetch('/api/review/ohlcv')]);
   TRADES=(await tr.json()).filter(t=>t.pnl!=null);
   computeAutoGrades();
   try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
@@ -516,4 +519,19 @@ fetch('/api/cone/status').then(function(r){return r.json()}).then(function(d){
 }).catch(function(){});
 """
 
-JOURNAL_HTML = shell("/journal", "Journal", BODY, script=SCRIPT, head_extra=_CSS, meta="what did I do?")
+def render(book: str = "hedge") -> str:
+    """One page, two books. 'prop' spans every eval attempt — the trade log for the
+    eval currently running lives on /prop-ledger, which also enforces the walls."""
+    book = "prop" if book == "prop" else "hedge"
+    other = "prop" if book == "hedge" else "hedge"
+    path = "/prop-journal" if book == "prop" else "/journal"
+    sub = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
+           f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
+           f'<a href="{"/journal" if book == "prop" else "/prop-journal"}" class="ac">'
+           f'switch to {other}</a></div>')
+    return shell(path, "Journal", sub + BODY,
+                 script=f'const BOOK="{book}";\n' + SCRIPT,
+                 head_extra=_CSS, meta="what did I do?")
+
+
+JOURNAL_HTML = render("hedge")   # back-compat for importers

@@ -386,7 +386,13 @@ def get_trades(
     if venue:
         where.append("venue = ?"); params.append(venue)
     if book:
-        where.append("book = ?"); params.append(book)
+        # trailing '*' = prefix match, so book='prop*' spans the live eval and its
+        # dated archives (prop_arch_*). Exact match otherwise — /prop-ledger relies
+        # on book='prop' meaning ONLY the eval currently running.
+        if book.endswith("*"):
+            where.append("book LIKE ?"); params.append(book[:-1] + "%")
+        else:
+            where.append("book = ?"); params.append(book)
     if direction:
         where.append("direction = ?"); params.append(direction)
     if result == "win":
@@ -443,34 +449,69 @@ def update_trade(trade_id: int, data: TradeUpdate) -> Optional[TradeResponse]:
     return _row_to_response(row) if row else None
 
 
-_PROP_EVAL_DEFAULT = {"account": 5000.0, "risk": 0.5, "eval_name": "BREAKOUT_1STEP_TURBO"}
+_PROP_EVAL_DEFAULT = {"account": 5000.0, "risk": 0.5, "eval_name": "BREAKOUT_1STEP_TURBO",
+                      "fee": 0.0, "basket": None}
+
+
+def _prop_eval_tables(c):
+    """Lazy create + add later columns to DBs that predate them.
+    fee    = what the attempt cost to buy; rides along to the archive so past
+             attempts can be costed.
+    basket = JSON list of strategy names the scanner may fire. NULL = fall back to
+             the Strategy Board's top-3, i.e. the old behaviour."""
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        account REAL, risk REAL, eval_name TEXT)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_archive (
+        tag TEXT PRIMARY KEY, account REAL, risk REAL, eval_name TEXT, created_at TEXT)""")
+    for tbl in ("prop_eval_state", "prop_eval_archive"):
+        cols = {r[1] for r in c.execute(f"PRAGMA table_info({tbl})").fetchall()}
+        if "fee" not in cols:
+            c.execute(f"ALTER TABLE {tbl} ADD COLUMN fee REAL DEFAULT 0")
+        if "basket" not in cols:
+            c.execute(f"ALTER TABLE {tbl} ADD COLUMN basket TEXT")
 
 
 def get_prop_eval() -> dict:
-    """Active prop-eval parameters (account size, risk %, plan). Single row,
-    lazily created — defaults to the Turbo 5k that was hardcoded before."""
+    """Active prop-eval parameters (account size, risk %, plan, fee paid). Single
+    row, lazily created — defaults to the Turbo 5k that was hardcoded before."""
     c = _conn()
-    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_state (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        account REAL, risk REAL, eval_name TEXT)""")
-    row = c.execute("SELECT account, risk, eval_name FROM prop_eval_state WHERE id = 1").fetchone()
+    _prop_eval_tables(c)
+    row = c.execute("SELECT account, risk, eval_name, fee, basket FROM prop_eval_state WHERE id = 1").fetchone()
+    c.commit()
     c.close()
     if not row:
         return dict(_PROP_EVAL_DEFAULT)
-    return {"account": row["account"], "risk": row["risk"], "eval_name": row["eval_name"]}
+    return {"account": row["account"], "risk": row["risk"],
+            "eval_name": row["eval_name"], "fee": row["fee"] or 0.0,
+            "basket": json.loads(row["basket"]) if row["basket"] else None}
 
 
-def set_prop_eval(account: float, risk: float, eval_name: str) -> dict:
+def set_prop_eval(account: float, risk: float, eval_name: str, fee: float = 0.0,
+                  basket: list = None) -> dict:
     c = _conn()
-    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_state (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        account REAL, risk REAL, eval_name TEXT)""")
-    c.execute("""INSERT INTO prop_eval_state (id, account, risk, eval_name) VALUES (1, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET account=excluded.account, risk=excluded.risk, eval_name=excluded.eval_name""",
-        (account, risk, eval_name))
+    _prop_eval_tables(c)
+    c.execute("""INSERT INTO prop_eval_state (id, account, risk, eval_name, fee, basket)
+        VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET account=excluded.account, risk=excluded.risk,
+            eval_name=excluded.eval_name, fee=excluded.fee, basket=excluded.basket""",
+        (account, risk, eval_name, fee, json.dumps(basket) if basket else None))
     c.commit()
     c.close()
-    return {"account": account, "risk": risk, "eval_name": eval_name}
+    return {"account": account, "risk": risk, "eval_name": eval_name,
+            "fee": fee, "basket": basket}
+
+
+def set_prop_basket(basket: list) -> dict:
+    """Swap the tradeable basket without disturbing the running eval's account/
+    risk/fee — changing which strategies may fire is not a new attempt."""
+    c = _conn()
+    _prop_eval_tables(c)
+    c.execute("UPDATE prop_eval_state SET basket = ? WHERE id = 1",
+              (json.dumps(basket) if basket else None,))
+    c.commit()
+    c.close()
+    return get_prop_eval()
 
 
 def archive_prop_trades(meta: dict = None) -> int:
@@ -480,15 +521,28 @@ def archive_prop_trades(meta: dict = None) -> int:
     the run used (trades don't carry it), so the history view can score it later."""
     tag = "prop_arch_" + datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     c = _conn()
-    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_archive (
-        tag TEXT PRIMARY KEY, account REAL, risk REAL, eval_name TEXT, created_at TEXT)""")
+    _prop_eval_tables(c)
     if meta:
-        c.execute("INSERT OR REPLACE INTO prop_eval_archive (tag, account, risk, eval_name, created_at) VALUES (?,?,?,?,?)",
-                  (tag, meta.get("account"), meta.get("risk"), meta.get("eval_name"), datetime.utcnow().isoformat()))
+        c.execute("INSERT OR REPLACE INTO prop_eval_archive (tag, account, risk, eval_name, created_at, fee) VALUES (?,?,?,?,?,?)",
+                  (tag, meta.get("account"), meta.get("risk"), meta.get("eval_name"),
+                   datetime.utcnow().isoformat(), meta.get("fee") or 0.0))
     cur = c.execute("UPDATE trades SET book = ? WHERE book = 'prop'", (tag,))
     c.commit()
     c.close()
     return cur.rowcount
+
+
+def stamp_prop_archive(tag: str, account: float, risk: float, eval_name: str,
+                       fee: float = 0.0, created_at: str = None) -> dict:
+    """Backfill metadata for a run archived before params were stamped (or fix a
+    fee entered late). Trades keep their book tag — only the scoring params move."""
+    c = _conn()
+    _prop_eval_tables(c)
+    c.execute("INSERT OR REPLACE INTO prop_eval_archive (tag, account, risk, eval_name, created_at, fee) VALUES (?,?,?,?,?,?)",
+              (tag, account, risk, eval_name, created_at or datetime.utcnow().isoformat(), fee))
+    c.commit()
+    c.close()
+    return {"tag": tag, "account": account, "risk": risk, "eval_name": eval_name, "fee": fee}
 
 
 def prop_archive_books() -> list[str]:
@@ -503,9 +557,9 @@ def prop_archive_books() -> list[str]:
 def get_prop_archives() -> list[dict]:
     """Archived eval runs (tag + the params they ran under), newest first."""
     c = _conn()
-    c.execute("""CREATE TABLE IF NOT EXISTS prop_eval_archive (
-        tag TEXT PRIMARY KEY, account REAL, risk REAL, eval_name TEXT, created_at TEXT)""")
-    rows = c.execute("SELECT tag, account, risk, eval_name, created_at FROM prop_eval_archive ORDER BY tag DESC").fetchall()
+    _prop_eval_tables(c)
+    rows = c.execute("SELECT tag, account, risk, eval_name, created_at, fee FROM prop_eval_archive ORDER BY tag DESC").fetchall()
+    c.commit()
     c.close()
     return [dict(r) for r in rows]
 
@@ -885,6 +939,7 @@ def get_signals(
     status: Optional[str] = None,
     strategy: Optional[str] = None,
     limit: int = 200,
+    id_prefix: Optional[str] = None,
 ) -> list[dict]:
     where = []
     params: list = []
@@ -892,6 +947,8 @@ def get_signals(
         where.append("status = ?"); params.append(status)
     if strategy:
         where.append("strategy_name = ?"); params.append(strategy)
+    if id_prefix:
+        where.append("signal_id LIKE ?"); params.append(id_prefix + "%")
     sql = "SELECT * FROM signals"
     if where:
         sql += " WHERE " + " AND ".join(where)
@@ -946,35 +1003,36 @@ _CFG_COLS = (
 )
 
 
-def get_lens_config() -> dict:
+def get_lens_config(row_id: int = 1) -> dict:
+    """Row 1 = hedge goal config, row 2 = prop goal config (same table, same shape)."""
     c = _conn()
-    row = c.execute("SELECT * FROM lens_config WHERE id = 1").fetchone()
+    row = c.execute("SELECT * FROM lens_config WHERE id = ?", (row_id,)).fetchone()
     c.close()
     return _row_to_dict(row) if row else {}
 
 
-def upsert_lens_config(updates: dict) -> dict:
+def upsert_lens_config(updates: dict, row_id: int = 1) -> dict:
     """Partial update — keeps existing values for keys not in `updates`."""
     payload = {k: v for k, v in updates.items() if k in _CFG_COLS}
     payload["updated_at"] = datetime.utcnow().isoformat()
     c = _conn()
-    existing = c.execute("SELECT id FROM lens_config WHERE id = 1").fetchone()
+    existing = c.execute("SELECT id FROM lens_config WHERE id = ?", (row_id,)).fetchone()
     if existing:
         set_clause = ", ".join(f"{k} = ?" for k in payload)
         c.execute(
-            f"UPDATE lens_config SET {set_clause} WHERE id = 1",
-            list(payload.values()),
+            f"UPDATE lens_config SET {set_clause} WHERE id = ?",
+            list(payload.values()) + [row_id],
         )
     else:
         cols = ["id"] + list(payload.keys())
-        vals = [1] + list(payload.values())
+        vals = [row_id] + list(payload.values())
         placeholders = ", ".join("?" for _ in cols)
         c.execute(
             f"INSERT INTO lens_config ({', '.join(cols)}) VALUES ({placeholders})",
             vals,
         )
     c.commit()
-    row = c.execute("SELECT * FROM lens_config WHERE id = 1").fetchone()
+    row = c.execute("SELECT * FROM lens_config WHERE id = ?", (row_id,)).fetchone()
     c.close()
     return _row_to_dict(row)
 

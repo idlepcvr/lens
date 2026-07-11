@@ -131,7 +131,9 @@ async function load(){
   // /api/trades = full trade incl review fields + is_open + ISO dates (primary).
   // /api/review/trades = indicator context at entry (bar/4H trend/RSI/move) — merged
   // in by id so the modal matches the /review page's richness.
-  const [tr,er,ca,co]=await Promise.all([fetch('/api/trades?limit=2000'),fetch('/api/review/trades'),fetch('/api/review/ohlcv'),
+  const BOOK=__BOOK__, RBOOK=BOOK.replace('*','');   // review APIs take 'prop', trades API takes 'prop*'
+  const [tr,er,ca,co]=await Promise.all([fetch('/api/trades?limit=2000&book='+encodeURIComponent(BOOK)),
+    fetch('/api/review/trades?book='+RBOOK),fetch('/api/review/ohlcv'),
     fetch('/api/cone/status').catch(()=>null)]);
   CONE=co&&co.ok?await co.json():null;
   const j=await tr.json(); let ej=[]; try{ej=await er.json();}catch(e){}
@@ -383,11 +385,31 @@ load();
 
 import json as _json
 
-CALENDAR_HTML = shell(
-    "/calendar", "Calendar", BODY,
-    script=(SCRIPT
-            .replace("__MISTAKES__", _json.dumps(MISTAKES))
-            .replace("__EMOTIONS__", _json.dumps(EMOTIONS))
-            .replace("__GRADES__",   _json.dumps(GRADES))),
-    head_extra=_CSS, meta="review my trades",
-)
+# book → (query value sent to the APIs, sub-title). 'prop*' spans every attempt,
+# because one eval is often 7 trades long and a heatmap of 7 cells says nothing.
+_BOOKS = {
+    "hedge": ("hedge", "Monthly hedge-book heatmap"),
+    "prop":  ("prop*", "Monthly prop heatmap · all eval attempts, live + archived"),
+}
+
+
+def render(book: str = "hedge") -> str:
+    q, sub = _BOOKS.get(book, _BOOKS["hedge"])
+    other = "prop" if book == "hedge" else "hedge"
+    body = BODY.replace(
+        "Monthly hedge-book heatmap",
+        f'{sub} · <a href="{"/prop-calendar" if book == "hedge" else "/calendar"}" class="ac">'
+        f'switch to {other}</a> ·')
+    return shell(
+        "/prop-calendar" if book == "prop" else "/calendar", "Calendar", body,
+        script=(SCRIPT
+                .replace("__MISTAKES__", _json.dumps(MISTAKES))
+                .replace("__EMOTIONS__", _json.dumps(EMOTIONS))
+                .replace("__GRADES__",   _json.dumps(GRADES))
+                .replace("__BOOK__",     _json.dumps(q))),
+        head_extra=_CSS, meta=f"review my {book} trades",
+    )
+
+
+# Back-compat for any importer that still wants the hedge page as a constant.
+CALENDAR_HTML = render("hedge")

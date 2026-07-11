@@ -178,7 +178,8 @@ BODY = r"""
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
           <div class="frow"><label>Losses allowed</label><input type="text" inputmode="decimal" name="losses_allowed"></div>
           <div class="frow"><label>Frac. Kelly</label><input type="text" inputmode="decimal" name="fractional_kelly"></div>
-          <div class="frow"><label>ATR floor</label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+          <div class="frow"><label>ATR floor <input type="checkbox" id="atr-auto" checked style="vertical-align:-1px"> <span class="hint">auto, decimal</span></label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+          <div class="frow"><label>Noise × <span class="hint">ATR mult</span></label><input type="text" inputmode="decimal" id="atr-mult" value="0.5"></div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Execution</div>
           <div class="frow"><label>Fill factor <span class="hint">0–1, size</span></label><input type="text" inputmode="decimal" name="execution_fill_factor" placeholder="1.0"></div>
@@ -468,17 +469,44 @@ async function renderSensitivity(payload){
 
 let debounce;
 FORM.addEventListener("input",()=>{ clearTimeout(debounce); debounce=setTimeout(recompute,250); });
-SAVE_BTN.addEventListener("click",async()=>{ await fetch("/api/config",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(readForm())}); SAVED.classList.add("show"); setTimeout(()=>SAVED.classList.remove("show"),1500); });
-RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config").then(r=>r.json())); recompute(); });
+SAVE_BTN.addEventListener("click",async()=>{ await fetch("/api/config"+BQ,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(readForm())}); SAVED.classList.add("show"); setTimeout(()=>SAVED.classList.remove("show"),1500); });
+RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config"+BQ).then(r=>r.json())); recompute(); });
 (async()=>{
-  populate(await fetch("/api/config").then(r=>r.json()));
+  populate(await fetch("/api/config"+BQ).then(r=>r.json()));
   // prefill from an /edge "→ Goal" handoff (?win_rate=..&rr_ratio=..&trades_per_week=..)
   const qs=new URLSearchParams(location.search);
   ["win_rate","rr_ratio","trades_per_week","leverage"].forEach(function(k){
     if(qs.has(k)){ const el=FORM.elements.namedItem(k); if(el) el.value=qs.get(k); }
   });
   recompute();
+  // auto-fills read the populated form, so they run strictly after populate()
+  loadLadder(); loadMeasured(); refreshVol();
 })();
+
+// ── ATR noise floor + live-price auto-fill (same behaviour as /dashboard) ────
+let lastVol=null, volDeb;
+const ATR_AUTO=document.getElementById("atr-auto"), ATR_MULT=document.getElementById("atr-mult");
+function applyAtrAuto(){
+  const fld=FORM.elements.namedItem("min_underlying_stop_pct");
+  if(ATR_AUTO.checked && lastVol && lastVol.noise_floor_pct!=null){
+    // calc compares this to the price-move fraction → store decimal, not percent
+    fld.value=(lastVol.noise_floor_pct/100).toFixed(5); fld.readOnly=true; fld.style.opacity=0.6;
+  } else { fld.readOnly=false; fld.style.opacity=1; }
+  recompute();
+}
+async function refreshVol(){
+  const m=parseFloat(ATR_MULT.value)||0.5;
+  try{ lastVol=await fetch("/api/volatility?mult="+m).then(r=>r.json()); }
+  catch(e){ lastVol=null; }
+  // BTC price €: live spot at load — we know this number, don't ask for it
+  if(lastVol && lastVol.btc_eur && !PX_FILLED){
+    FORM.elements.namedItem("btc_price_eur").value=lastVol.btc_eur; PX_FILLED=true;
+  }
+  applyAtrAuto();
+}
+let PX_FILLED=false;
+ATR_AUTO.addEventListener("change",applyAtrAuto);
+ATR_MULT.addEventListener("input",()=>{ clearTimeout(volDeb); volDeb=setTimeout(refreshVol,350); });
 
 document.querySelectorAll('#goal-form input:not([type=date])').forEach(function(inp){
   function tryCalc(){ var v=inp.value.trim(); if(!v) return;
@@ -504,6 +532,12 @@ function renderLadder(L){
   document.getElementById("am-goal-btc").value=p.goal_btc;
   document.getElementById("am-goal-date").value=p.goal_date;
   document.getElementById("am-burn").value=p.burn_monthly_eur;
+
+  // BTC growth /mo: empty or 0 = unset → fill from the plan's base scenario (% p.a. → monthly)
+  const gr=FORM.elements.namedItem("btc_growth_monthly");
+  if(!parseFloat(gr.value)&&p.price_scenarios&&p.price_scenarios.base!=null){
+    gr.value=(Math.pow(1+p.price_scenarios.base/100,1/12)-1).toFixed(4); recompute();
+  }
 
   const nextIdx=L.milestones.findIndex(m=>!m.done);
   document.getElementById("ladder").innerHTML=L.milestones.map((m,i)=>
@@ -619,7 +653,7 @@ function markSrc(measured){ ["win_rate","rr_ratio","trades_per_week"].forEach(k=
   const el=document.getElementById("src-"+k); el.textContent=measured?"measured":"typed";
   el.className="msrc "+(measured?"measured":"typed"); }); }
 async function loadMeasured(){
-  MEAS=await fetch("/api/goal/measured"+(MEAS_DAYS?"?days="+MEAS_DAYS:"")).then(r=>r.json());
+  MEAS=await fetch("/api/goal/measured"+(BQ||"?x=1")+(MEAS_DAYS?"&days="+MEAS_DAYS:"")).then(r=>r.json());
   const btn=document.getElementById("measured-btn"), note=document.getElementById("measured-note");
   const ok=MEAS.n&&MEAS.enough&&MEAS.rr_ratio!=null;
   btn.disabled=!ok;
@@ -638,7 +672,6 @@ document.getElementById("measured-btn").addEventListener("click",()=>{
   markSrc(true); recompute();
 });
 FORM.addEventListener("input",()=>markSrc(false));
-loadLadder(); loadMeasured();
 
 // Target BTC helper — type a BTC count → fills Target € at TODAY's price (price cancels).
 const TBTC=document.getElementById("target_btc");
@@ -654,5 +687,11 @@ TBTC.addEventListener("keydown",function(e){ if(e.key==="Enter"){ tbtcApply(); e
 """ + HERO_JS
 
 
-def render() -> str:
-    return shell("/goal", "Goal", BODY, script=SCRIPT, head_extra=CSS, meta="re-solved goal model")
+def render(book: str = "hedge") -> str:
+    """One page, two books — an exact clone. `book` only changes which config row
+    and measured book feed the form (BQ suffix); every panel and computation is
+    identical. Prop values are seeded on first load (see _seed_prop_goal_config)."""
+    path = "/prop-goal" if book == "prop" else "/goal"
+    bq = "?book=prop" if book == "prop" else ""
+    script = f'const BQ="{bq}";\n' + SCRIPT
+    return shell(path, "Goal", BODY, script=script, head_extra=CSS, meta="re-solved goal model")

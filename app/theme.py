@@ -15,11 +15,32 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
+# PROP mirrors HEDGE one-for-one, in the same order, so the two modes are learnable
+# as one layout. Every prop page has its OWN URL (a /prop-* twin) — no ?book= toggle.
+# The twin routes call the same render() with book="prop" hard-locked, so hedge and
+# prop share one codebase and can never drift, but read as fully separate pages.
+#   hedge          prop                    render
+#   /dashboard  →  /prop-dashboard         own page
+#   /goal       →  /prop-goal              own page
+#   /desk       →  /prop-desk              own page
+#   /signals    →  /prop-signals           own page
+#   /journal    →  /prop-journal           shared render, book="prop" locked
+#   /calendar   →  /prop-calendar          shared render, book="prop" locked
+#   /analytics  →  /prop-analytics         shared render, book="prop" locked
+#   /position   →  /prop-position          shared render, book="prop" locked
+#   /edge       →  /prop-edge              shared render, book="prop" locked
 NAV_PROP = [
     ("/overview", "Overview"),
-    ("/prop", "Goals"),
-    ("/prop-desk", "Live"),
+    ("/prop-dashboard", "Plan"),
+    ("/prop-goal", "Goal"),
+    ("/prop-position", "Position"),
+    ("/prop-desk", "Desk"),
     ("/prop-signals", "Signals"),
+    ("/prop-calendar", "Calendar"),
+    ("/prop-analytics", "Analytics"),
+    ("/prop-journal", "Journal"),
+    ("/prop-edge", "Edge"),
+    ("/prop", "Goals board"),
     ("/prop-ledger", "Ledger"),
     ("/prop-income", "Income"),
     ("/strategy", "Strategy"),
@@ -40,15 +61,15 @@ NAV_HEDGE = [
     ("/analytics", "Analytics"),
     ("/journal", "Journal"),
     ("/edge", "Edge"),
-    ("/glossary", "Learn"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.
-PROP_MAIN  = {"/overview", "/prop-desk", "/prop-ledger"}
+PROP_MAIN  = {"/overview", "/prop-dashboard", "/prop-desk", "/prop-ledger", "/prop-calendar"}
 HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
-NAV_NEUTRAL = [("/money", "Money"), ("/audit", "Audit"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+# /glossary is pure reference with no book — neutral, so neither nav owns it.
+NAV_NEUTRAL = [("/glossary", "Learn"), ("/money", "Money"), ("/audit", "Audit"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
@@ -56,7 +77,15 @@ _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
 
 
 def page_mode(path: str) -> str:
-    """Which mode a page lives in (defaults to prop for neutral pages)."""
+    """Which mode a page lives in (defaults to prop for neutral pages).
+
+    A shared page (/position, /edge, /journal…) belongs to whichever mode you
+    arrived from, so `?book=` on the path wins over the static table. Without this
+    a prop user clicking "Position" would be dumped into the hedge nav."""
+    if "book=prop" in path:
+        return "prop"
+    if "book=hedge" in path:
+        return "hedge"
     return _PAGE_MODE.get(path, "prop")
 
 # ─────────────────────────────────────────────────────────────────────────────

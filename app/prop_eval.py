@@ -190,9 +190,13 @@ def _trade_log(df, signal_fn, params, eval_rule, risk_per_trade_pct):
     return trades
 
 
-def _walk_eval(daily_trades, account, eval_rule, open_equity=True):
+def _walk_eval(daily_trades, account, eval_rule, open_equity=True, path=None):
     """Replay an ordered list of (eval_day -> [(pnl_pct, dip_pct),...]) under the
     eval rules. Returns (result, final_balance, n_trades, fail_reason).
+
+    Pass `path` (a list) to have the balance after every closed trade appended —
+    that's what the /prop-goal cone samples. Kept as an out-param so the hot MC
+    loop allocates nothing when it isn't asked for.
 
     open_equity=True (default) also tests each trade's intra-trade trough (a full
     adverse move to its price stop) against the floor + daily wall BEFORE the
@@ -223,6 +227,8 @@ def _walk_eval(daily_trades, account, eval_rule, open_equity=True):
                     return "FAIL", trough, n + 1, "daily_loss_intratrade"
             balance *= (1 + pnl / 100)
             n += 1
+            if path is not None:
+                path.append(balance)
             if trailing:
                 if balance > peak:
                     peak = balance
@@ -442,6 +448,11 @@ def _portfolio_daily_trades(strategy_names, rule, risk_per_trade_pct, months,
         _df_cache = {}
     all_trades = []
     for name in strategy_names:
+        if name not in STRATEGIES:
+            # Not a real backtest strategy (no signal_fn) → skip. Prop trades only
+            # strategies the engine can actually fire; hedge bar-context setups are
+            # not portable to the eval (no backtest), so they never enter a basket.
+            continue
         strat = STRATEGIES[name]
         tf = strat.get("timeframe", "4h")
         if tf not in _df_cache:

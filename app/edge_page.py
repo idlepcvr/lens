@@ -105,13 +105,15 @@ _MODE_JS = r"""
 """
 
 
-def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str:
-    """bt_* = the backtest-runner fragment (built in main.py, embedded as #backtest)."""
+def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "",
+                book: str = "hedge") -> str:
+    """bt_* = the backtest-runner fragment (built in main.py, embedded as #backtest).
+    `book` only picks which nav to render — the page shows both boards regardless."""
     from .prop_views import _board, _CSS as PV_CSS
     from .strategy_eval import load_cache
     from .fit_page import fragment as _fit_fragment
 
-    fit_css, fit_body, fit_script = _fit_fragment()
+    fit_css, fit_body, fit_script = _fit_fragment(book)
 
     d = load_cache()
     if d:
@@ -147,8 +149,9 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str
         head = _CSS + fit_css + bt_css
         script = SCRIPT + fit_script + bt_script
 
+    fit_label = "eval-constrained sweep" if book == "prop" else "goal-constrained sweep"
     anchors = ('<div class="ed-anchors">'
-               '<a href="#fit" style="color:var(--accent);border-color:var(--accent)">↓ Fit · goal-constrained sweep</a>'
+               f'<a href="#fit" style="color:var(--accent);border-color:var(--accent)">↓ Fit · {fit_label}</a>'
                '<a href="#backtest">↓ Backtest · run &amp; build</a>'
                '<a href="#board">↓ Board · simulated ranks</a>'
                '<a href="#past">↓ Past · live results</a></div>')
@@ -156,4 +159,5 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str
             'must be, a runner to test the next idea, what the coded rules would have done, and what '
             'your trades actually did.</div>'
             + anchors + fit_body + bt_body + board + _LIVE)
-    return shell("/edge", "Edge", body, script=script, head_extra=head, meta="which setups pay?")
+    path = "/prop-edge" if book == "prop" else "/edge"
+    return shell(path, "Edge", body, script=script, head_extra=head, meta="which setups pay?")

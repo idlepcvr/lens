@@ -64,8 +64,23 @@ def main():
     assert abs(d["daily_limit_usd"] - 162.0) < 1e-6, d
     assert d["breach_daily"] and d["failed"], d
 
+    # 5) fee rides state → archive → summary, and survives a new eval
+    _reset_book()
+    _add(-200, old)                          # a losing run to archive
+    database.set_prop_eval(5000.0, 0.5, "BREAKOUT_1STEP_TURBO", fee=20.0)
+    assert database.get_prop_eval()["fee"] == 20.0
+    from app.prop_ledger import archive_summaries
+    database.archive_prop_trades(meta=database.get_prop_eval())
+    database.set_prop_eval(10000.0, 0.5, "BREAKOUT_1STEP_TURBO", fee=48.0)
+    arch = archive_summaries()
+    assert len(arch) == 1 and arch[0]["fee"] == 20.0, arch
+    assert arch[0]["verdict"] == "failed", arch
+    assert database.get_prop_eval()["account"] == 10000.0, "new eval params live"
+    # lifetime spend = archived fees + the fee already paid on the active eval
+    assert sum(a["fee"] for a in arch) + database.get_prop_eval()["fee"] == 68.0
+
     os.remove(path)
-    print("ok — prop_ledger breach + daily-wall logic holds")
+    print("ok — prop_ledger breach + daily-wall logic holds; fee tracks across evals")
 
 
 if __name__ == "__main__":

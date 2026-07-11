@@ -49,7 +49,7 @@ _CSS = r"""<style>
 </style>"""
 
 
-def position_page() -> str:
+def position_page(book: str = "hedge") -> str:
     body = r"""
 <div class="pz">
   <h1>Position</h1>
@@ -64,7 +64,7 @@ def position_page() -> str:
       <div class="lf"><label>Balance €</label><input id="p-bal" type="text" inputmode="decimal" placeholder="—"></div>
       <div class="lf"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
     </div>
-    <div class="frow" style="margin-bottom:0">
+    <div class="frow" style="margin-bottom:0" id="book-preset-row">
       <div class="lf"><label>Book preset</label>
         <div class="seg"><button type="button" id="b-hedge" class="on book" onclick="setBook('hedge')">Hedge</button><button type="button" id="b-prop" class="book" onclick="setBook('prop')">Prop</button></div>
       </div>
@@ -91,7 +91,7 @@ def position_page() -> str:
 
     script = r"""
 const $=id=>document.getElementById(id);
-let dir='long', book='hedge', CFG=null, deb, EURUSD=null, HEDGE_BAL=null, LAST=null;
+let dir='long', book=START_BOOK, CFG=null, deb, EURUSD=null, HEDGE_BAL=null, LAST=null;
 const fP=n=>n==null?'—':Number(n).toLocaleString('en',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2}); // ponytail: no $/commas so prices paste straight into Kraken
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
@@ -267,6 +267,9 @@ async function logTrade(){
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ tryCalc(); e.preventDefault(); } });
 });
 
+// arrive via /prop-position → the Prop tab is already selected
+if(START_BOOK==='prop') setBook('prop');
+
 (async ()=>{ const c=await ensureCfg();
   HEDGE_BAL = c.start_balance!=null ? c.start_balance : null;
   if(c.start_balance!=null) $('p-bal').placeholder=c.start_balance;
@@ -287,5 +290,9 @@ async function logTrade(){
     cfg = prop_config()
     prop_def = {"account": cfg["account"], "risk": round(cfg["risk"] / 100, 4),
                 "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
-    script = f"const PROP={json.dumps(prop_def)};\n" + script
-    return shell("/position", "Position", body, script=script, head_extra=_CSS, meta="size the trade")
+    script = f"const PROP={json.dumps(prop_def)};\nconst START_BOOK=\"{book}\";\n" + script
+    # /prop-position keeps the PROP nav + preselects the Prop tab (see theme.NAV_PROP).
+    # On the prop page there's no hedge sizing — lock the book, hide the toggle.
+    path = "/prop-position" if book == "prop" else "/position"
+    head = _CSS + ("<style>#book-preset-row{display:none}</style>" if book == "prop" else "")
+    return shell(path, "Position", body, script=script, head_extra=head, meta="size the trade")

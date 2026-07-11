@@ -98,7 +98,7 @@ function historyRow(s){
     ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}
     ${s.status==='approved'?`<button class="btn" style="margin-top:8px;background:var(--panel);border:1px solid var(--line)" onclick='logLedger(${JSON.stringify(s)})'>＋ Log fill to ledger →</button>`:''}`;
   return `<tr class="hrow" onclick="toggleRow('${id}')" style="cursor:pointer">
-    <td>PROP</td>
+    <td style="font-size:11px">${s.strategy_name||'PROP'}</td>
     <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>
     <td><span class="badge ${s.status}">${s.status}</span></td>
     <td class="m">${conv}</td>
@@ -139,14 +139,14 @@ async function logLedger(s){
 }
 
 function render(all){
-  const sigs = all.filter(s=>s.strategy_name==='ASIAN_RSI_DIP_v1');
+  const sigs = all;  // API already returns only prop-* signals (whole basket, not just the hero)
   const pending = sigs.filter(s=>s.status==='pending').sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''));
   const decided = sigs.filter(s=>s.status!=='pending').sort((a,b)=>(b.decided_at||b.received_at||'').localeCompare(a.decided_at||a.received_at||'')).slice(0,25);
 
   let html = '';
   html += `<div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ what is this page</span><span class="line"></span></div>`
     + `<div class="sec-body closed" id="s-help"><div class="help-body">`
-    + `<h4>prop alerts</h4>The hourly cron reads the hero <b>ASIAN_RSI_DIP_v1</b> on the freshest closed 4H bar. It only fires on Asian-session closes (00 / 04 UTC). An ENTER lands here as <b class="a">pending</b> and pushes your phone.`
+    + `<h4>prop alerts</h4>The hourly cron reads your prop tradeable basket (the Strategy Board's top prop strategies, or whatever basket you pinned) on the freshest closed 4H bar. The highest-ranked one saying ENTER wins the bar, lands here as <b class="a">pending</b>, and pushes your phone. Each strategy fires on its own session rule.`
     + `<h4>decide</h4><b class="g">TAKE A+</b> (=5) / <b class="g">TAKE</b> (=3) / <b class="r">SKIP</b> — same buttons as the alert. A skip is recorded too.`
     + `<h4>log fill to ledger</h4>After you place the order on Kraken, hit <b>Log fill to ledger</b>. It writes an <i>open</i> prop-book trade (sized from the ticket) carrying <code>linked_signal_id</code> back to this alert. Close it out — add exit + pnl — on <a href="/prop-ledger" class="ac">Ledger</a>.`
     + `<h4>separate from the hedge book</h4>These are <code>book='prop'</code> trades on the $5k eval account, kept apart from your own-money HEDGE trades.`

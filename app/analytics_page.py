@@ -101,10 +101,14 @@ const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).tri
 let cumSeries=null, balSeries=null, coneSeries=[], CHART=null, CONE_END=0;
 
 Promise.all([
-  fetch('/api/review/equity').then(r=>r.json()),
-  fetch('/api/review/analytics').then(r=>r.json()),
-  fetch('/api/cone').then(r=>r.json()).catch(()=>null),
-  fetch('/api/excursion').then(r=>r.json()).catch(()=>null),
+  // book-scoped. Unscoped, this silently folded every prop attempt's trades into
+  // the hedge P&L, win-rate and drawdown.
+  fetch('/api/review/equity?book='+BOOK).then(r=>r.json()),
+  fetch('/api/review/analytics?book='+BOOK).then(r=>r.json()),
+  // cone + excursion are the HEDGE book only (the BTC-stack goal cone, hedge trade
+  // geometry). On prop they'd be foreign data, so skip them — the panels self-hide.
+  BOOK==='prop' ? Promise.resolve(null) : fetch('/api/cone').then(r=>r.json()).catch(()=>null),
+  BOOK==='prop' ? Promise.resolve(null) : fetch('/api/excursion').then(r=>r.json()).catch(()=>null),
 ]).then(([E,A,C,X])=>{
   if(!E||!E.n){document.getElementById('read').innerHTML='<div class="read"><p class="lede">No closed trades yet.</p></div>';return;}
   drawEquity(E);
@@ -368,5 +372,21 @@ function renderSections(E,A,X){
 }
 """
 
-ANALYTICS_HTML = shell("/analytics", "Analytics", BODY, script=SCRIPT,
-                       head_extra=_CSS, meta="how am I doing?")
+def render(book: str = "hedge") -> str:
+    """One page, two books. 'prop' spans every eval attempt (see review.book_filter)
+    — the current eval alone is /prop-ledger."""
+    book = "prop" if book == "prop" else "hedge"
+    other = "prop" if book == "hedge" else "hedge"
+    path = "/prop-analytics" if book == "prop" else "/analytics"
+    eval_cone = ('' if book != "prop"
+                 else ' · <a href="/prop-goal" class="ac">eval projection cone → /prop-goal</a>')
+    body = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
+            f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
+            f'<a href="{"/analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
+            f'switch to {other}</a>{eval_cone}</div>') + BODY
+    return shell(path, "Analytics", body,
+                 script=f"const BOOK={book!r};\n".replace("'", '"') + SCRIPT,
+                 head_extra=_CSS, meta="how am I doing?")
+
+
+ANALYTICS_HTML = render("hedge")   # back-compat for importers

@@ -318,15 +318,21 @@ def hero() -> dict:
 
 # ─── Measured parameters (the ledger's own numbers) ──────────────────────────
 
-def measured(days: int = None) -> dict:
+def measured(days: int = None, book: str = None) -> dict:
     """WR, realized R, trades/week and fee drag straight from closed trades.
 
-    `days=None` → all time. Fee drag is expressed in R (fees per trade ÷ avg loss)
-    because that's the unit the goal model's breakeven-WR argument lives in.
+    `days=None` → all time. `book='prop'` = every prop attempt (prefix match,
+    review.book_filter semantics); None = every book. Fee drag is expressed in R
+    (fees per trade ÷ avg loss) — the unit the goal model's breakeven-WR lives in.
     """
     c = _conn()
     where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
     params = []
+    if book == "prop":
+        where += " AND book LIKE 'prop%'"
+    elif book:
+        where += " AND book = ?"
+        params.append(book)
     if days:
         where += " AND closed_at >= ?"
         params.append(date.fromordinal(date.today().toordinal() - days).isoformat())

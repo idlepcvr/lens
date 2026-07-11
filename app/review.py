@@ -81,18 +81,35 @@ def _load_ohlcv():
     return c1h, c4h
 
 
-def _load_trades():
+def book_filter(book: str) -> tuple:
+    """(sql_fragment, params) for scoping a trades query to one book.
+
+    `book='prop'` means EVERY prop attempt — the live eval plus its dated archives
+    (`prop_arch_*`) — because prop performance only makes sense across attempts;
+    a single eval is often 7 trades long. The CURRENT eval alone is /prop-ledger.
+    `book='hedge'` is exact. None = every book, which is what analytics did
+    unconditionally before, quietly folding prop trades into hedge stats.
+    """
+    if not book:
+        return "", []
+    if book == "prop":
+        return " AND book LIKE 'prop%'", []
+    return " AND book = ?", [book]
+
+
+def _load_trades(book: str = None):
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
-    cur.execute("""
+    bsql, bparams = book_filter(book)
+    cur.execute(f"""
         SELECT id, direction, entry, exit, pnl, fees, size, leverage,
                opened_at, closed_at, notes, balance_after, balance_before, merged_manual, setup_tag,
                tp, sl, funding_cost, followed_plan, followed_strategy,
                market_type, order_type, fill_count,
                grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
                book, venue, symbol, manually_edited
-        FROM trades WHERE closed_at IS NOT NULL ORDER BY opened_at
-    """)
+        FROM trades WHERE closed_at IS NOT NULL {bsql} ORDER BY opened_at
+    """, list(bparams))
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -100,9 +117,9 @@ def _load_trades():
 
 # ── enrichment ────────────────────────────────────────────────────────────────
 
-def get_enriched_trades() -> list:
+def get_enriched_trades(book: str = None) -> list:
     c1h, c4h   = _load_ohlcv()
-    trades_raw = _load_trades()
+    trades_raw = _load_trades(book)
 
     ts1h   = [r[0] for r in c1h]
     open1h = [r[1] for r in c1h]
@@ -208,18 +225,15 @@ def review_analytics(book: str = None) -> dict:
     hedge balance, i.e. >= 100). Pass book='hedge'|'prop' to scope to one book."""
     import math, datetime as _dt
     conn = sqlite3.connect(DB_PATH)
-    where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
-    params: list = []
-    if book:
-        where += " AND book = ?"; params.append(book)
+    bsql, bparams = book_filter(book)
+    where = "closed_at IS NOT NULL AND pnl IS NOT NULL" + bsql
     rows = conn.execute(
         f"SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
-        f"WHERE {where} ORDER BY closed_at", params
+        f"WHERE {where} ORDER BY closed_at", list(bparams)
     ).fetchall()
     cfg = conn.execute("SELECT start_balance, win_rate, rr_ratio FROM lens_config WHERE id=1").fetchone()
     n_open = conn.execute(
-        "SELECT COUNT(*) FROM trades WHERE closed_at IS NULL" + (" AND book = ?" if book else ""),
-        ([book] if book else [])
+        "SELECT COUNT(*) FROM trades WHERE closed_at IS NULL" + bsql, list(bparams)
     ).fetchone()[0]
     conn.close()
 
@@ -283,11 +297,27 @@ def review_analytics(book: str = None) -> dict:
     sharpe = (mean_p / sd * math.sqrt(tpy)) if sd else 0.0
     sortino = (mean_p / dsd * math.sqrt(tpy)) if dsd else 0.0
 
-    # capital-dependent (only if a real base exists)
-    capital = cfg[0] if (cfg and cfg[0] and cfg[0] >= 100) else None
+    # Capital-dependent. `lens_config.start_balance` doubles as the Goal model's
+    # seed (it is literally 100.0), so a bare `>= 100` test lets a fake base through
+    # and prints things like "max drawdown −9512%". A capital base is only credible
+    # if the account could actually have absorbed the drawdown it took: otherwise
+    # equity would have gone through zero and the trades could not have happened.
+    raw_capital = cfg[0] if (cfg and cfg[0]) else None
+    capital = raw_capital if (raw_capital and raw_capital > maxdd_eur) else None
     cum_return = (total_pnl / capital * 100) if capital else None
     ann_return = (cum_return / (span_days / 365.0)) if cum_return is not None else None
-    maxdd_pct = (maxdd_eur / capital * 100) if capital else None
+    # drawdown as a fraction of peak EQUITY (capital + cumulative pnl), not of the
+    # starting balance — a €500 drawdown off a €10k peak is 5%, not 5% of the seed.
+    maxdd_pct = None
+    if capital:
+        eq2 = peak_eq = capital
+        dd = 0.0
+        for p in pnls:
+            eq2 += p
+            peak_eq = max(peak_eq, eq2)
+            if peak_eq > 0:
+                dd = max(dd, (peak_eq - eq2) / peak_eq * 100)
+        maxdd_pct = dd
     calmar = (ann_return / maxdd_pct) if (ann_return is not None and maxdd_pct) else None
 
     buckets = [("< 5m", 0, 5), ("5–15m", 5, 15), ("15–60m", 15, 60),
@@ -302,7 +332,13 @@ def review_analytics(book: str = None) -> dict:
                    "total": round(tot, 2), "avg": round(tot / cnt, 2) if cnt else 0.0})
 
     return {
-        "n": n, "open": n_open,
+        "n": n, "open": n_open, "book": book or "all",
+        # capital_base is null when start_balance isn't credible — the UI must then
+        # show "—", not a percentage derived from the Goal model's seed.
+        "capital_note": None if capital else
+            (f"no capital base: start_balance €{raw_capital:,.0f} is smaller than the "
+             f"€{maxdd_eur:,.0f} drawdown, so % figures would be fiction"
+             if raw_capital else "no start_balance set"),
         "wr": round(nw / n * 100, 1),
         "avg_win": round(avg_win, 2), "avg_loss": round(avg_loss, 2),
         "rr": round(avg_win / avg_loss, 2) if avg_loss else None,
@@ -340,12 +376,11 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
     import datetime as _dt
     conn = sqlite3.connect(DB_PATH)
     where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
-    params: list = []
-    if book:
-        where += " AND book = ?"; params.append(book)
+    bsql, params = book_filter(book)
+    where += bsql
     rows = conn.execute(
         f"SELECT pnl, opened_at, closed_at, balance_after FROM trades "
-        f"WHERE {where} ORDER BY closed_at", params
+        f"WHERE {where} ORDER BY closed_at", list(params)
     ).fetchall()
     snaps = conn.execute(
         "SELECT snapshot_date, eur_balance FROM daily_snapshots "

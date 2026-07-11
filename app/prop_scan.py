@@ -27,18 +27,46 @@ PROP_FALLBACK = [("ASIAN_RSI_DIP_v1", 2.0), ("ASIAN_PULLBACK_v2", 3.0), ("ASIAN_
 
 
 def prop_tradeable() -> list[tuple[str, float]]:
-    """The live prop tradeable set: the Strategy Board's top-3 prop strategies,
-    each paired with its board-optimal target R. Auto-syncs with the weekly board
-    refresh; falls back to PROP_FALLBACK if the cache isn't there yet."""
+    """The live prop tradeable set, each strategy paired with its board-optimal
+    target R. Precedence:
+      1. the basket saved on the eval config (explicit user choice), else
+      2. the Strategy Board's top-3 prop strategies (auto-syncs weekly), else
+      3. PROP_FALLBACK.
+    Widening the basket raises trades/month and LOWERS the eval pass-rate — the
+    two move against each other. /prop-goal prices that trade before you take it."""
+    from .backtest_engine import STRATEGIES
+    best_r = {}
+    try:
+        from .strategy_eval import load_cache
+        d = load_cache() or {}
+        for o in d.get("results", []):
+            if o["mode"] == "prop" and o.get("best_r"):
+                best_r[o["name"]] = float(o["best_r"])
+    except Exception:
+        pass
+
+    chosen = prop_config().get("basket")
+    if chosen:
+        # ignore anything that isn't a real backtest strategy — a basket entry with
+        # no signal_fn would silently never fire.
+        return [(n, best_r.get(n, 4.0)) for n in chosen if n in STRATEGIES]
+
     try:
         from .strategy_eval import load_cache
         d = load_cache()
         if d:
-            top = sorted([o for o in d["results"]
-                          if o["mode"] == "prop" and o.get("top3") and o.get("best_r")],
-                         key=lambda x: x["rank"])
-            if top:
-                return [(o["name"], float(o["best_r"])) for o in top]
+            # Default = every prop SURVIVOR, not just the board top-3: any strategy
+            # that isn't `thin` (≥40 occurrences) and has a net-positive config
+            # (score > 0, i.e. at least one R level pays after fees). Ordered best
+            # score first, hero pinned rank-1 so it still wins ties on the bar.
+            # ⚠️ Wider basket = more signals but a LOWER eval pass-rate (speed↔
+            # survival). This is his explicit call — /prop-goal prices it.
+            surv = sorted([o for o in d["results"]
+                           if o["mode"] == "prop" and not o.get("thin")
+                           and o.get("best_r") and o.get("score", 0) > 0],
+                          key=lambda x: (x["name"] != HERO, -x.get("score", 0)))
+            if surv:
+                return [(o["name"], float(o["best_r"])) for o in surv]
     except Exception:
         pass
     return list(PROP_FALLBACK)
@@ -104,9 +132,11 @@ def _prop_alert_message(sig: dict) -> tuple[str, str, str]:
 
     title = f"PROP {side} BTC {m(entry)}"
     strat_name = sig.get("strategy_name", PROP_STRATEGY)
+    from .backtest_engine import STRATEGIES
+    tf = (STRATEGIES.get(strat_name, {}).get("timeframe") or "4h").upper()
     body = (
         f"{head} PROP · {side} · BTC/USD {arrow}\n"
-        f"\U0001F9E0 {strat_name} (4H eval · {t['rr']:g}R)\n"             # 🧠
+        f"\U0001F9E0 {strat_name} ({tf} eval · {t['rr']:g}R)\n"           # 🧠
         "\n"
         + L("\U0001F4E5", "Entry (in)", m(entry))                         # 📥
         + L("\U0001F3AF", "TP  (out)", f"{m(target)} · +{t['tp_pct']:.2f}%")   # 🎯
@@ -126,6 +156,25 @@ def _prop_alert_message(sig: dict) -> tuple[str, str, str]:
     return title, body, tag
 
 
+DIGEST_HOUR_UTC = 8     # just after the 04:00 UTC Asian bar closes
+
+
+def _push_stand_down(states: list) -> bool:
+    """One low-priority push naming the first unmet gate per strategy. Answers
+    'why did nothing fire today?' without you opening the desk."""
+    if not states:
+        return False
+    lines = []
+    for name, st in states:
+        why = st.get("stand_down_reason") or "conditions not met"
+        lines.append(f"• {name}\n   {why}")
+    close = states[0][1].get("close")
+    body = (f"\U0001F634 No prop entry today\n"           # 😴
+            f"BTC ${close:,.0f}\n\n" + "\n".join(lines) +
+            "\n\n\U0001F4CA /prop-desk for the full read")
+    return _notify("PROP · stand down", body, tags="sleeping")
+
+
 def run_prop_scan_cli(emit: bool = True) -> dict:
     """Cron entry point: evaluate the Strategy Board's top-3 prop strategies on the
     freshest closed 4H Asian bar. The highest-ranked one saying ENTER wins the bar
@@ -141,13 +190,19 @@ def run_prop_scan_cli(emit: bool = True) -> dict:
     last_state = None
     emitted = "none"
     fired = None
+    states = []
     for rank, (name, target_r) in enumerate(tradeable, 1):
         state = prop_desk_state(refresh=(rank == 1), strategy=name)
         last_state = state
         if state.get("error"):
             continue
+        states.append((name, state))
         verdict, direction = state.get("verdict"), state.get("direction")
-        if not (emit and verdict == "enter" and direction and state.get("is_asian")):
+        # NO session gate here. Every signal_fn enforces its own session/hour rule
+        # (ASIAN_* check `df.index[i].hour in (0, 4)` internally, backtest_engine.py).
+        # The old `state["is_asian"]` gate was redundant for those and silently made
+        # it impossible for any non-Asian strategy in the basket to ever emit.
+        if not (emit and verdict == "enter" and direction):
             continue
 
         # trade at the strategy's board-optimal R: target = entry ± stop_dist × R
@@ -185,6 +240,12 @@ def run_prop_scan_cli(emit: bool = True) -> dict:
             emitted = f"{sig_id}:already-emitted"
         fired = name
         break   # highest-ranked ENTER wins the bar
+
+    # Nothing fired → once a day, say WHY, so silence is legible instead of
+    # ambiguous. Gated to a single UTC hour: the scanner runs every hour, and a
+    # "nothing happened" push on each of those would train you to ignore it.
+    if emit and fired is None and datetime.datetime.now(datetime.timezone.utc).hour == DIGEST_HOUR_UTC:
+        _push_stand_down(states)
 
     s = last_state or {}
     print(f"[{stamp}] bar={s.get('bar_ts')} close={s.get('close')} "
