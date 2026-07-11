@@ -15,11 +15,10 @@ view can drift from another. Server-rendered except /equity (needs a canvas).
 from .theme import shell
 
 HERO = "ASIAN_RSI_DIP_v1"
-# Defaults only — the live eval (account size / risk / plan) is persisted and read
-# via prop_config(). These are the fallback when nothing's been saved yet.
-EVAL = "BREAKOUT_1STEP_TURBO"   # "Advanced" — the €20 plan
-ACCOUNT = 5000.0
-RISK = 0.5
+# The live eval (account / risk / plan) is persisted and read via prop_config();
+# the unsaved-yet fallback is database._PROP_EVAL_DEFAULT. The old EVAL/ACCOUNT/
+# RISK constants are gone on purpose: importing one got you a silently stale $5k
+# eval, and a dropped import of ACCOUNT is what 500'd /prop-position today.
 
 
 def prop_config() -> dict:
