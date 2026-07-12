@@ -234,16 +234,25 @@ def run_prop_scan_cli(emit: bool = True) -> dict:
             "mtf_confluence": [f"board top-{rank} prop", f"4H {state['trend']}-trend", f"{target_r:g}R target"],
             "confluence_count": 2,
         }
+        # Same discipline filters as the hedge paths (2026-07-12 — prop signals
+        # used to bypass them entirely). Rejected = stored, never pushed.
+        from . import discipline
+        from .database import get_last_non_rejected_signal_for_symbol
+        reason = discipline.evaluate(
+            payload, get_last_non_rejected_signal_for_symbol(payload["symbol"]))
         try:
-            row = insert_signal(payload)
-            row["strategy_name"] = name
-            title, body, tag = _prop_alert_message(row)
-            _notify(title, body, signal_id=sig_id, tags=tag)
-            emitted = f"{sig_id}:pushed"
+            row = insert_signal(payload, auto_rejection_reason=reason)
+            if reason:
+                emitted = f"{sig_id}:auto-rejected({reason})"
+            else:
+                row["strategy_name"] = name
+                title, body, tag = _prop_alert_message(row)
+                _notify(title, body, signal_id=sig_id, tags=tag)
+                emitted = f"{sig_id}:pushed"
         except ValueError:
             emitted = f"{sig_id}:already-emitted"
         fired = name
-        break   # highest-ranked ENTER wins the bar
+        break   # highest-ranked ENTER wins the bar (a lower rank would hit the same time/venue filters)
 
     # Nothing fired → once a day, say WHY, so silence is legible instead of
     # ambiguous. Gated to a single UTC hour: the scanner runs every hour, and a
