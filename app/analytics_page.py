@@ -100,17 +100,24 @@ const pc=v=>v>=0?'var(--long)':'var(--short)';
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 let cumSeries=null, balSeries=null, coneSeries=[], CHART=null, CONE_END=0;
 
+// era: fresh scoreboard since review.ERA_START by default; ?era=all = lifetime
+const ERA=new URLSearchParams(location.search).get('era')||'current';
+
 Promise.all([
   // book-scoped. Unscoped, this silently folded every prop attempt's trades into
   // the hedge P&L, win-rate and drawdown.
-  fetch('/api/review/equity?book='+BOOK).then(r=>r.json()),
-  fetch('/api/review/analytics?book='+BOOK).then(r=>r.json()),
+  fetch('/api/review/equity?book='+BOOK+'&era='+ERA).then(r=>r.json()),
+  fetch('/api/review/analytics?book='+BOOK+'&era='+ERA).then(r=>r.json()),
   // cone + excursion are the HEDGE book only (the BTC-stack goal cone, hedge trade
   // geometry). On prop they'd be foreign data, so skip them — the panels self-hide.
   BOOK==='prop' ? Promise.resolve(null) : fetch('/api/cone').then(r=>r.json()).catch(()=>null),
   BOOK==='prop' ? Promise.resolve(null) : fetch('/api/excursion').then(r=>r.json()).catch(()=>null),
 ]).then(([E,A,C,X])=>{
-  if(!E||!E.n){document.getElementById('read').innerHTML='<div class="read"><p class="lede">No closed trades yet.</p></div>';return;}
+  if(!E||!E.n){
+    const hint=E&&E.era_start
+      ?'No closed trades yet in the current era (since '+E.era_start+'). The old book is the baseline, not the scoreboard — <a href="?era=all">lifetime view</a>.'
+      :'No closed trades yet.';
+    document.getElementById('read').innerHTML='<div class="read"><p class="lede">'+hint+'</p></div>';return;}
   drawEquity(E);
   drawCone(C);
   renderRead(E,A);
@@ -251,8 +258,11 @@ function renderRead(E,A){
       `and weekday (<b>${bestD?bestD.label:'—'}</b>), and treat everything else as sub-scale until it earns more trades.`;
   }
 
+  const eraTag=E.era_start
+    ?` <span class="sp" style="font-weight:normal">· era since ${E.era_start} — <a href="?era=all">lifetime</a></span>`
+    :` <span class="sp" style="font-weight:normal">· lifetime — <a href="?">current era</a></span>`;
   document.getElementById('read').innerHTML=
-    `<div class="read"><h3>The Read</h3>`+
+    `<div class="read"><h3>The Read${eraTag}</h3>`+
     `<p class="lede">${head}</p>`+
     `<ul>${li.map(x=>`<li>${x}</li>`).join('')}</ul>`+
     `<div class="move"><div class="lbl">The move · one iterative test</div><p>${move}</p></div></div>`;

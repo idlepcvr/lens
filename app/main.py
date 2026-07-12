@@ -1351,7 +1351,7 @@ def autofill_actuals(plan_id: int):
 def ingest_signal(payload: SignalIngest):
     """Accept a Pine Script alert payload, run discipline filters, persist.
 
-    Signals that violate discipline (Saturday, sub-5min cooldown, bleed hour,
+    Signals that violate discipline (09:00-BKK bleed hour, sub-60min cooldown,
     bad venue) are still stored — with status='rejected' and rejection_reason
     set — so the dataset stays complete. Live signals land as status='pending'
     for manual approve/reject in the decision view.
@@ -2790,16 +2790,17 @@ def api_review_trades(book: str = None):
 
 
 @app.get("/api/review/analytics")
-def api_review_analytics(book: str = None):
-    """book='hedge' | 'prop' (all prop attempts incl. archives) | omit for all books."""
+def api_review_analytics(book: str = None, era: str = "current"):
+    """book='hedge' | 'prop' (all prop attempts incl. archives) | omit for all books.
+    era='current' (default, since review.ERA_START) | 'all' (lifetime)."""
     from .review import review_analytics
-    return review_analytics(book)
+    return review_analytics(book, era=era)
 
 
 @app.get("/api/review/equity")
-def api_review_equity(book: str = None):
+def api_review_equity(book: str = None, era: str = "current"):
     from .review import equity_timing
-    return equity_timing(book)
+    return equity_timing(book, era=era)
 
 
 @app.get("/api/review/ohlcv")

@@ -49,9 +49,9 @@ def main():
     assert len(database.get_trades(limit=99)) == 4, "no book → every book"
 
     # 2) review_analytics scopes the same way; 'prop' spans attempts by design
-    h = review.review_analytics(book="hedge")
-    p = review.review_analytics(book="prop")
-    a = review.review_analytics()
+    h = review.review_analytics(book="hedge", era="all")
+    p = review.review_analytics(book="prop", era="all")
+    a = review.review_analytics(era="all")
     assert h["n"] == 2 and abs(h["total_pnl"] - 50) < 1e-6, h
     assert p["n"] == 2 and abs(p["total_pnl"] + 50) < 1e-6, p   # -30 + -20
     assert a["n"] == 4, a
@@ -63,7 +63,7 @@ def main():
     conn = sqlite3.connect(path)
     conn.execute("UPDATE lens_config SET start_balance = 100.0 WHERE id = 1")
     conn.commit()
-    ok = review.review_analytics(book="hedge")
+    ok = review.review_analytics(book="hedge", era="all")
     assert ok["max_dd_eur"] == 50.0, ok["max_dd_eur"]
     assert ok["capital_base"] == 100.0, "base 100 > 50 drawdown → credible"
     # peak equity = 100 + 100 = 200; trough 150 → 25%, NOT 50/100 = 50% of the seed
@@ -71,7 +71,7 @@ def main():
 
     # 4) drawdown exceeds the base → % is suppressed, not faked as "−9512%"
     _add("hedge", -500, day(4))
-    bad = review.review_analytics(book="hedge")
+    bad = review.review_analytics(book="hedge", era="all")
     assert bad["max_dd_eur"] > 100, bad["max_dd_eur"]
     assert bad["max_dd_pct"] is None, f"expected suppressed %, got {bad['max_dd_pct']}"
     assert bad["capital_base"] is None

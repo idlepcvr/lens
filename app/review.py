@@ -81,6 +81,17 @@ def _load_ohlcv():
     return c1h, c4h
 
 
+# Fresh scoreboard (his call, 2026-07-12): analytics stats default to trades
+# opened on/after this date; the old ~500 trades stay in the DB as the baseline
+# (they built the filters + fee math) and are reachable with era='all'.
+ERA_START = "2026-07-12"
+
+
+def era_filter(era: str) -> str:
+    """SQL fragment scoping a trades query to the current era ('all' = lifetime)."""
+    return "" if era == "all" else f" AND opened_at >= '{ERA_START}'"
+
+
 def book_filter(book: str) -> tuple:
     """(sql_fragment, params) for scoping a trades query to one book.
 
@@ -217,16 +228,17 @@ def get_enriched_trades(book: str = None) -> list:
     return out
 
 
-def review_analytics(book: str = None) -> dict:
+def review_analytics(book: str = None, era: str = "current") -> dict:
     """Trade-log analytics for the /review dashboard: performance, risk-adjusted
     ratios, duration breakdown (the key edge insight — long holds carry), and
     actual-vs-model. Capital-independent where possible; cum/annual return need a
     capital base (lens_config.start_balance, only used if it looks like a real
-    hedge balance, i.e. >= 100). Pass book='hedge'|'prop' to scope to one book."""
+    hedge balance, i.e. >= 100). Pass book='hedge'|'prop' to scope to one book.
+    era='current' (default) = trades since ERA_START; era='all' = lifetime."""
     import math, datetime as _dt
     conn = sqlite3.connect(DB_PATH)
     bsql, bparams = book_filter(book)
-    where = "closed_at IS NOT NULL AND pnl IS NOT NULL" + bsql
+    where = "closed_at IS NOT NULL AND pnl IS NOT NULL" + bsql + era_filter(era)
     rows = conn.execute(
         f"SELECT pnl, fees, direction, opened_at, closed_at FROM trades "
         f"WHERE {where} ORDER BY closed_at", list(bparams)
@@ -239,7 +251,8 @@ def review_analytics(book: str = None) -> dict:
 
     n = len(rows)
     if not n:
-        return {"n": 0, "open": n_open}
+        return {"n": 0, "open": n_open,
+                "era_start": None if era == "all" else ERA_START}
 
     pnls = [r[0] for r in rows]
     fees = [r[1] or 0.0 for r in rows]
@@ -333,6 +346,7 @@ def review_analytics(book: str = None) -> dict:
 
     return {
         "n": n, "open": n_open, "book": book or "all",
+        "era_start": None if era == "all" else ERA_START,
         # capital_base is null when start_balance isn't credible — the UI must then
         # show "—", not a percentage derived from the Goal model's seed.
         "capital_note": None if capital else
@@ -362,7 +376,7 @@ def review_analytics(book: str = None) -> dict:
     }
 
 
-def equity_timing(book: str = None) -> dict:  # book=None → all books, to match review_analytics on the same page
+def equity_timing(book: str = None, era: str = "current") -> dict:  # book=None → all books, to match review_analytics on the same page
     """Equity curve + time-of-play breakdowns for the /analytics page.
 
     Returns:
@@ -372,12 +386,14 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
       dow     — P&L grouped by weekday of ENTRY (what days pay).
       hod     — P&L grouped by hour of ENTRY, Bangkok time (what hours pay).
       periods — avg/best P&L per day, week, month.
-    Hours use a fixed UTC+7 (Bangkok has no DST, so the offset is exact)."""
+    Hours use a fixed UTC+7 (Bangkok has no DST, so the offset is exact).
+    era='current' (default) scopes trade stats to ERA_START+; transfers and
+    daily snapshots stay lifetime — cash history is not era-dependent."""
     import datetime as _dt
     conn = sqlite3.connect(DB_PATH)
     where = "closed_at IS NOT NULL AND pnl IS NOT NULL"
     bsql, params = book_filter(book)
-    where += bsql
+    where += bsql + era_filter(era)
     rows = conn.execute(
         f"SELECT pnl, opened_at, closed_at, balance_after FROM trades "
         f"WHERE {where} ORDER BY closed_at", list(params)
@@ -423,7 +439,7 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
         ).fetchall()
     conn.close()
     if not rows:
-        return {"n": 0}
+        return {"n": 0, "era_start": None if era == "all" else ERA_START}
 
     BKK = _dt.timezone(_dt.timedelta(hours=7))
     def _parse(s):
@@ -493,6 +509,7 @@ def equity_timing(book: str = None) -> dict:  # book=None → all books, to matc
         except Exception:
             cur_bal = None
     return {"n": len(rows), "equity": equity, "daily": daily,
+            "era_start": None if era == "all" else ERA_START,
             "dow": dow, "hod": hod, "periods": periods,
             "deposits": round(dep_in, 2), "withdrawals": round(dep_out, 2),
             "net_deposit": round(dep_in - dep_out, 2), "cur_bal": cur_bal,
