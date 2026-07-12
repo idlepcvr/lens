@@ -82,9 +82,9 @@ def _load_ohlcv():
 
 
 # Fresh scoreboard (his call, 2026-07-12): analytics stats default to trades
-# opened on/after this date; the old ~500 trades stay in the DB as the baseline
-# (they built the filters + fee math) and are reachable with era='all'.
-ERA_START = "2026-07-12"
+# opened on/after this date — start of Q3; the old trades stay in the DB as the
+# baseline (they built the filters + fee math) and are reachable with era='all'.
+ERA_START = "2026-07-01"
 
 
 def era_filter(era: str) -> str:
