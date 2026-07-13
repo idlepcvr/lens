@@ -1,10 +1,58 @@
 # LENS — Changelog
 
-Dated build history, newest first. Forward-looking plan lives in
-`LENS_PLAN.md`; open next-steps live in the README's **Next** section; commit
-detail is in `git log`.
+Dated build history, newest first. Forward-looking plan and open next-steps
+live in `LENS_PLAN.md`; commit detail is in `git log`.
 
 ---
+
+## 2026-07-13 → 14
+
+**Landing page rebuilt as the cockpit front door.** Aperture mark scaled into
+the hero (slow crosshair spin, reduced-motion respected), thesis line, live
+status line, ledger-derived gauges (one SQL each, ~13ms render), the two
+machine doors, and a how-it-runs pipeline row. Then **money came off the front
+door entirely**: the gauges report what the instrument does (fills logged,
+vetoes armed, signals screened/blocked, rules-audit verdict), not what the
+owner is worth — zero currency figures on the page.
+
+**README rewritten as a production front page** (what it is, the loop, how to
+run it, docs map). The detail it used to carry lives here and in
+`LENS_PLAN.md` now.
+
+## 2026-07-12
+
+**Discipline filters re-derived from the actual ledger** — the originals were
+folklore. The **Saturday rule is GONE** (Saturday is the best day in the
+fills); the only bleed hour is **09:00 BKK**; cooldown is 60m. `prop_scan` now
+runs the discipline filters too — prop signals had been bypassing them
+entirely.
+
+**Era scoreboard.** Analytics defaults to trades since **2026-07-01** (Q3, the
+era the re-derived filters apply to); `?era=all` shows lifetime. The old ~500
+trades stay as the baseline, not the scorecard.
+
+**`/robustness`** — permutation verdict on the discipline filters (are they
+signal or noise?) plus a conviction-calibration tracker, and a veto
+counterfactual panel.
+
+**Prop ticket** split risk from leverage and gained a stop-% what-if dial.
+
+## 2026-07-10 → 11
+
+**Prop round 2 — the eval cockpit got its own physics.** Fit sweep under real
+prop constraints, `/prop-cone`, position overrides, Fit→prop-goal handoff,
+prop cash flow, nav declutter; the stale-$5k EVAL/ACCOUNT/RISK constants
+deleted (`prop_views`). Context: the **$48 Breakout $10k Advanced Eval 2 was
+purchased 2026-07-10** (`BREAKOUT_1STEP_TURBO` @ 0.5% risk) — superseding the
+README's old €20 5k plan.
+
+**Stack projection unblocked** (0 ₿ fallback + live € spot) and the goal
+sidebar auto-fills (ATR floor · BTC price · BTC growth) on `/goal` +
+`/prop-goal`. A real stack snapshot is still wanted for real rung dates.
+
+**Exit mechanics exonerated:** MAE/MFE shows the low realized R is a
+*selection* problem, not an exit problem; reachability grades the book against
+the TP it actually trades. Exit-mechanics sims retired.
 
 ## 2026-07-09
 

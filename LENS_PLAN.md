@@ -4,6 +4,25 @@
 
 ---
 
+## Open items (2026-07-14)
+
+1. **Run the loop.** Still the real bottleneck, not code — 4 of ~500 trades
+   carry a signal link. Take the next valid alert, let it auto-tag on sync,
+   accumulate tagged live trades toward the v4 re-mine (~3 months needed).
+2. **Log a stack snapshot on `/goal`** (two minutes). The projection has a
+   0 ₿ fallback since 2026-07-11, but real rung dates need a real snapshot.
+3. **Retire the stale engine target** — `lens_config` still carries
+   `€100 → €55,000 by 2026-12-31`; it feeds the /edge Fit sweep and
+   `compute_goal`, so feasibility verdicts measure against a number nobody
+   ratified. Pick an engine-equity target or delete it. (The stack-level goal
+   is settled: 50 BTC by 2028-12-31, `goal_plan` v1.)
+4. **Forward-test before any promotion** (~early Aug 2026) — the three v3
+   search families stay shadow-registered until they hold on fresh data.
+5. **Next dimension:** order-flow features (CVD, delta, funding, OI) — needs a
+   data source first.
+
+---
+
 ## What changed (and why)
 
 PRISM v0.1 was a proof of concept. It validated that local SQLite + FastAPI + exchange sync works, that the goal calculator math is sound, and that a single-user trading dashboard can run on a miniPC without cloud dependencies. But the architecture grew around discoveries instead of intent — alerts were bolted on then ripped out, Supabase came and went, scope kept expanding.
