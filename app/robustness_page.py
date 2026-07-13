@@ -87,7 +87,50 @@ def results() -> dict:
         _cache["n"] = n
         _cache["2026"] = perm_test(load_trades("2026-01-01"))
         _cache["life"] = perm_test(load_trades())
+        _cache["cf"] = counterfactual()
     return _cache
+
+
+def counterfactual() -> dict:
+    """Retro-apply today's discipline rules to every historical trade: which
+    would have been vetoed, what did they cost, and (for the cooldown, which was
+    set a priori rather than bucket-mined) does the damage beat luck?"""
+    rows = sqlite3.connect(DB_PATH).execute(
+        "SELECT opened_at, symbol, pnl FROM trades WHERE pnl IS NOT NULL "
+        "ORDER BY opened_at").fetchall()
+    pnls, h9_idx, cool_idx, any_idx = [], [], [], []
+    last_open: dict = {}
+    for i, (ts, sym, pnl) in enumerate(rows):
+        dt = datetime.fromisoformat(ts.replace("Z", ""))
+        pnls.append(pnl)
+        hit = False
+        if (dt + BKK).hour == 9:
+            h9_idx.append(i); hit = True
+        prev = last_open.get(sym)
+        if prev and timedelta(0) < dt - prev < timedelta(minutes=60):
+            cool_idx.append(i); hit = True
+        last_open[sym] = dt
+        if hit:
+            any_idx.append(i)
+
+    obs_cool = sum(pnls[i] for i in cool_idx)
+    hits = 0
+    shuffled = pnls[:]
+    rng = random.Random(7)
+    for _ in range(N_SHUFFLES):
+        rng.shuffle(shuffled)
+        if sum(shuffled[i] for i in cool_idx) <= obs_cool:
+            hits += 1
+
+    total = sum(pnls)
+    vetoed = sum(pnls[i] for i in any_idx)
+    return {
+        "n": len(pnls), "total": total,
+        "h9": (len(h9_idx), sum(pnls[i] for i in h9_idx)),
+        "cool": (len(cool_idx), obs_cool, hits / N_SHUFFLES),
+        "any": (len(any_idx), vetoed),
+        "rest": (len(pnls) - len(any_idx), total - vetoed),
+    }
 
 
 def conviction_rows() -> tuple[list, int, int]:
@@ -118,6 +161,7 @@ def _eur(x: float) -> str:
 
 def render() -> str:
     r = results()
+    cf = r["cf"]
     conv, tagged, total = conviction_rows()
 
     hour_rows = ""
@@ -170,6 +214,25 @@ Recomputes automatically when a new trade lands.</p>
 <tr><th colspan="6">Removed rule — Saturday veto (needs Saturday to be not-bad)</th></tr>
 <tr><th>window</th><th>bucket</th><th>p&amp;l</th><th colspan="2">p (any weekday this good)</th><th>verdict</th></tr>
 {sat_rows}
+</table>
+</div>
+
+<div class="sb-wrap" style="margin-bottom:12px">
+<table class="sb">
+<tr><th colspan="5">Counterfactual — if today's rules had always been on (lifetime)</th></tr>
+<tr><th>rule</th><th>trades hit</th><th>p&amp;l</th><th>p</th><th>note</th></tr>
+<tr><td>no 09:00 BKK</td><td>{cf['h9'][0]}</td>{_eur(cf['h9'][1])}
+<td class="m">{r['life']['p_worst']:.2f}</td><td class="m">honest p from above — bucket-mined</td></tr>
+<tr><td>cooldown &lt;60m</td><td>{cf['cool'][0]}</td>{_eur(cf['cool'][1])}
+<td><b>{cf['cool'][2]:.3f}</b></td><td class="m">rule was set a priori, so this p is honest</td></tr>
+<tr><td><b>any rule</b></td><td>{cf['any'][0]}</td>{_eur(cf['any'][1])}
+<td class="m">—</td><td class="m">{100*cf['any'][1]/cf['total']:.0f}% of lifetime net P&amp;L (€{cf['total']:+,.0f})</td></tr>
+<tr><td class="m">everything else</td><td class="m">{cf['rest'][0]}</td>{_eur(cf['rest'][1])}
+<td class="m">—</td><td class="m">the ledger with the rules applied</td></tr>
+<tr><td colspan="5" class="m">Retro-tags use only objective entry-time facts (clock, gap
+since last trade) — never outcomes. Bybit rows were purged from this ledger, so that rule
+can't be retro-tested. Live signals are already auto-vetoed by these rules; rejected ones
+are stored as the ongoing out-of-sample test.</td></tr>
 </table>
 </div>
 
