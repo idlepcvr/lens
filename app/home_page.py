@@ -38,14 +38,15 @@ NARROW = (60, 22)
 
 def _gauges() -> dict:
     con = sqlite3.connect(DB_PATH)
-    fills, last = con.execute(
-        "SELECT COUNT(*), MAX(date(COALESCE(closed_at, opened_at))) "
+    fills, first, last = con.execute(
+        "SELECT COUNT(*), MIN(date(COALESCE(closed_at, opened_at))), "
+        "MAX(date(COALESCE(closed_at, opened_at))) "
         "FROM trades WHERE pnl IS NOT NULL").fetchone()
     era_n, era_pnl, era_w = con.execute(
         "SELECT COUNT(*), COALESCE(SUM(pnl),0), COALESCE(SUM(pnl>0),0) "
         f"FROM trades WHERE pnl IS NOT NULL AND opened_at >= '{ERA_START}'").fetchone()
     return {
-        "fills": fills, "last": last or "—",
+        "fills": fills, "first": first, "last": last or "—",
         "era_n": era_n, "era_pnl": era_pnl,
         "era_wr": (100 * era_w / era_n) if era_n else None,
         "filters": len(discipline.settings()),
@@ -53,15 +54,22 @@ def _gauges() -> dict:
 
 
 def _curve() -> list[float]:
-    """Cumulative realised P&L across every closed fill, oldest first.
+    """Cumulative realised P&L of the HEDGE book, oldest fill first.
 
-    Note this is a P&L curve, NOT account equity — `trades.balance_after` is not
-    account equity and is deliberately not used here."""
+    Hedge only, on purpose. The prop rows are evaluation money — paper — and
+    summing them into own-money P&L would be adding two different units.
+
+    This is a P&L curve, NOT account equity: `trades.balance_after` is not
+    account equity and is deliberately not used. It is also not a track record —
+    deposits, withdrawals and a retired venue (the Bybit fills are no longer in
+    the ledger) are not in it. The page therefore draws its SHAPE and never
+    quotes a figure off it. Do not add axis numbers to this.
+    """
     con = sqlite3.connect(DB_PATH)
     total = 0.0
     out = []
     for (pnl,) in con.execute(
-            "SELECT pnl FROM trades WHERE pnl IS NOT NULL "
+            "SELECT pnl FROM trades WHERE pnl IS NOT NULL AND book = 'hedge' "
             "ORDER BY COALESCE(closed_at, opened_at)"):
         total += pnl
         out.append(total)
@@ -197,24 +205,24 @@ _CSS = r"""<style>
 .secbody b{color:var(--ink);font-weight:500}
 .secbody .g{color:var(--long)} .secbody .r{color:var(--short)}
 
-.matrix{margin:clamp(26px,3.4vw,42px) 0 0;overflow:hidden}
+.matrix{margin:clamp(26px,3.4vw,42px) 0 0;overflow:hidden;position:relative}
 .matrix pre{font-family:var(--mono);font-weight:500;line-height:1.02;letter-spacing:0;
-  white-space:pre;margin:0 auto;width:max-content;max-width:100%;
-  animation:acquire 1.5s cubic-bezier(.22,1,.36,1) both}
+  white-space:pre;margin:0 auto;width:max-content;max-width:100%}
 /* one grid per viewport: 150 cols needs ~12px cells to read, 60 cols suits a phone */
 .matrix .wide{display:none;font-size:min(1.02vw,12px)}
 .matrix .narrow{font-size:min(2.5vw,11px)}
 @media(min-width:680px){
   .matrix .wide{display:block} .matrix .narrow{display:none}
 }
-/* the plate "acquires" the curve left→right, like a scope resolving. No mask
-   exists outside the keyframes, so a headless render still ships the art. */
-@keyframes acquire{
-  from{-webkit-mask-image:linear-gradient(90deg,#000 0%,#000 0%,transparent 6%);
-               mask-image:linear-gradient(90deg,#000 0%,#000 0%,transparent 6%)}
-  to  {-webkit-mask-image:linear-gradient(90deg,#000 0%,#000 100%,transparent 106%);
-               mask-image:linear-gradient(90deg,#000 0%,#000 100%,transparent 106%)}
-}
+/* A scope sweep passes over the plate once, left→right. It is ADDITIVE — the
+   curve is fully painted without it. Never gate the artwork behind an
+   animation: a paused tab, a print view or a headless render would ship the
+   page's whole argument blank. */
+.matrix::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(91,157,255,.10) 45%,
+    rgba(232,238,248,.16) 50%,rgba(91,157,255,.10) 55%,transparent);
+  transform:translateX(-100%);animation:sweep 1.7s cubic-bezier(.33,1,.68,1) .15s 1}
+@keyframes sweep{to{transform:translateX(100%)}}
 .matrix i{font-style:normal}
 .matrix .f{color:var(--ghost)}
 .matrix .g{color:var(--long);opacity:.42}
@@ -291,8 +299,8 @@ _CSS = r"""<style>
 .rise{animation:rise .62s cubic-bezier(.22,1,.36,1) both}
 
 @media(prefers-reduced-motion:reduce){
-  .tick,.statline .on::before{animation:none}
-  .matrix pre,.rise{animation:none}
+  .tick,.statline .on::before,.rise{animation:none}
+  .matrix::after{display:none}          /* the sweep is the only pure decoration */
   .door .go span,.door::before{transition:none}
 }
 </style>"""
@@ -315,13 +323,10 @@ _XH = ('<i class="xh tl"></i><i class="xh tr"></i>'
 def render() -> str:
     g = _gauges()
     cum = _curve()
-    peak = max(cum) if cum else 0.0
-    final = cum[-1] if cum else 0.0
-    trough = min(cum) if cum else 0.0
 
     wr = f"{g['era_wr']:.0f}<small>%</small>" if g["era_wr"] is not None else "—"
     era_cls = "g" if g["era_pnl"] > 0 else "r" if g["era_pnl"] < 0 else ""
-    fin_cls = "g" if final > 0 else "r"
+    span = f"{g['first'][:7]} → {g['last'][:7]}" if g["first"] else "—"
 
     body = f"""
 <section class="plate">{_XH}<i class="scale"></i>
@@ -347,28 +352,27 @@ def render() -> str:
 
 <section class="plate">{_XH}
   <h2 class="sechead">The ledger is the argument.</h2>
-  <p class="secbody">Every fill is stored, and the curve below is all of them. It peaked at
-    <b class="g">€{peak:+,.0f}</b>, gave it back, and bottomed at <b class="r">€{trough:+,.0f}</b>.
-    That drawdown is not a footnote — it is the training set. Each veto LENS arms was derived
-    from these trades, not from a book.</p>
+  <p class="secbody">Every fill is stored, and the curve below is all of them. It ran up,
+    gave it back, and went under. That collapse is not a footnote — it is the training set.
+    Every veto LENS arms was derived from these trades, not from a book.</p>
 
   <div class="matrix"
-       aria-label="Cumulative realised profit and loss across {len(cum)} fills, peaking at €{peak:+,.0f} and ending at €{final:+,.0f}"><pre
+       aria-label="The shape of realised profit and loss across {len(cum)} fills on the hedge book: a long flat stretch, a run up, then a deeper collapse below the starting line."><pre
        class="wide" aria-hidden="true">{_matrix(cum, *WIDE)}</pre><pre
        class="narrow" aria-hidden="true">{_matrix(cum, *NARROW)}</pre>
     <div class="mcap">
-      <span>cumulative realised p&amp;l · {len(cum):,} fills · all books</span>
-      <span>peak €{peak:+,.0f} · trough €{trough:+,.0f} · now €{final:+,.0f}</span>
+      <span>realised p&amp;l · hedge book · {len(cum):,} fills · {span}</span>
+      <span>shape, not a track record — unscaled, no axis</span>
     </div>
   </div>
 
   <div class="gauges">
     <div class="gauge"><div class="k">ledger</div>
       <div class="v">{g['fills']:,}<small> fills</small></div>
-      <div class="n">every fill and rejection</div></div>
-    <div class="gauge"><div class="k">lifetime</div>
-      <div class="v {fin_cls}">€{final:+,.0f}</div>
-      <div class="n">the baseline it learned from</div></div>
+      <div class="n">every fill and every rejection</div></div>
+    <div class="gauge"><div class="k">vetoes</div>
+      <div class="v">{g['filters']}<small> armed</small></div>
+      <div class="n">derived from the curve, not a book</div></div>
     <div class="gauge"><div class="k">this era · q3</div>
       <div class="v {era_cls}">€{g['era_pnl']:+,.0f}</div>
       <div class="n">{g['era_n']} trades · {wr} won</div></div>
