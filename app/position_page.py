@@ -52,7 +52,9 @@ _CSS = r"""<style>
 def position_page(book: str = "hedge") -> str:
     sub = ('Entry → full trade: levels, sizing, risk — long &amp; short. Sized off <b>live eval equity</b> '
            'at the plan\'s risk — see <a href="/rules" style="color:var(--accent)">Rules</a>. '
-           'Override risk %, R:R or the leverage cap below for a per-trade what-if; the saved plan is untouched.'
+           'Risk sets the <b>size</b>; leverage only sets the <b>margin</b> and the liq price — '
+           'move it freely, the stop, target and € at risk don\'t budge. '
+           'Override risk %, R:R or leverage below for a per-trade what-if; the saved plan is untouched.'
            if book == "prop" else
            'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
            '<a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
@@ -84,6 +86,10 @@ def position_page(book: str = "hedge") -> str:
         <div class="lf"><label>Risk/trade <span class="hint" id="risk-hint">0–1 dec</span></label><input id="o-risk" type="text" inputmode="decimal" placeholder="auto (EV)"></div>
         <div class="lf"><label>Daily vol σ <span class="hint">auto from ATR feed</span></label><input id="o-std" type="text" inputmode="decimal" placeholder="0.0356"></div>
       </div>
+      <div class="frow" style="margin-bottom:0;margin-top:11px;display:none" id="f-stop">
+        <div class="lf"><label>Stop % <span class="hint">travel-distance dial</span></label><input id="o-stop" type="text" inputmode="decimal" placeholder="strategy's stop"></div>
+        <div class="lf" style="justify-content:flex-end"><span class="hint" style="text-transform:none;letter-spacing:0;line-height:1.5">Tighten the stop → bigger size at the same € risk → less travel to TP. Adds a second, side-by-side ticket below; the strategy's stays put.</span></div>
+      </div>
     </div>
   </form>
 
@@ -97,7 +103,7 @@ def position_page(book: str = "hedge") -> str:
 
     script = r"""
 const $=id=>document.getElementById(id);
-let dir='long', book=START_BOOK, CFG=null, deb, EURUSD=null, HEDGE_BAL=null, LAST=null;
+let dir='long', book=START_BOOK, CFG=null, deb, HEDGE_BAL=null, LAST=null;
 const fP=n=>n==null?'—':Number(n).toLocaleString('en',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2}); // ponytail: no $/commas so prices paste straight into Kraken
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
@@ -113,9 +119,11 @@ function setBook(b){
   // leverage cap and the eval balance are per-trade overridable. Win-rate and
   // daily σ only feed the hedge goal model — greyed out in prop mode.
   $('o-wr').disabled=$('o-std').disabled=prop;
+  $('o-stop').disabled=!prop;                      // stop override is prop-only sizing
+  $('f-stop').style.display=prop?'grid':'none';
   $('o-rr').disabled=$('o-lev').disabled=$('o-risk').disabled=$('p-bal').disabled=false;
   $('bal-label').textContent = prop?'Eval balance $':'Balance €';
-  $('lev-label').textContent = prop?'Leverage cap':'Leverage';
+  $('lev-label').innerHTML = prop?'Leverage <span class="hint">margin only</span>':'Leverage';
   $('risk-hint').textContent = prop?'% · 0.5':'0–1 dec';
   $('pf').style.opacity=1;
   if(!prop){ if(HEDGE_BAL!=null) $('p-bal').value=HEDGE_BAL; }
@@ -210,26 +218,71 @@ function render(g, p, pl, bal, btcE){
   $('logbar').style.display='flex'; $('logmsg').textContent='';
 }
 
+async function ticket(q){
+  const r=await fetch('/api/prop/position?'+q);
+  if(!r.ok){ throw new Error((await r.json()).detail||'prop error'); }
+  return r.json();
+}
+
 async function calcProp(entry){
   const q=new URLSearchParams({entry:entry, direction:dir});
   const ov=(id)=>{ const v=parseFloat($(id).value); return (isFinite(v)&&v>0)?v:null; };
-  const bal=ov('p-bal'), rk=ov('o-risk'), rr=ov('o-rr'), lv=ov('o-lev');
+  const bal=ov('p-bal'), rk=ov('o-risk'), rr=ov('o-rr'), lv=ov('o-lev'), st=ov('o-stop');
   if(bal)q.set('balance',bal); if(rk)q.set('risk',rk); if(rr)q.set('rr',rr); if(lv)q.set('lev',lv);
   try{
-    const r=await fetch('/api/prop/position?'+q);
-    if(!r.ok){ throw new Error((await r.json()).detail||'prop error'); }
-    const t=await r.json();
-    if(!bal) $('p-bal').placeholder=t.account;   // live eval equity, visible before you override
-    $('err').classList.add('hide'); renderProp(t);
+    // the strategy's ticket always renders; a stop override adds a second one beside it
+    const base=await ticket(q);
+    let alt=null;
+    if(st){ const q2=new URLSearchParams(q); q2.set('stop',st); alt=await ticket(q2); }
+    if(!bal) $('p-bal').placeholder=base.account;   // live eval equity, visible before you override
+    $('err').classList.add('hide'); renderProp(base, alt);
   }catch(e){ $('err').textContent=String(e.message||e); $('err').classList.remove('hide'); }
 }
 
-function renderProp(t){
+const MM=0.005;   // maintenance margin — mirrors prop_scan.MM_RATE
+
+// the four prices a ticket actually trades at, long and short
+function levels(t){
   const e=t.entry, sp=t.stop_pct/100, tpp=t.tp_pct/100, lev=t.leverage;
-  const tpL=e*(1+tpp), slL=e*(1-sp), tpS=e*(1-tpp), slS=e*(1+sp);
-  const liqL=lev>1?e*(1-1/lev):null, liqS=lev>1?e*(1+1/lev):null;
-  const beL=e*(1+t.fee_rt_pct/100), beS=e*(1-t.fee_rt_pct/100);
-  const btcE=parseFloat($('p-btc').value)||1, marginE=EURUSD?t.margin_usd/EURUSD:t.margin_usd;
+  return {e, tpL:e*(1+tpp), slL:e*(1-sp), tpS:e*(1-tpp), slS:e*(1+sp),
+          liqL:e*(1-1/lev+MM), liqS:e*(1+1/lev-MM),
+          beL:e*(1+t.fee_rt_pct/100), beS:e*(1-t.fee_rt_pct/100)};
+}
+
+// The stop override, side by side with the strategy's own numbers. The point of
+// the section: risk is identical in both columns — the stop is what buys the
+// shorter travel to TP, and it's paid for in leverage and (unshown) win rate.
+function overrideSec(t, o){
+  const L=levels(o), cut=o.actual_risk_pct < o.risk_pct - 0.001;   // firm's cap ate the size
+  const per=x=>fP(x.notional/100);                                  // $ per 1% move
+  return sec('Stop override · levels', [
+      ['', 'Long', 'Short', 'dim', 'dim'],
+      ['Take profit', fP(L.tpL), fP(L.tpS), 'g','g'],
+      ['Stop loss',   fP(L.slL), fP(L.slS), 'r','r'],
+      ['Entry',       fP(L.e),   fP(L.e),   'ac'],
+      ['Liquidation', L.liqL>0?fP(L.liqL):'none', fP(L.liqS), 'a','a'],
+      ['Travel to TP', pc(o.tp_pct), 'was '+pc(t.tp_pct), 'g','dim'],
+    ])
+  + sec('Stop override · vs strategy', [
+      ['', 'Strategy', 'Override', 'dim', 'dim'],
+      ['Stop',        pc(t.stop_pct), pc(o.stop_pct), 'dim','r'],
+      ['Travel to TP',pc(t.tp_pct),   pc(o.tp_pct),   'dim','g'],
+      ['Notional',    fP(t.notional), fP(o.notional), 'dim','ac'],
+      ['$ / 1% move', per(t),         per(o),         'dim','ac'],
+      ['Leverage needed', t.min_leverage+'×', o.min_leverage+'×', 'dim', cut?'r':'a'],
+      ['Margin',      pc(t.margin_pct), pc(o.margin_pct), 'dim',''],
+      ['Risk / trade',pc(t.actual_risk_pct), pc(o.actual_risk_pct), 'dim', cut?'r':'g'],
+      ['Win $',       fP(t.win_usd),  fP(o.win_usd),  'dim','g'],
+      [cut ? '⚠ Over the '+o.max_leverage+'× cap' : 'Risk held · same €',
+       cut ? 'size cut' : 'yes',
+       cut ? 'floor: '+pc(o.risk_pct/o.max_leverage)+' stop' : 'shorter travel, tighter stop',
+       cut?'r':'g', 'dim'],
+    ]);
+}
+
+function renderProp(t, o){
+  const L=levels(t), lev=t.leverage;
+  const e=L.e, tpL=L.tpL, slL=L.slL, tpS=L.tpS, slS=L.slS, liqL=L.liqL, liqS=L.liqS, beL=L.beL, beS=L.beS;
   const out =
     sec('Position sizing · PROP', [
       ['', 'Long', 'Short', 'dim', 'dim'],
@@ -237,15 +290,15 @@ function renderProp(t){
       ['Stop loss',   fP(slL), fP(slS), 'r','r'],
       ['Entry',       fP(e),   fP(e),   'ac'],
       ['Breakeven',   fP(beL), fP(beS)],
-      ['Liquidation', liqL?fP(liqL):'none', liqS?fP(liqS):'none', 'a','a'],
+      ['Liquidation', liqL>0?fP(liqL):'none', fP(liqS), 'a','a'],
       ['Stop / TP move', pc(t.stop_pct), pc(t.tp_pct), 'r','g'],
     ])
   + sec('Prop rule sizing', [
       ['Eval equity', fP(t.account), 'nominal '+fP(t.account_nominal), 'ac', 'dim'],
-      ['Risk / trade', pc(t.risk_pct), fP(t.risk_usd), 'r','r'],
+      ['Risk / trade', pc(t.actual_risk_pct), fP(t.risk_usd), 'r','r'],
       ['Notional', fP(t.notional), t.size_btc.toFixed(4)+' ₿'],
-      ['Margin', fP(t.margin_usd), fE(marginE)],
-      ['Leverage', lev.toFixed(2)+'×', 'cap '+t.max_leverage+'×', lev>t.max_leverage?'r':''],
+      ['Margin', fP(t.margin_usd), pc(t.margin_pct)+' of acct'],
+      ['Leverage', lev.toFixed(2)+'×', 'min '+t.min_leverage+'× · cap '+t.max_leverage+'×', 'ac', 'dim'],
       ['R:R (net)', t.rr.toFixed(2)+'×', ''],
     ])
   + sec('Outcome', [
@@ -253,10 +306,14 @@ function renderProp(t){
       ['Loss', '−'+fP(t.loss_usd), fP(t.account-t.loss_usd), 'r','r'],
       ['Win rate (hist)', pc(t.win_rate_pct), ''],
       ['Strategy', t.strategy, t.eval, 'dim','dim'],
-    ]);
+    ])
+  + (o ? overrideSec(t, o) : '');
   $('out').innerHTML='<div class="grid">'+out+'</div>';
-  LAST={book:'prop',direction:dir,entry:e,size:t.size_btc,leverage:lev};
-  $('logbar').style.display='flex'; $('logmsg').textContent='';
+  // log the ticket you'd actually place — the override when there is one
+  const k = o || t;
+  LAST={book:'prop',direction:dir,entry:k.entry,size:k.size_btc,leverage:k.leverage};
+  $('logbar').style.display='flex';
+  $('logmsg').textContent = o ? 'logs the OVERRIDE ticket ('+pc(o.stop_pct)+' stop)' : '';
 }
 
 async function logTrade(){
@@ -274,7 +331,7 @@ async function logTrade(){
 }
 
 // calculator — type 60000*1.02 → Enter/blur → evaluates, then re-sizes
-['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std'].forEach(id=>{
+['p-entry','p-bal','p-btc','o-wr','o-rr','o-lev','o-risk','o-std','o-stop'].forEach(id=>{
   const inp=$(id);
   function tryCalc(){ const v=inp.value.trim(); if(!v||!/[+*\/]/.test(v))return;
     try{ const r=Function('"use strict";return('+v.replace(/[^0-9+\-*/.() \t]/g,'')+')')();
@@ -293,7 +350,6 @@ if(START_BOOK==='prop') setBook('prop');
   if(c.btc_price_eur!=null) $('p-btc').placeholder=c.btc_price_eur;
   // live balance + BTC price + auto daily σ (best-effort)
   try{ const a=await fetch('/api/account/live').then(r=>r.json());
-    if(a.eur_usd) EURUSD=a.eur_usd;
     if(a.total_eur){ HEDGE_BAL=a.total_eur.toFixed(2); if(book==='hedge') $('p-bal').value=HEDGE_BAL; }
     const v=await fetch('/api/volatility').then(r=>r.json());
     if(v.btc_usd){ $('p-entry').placeholder=v.btc_usd.toFixed(0); if(!$('p-entry').value){ $('p-entry').value=v.btc_usd.toFixed(0); calc(); } }

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import datetime
 
-from .prop_eval import EVALS, _legal_leverage
+from .prop_eval import EVALS
 from .prop_views import HERO, prop_config
 from .setups import _notify
 
@@ -74,27 +74,40 @@ def prop_tradeable() -> list[tuple[str, float]]:
 
 def prop_ticket(entry: float, stop: float, target: float, long_: bool,
                 strategy: str = PROP_STRATEGY, account: float = None,
-                risk: float = None, max_lev: float = None) -> dict:
-    """Prop-legal order ticket from a signal's levels — same sizing math as
-    prop_desk_state (risk% of the eval account, leverage capped at the firm's
-    5x). Deterministic from entry/stop/target, so it recomputes identically for a
-    live pending signal or a historical one on the review page. `account`/risk/plan
-    default to the active eval config; pass the live eval equity to size off it.
-    `risk` (%) / `max_lev` override the plan for what-if sizing on /prop-position."""
+                risk: float = None, lev: float = None) -> dict:
+    """Prop-legal order ticket from a signal's levels.
+
+    Risk-first, leverage-second — the two are independent:
+      notional = risk$ / stop%        → what a stop-out costs, fixed by RISK
+      margin   = notional / leverage  → how much of the account is tied up
+    Leverage moves margin and the liquidation price, NOT the risk, the size or
+    the levels. `lev` is the leverage you'll actually set on the venue (default:
+    the firm's max); it's floored at notional/account (below that the margin
+    exceeds the account) and capped at the firm's max. Only when the account
+    can't margin the position even at max leverage does the size — and with it
+    the realised risk — get cut, hence `actual_risk_pct`.
+
+    Deterministic from entry/stop/target, so it recomputes identically for a live
+    pending signal or a historical one on the review page. `account`/`risk`/`lev`
+    override the plan for what-if sizing on /prop-position."""
     cfg = prop_config()
     EVAL = cfg["eval_name"]
     RISK = risk if risk is not None else cfg["risk"]
     if account is None:
         account = cfg["account"]
     rule = EVALS[EVAL]
-    cap = max_lev if max_lev is not None else rule["max_leverage"]
+    cap = rule["max_leverage"]
     fee_rt = rule.get("commission_per_side", 0.0004) * 2
     stop_pct = abs(entry - stop) / entry * 100 if entry else 0.0
     tp_pct = abs(target - entry) / entry * 100 if entry else 0.0
-    lev, actual_risk = _legal_leverage(stop_pct, RISK, cap)
     risk_usd = account * RISK / 100.0
-    notional = risk_usd / (stop_pct / 100.0) if stop_pct else 0.0
+    # size by risk, then cut it only if even an all-in margin at the cap can't hold it
+    notional = min(risk_usd / (stop_pct / 100.0), account * cap) if stop_pct else 0.0
+    actual_risk = notional * stop_pct / account if account else 0.0
+    risk_usd = notional * stop_pct / 100.0
     size_btc = notional / entry if entry else 0.0
+    lev_min = notional / account if account else 0.0     # margin can't exceed the account
+    lev = min(max(lev if lev is not None else cap, lev_min), cap)
     margin = notional / lev if lev else 0.0
     fee_usd = notional * fee_rt
     win_usd = notional * (tp_pct / 100.0) - fee_usd
@@ -106,12 +119,13 @@ def prop_ticket(entry: float, stop: float, target: float, long_: bool,
         "account": account, "risk_pct": RISK, "leverage": round(lev, 2),
         "actual_risk_pct": round(actual_risk, 2), "notional": round(notional, 2),
         "size_btc": size_btc, "margin_usd": round(margin, 2),
+        "margin_pct": round(margin / account * 100, 1) if account else 0.0,
         "win_usd": round(win_usd, 2), "loss_usd": round(loss_usd, 2),
         "risk_usd": round(risk_usd, 2), "fee_rt_pct": fee_rt * 100,
         "breakeven": round(breakeven, 1), "liq": round(liq, 1) if liq else None,
         "stop_pct": round(stop_pct, 2), "tp_pct": round(tp_pct, 2),
         "rr": round(tp_pct / stop_pct, 2) if stop_pct else 0.0,
-        "max_leverage": cap,
+        "min_leverage": round(lev_min, 2), "max_leverage": cap,
         "eval": EVAL, "strategy": strategy,
     }
 
