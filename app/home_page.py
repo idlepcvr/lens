@@ -42,13 +42,14 @@ def _gauges() -> dict:
         "SELECT COUNT(*), MIN(date(COALESCE(closed_at, opened_at))), "
         "MAX(date(COALESCE(closed_at, opened_at))) "
         "FROM trades WHERE pnl IS NOT NULL").fetchone()
-    era_n, era_pnl, era_w = con.execute(
-        "SELECT COUNT(*), COALESCE(SUM(pnl),0), COALESCE(SUM(pnl>0),0) "
-        f"FROM trades WHERE pnl IS NOT NULL AND opened_at >= '{ERA_START}'").fetchone()
+    # What the machine DOES — screened and blocked. No money on the front door:
+    # P&L is not what this page is for, and it hands the owner's finances to
+    # anyone he turns the screen toward. The books keep their own scoreboards.
+    seen, blocked = con.execute(
+        "SELECT COUNT(*), COALESCE(SUM(status = 'rejected'), 0) FROM signals").fetchone()
     return {
         "fills": fills, "first": first, "last": last or "—",
-        "era_n": era_n, "era_pnl": era_pnl,
-        "era_wr": (100 * era_w / era_n) if era_n else None,
+        "seen": seen, "blocked": blocked,
         "filters": len(discipline.settings()),
     }
 
@@ -324,8 +325,6 @@ def render() -> str:
     g = _gauges()
     cum = _curve()
 
-    wr = f"{g['era_wr']:.0f}<small>%</small>" if g["era_wr"] is not None else "—"
-    era_cls = "g" if g["era_pnl"] > 0 else "r" if g["era_pnl"] < 0 else ""
     span = f"{g['first'][:7]} → {g['last'][:7]}" if g["first"] else "—"
 
     body = f"""
@@ -373,9 +372,9 @@ def render() -> str:
     <div class="gauge"><div class="k">vetoes</div>
       <div class="v">{g['filters']}<small> armed</small></div>
       <div class="n">derived from the curve, not a book</div></div>
-    <div class="gauge"><div class="k">this era · q3</div>
-      <div class="v {era_cls}">€{g['era_pnl']:+,.0f}</div>
-      <div class="n">{g['era_n']} trades · {wr} won</div></div>
+    <div class="gauge"><div class="k">signals</div>
+      <div class="v">{g['seen']}<small> screened</small></div>
+      <div class="n">{g['blocked']} blocked by a veto</div></div>
     <div class="gauge"><div class="k">rules audit</div>
       <div class="v a"><a href="/robustness">SUGGESTIVE</a></div>
       <div class="n">not yet significant — say so</div></div>
