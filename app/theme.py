@@ -424,9 +424,13 @@ def footer_html(current_path: str) -> str:
 
 def shell(current_path: str, page_label: str, body: str, *,
           script: str = "", right: str = "", head_extra: str = "",
-          meta: str = "can I trade?") -> str:
+          meta: str = "can I trade?", bare: bool = False) -> str:
     """Build a full standardized page. `body` and `script` are inserted verbatim
-    (may contain braces / template literals — no .format is run on them)."""
+    (may contain braces / template literals — no .format is run on them).
+
+    bare=True drops the top bar and nav chips — for "/", which is the front door
+    and carries its own wordmark and its own doors. The footer still lists every
+    page, so nothing becomes unreachable."""
     head = (
         "<!DOCTYPE html><html lang=\"en\"><head>"
         "<meta charset=\"UTF-8\">"
@@ -449,12 +453,15 @@ def shell(current_path: str, page_label: str, body: str, *,
         "</style>"
         + head_extra +
         "</head><body><div class=\"app\">"
-        "<div class=\"bar\">"
-        "<div class=\"logo\">LEN<span class=\"s\">S</span> "
-        "<span class=\"pg\">" + page_label + "</span></div>"
-        + (right or ("<div class=\"live\"><span class=\"dot\"></span>" + meta + "</div>")) +
-        "</div>"
-        + nav_html(current_path)
     )
+    if not bare:
+        head += (
+            "<div class=\"bar\">"
+            "<div class=\"logo\">LEN<span class=\"s\">S</span> "
+            "<span class=\"pg\">" + page_label + "</span></div>"
+            + (right or ("<div class=\"live\"><span class=\"dot\"></span>" + meta + "</div>")) +
+            "</div>"
+            + nav_html(current_path)
+        )
     tail = footer_html(current_path) + "</div>" + (("<script>" + script + "</script>") if script else "") + "</body></html>"
     return head + body + tail

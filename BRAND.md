@@ -62,6 +62,12 @@ warn/veto, blue = neutral interactive.** Never use green/red decoratively.
 - **Chakra Petch** (`--hud`) — display, verdicts, labels, UI chrome. Weights 400–700.
 - **JetBrains Mono** (`--mono`) — all data: prices, R, %, tables, nav chips,
   timestamps. Weights 400–800.
+- **Libre Caslon Text** (`--serif`) — **the front door only.** One serif line: the
+  thesis on `/`. Caslon is the serif of engraved scientific printing, so it reads
+  as an instrument plate, not a fashion magazine. The tension between it and the
+  mono data is the point. Loaded by `home_page.py` alone, never by `theme.py` —
+  no other page pays for it, and no other page may use it. An app screen that
+  reaches for the serif is off-brand.
 
 Scale (representative): price `30px/800`, verdict `34px/700`, big `24px/800`,
 logo `17px/700`, body `14px/400`, mono data `12px/500`, nav `11px`, label
