@@ -679,28 +679,41 @@ def _prop_moves() -> tuple:
 def api_prop_position(entry: float, direction: str = "long",
                       risk: Optional[float] = Query(None, gt=0, le=10, description="risk %/trade override"),
                       rr: Optional[float] = Query(None, gt=0, le=20, description="target R override (rescales TP)"),
-                      lev: Optional[float] = Query(None, gt=0, le=10, description="leverage cap override"),
+                      lev: Optional[float] = Query(None, gt=0, le=10, description="leverage to trade at"),
+                      stop: Optional[float] = Query(None, gt=0, le=20, description="stop distance % override — the only lever on travel distance"),
                       balance: Optional[float] = Query(None, gt=0, description="eval balance $ override")):
-    """Prop-rule sizing for a manual entry: risk RISK% of the eval ÷ stop,
-    leverage capped at the firm's max. Stop/target derived from the prop hero
-    strategy's measured average move, then run through prop_ticket (same math as
-    the signal ticket and the eval ledger). risk/rr/lev/balance override the plan
-    per-trade — what-if sizing, the saved plan is untouched."""
+    """Prop-rule sizing for a manual entry: risk RISK% of the eval ÷ stop.
+
+    `stop` is the dial on TRAVEL DISTANCE. Risk is fixed, so notional = risk$ /
+    stop% — halve the stop and the position doubles, which halves the price move
+    needed for the same $. The target moves with it (the strategy's R is held
+    unless `rr` says otherwise), and the tighter stop demands more leverage:
+    min_leverage = risk% / stop%, so the firm's 5x cap floors the stop at
+    risk%/5. Past that the size is cut and `actual_risk_pct` drops below plan.
+    `lev` is only the leverage you'll set on the venue — it moves margin and the
+    liq price, never the risk, the size or the levels (see prop_ticket).
+
+    Stop/target otherwise come from the prop hero strategy's measured average
+    move, then run through prop_ticket (same math as the signal ticket and the
+    eval ledger). Every override is per-trade — the saved plan is untouched."""
     from .prop_scan import prop_ticket
     from .prop_ledger import prop_ledger_data
     from .prop_views import prop_config
     win_pct, loss_pct, wr = _prop_moves()
     if not loss_pct:
         raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
-    if rr:
-        win_pct = loss_pct * rr        # keep the strategy's stop, rescale the target
+    r_target = rr or (win_pct / loss_pct)   # hold the strategy's own R unless overridden
+    if stop:
+        loss_pct = stop                     # tighter stop → bigger size → shorter travel
+    if rr or stop:
+        win_pct = loss_pct * r_target
     # size off the CURRENT eval equity (realized ledger), not the nominal start
     nominal = prop_config()["account"]
     equity = balance or prop_ledger_data().get("equity") or nominal
     long_ = direction == "long"
     stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
     target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
-    t = prop_ticket(entry, stop, target, long_, account=equity, risk=risk, max_lev=lev)
+    t = prop_ticket(entry, stop, target, long_, account=equity, risk=risk, lev=lev)
     t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
              win_rate_pct=round(wr, 1), direction=direction,
              account_nominal=nominal)
@@ -923,6 +936,12 @@ def goal_page():
 @app.get("/glossary", response_class=HTMLResponse)
 def glossary_page():
     from .glossary_page import render
+    return render()
+
+
+@app.get("/robustness", response_class=HTMLResponse)
+def robustness_page():
+    from .robustness_page import render
     return render()
 
 
