@@ -96,50 +96,9 @@ async def not_found(request, exc):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """The front door: pick a machine. Two modes, no mixing.
-    PROP = pass the Kraken Prop eval. HEDGE = trade your own edge."""
-    from .theme import shell
-    css = r"""<style>
-.choose{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px}
-@media(max-width:680px){.choose{grid-template-columns:1fr}}
-.door{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;padding:26px 24px;transition:.18s;position:relative;overflow:hidden}
-.door:active{transform:scale(.985)}
-.door .ic{font-size:30px;line-height:1}
-.door h2{font-family:var(--mono);font-size:21px;font-weight:800;letter-spacing:.04em;
-  margin:14px 0 4px;color:var(--ink)}
-.door .sub{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
-.door p{font-size:13px;line-height:1.55;color:var(--dim);margin:14px 0 0}
-.door .go{font-family:var(--mono);font-size:11px;font-weight:700;margin-top:18px;color:var(--ink)}
-.door.prop{border-top:3px solid var(--accent)}
-.door.hedge{border-top:3px solid var(--amber)}
-@media(hover:hover){.door:hover{border-color:var(--line2);transform:translateY(-2px)}}
-.intro{font-size:13px;color:var(--dim);margin-top:6px;line-height:1.5}
-.intro b{color:var(--ink)}
-</style>"""
-    body = """
-<p class="intro">Two machines, two goals. Pick one — they never mix.<br>
-<b>PROP</b> is the money-maker right now: pass the €20 eval, scale to $200k.
-<b>HEDGE</b> is your own-money discretionary edge (S1–S5 setups + vetoes).</p>
-<div class="choose">
-  <a class="door prop" href="/prop-dashboard">
-    <div class="ic">◎</div>
-    <div class="sub">Pass the eval</div>
-    <h2>PROP</h2>
-    <p>Kraken Prop · $10k Advanced · 0.5% risk · survive the 3% floor, hit +9%.
-       Goal · Ledger · Desk · Queue · Survival.</p>
-    <div class="go">ENTER →</div>
-  </a>
-  <a class="door hedge" href="/dashboard">
-    <div class="ic">▤</div>
-    <div class="sub">Trade your edge</div>
-    <h2>HEDGE</h2>
-    <p>Your own Kraken money. Mined setups S1–S5, the 7 vetoes that kill the
-       bleed, sizing & journal. Plan · Position · Desk · Signals · Journal.</p>
-    <div class="go">ENTER →</div>
-  </a>
-</div>"""
-    return shell("/", "Home", body, head_extra=css, meta="pick a machine")
+    """The front door: cockpit power-on + live gauges + pick a machine."""
+    from .home_page import render
+    return render()
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
