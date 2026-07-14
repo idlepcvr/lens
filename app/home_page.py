@@ -1,4 +1,10 @@
-"""LENS / — the front door.
+"""LENS /system — the instrument plate.
+
+This was "/" until 2026-07-14. It assumes the reader already knows what a trade
+is, which turned out to be the whole problem: the one page he'd actually hand to
+someone — a partner, a parent — was written for people who didn't need it. "/"
+is now a plain-English explainer (explain_page.py) and this is the craft
+showcase, reached from it. Nothing here changed; it just isn't the front door.
 
 A scrolling instrument plate, not a pitch. Five folds:
 
@@ -429,4 +435,4 @@ def render() -> str:
     <b>Watch-only, by construction.</b></p>
 </section>
 """
-    return shell("/", "Home", body, head_extra=_FONT + _CSS, bare=True)
+    return shell("/system", "System", body, head_extra=_FONT + _CSS, bare=True)

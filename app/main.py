@@ -20,6 +20,7 @@ Routes:
   POST   /api/signals/{signal_id}/decide → approve / reject (week 4 wire-up)
 """
 
+import threading
 import time
 from datetime import date, datetime
 from functools import lru_cache
@@ -71,6 +72,28 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    _warm_caches()
+
+
+def _warm_caches():
+    """Replay the basket's trade logs once, in the background, at boot.
+
+    The prop pages are pure functions of a frozen backtest, so they're memoised
+    (_TL_CACHE) — but *someone* has to pay for the first replay, and until this
+    existed that someone was whoever clicked Plan first after a deploy: 7s of
+    staring at a dead nav. Now the cache is warm before the landing page is.
+
+    Daemon thread: a failure here must never stop the app booting, and a slow
+    warm must never delay it — the pages still compute on demand if this loses
+    the race. ponytail: no scheduler, no lock. Worst case is a duplicate replay.
+    """
+    def warm():
+        try:
+            from .prop_goal import cone
+            cone()
+        except Exception as e:                       # a cold cache is not fatal
+            print(f"[warm] skipped: {e}")
+    threading.Thread(target=warm, daemon=True, name="warm-caches").start()
 
 
 @app.exception_handler(404)
@@ -96,7 +119,17 @@ async def not_found(request, exc):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """The front door: cockpit power-on + live gauges + pick a machine."""
+    """The front door: what this is, in plain English, for someone who has never
+    traded anything. No numbers, no jargon, nothing for sale."""
+    from .explain_page import render
+    return render()
+
+
+@app.get("/system", response_class=HTMLResponse)
+def system_page():
+    """The instrument plate: the ledger drawn as a dot-matrix, the loop, the two
+    books. This is the craft showcase — it used to be "/", and it assumes you
+    already know what a trade is. "/" now explains that first."""
     from .home_page import render
     return render()
 

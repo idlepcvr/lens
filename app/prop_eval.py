@@ -269,12 +269,12 @@ def simulate_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
 
     strat = STRATEGIES[strategy_name]
     rule = EVALS[eval_name]
-    tf = strat.get("timeframe", "4h")
-    if df is None:
-        df = add_indicators(load_ohlcv(months=months, timeframe=tf))
-
-    trades = _trade_log(df, strat["signal_fn"], strat["params"], rule,
-                        risk_per_trade_pct)
+    # df=None is the web path (the standard log → memoised). A caller passing its
+    # own df is the sweep, walking a slice we've never cached — walk it raw.
+    trades = (_cached_trade_log(strategy_name, rule, risk_per_trade_pct, months)
+              if df is None else
+              _trade_log(df, strat["signal_fn"], strat["params"], rule,
+                         risk_per_trade_pct))
     daily_trades = _group_by_day(trades)
     result, final, n, reason = _walk_eval(daily_trades, account, rule, open_equity)
 
@@ -338,11 +338,10 @@ def monte_carlo_eval(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC",
         return {"error": f"unknown strategy: {strategy_name}"}
     rule = EVALS[eval_name]
     strat = STRATEGIES[strategy_name]
-    tf = strat.get("timeframe", "4h")
-    if df is None:
-        df = add_indicators(load_ohlcv(months=months, timeframe=tf))
-    trades = _trade_log(df, strat["signal_fn"], strat["params"], rule,
-                        risk_per_trade_pct)
+    trades = (_cached_trade_log(strategy_name, rule, risk_per_trade_pct, months)
+              if df is None else
+              _trade_log(df, strat["signal_fn"], strat["params"], rule,
+                         risk_per_trade_pct))
     daily_trades = _group_by_day(trades)
     if not daily_trades:
         return {"error": "no trades", "strategy": strategy_name}
@@ -369,6 +368,30 @@ def _cached_df(months, tf):
     return _DF_CACHE[key]
 
 
+_TL_CACHE: dict = {}
+
+def _cached_trade_log(name, rule, risk, months):
+    """Memoised _trade_log — the same deal _cached_df gives the dataframe.
+
+    The trade log is a pure function of (strategy, eval rule, risk, months): the
+    dataframe it walks is itself frozen in _DF_CACHE, so replaying it per request
+    can only ever produce the same list. It was not free — a 6-strategy basket
+    replayed 872 trades over 30 months on EVERY /prop-dashboard render (6.4s, of
+    which 1H_PULLBACK_v1 alone was 4.1s on 1h bars).
+
+    Callers treat the log as read-only, so the list is shared, not copied.
+    ponytail: process-lifetime memo, same lifetime as _DF_CACHE — new bars land
+    on restart, exactly as they already did for the dataframe.
+    """
+    strat = STRATEGIES[name]
+    key = (name, months, risk, tuple(sorted(rule.items())))
+    if key not in _TL_CACHE:
+        df = _cached_df(months, strat.get("timeframe", "4h"))
+        _TL_CACHE[key] = _trade_log(df, strat["signal_fn"], strat["params"],
+                                    rule, risk)
+    return _TL_CACHE[key]
+
+
 def eval_summary(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC", account=5000.0,
                  risk_per_trade_pct=2.0, months=30, paths=3000, open_equity=True):
     """Everything the /prop page needs for one config in a single dict: real
@@ -381,8 +404,7 @@ def eval_summary(strategy_name, eval_name="BREAKOUT_1STEP_CLASSIC", account=5000
     strat = STRATEGIES[strategy_name]
     rule = EVALS[eval_name]
     tf = strat.get("timeframe", "4h")
-    df = _cached_df(months, tf)
-    trades = _trade_log(df, strat["signal_fn"], strat["params"], rule, risk_per_trade_pct)
+    trades = _cached_trade_log(strategy_name, rule, risk_per_trade_pct, months)
     n = len(trades)
     daily = _group_by_day(trades)
     wins = [t["pnl_pct"] for t in trades if t["pnl_pct"] > 0]
@@ -438,14 +460,11 @@ def list_configs():
 
 # ─── Portfolio: multiple strategies, one account, shared walls ────────────────
 
-def _portfolio_daily_trades(strategy_names, rule, risk_per_trade_pct, months,
-                            _df_cache=None):
+def _portfolio_daily_trades(strategy_names, rule, risk_per_trade_pct, months):
     """Merge several strategies' trade logs onto one timeline, grouped per
     eval-day. All strategies share the same account, so a day's drawdown is the
     sum of every strategy's trades that day — that's where stacking can either
     speed the pass or trip the daily wall."""
-    if _df_cache is None:
-        _df_cache = {}
     all_trades = []
     for name in strategy_names:
         if name not in STRATEGIES:
@@ -453,13 +472,7 @@ def _portfolio_daily_trades(strategy_names, rule, risk_per_trade_pct, months,
             # strategies the engine can actually fire; hedge bar-context setups are
             # not portable to the eval (no backtest), so they never enter a basket.
             continue
-        strat = STRATEGIES[name]
-        tf = strat.get("timeframe", "4h")
-        if tf not in _df_cache:
-            _df_cache[tf] = add_indicators(load_ohlcv(months=months, timeframe=tf))
-        t = _trade_log(_df_cache[tf], strat["signal_fn"], strat["params"],
-                       rule, risk_per_trade_pct)
-        all_trades.extend(t)
+        all_trades.extend(_cached_trade_log(name, rule, risk_per_trade_pct, months))
     # Sort onto one timeline so same-day trades from different strategies group.
     all_trades.sort(key=lambda x: x["eval_day"])
     return _group_by_day(all_trades), len(all_trades)

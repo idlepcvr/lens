@@ -1,10 +1,17 @@
-"""The regime badge on the alert ticket (pre-trade, not post-mortem).
+"""The reach verdict on the alert ticket.
 
-The contract: STARVED reaches the ASCII title so it lands on the lock screen, and
-a badge that cannot be computed NEVER blocks the push. A missing alert is a worse
-failure than a missing badge.
+Contract, and every line of it is a scar:
 
-Run: python test_alert_regime.py
+  · The badge rides the BODY. It NEVER touches the title. The verdict reads the
+    geometry (a fixed TP/SL), not the moment, so for a given setup it returns the
+    same word on every signal forever. In the title that is an alarm firing 100%
+    of the time — an alarm you learn to ignore, which is worse than no alarm.
+    This has been wired to the title twice and removed twice. Don't be the third.
+
+  · A badge that cannot be computed NEVER blocks the push. A missing badge costs
+    a line of text. A missing alert costs the trade.
+
+Run: .venv/bin/python3 test_alert_regime.py
 """
 import os
 
@@ -27,31 +34,26 @@ def _shape(_sig):
 
 
 setups._trade_shape = _shape
-_real_badge = setups._regime_badge   # capture BEFORE the stubs below replace it
+_real_badge = setups._regime_badge      # capture BEFORE the stubs replace it
 
-# 1. STARVED rides the title AND the body, and adds the warning tag.
-setups._regime_badge = lambda *_a: {
-    "badge": "STARVED", "text": "needs 4/wk · SIDEWAYS regime offers ~1/wk of >=0.95% moves"}
-title, body, tag = setups._alert_message(SIG)
-assert title.startswith("[STARVED] "), title
-assert "S1 SHORT BTC" in title, title
-assert "STARVED" in body, body
-assert "warning" in tag, tag
-assert title.encode("latin-1"), "ntfy titles must be latin-1 encodable"
+# 1. Every verdict reports in the body and NONE of them shout in the title.
+#    STARVED is the one that would tempt you. It still doesn't get the title.
+for word in ("STARVED", "TIGHT", "OFFERED"):
+    setups._regime_badge = lambda *_a, _w=word: {"badge": _w, "text": "needs 4/wk · offers ~1/wk"}
+    title, body, tag = setups._alert_message(SIG)
+    assert word in body, f"{word} must reach the body"
+    assert not title.startswith("["), f"{word} must NOT shout in the title: {title}"
+    assert "S1 SHORT BTC" in title, title
+    assert "warning" not in tag, f"{word} must not tag the push as a warning"
+    assert title.encode("latin-1"), "ntfy titles must be latin-1 encodable"
 
-# 2. OFFERED is informational: body only, no title shout, no warning tag.
-setups._regime_badge = lambda *_a: {"badge": "OFFERED", "text": "needs 4/wk · offers ~9/wk"}
-title, body, tag = setups._alert_message(SIG)
-assert not title.startswith("["), title
-assert "OFFERED" in body, body
-assert "warning" not in tag, tag
-
-# 3. TIGHT likewise reports without shouting.
-setups._regime_badge = lambda *_a: {"badge": "TIGHT", "text": "needs 4/wk · offers ~4/wk"}
+# 2. No badge → a clean ticket, exactly as it was before the feature existed.
+setups._regime_badge = lambda *_a: None
 title, body, tag = setups._alert_message(SIG)
 assert not title.startswith("["), title
-assert "TIGHT" in body, body
+assert "Reach" not in body, body
 
+# ── the badge itself: authority order, and it must never take the alert down ──
 import app.excursion as _excursion
 import app.realism as _realism
 
@@ -62,37 +64,29 @@ def _raise(*_a, **_k):
 
 _saved_reach, _saved_badge = _excursion.reachability, _realism.badge
 
-# 4. His own fills outrank the day-range proxy. Given a loss move, reachability
-#    answers and realism is never consulted (it would raise if it were).
+# 3. His own fills outrank the day-range proxy. Given a real answer from
+#    reachability, realism is never consulted — it would raise if it were.
 _excursion.reachability = lambda *_a, **_k: {"badge": "STARVED", "text": "ceiling 34%"}
 _realism.badge = _raise
 assert _real_badge(0.95, 0.63)["text"] == "ceiling 34%", "excursion must win when it answers"
 
-# 5. Under min_n reachability returns None -> fall back to the proxy, don't crash.
+# 4. Under min_n reachability returns None → fall back to the proxy, don't crash.
 _excursion.reachability = lambda *_a, **_k: None
 _realism.badge = lambda *_a, **_k: {"badge": "OFFERED", "text": "proxy"}
 assert _real_badge(0.95, 0.63)["text"] == "proxy", "None reachability falls back to realism"
 
-# 6. THE IMPORTANT ONE: both sources dead must not take the alert with them.
+# 5. THE IMPORTANT ONE: both sources dead must not take the alert with them.
 _excursion.reachability = _raise
 _realism.badge = _raise
 assert _real_badge(0.95, 0.63) is None, "a raising badge must yield None, not propagate"
 
-# ...and the ticket still builds, unbadged.
 setups._regime_badge = _real_badge
 title, body, tag = setups._alert_message(SIG)
-assert "S1 SHORT BTC" in title and "Regime" not in body, "push survives a dead badge"
+assert "S1 SHORT BTC" in title and "Reach" not in body, "the push survives a dead badge"
 _excursion.reachability, _realism.badge = _saved_reach, _saved_badge
 
-# 7. No badge at all -> a clean ticket, unchanged from before this feature.
-setups._regime_badge = lambda *_a: None
-title, body, tag = setups._alert_message(SIG)
-assert not title.startswith("["), title
-assert "Regime" not in body, body
-assert "warning" not in tag, tag
-
-# 8. A zero/None required move can't be checked -> no badge, no crash.
+# 6. A zero/None required move can't be judged → no badge, no crash.
 assert _real_badge(0, 0.63) is None
 assert _real_badge(None, 0.63) is None
 
-print("ok — 18 checks passed")
+print("ok — verdict reports in the body, never the title, and never eats an alert")

@@ -35,7 +35,7 @@ def prop_metrics(strategy=HERO, eval_name=None, account=None, risk=None, months=
     eval_name = eval_name or cfg["eval_name"]
     account = account if account is not None else cfg["account"]
     risk = risk if risk is not None else cfg["risk"]
-    from .prop_eval import eval_summary, _trade_log, _cached_df, EVALS
+    from .prop_eval import eval_summary, _cached_trade_log, _cached_df, EVALS
     from .backtest_engine import STRATEGIES
 
     s = eval_summary(strategy, eval_name, account, risk, months=months)
@@ -55,8 +55,8 @@ def prop_metrics(strategy=HERO, eval_name=None, account=None, risk=None, months=
 
     # max historical drawdown — walk the real trade sequence (compounding)
     strat = STRATEGIES[strategy]
-    df = _cached_df(months, strat.get("timeframe", "4h"))
-    trades = _trade_log(df, strat["signal_fn"], strat["params"], EVALS[eval_name], risk)
+    df = _cached_df(months, strat.get("timeframe", "4h"))   # still needed for last_price
+    trades = _cached_trade_log(strategy, EVALS[eval_name], risk, months)
     eq, peak, maxdd = 1.0, 1.0, 0.0
     for t in trades:
         eq *= (1 + t["pnl_pct"] / 100.0)

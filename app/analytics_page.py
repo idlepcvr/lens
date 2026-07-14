@@ -376,6 +376,15 @@ function renderSections(E,A,X){
   if(X&&X.n){
     const sel=X.verdict.startsWith('SELECTION'), exi=X.verdict.startsWith('EXITS');
     exHead=X.verdict.split(' — ')[0]; exCol=sel||exi?'var(--short)':'var(--dim)';
+    // A geometry that CANNOT pay outranks "was it exits or selection?" — that is a
+    // question about how you trade the setup, and it is moot if the setup's target
+    // is out of reach. So STARVED takes the closed fold's chip: the verdict has to
+    // be legible without opening anything, or it may as well not be computed.
+    if(X.reach&&X.reach.badge==='STARVED'){
+      exHead='STARVED · ceiling '+(100*X.reach.reach).toFixed(0)+'% < '
+            +(100*X.reach.breakeven_wr).toFixed(0)+'% needed';
+      exCol='var(--short)';
+    }
     exBody=`<div class="an-grid">`+
       card('Median MFE',pct(X.median_mfe_pct),'best move offered','var(--long)')+
       card('Median MAE',pct(X.median_mae_pct),'worst heat taken','var(--short)')+

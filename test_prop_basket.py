@@ -19,13 +19,33 @@ def main():
     database.init_db()
     database.set_prop_eval(10000.0, 0.5, "BREAKOUT_1STEP_TURBO", fee=48.0)
 
-    from app.prop_scan import prop_tradeable
+    import app.strategy_eval as se
+    from app.backtest_engine import STRATEGIES
+    from app.prop_scan import HERO, PROP_FALLBACK, prop_tradeable
     from app.prop_desk import _stand_down_reason, _tf_ms
 
-    # 1) no basket saved → falls back to the board top-3 (old behaviour preserved)
+    # 1) no basket saved → every prop SURVIVOR on the board, hero pinned first.
+    #    This test used to assert the top-3. 48de5b8 deliberately widened it to
+    #    the survivors (not `thin`, score > 0) and the assertion was never
+    #    updated — it has been failing ever since, asserting behaviour that was
+    #    replaced on purpose. Lock the CONTRACT, not the count: the count is a
+    #    property of the board cache and moves whenever the board is re-mined.
     assert database.get_prop_eval()["basket"] is None
-    fallback = prop_tradeable()
-    assert len(fallback) == 3, fallback
+    surv = prop_tradeable()
+    assert surv, "no basket and no survivors — the scanner would trade nothing"
+    assert surv[0][0] == HERO, f"hero must be pinned rank-1, got {surv[0][0]}"
+    for name, r in surv:
+        assert name in STRATEGIES, f"{name} has no signal_fn — it could never fire"
+        assert r > 0, f"{name} has a non-positive target R ({r})"
+
+    # 1b) …and with no board cache at all, the hardcoded 3 are the floor. THIS is
+    #     the real 3-strategy fallback the old assertion was reaching for.
+    real_load = se.load_cache
+    se.load_cache = lambda: None
+    try:
+        assert prop_tradeable() == list(PROP_FALLBACK), "lost the no-cache floor"
+    finally:
+        se.load_cache = real_load
 
     # 2) an explicit basket wins, and rides through to prop_tradeable
     picked = ["ASIAN_RSI_DIP_v1", "PULLBACK_4R_v1", "ENGULF_v1"]

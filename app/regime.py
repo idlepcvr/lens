@@ -12,6 +12,7 @@ for the eval — "is right now a regime where ASIAN_RSI_DIP_v1 actually wins?"
 import math
 import random
 import statistics
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -202,17 +203,14 @@ def hero_by_regime(by_date: dict, strategy: str = "ASIAN_RSI_DIP_v1",
     day. Win/loss is the sign of pnl_pct (sizing-independent). Returns per-regime
     {n, wins, wr_pct}. This is the prop-relevant tailoring of the regime view."""
     # Imported here to avoid a circular import at module load.
-    from app.prop_eval import _trade_log, EVALS
-    from app.backtest_engine import load_ohlcv, add_indicators, STRATEGIES
+    from app.prop_eval import _cached_trade_log, EVALS
+    from app.backtest_engine import STRATEGIES
 
     out = {r: {"n": 0, "wins": 0, "wr_pct": None} for r in ("BULL", "SIDEWAYS", "BEAR")}
     if strategy not in STRATEGIES or eval_name not in EVALS or not by_date:
         return out
-    strat = STRATEGIES[strategy]
-    tf = strat.get("timeframe", "4h")
     try:
-        df = add_indicators(load_ohlcv(months=months, timeframe=tf))
-        trades = _trade_log(df, strat["signal_fn"], strat["params"], EVALS[eval_name], 0.5)
+        trades = _cached_trade_log(strategy, EVALS[eval_name], 0.5, months)
     except Exception:
         return out
     for t in trades:
@@ -228,9 +226,30 @@ def hero_by_regime(by_date: dict, strategy: str = "ASIAN_RSI_DIP_v1",
     return out
 
 
+_PAYLOAD_TTL_S = 300
+_payload_cache: tuple[float, dict] | None = None
+
+
 def regime_payload() -> dict:
-    """Everything the /regime page + API needs in one call."""
+    """Everything the /regime page + API needs in one call.
+
+    Cached for 5 minutes, not for the life of the process: unlike the backtest
+    caches, this one reads LIVE market state, so freezing it until restart would
+    make the page lie. Five minutes is safe because the classification runs a
+    14-day window over DAILY candles — it cannot meaningfully move inside one.
+
+    Without this, every hit re-fetched 1000 daily candles from Bybit and re-ran
+    a 5-restart k-means over them in pure Python (~0.9s), to reach the same
+    answer it reached a second ago. ponytail: a dict and a timestamp; if this
+    ever needs to be shared across processes, that's when it earns a real cache.
+    """
+    global _payload_cache
+    now = time.time()
+    if _payload_cache and now - _payload_cache[0] < _PAYLOAD_TTL_S:
+        return _payload_cache[1]
+
     reg = detect_regimes()
     reg["hero_by_regime"] = hero_by_regime(reg.get("by_date", {}))
     reg.pop("by_date", None)   # internal only — don't ship the full map
+    _payload_cache = (now, reg)
     return reg

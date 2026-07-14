@@ -857,6 +857,48 @@ def auto_approve_same_idea(sig: dict) -> Optional[str]:
     return parent[0]
 
 
+def _regime_badge(win_move_pct: float, loss_move_pct: float) -> dict | None:
+    """Can the market actually SUPPLY the move this trade's target needs?
+
+    Two sources, in order of authority:
+
+      1. excursion.reachability — HIS OWN fills. Of every trade actually closed,
+         what share ever travelled far enough to touch this target? You cannot
+         win a trade whose target is never reached, so that share is a CEILING on
+         win rate — measured, not modelled. It wins whenever it can answer.
+      2. realism.badge — the day-range proxy, for when there aren't enough fills.
+         How many moves this size does the current regime hand out per week,
+         against the cadence the plan needs (lens_config.trades_per_week).
+
+    Both already return {badge, text}, so this picks the authority — it does not
+    invent copy. Never raises: a missing badge costs a line, a missing alert
+    costs the trade.
+
+    ⚠️ THE VERDICT IS ON THE GEOMETRY, NOT THE MOMENT. For a fixed TP/SL it
+    returns the same word on every signal, forever. So it goes in the BODY, as a
+    standing footnote — never in the title. Wired to the title it becomes an
+    alarm that fires 100% of the time, which is an alarm you learn to ignore.
+    That mistake has now been made twice; the second time it lasted an hour.
+    """
+    if not win_move_pct or not loss_move_pct:
+        return None
+    # Module attribute lookup, not from-import — both sources must stay swappable.
+    try:
+        from . import excursion
+        reach = excursion.reachability(win_move_pct, loss_move_pct)
+        if reach:
+            return reach
+    except Exception:
+        pass
+    try:
+        from . import realism
+        from .database import get_lens_config
+        needed = (get_lens_config() or {}).get("trades_per_week")
+        return realism.badge(win_move_pct, needed) if needed else None
+    except Exception:
+        return None
+
+
 def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
     """Build (title, body, tag-emoji) for a setup push. A deliberately lean
     lock-screen ticket: identity, the three levels, win/lose balance, notional,
@@ -885,6 +927,13 @@ def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
     def L(em, lab, val):
         return f"{em} {lab:<{W}}{val}\n"
 
+    # The regime verdict rides the BODY, never the title — see _regime_badge.
+    # It is constant for a given setup's geometry, so as a title it would shout
+    # on every push and mean nothing. As a footnote on the ticket it is exactly
+    # what it should be: a standing reminder of what this trade's target is up
+    # against, in front of him at the moment he decides to take it.
+    badge = _regime_badge(s.get("win_move_pct"), s.get("loss_move_pct"))
+
     title = f"{setup} {side} BTC {m(s['entry'])}"
     body = (
         f"{head_emoji} {setup} · {side} · BTC/USD {arrow}\n"
@@ -903,6 +952,8 @@ def _alert_message(sig: dict, price: float = None) -> tuple[str, str, str]:
         + L("⚡", "Leverage", f"{s['leverage']:.0f}×")                              # ⚡
         + L("\U0001F6A6", "Risk", f"${m(s['risk_usd'])} · {s['loss_pct']:.1f}%")             # 🚦
         + "\n"
+        + (L("\U0001F30A", "Reach", f"{badge['badge']} · {badge['text']}")                   # 🌊
+           if badge else "")
         + "\U0001F4DD /desk for the full ticket"                                             # 📝
     )
     return title, body, tag
