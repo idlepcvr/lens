@@ -5,7 +5,19 @@ the joint-optimum / nearest-miss layering, the envelope bounds, and that
 model-error cells don't kill the run. Pure math, offline (no candles, no HTTP).
 Run: python3 test_fit_sweep.py
 """
+import datetime as _dt
+
 from app.fit_sweep import evaluate, build_axes, total_cells, start, CELL_CAP
+
+# Horizons are relative: the sweep gates on weeks-REMAINING, so a hardcoded date
+# silently becomes "0 weeks left" once it passes and every cell CalcErrors out.
+def _in(days: int) -> str:
+    return (_dt.date.today() + _dt.timedelta(days=days)).isoformat()
+
+
+# TIGHT is deliberately ≤7d: annualising a 10^9× target over a longer window stops
+# overflowing, and case 5 below needs EVERY cell to blow up.
+TIGHT, NEAR, FAR = _in(3), _in(14), _in(345)
 
 # A coarse grid keeps the test fast — the axis-resolution logic is the same.
 COARSE = {"lev_min": 1, "lev_max": 10, "lev_step": 3,
@@ -24,7 +36,7 @@ def _req(**over):
 
 
 # ── 1. feasible goal: modest target, long date → a feasible optimum exists ──
-r = evaluate(_req(target_balance=2000, target_date="2027-07-01"))
+r = evaluate(_req(target_balance=2000, target_date=FAR))
 o = r["optimum"]
 assert r["feasible_count"] > 0, "modest goal should have feasible cells"
 assert o["feasible"] and o["closes"], o
@@ -55,7 +67,7 @@ assert m is None or (
 ), m
 
 # ── 4. impossible goal: 1000× in two weeks → no feasible, nearest miss shown ─
-imp = evaluate(_req(target_balance=1_000_000, target_date="2026-07-18"))
+imp = evaluate(_req(target_balance=1_000_000, target_date=NEAR))
 assert imp["feasible_count"] == 0, "1000× in two weeks can't be feasible"
 assert imp["optimum"] is not None, "nearest miss must still be surfaced"
 assert not imp["optimum"]["feasible"], imp["optimum"]
@@ -65,14 +77,14 @@ assert imp["evaluated"] > 0, imp
 
 # ── 5. numerical blow-ups are skipped, not fatal (absurd target overflows the
 #      model's annual-rate term for every cell → 0 evaluated, but no crash) ──
-blow = evaluate(_req(target_balance=10**12, target_date="2026-07-11"))
+blow = evaluate(_req(target_balance=10**12, target_date=TIGHT))
 assert blow["evaluated"] == 0 and blow["optimum"] is None, blow
 
 # ── 6. axis resolution + cap math ───────────────────────────────────────────
 ax = build_axes(COARSE)
 assert ax["wr"] == [0.3, 0.4, 0.5, 0.6, 0.7], ax["wr"]
 assert ax["atr"] == [0.0, 0.01, 0.02], ax["atr"]
-big = start({"start_balance": 1000, "target_balance": 2000, "target_date": "2027-07-01",
+big = start({"start_balance": 1000, "target_balance": 2000, "target_date": FAR,
              "lev_step": 0.01, "freq_step": 0.01})   # ~absurd resolution → over cap
 assert "error" in big and "too large" in big["error"], big
 
