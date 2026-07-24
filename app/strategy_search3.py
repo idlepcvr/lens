@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest_engine import load_ohlcv, add_indicators, _run_backtest
+from .paths import SEARCH_JSON
 from .strategy_search import (CAPITAL, MONTHS, MIN_N, MAX_CONDS, SLOTS,
                               _masks, _combo_mask, _sig_fn, combo_params,
                               _describe, _eval)
@@ -171,7 +172,7 @@ def run_search():
         "survivors": surv_rows,
         "all": sorted(all_rows, key=lambda r: r["net_pct"], reverse=True)[:300],
     }
-    with open("strategy_search.json", "w") as f:
+    with open(SEARCH_JSON, "w") as f:
         json.dump(out, f, indent=1,
                   default=lambda o: o.item() if hasattr(o, "item") else str(o))
 
@@ -199,7 +200,7 @@ def rescore_baselines():
     confirmed' alone over-credits longs. Rescore every survivor against the
     every-bar baseline at its own (tf, k, R) on both windows; a survivor only
     counts if its per-trade expectancy beats the baseline's on BOTH."""
-    with open("strategy_search.json") as f:
+    with open(SEARCH_JSON) as f:
         out = json.load(f)
     surv = out["survivors"]
     regimes = sorted({(s["tf"], s["direction"], s["k"], s["rr"]) for s in surv})
@@ -240,7 +241,7 @@ def rescore_baselines():
     out["baselines"] = [{"window": w, "tf": t, "direction": d, "k": k, "rr": r, **ev}
                         for (w, t, d, k, r), ev in base.items() if ev]
     out["final_survivors"] = sum(1 for s in surv if s.get("beats_baseline"))
-    with open("strategy_search.json", "w") as f:
+    with open(SEARCH_JSON, "w") as f:
         json.dump(out, f, indent=1,
                   default=lambda o: o.item() if hasattr(o, "item") else str(o))
     print(f"\n=== gate 4: {out['final_survivors']} of {len(surv)} survivors "

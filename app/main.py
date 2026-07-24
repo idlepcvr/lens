@@ -2857,6 +2857,14 @@ def style_guide_page():
     return STYLE_HTML
 
 
+@app.get("/manual", response_class=HTMLResponse)
+def manual_page(doc: str = Query("readme", description="readme|plan|changelog|product|brand")):
+    """The repo's markdown, rendered from disk on every request — a generated
+    copy would be stale the next time CHANGELOG.md is appended to."""
+    from .docs_page import render
+    return render(doc)
+
+
 @app.get("/api/setups/state")
 def api_setups_state(refresh: bool = Query(True, description="fetch fresh candles first")):
     """Live desk state: per-direction verdicts, checklists, vetoes, scoreboard."""

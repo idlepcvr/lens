@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest_engine import load_ohlcv, add_indicators, _run_backtest
+from .paths import SEARCH_JSON
 
 CAPITAL    = 1000.0
 MONTHS     = 30
@@ -275,7 +276,7 @@ def run_search():
         "survivors": surv_rows,
         "all": sorted(all_rows, key=lambda r: r["net_pct"], reverse=True)[:300],
     }
-    with open("strategy_search.json", "w") as f:
+    with open(SEARCH_JSON, "w") as f:
         # numpy scalars (from the ATR-floor path) aren't JSON-serializable
         json.dump(out, f, indent=1,
                   default=lambda o: o.item() if hasattr(o, "item") else str(o))

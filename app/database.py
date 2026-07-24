@@ -14,7 +14,7 @@ from typing import Optional
 
 from .models import TradeCreate, TradeUpdate, TradeResponse
 
-DB_PATH = "lens.db"
+from .paths import DB_PATH  # noqa: F401  — re-exported; many modules import it from here
 
 
 # ─── Connection / schema ──────────────────────────────────────────────────────

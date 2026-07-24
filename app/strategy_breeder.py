@@ -63,6 +63,7 @@ from .backtest_engine import _run_backtest
 from .strategy_search import (CAPITAL, MIN_N, MONTHS, SLOTS, _combo_mask,
                               _describe, _masks, _sig_fn, combo_params)
 from .strategy_search3 import RISK, _geo, _load
+from .paths import BREEDER_JSON
 
 MAX_CONDS   = 6       # the point of the GA — grid search stopped at 3
 POP         = 60
@@ -290,7 +291,7 @@ def _row(p, tf):
 
 
 def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
-        pop_size=POP, seed=0, window=DEFAULT_WINDOW, out="strategy_breeder.json"):
+        pop_size=POP, seed=0, window=DEFAULT_WINDOW, out=BREEDER_JSON):
     w = WINDOWS[window]
     t0, out_rows, hist = time.time(), [], {}
     print(f"breeder: pop {pop_size} × {generations} gens × {list(timeframes)} "

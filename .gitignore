@@ -2,8 +2,10 @@
 .env
 *.env
 
-# Database
-lens.db
+# Database — the ledger and its WAL sidecars live in data/ since 2026-07-24.
+# The whole directory is ignored: it holds the one irreplaceable file here and
+# nothing in it belongs in git.
+data/
 *.db-shm
 *.db-wal
 
@@ -38,9 +40,10 @@ node_modules/
 # Screenshots (Week 6 deliverable)
 data/screenshots/
 
-# Generated strategy-board cache (refreshed by app.strategy_eval cron)
-strategy_scores.json
+# Generated strategy-board cache (refreshed by app.strategy_eval cron).
+# The other results/ files ARE tracked — this one is a rebuildable cache.
+results/strategy_scores.json
 
 # local DB backups
-lens.db.bak-*
+data/backups/
 .playwright-cli/

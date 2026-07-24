@@ -26,8 +26,7 @@ FORWARD_BARS = 96                    # ~4 days, so even a 6R target gets a fair 
 MAE_WINDOW = 8                       # bars used to size the structural stop
 MIN_N = 40                           # below this a strategy is "thin", unranked
 
-CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                          "strategy_scores.json")
+from .paths import SCORES_JSON as CACHE_PATH
 
 
 # ── strategy registry ─────────────────────────────────────────────────────────

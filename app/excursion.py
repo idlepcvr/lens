@@ -23,7 +23,7 @@ from pathlib import Path
 from statistics import median
 from typing import Optional
 
-_DB_PATH = Path(__file__).parent.parent / "lens.db"
+from .paths import DB_PATH as _DB_PATH
 
 # Preference order: finest resolution first. 5m stops ~2026-06-26, 1h runs to now,
 # so recent trades fall back automatically rather than dropping out of the sample.

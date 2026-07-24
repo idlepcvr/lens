@@ -65,10 +65,22 @@ research/     one-off analysis scripts, not wired into the app. They import
               each other by bare name (edge_miner, ict_miner and trade_review
               are one family), so they have to share a directory
 tests/        assert-based self-checks, run directly (no framework)
-docs/         reference docs + screenshots
+docs/         reference docs, screenshots, and completed build specs
+data/         lens.db — the ledger. The one irreplaceable thing here.
+              Gitignored, backups in data/backups/
+results/      generated output: searches, breeder runs, dedup clusters.
+              strategy_scores.json is the live board cache the app reads
 logs/         everything systemd and cron redirect into
-lens.db       the ledger. DB_PATH is relative, so the app runs from repo root
 ```
+
+Every path is defined once in `app/paths.py`, anchored to the repo root via
+`__file__` rather than the cwd. That matters more than tidiness: the database
+path used to be a bare relative `"lens.db"`, so a script run from the wrong
+directory silently opened a **different, empty** database instead of failing.
+
+Reading the docs: **`/manual`** renders README, the plan, the changelog,
+PRODUCT and BRAND live from disk, in the app's own theme. (`/docs` is FastAPI's
+API reference — different thing, same-sounding name.)
 
 Scripts in `research/` and `tests/` open with `import _bootstrap`, which puts
 the repo root on `sys.path` and makes it the cwd — they import `app` and some

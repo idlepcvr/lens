@@ -21,7 +21,7 @@ import pandas as pd
 import ccxt
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-_DB_PATH = Path(__file__).parent.parent / "lens.db"
+from .paths import DB_PATH as _DB_PATH
 
 # ─── OHLCV cache ─────────────────────────────────────────────────────────────
 

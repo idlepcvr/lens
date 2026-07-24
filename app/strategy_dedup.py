@@ -62,6 +62,7 @@ from scipy.spatial.distance import squareform
 from .backtest_engine import _run_backtest
 from .strategy_search import CAPITAL, MONTHS, SLOTS, _combo_mask, _masks, _sig_fn
 from .strategy_search3 import _geo, _load
+from .paths import SEARCH_JSON, clusters_json
 
 THRESHOLD = 0.9    # mask overlap ≥ this ⇒ same idea. See _cluster().
 
@@ -172,7 +173,7 @@ def _cluster(sim, threshold=THRESHOLD):
 
 
 def run(only_baseline_beaters=True):
-    with open("strategy_search.json") as f:
+    with open(SEARCH_JSON) as f:
         out = json.load(f)
     surv = out["survivors"]
     if only_baseline_beaters:
@@ -229,7 +230,7 @@ def run(only_baseline_beaters=True):
         "labels_in": len(surv), "ideas_out": len(clusters),
         "clusters": clusters,
     }
-    out_path = f"strategy_clusters_{result['scope']}.json"
+    out_path = clusters_json(result["scope"])
     with open(out_path, "w") as f:
         json.dump(result, f, indent=1)
 

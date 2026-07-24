@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
+from app.paths import SEARCH_JSON
 from app.backtest_engine import add_indicators, _run_backtest
 
 n = 400
@@ -63,7 +64,7 @@ import json
 from app.backtest_engine import STRATEGIES, to_pinescript
 from app.strategy_search3 import RISK
 
-_j = json.load(open("strategy_search.json"))
+_j = json.load(open(SEARCH_JSON))
 _by_desc = {s["desc"]: s["params"] for s in _j["survivors"]}
 SHADOWS = {
     "TREND_MOMO_VOLSPIKE_v3":     "LONG · 4h · trend up · MACD bull · vol spike · 1.5×ATR stop · 3.0R",

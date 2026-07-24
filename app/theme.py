@@ -67,7 +67,7 @@ HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
-NAV_NEUTRAL = [("/glossary", "Learn"), ("/system", "System"), ("/robustness", "Robustness"), ("/money", "Money"), ("/audit", "Audit"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+NAV_NEUTRAL = [("/glossary", "Learn"), ("/system", "System"), ("/robustness", "Robustness"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}

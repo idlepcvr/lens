@@ -17,7 +17,7 @@ import sqlite3
 # Anchored to the repo root rather than hardcoded to /home/mini/lens, so this
 # survives being run from anywhere — and being cloned anywhere.
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB  = os.path.join(_ROOT, "lens.db")
+DB  = os.path.join(_ROOT, "data", "lens.db")
 OUT = os.path.join(_ROOT, "research", "trade_review.html")
 
 CANDLE_STEP_1H = 3_600_000   # ms

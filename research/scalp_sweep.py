@@ -7,13 +7,14 @@ import sqlite3
 import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd; precedes `app`
 import pandas as pd
 
+from app.paths import DB_PATH
 from app.backtest_engine import add_indicators, _run_backtest, _compute_metrics
 
 MONTHS = 30
 
 
 def load_cache(cache_symbol="binance:BTC/USDT", timeframe="1h"):
-    c = sqlite3.connect("lens.db")
+    c = sqlite3.connect(DB_PATH)
     rows = c.execute(
         "SELECT ts,open,high,low,close,volume FROM ohlcv_cache "
         "WHERE symbol=? AND timeframe=? ORDER BY ts ASC",
