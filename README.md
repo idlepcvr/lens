@@ -61,7 +61,9 @@ deploy: `systemctl --user restart lens.service`
 ```
 app/          the server — FastAPI, pages, engines, scanners
 strategies/   Pine strategies, one folder each + BASELINE/FINDINGS
-research/     one-off analysis scripts, not wired into the app
+research/     one-off analysis scripts, not wired into the app. They import
+              each other by bare name (edge_miner, ict_miner and trade_review
+              are one family), so they have to share a directory
 tests/        assert-based self-checks, run directly (no framework)
 docs/         reference docs + screenshots
 logs/         everything systemd and cron redirect into

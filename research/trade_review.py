@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Generate trade_review.html — visual trade reviewer with edge computation."""
+"""Generate research/trade_review.html — visual trade reviewer with edge computation.
+
+Also the shared feature library for the two miners beside it: `edge_miner` and
+`ict_miner` both do `from trade_review import ...`. That bare sibling import
+only resolves if they share a directory, which is why this lives in research/
+rather than at the repo root. Run: python3 research/trade_review.py
+"""
 
 import bisect
 import datetime
 import json
 import math
+import os
 import sqlite3
 
-DB  = "/home/mini/lens/lens.db"
-OUT = "/home/mini/lens/trade_review.html"
+# Anchored to the repo root rather than hardcoded to /home/mini/lens, so this
+# survives being run from anywhere — and being cloned anywhere.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB  = os.path.join(_ROOT, "lens.db")
+OUT = os.path.join(_ROOT, "research", "trade_review.html")
 
 CANDLE_STEP_1H = 3_600_000   # ms
 CANDLE_STEP_4H = 14_400_000  # ms
@@ -696,7 +706,7 @@ def main():
 
     size_kb = len(html) / 1024
     print(f"Written: {OUT} ({size_kb:.0f} KB)")
-    print("Open in browser: xdg-open trade_review.html")
+    print(f"Open in browser: xdg-open {OUT}")
 
 
 if __name__ == "__main__":
