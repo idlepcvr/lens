@@ -36,6 +36,7 @@ A `201 Created` with the full signal row means schema parses. A `422` means a fi
 |---|---|---|---|
 | `TREND_4R_v1` | **ready to test** | TBD | **Current focus.** 4H with-trend, fixed 1% stop / 4% TP (4R). Built to the locked thesis (see repo-root `PRISM-SYSTEM-SPEC (1).md`). Tests whether 4R is reachable at a 1% stop. |
 | `MOM_BREAK_v1` | ⏸ on hold | TBD | 5m/15m scalp. **Superseded for live use** by the 2026-06-02 conclusion that scalping doesn't fit the account-risk math — kept for reference only. |
+| `DAILY_BREAK_v1` | ❌ NO-GO | PF 0.51, WR 21.2% (n=104, 24mo) | Prev-day break, 3R. Entry is the problem, not the exit: needs 28% WR to break even, gets 21%. Trailing + pyramiding evaluated 2026-07-24 across 54 sweep cells — **all 54 lose**. Pine left at v1.0.0. Harness is reusable for other exit questions. |
 | `MACD_MTF_v1` | ⚠ DEPRECATED | PF 0.11, WR 14.9% | Kept as negative-baseline reference |
 | `MACD_MTF_BOS_v1` | not started | — | Week 8 — adds Break-of-Structure confirmation |
 

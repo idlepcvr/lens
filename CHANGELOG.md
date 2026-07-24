@@ -34,6 +34,27 @@ though by varying rules rather than one structural pair.
 +€2,000 over 26 trades, while its frozen label still reads "−€15/trade". It is
 blocking the most and justifying it the least. Worth a hard look.
 
+**DAILY_BREAK_v1 evaluated and retired — ❌ NO-GO.** The 2026-07-14 spec asked
+whether Darvas-style structure trailing or pyramiding beats the designed fixed-3R
+exit. New perp-aware harness (`strategies/DAILY_BREAK_v1/backtest.py`): Bybit 1h,
+24 months, all five variants (A / B / B+P / C / C+P), real Bybit funding (2,232
+stamps, +0.0048%/8h), per-unit fees on notional, a liquidation guard, and the D4
+risk-ledger invariant asserted on every add. Plus `sweep.py` (54 cells,
+median-reported) and a `test_backtest.py` self-check.
+
+**The answer is not "fixed 3R stands" — it's that the premise fails.** Variant A
+nets PF **0.51** / WR **21.2%** on n=104. Wins land at +2.85R and losses at
+−1.11R, exactly the designed geometry, so breakeven WR is 28% and the strategy
+gets 21%. The entry isn't selective enough; exits were never the problem. All 54
+sweep cells lose (best 0.68). D7's "1.2× A's PF" test was reported but is
+meaningless against a losing control — a bar beneath breakeven. The trail did
+work as designed (max DD 23.9% → 16.3%, giveback 1.32R → 2.10R); it just can't
+rescue a negative-expectancy entry. **`strategy.pine` untouched at v1.0.0** —
+deliverable 4 was conditional on a variant winning, and none did.
+
+Side note: designed for the >24h hold bucket, the 1h version averages **14 hours**
+in trade — it was never reaching the bucket it was built to exploit.
+
 ## 2026-07-13 → 14
 
 **Landing page rebuilt as the cockpit front door.** Aperture mark scaled into
