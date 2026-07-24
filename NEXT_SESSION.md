@@ -1,5 +1,37 @@
 # NEXT SESSION — LENS: Structure-trailing + pyramiding eval for DAILY_BREAK_v1
 
+> ## ✅ BUILT — 2026-07-24 (`1caa742`). Verdict: ❌ **NO-GO**.
+>
+> Full write-up in `strategies/DAILY_BREAK_v1/BASELINE.md`; summary in CHANGELOG.
+>
+> Deliverables 1–3 and 5 shipped: `backtest.py` (all five variants, real Bybit
+> funding, per-unit fees, liquidation guard, the D4 risk-ledger invariant
+> asserted on every add), `sweep.py` (54 cells, median-reported),
+> `test_backtest.py`, BASELINE.md filled, CHANGELOG entry.
+>
+> **Deliverable 4 (`strategy.pine` v1.1.0) was correctly NOT built.** It was
+> conditional on a variant winning by D7. None did, so the Pine stays at v1.0.0.
+>
+> **The answer is not the one D7 had a branch for.** The control loses money:
+> variant A is PF 0.51 / WR 21.2% on n=104. Wins land at +2.85R and losses at
+> −1.11R — exactly the geometry this spec designed, with fees behaving as
+> modelled — so breakeven WR is 28.0% and it realizes 21.2%. **The entry is not
+> selective enough; exits were never what was wrong.** All 54 sweep cells lose.
+> Because A's PF is under 1, D7's "1.2× A's PF" gate sits *beneath breakeven*,
+> so `verdict()` says that out loud rather than letting a losing variant print
+> as ADOPT.
+>
+> The trail did work as specified — max drawdown 23.9% → 16.3%, giveback 1.32R →
+> 2.10R. Pyramiding held its discipline: 11 adds taken, 9 refused by the
+> invariant. Neither can rescue a negative-expectancy entry.
+>
+> Also worth knowing: built for the >24h hold bucket, the 1h version averages
+> **14 hours** in trade. It never reached the bucket it was designed to exploit.
+>
+> *Everything below is the original 2026-07-14 spec, kept for provenance.*
+
+---
+
 *Handoff file. **Fable made every design call below on 2026-07-14**; Opus executes.
 The previous spec (Goal Ladder, ✅ built 2026-07-09) lives in git history at
 `e1e52cc^` and in CHANGELOG.*

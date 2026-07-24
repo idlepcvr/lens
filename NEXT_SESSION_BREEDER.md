@@ -1,9 +1,48 @@
 # WISHLIST — Strategy breeder + veto visibility
 
-*Captured 2026-07-18 from the Algory 2.0 teardown (algory.app). This is a
-**wishlist, not a ratified spec** — design calls marked OPEN are still open.
-Separate file on purpose: `NEXT_SESSION.md` holds the DAILY_BREAK_v1
-trailing/pyramiding spec, still unbuilt, untouched by this.*
+> ## ✅ BOTH ITEMS BUILT — 2026-07-24. Nothing here is outstanding.
+>
+> · **Item 0 — log vetoed setups** → `17ec6e1`. Vetoed matches persist as
+>   `rejected` `veto:<rules>` rows (deduped per bar+setup, never notify), and
+>   `/signals` gained a **blocked** section showing setup ✓ / rules ✗ / that veto
+>   bucket's realized ledger. Both drop sites had to change — `emit_signals` AND
+>   the `m["clean"]` filter in `run_scan_cli` — or the log stays empty.
+>   **The S2 question this file raised is answered, and it was worse than asked:**
+>   S2 is effectively dead (5 matches, 5 vetoed), and **S4 is dead code** (25
+>   matches, 25 vetoed, zero emitted — a long on `rsi<40` in discount trips
+>   `slope_against` structurally every time). Separately, **`fvg_entry` is the
+>   most-fired veto and the only one in profit** (+€2,000 / 26 trades) while its
+>   frozen label still reads "−€15/trade". Open decisions, not open build.
+>
+> · **Dedup prerequisite** → `27a1b13`. This file's hypothesis — that the 933
+>   survivors are "really ~20 ideas" — is **false**. Measured: 933 → **525
+>   ideas**, median pair shares 1.3% of entry bars. Nothing to unpack. It also
+>   found that Algory's own diversity metric (correlation of equity curves) is
+>   the **wrong instrument** for this vault: these strategies trade ~59 days out
+>   of 770 and the median pair shares one, so Pearson mostly measures mutual
+>   zeros. Entry-mask overlap is the metric that works.
+>
+> · **Item 1 — genetic breeder** → `1445f04`. Built, with the five OPEN design
+>   calls resolved in code (see CHANGELOG). Fitness is `min(train, holdout)` of
+>   drawdown-penalised expectancy in R, clamped *inside* selection so a
+>   curve-fit genome is scored by its bad half and dies before it can win.
+>   **The GA works and its premise does not.** Its whole functional case was
+>   reaching >3 conditions; of 103 viable genomes, **one** does. By 5 conditions,
+>   fewer than 40 bars are selected in 30 months. **Depth fails on data, not on
+>   search** — `max_conditions=3` was never arbitrary, it is where this window
+>   runs out of evidence. The next move is the **7-year window**, not a cleverer
+>   algorithm.
+>
+> *Everything below is the original 2026-07-18 capture, kept for provenance —
+> including the assumptions that turned out to be wrong. Read it as history.*
+
+---
+
+*Captured 2026-07-18 from the Algory 2.0 teardown (algory.app). This was a
+**wishlist, not a ratified spec** when written; the design calls marked OPEN
+below were resolved during the 2026-07-24 build. Separate file on purpose:
+`NEXT_SESSION.md` holds the DAILY_BREAK_v1 trailing/pyramiding spec — also
+built 2026-07-24, verdict NO-GO.*
 
 ---
 
