@@ -7,6 +7,40 @@ live in `LENS_PLAN.md`; commit detail is in `git log`.
 
 ## 2026-07-24
 
+**The strategy vault is genuinely diverse — the near-duplicate hypothesis was
+wrong** (`app/strategy_dedup.py`, breeder wishlist Item 1 prerequisite). The
+breeder doc assumed the 933 split-half survivors were "really ~20 ideas wearing
+different labels", and rated dedup as higher value per hour than the GA itself.
+Measured: **933 labels → 525 ideas**, and the 402 baseline-beaters → **230**.
+The median pair of survivors shares **1.3%** of its entry bars and **0%** of its
+realized trades. Nothing to unpack; the GA would be searching an already-wide
+space.
+
+Two measurements that cost more than the answer and matter more:
+
+· **Correlation of equity curves — Algory's own diversity metric — is the wrong
+instrument for this vault.** These survivors trade a median of 59 days out of
+770, and the median pair shares *one* active day. With near-disjoint supports,
+Pearson on daily pnl is dominated by mutual zeros; it reported 325 "ideas" off
+pure sparsity. Correlating *cumulative* equity would be worse still — every
+curve inherits BTC's uptrend, so everything correlates with everything. The
+metric that works here is Jaccard overlap of the **entry masks**: which bars the
+conditions select, before geometry or position state touches anything.
+
+· **Geometry re-shuffles the realized trade set far more than expected.** Two
+survivors with *identical* entry conditions, differing only 3.0R vs 5.0R, share
+just **0.38** of their realized trades — a different take-profit frees the
+position at a different bar, so a different set of later signals is taken rather
+than blocked. This is why realized-trade overlap was also rejected as the
+metric, and it constrains the breeder: `execution` genes are not a cosmetic tail
+on the genome, so fitness must be scored per full genome, never by evaluating a
+condition set once and sweeping geometry over it afterwards.
+
+Counts are bounds, not a point estimate — mask overlap is the upper bound (it
+under-merges when extra selected bars all land while a position is already
+open), realized-trade overlap the lower. Both agree the vault is wide.
+Results → `strategy_clusters_beats_baseline.json` / `_split_half.json`.
+
 **Vetoed setups are logged instead of silently discarded** (breeder wishlist
 Item 0). A setup that matched and was stood down by a veto rule left no row, no
 trace and no notification: `emit_signals` dropped every non-clean match and
