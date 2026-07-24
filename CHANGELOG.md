@@ -5,6 +5,37 @@ live in `LENS_PLAN.md`; commit detail is in `git log`.
 
 ---
 
+## 2026-07-24 (later)
+
+**The breeder now runs on the 7-year window, and the depth hypothesis held.**
+The first pass concluded that depth failed on *data*, not on search — so the
+default window moved from 30 months of Bybit perp to the 84-month Binance spot
+set `strategy_search3` stage 3 already used for deep confirmation (2.8× the
+bars: 15,623 vs 5,580 on 4h). Window is now a parameter (`--window w30|deep`)
+and every result records which one produced it, because they are **different
+instruments**, not just different lengths — spot has no funding and a different
+microstructure, so the two are never comparable bar-for-bar.
+
+**The prediction was falsifiable and it survived.** Genomes above 3 conditions
+went from **1 of 103** viable to **25 of 78** — 1% to 32%, the region grid
+enumeration cannot reach. Best fitness went 0.028 → **0.112**, and holdout
+samples went from a median of 33 trades to 62–187. `max_conditions=3` was a
+data limit, exactly as measured; it was never a property of the search.
+
+**⚠ The champions are NOT validated, and the top of the table should be read
+with suspicion.** Two reasons, both structural:
+· **65 of 78 viable genomes are LONG**, on *spot*, over a window starting
+June 2019 — a period in which BTC went up roughly an order of magnitude. The
+dedup pass already warned that every equity curve here inherits BTC's trend.
+· **The breeder's fitness contains no baseline comparison at all.**
+`strategy_search3` scores survivors against a buy-every-bar baseline and carries
+a `beats_baseline` flag precisely to catch this; the GA's fitness is raw
+drawdown-penalised expectancy. So "LONG · 1d · trend up · 5.0R, +185%" has not
+yet been asked the only question that matters — *did it beat simply holding?*
+
+The depth result stands on its own. The genomes are leads, not findings, until
+they go through the baseline gate.
+
 ## 2026-07-24
 
 **The genetic breeder is built — and it measured why its own premise fails**
