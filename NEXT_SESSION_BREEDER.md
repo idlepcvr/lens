@@ -122,8 +122,33 @@ this before Item 1** — it may reveal that the 933 are really ~20 ideas.
    alongside `strategy_search.json` rather than extending it; the breeder can
    follow that pattern or claim a vault table. Decide when there is output.
 
-Still genuinely unbuilt: everything in Item 1 above. The dedup was the
-prerequisite, and it is done.
+### BUILT 2026-07-24 — `app/strategy_breeder.py`
+
+Item 1 is done, ran, and returned a negative result worth more than a champion.
+
+**Of 103 viable genomes, one uses >3 conditions.** The GA's whole functional
+case was reaching depth the grid cannot afford. It reached almost none, and the
+reason is not the algorithm — 120 random genomes per depth on 4h:
+
+| conditions | viable | too few signals | median holdout n |
+|---|---|---|---|
+| 1 | 94 | 0 | 69 |
+| 3 | 26 | 57 | 33 |
+| 5 | **0** | 111 | 14 |
+| 6 | **0** | 114 | 17 |
+
+By 5 conditions the filter selects under 40 bars in 30 months. `max_conditions=3`
+was not an arbitrary cap — it is where this window runs out of evidence.
+
+**So the open question is a data question, not a search question.** Re-running
+the breeder against the 7-year Binance set (already wired for `strategy_search3`
+stage 3) is the only thing that would make depth reachable. That is a small
+change — `_load(tf, 84, exchange="binance")` in `evolve()` — and it is the
+honest next step. Until then a deeper GA on 30 months is searching for genomes
+the data cannot validate.
+
+Not done, deliberately: nothing bred here is anywhere near live. Best fitness
+0.028, and every top genome sits inside the region the grid already enumerates.
 
 ### Standing context for whoever builds this
 Measured live edge is −6.6%/mo geometric; mining says the #1 lever is not

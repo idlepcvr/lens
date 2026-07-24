@@ -7,6 +7,38 @@ live in `LENS_PLAN.md`; commit detail is in `git log`.
 
 ## 2026-07-24
 
+**The genetic breeder is built — and it measured why its own premise fails**
+(`app/strategy_breeder.py`, wishlist Item 1). Tournament GA over the `SLOTS`
+vocabulary with geometry bred as part of the genome, `max_conditions=6`.
+Fitness is **`min(train, holdout)`** of drawdown-penalised expectancy in R —
+the clamp is inside selection, not a post-screen, so a genome that only works
+in-sample is scored by its bad half and dies before it can win. Holdout `n ≥ 40`
+or it is disqualified outright, however good the in-sample number looks.
+
+**It ran, and the functional case did not survive contact.** The GA existed to
+reach genomes with >3 conditions, which grid enumeration cannot afford. Of 103
+viable genomes across 1h/4h/1d, **one** uses more than 3 conditions. Best
+fitness is 0.028 — thin. Every top genome sits inside the region
+`strategy_search3` already enumerates.
+
+**Why, measured** — 120 random genomes per depth on 4h:
+
+| conditions | viable | too few signals | thin holdout | median holdout n |
+|---|---|---|---|---|
+| 1 | 94 | 0 | 26 | 69 |
+| 2 | 60 | 10 | 50 | 42 |
+| 3 | 26 | 57 | 37 | 33 |
+| 4 | 7 | 84 | 29 | 21 |
+| 5 | **0** | 111 | 9 | 14 |
+| 6 | **0** | 114 | 6 | 17 |
+
+Depth doesn't fail on fitness — it fails on **data**. By 5 conditions the
+combined filter selects under 40 bars in 30 months, so there is nothing to
+backtest, let alone validate out-of-sample. `max_conditions=3` was never an
+arbitrary cap on the grid: it is approximately where this window runs out of
+evidence. A deeper search needs a longer window (the 7-year Binance set already
+wired into `strategy_search3` stage 3), not a cleverer search algorithm.
+
 **The strategy vault is genuinely diverse — the near-duplicate hypothesis was
 wrong** (`app/strategy_dedup.py`, breeder wishlist Item 1 prerequisite). The
 breeder doc assumed the 933 split-half survivors were "really ~20 ideas wearing

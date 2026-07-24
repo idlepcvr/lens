@@ -1,0 +1,3475 @@
+{
+ "ran_at": "2026-07-24T12:49:03.714540+00:00",
+ "months": 30,
+ "capital": 1000.0,
+ "risk": {
+  "risk_pct": 2.0,
+  "leverage": 5.0,
+  "slippage_pct": 0.03,
+  "stop_pct": 1.0,
+  "tp_pct": 2.0
+ },
+ "max_conditions": 6,
+ "min_n_holdout": 40,
+ "population": 60,
+ "generations": 12,
+ "seed": 0,
+ "fitness": "min(train, holdout) of expectancy_R / max(drawdown_R, 1)",
+ "history": {
+  "1h": [
+   {
+    "gen": 1,
+    "best": -0.00579,
+    "viable": 26,
+    "evaluated": 60
+   },
+   {
+    "gen": 2,
+    "best": -0.00348,
+    "viable": 46,
+    "evaluated": 111
+   },
+   {
+    "gen": 3,
+    "best": -0.00267,
+    "viable": 52,
+    "evaluated": 160
+   },
+   {
+    "gen": 4,
+    "best": -0.00267,
+    "viable": 57,
+    "evaluated": 204
+   },
+   {
+    "gen": 5,
+    "best": -0.00267,
+    "viable": 59,
+    "evaluated": 243
+   },
+   {
+    "gen": 6,
+    "best": -0.00067,
+    "viable": 56,
+    "evaluated": 281
+   },
+   {
+    "gen": 7,
+    "best": -0.00067,
+    "viable": 55,
+    "evaluated": 323
+   },
+   {
+    "gen": 8,
+    "best": 0.00193,
+    "viable": 57,
+    "evaluated": 361
+   },
+   {
+    "gen": 9,
+    "best": 0.00193,
+    "viable": 54,
+    "evaluated": 393
+   },
+   {
+    "gen": 10,
+    "best": 0.02783,
+    "viable": 55,
+    "evaluated": 426
+   },
+   {
+    "gen": 11,
+    "best": 0.02783,
+    "viable": 54,
+    "evaluated": 459
+   },
+   {
+    "gen": 12,
+    "best": 0.02783,
+    "viable": 55,
+    "evaluated": 492
+   }
+  ],
+  "4h": [
+   {
+    "gen": 1,
+    "best": -0.00572,
+    "viable": 10,
+    "evaluated": 60
+   },
+   {
+    "gen": 2,
+    "best": -0.00572,
+    "viable": 20,
+    "evaluated": 109
+   },
+   {
+    "gen": 3,
+    "best": -0.00514,
+    "viable": 33,
+    "evaluated": 151
+   },
+   {
+    "gen": 4,
+    "best": -0.00514,
+    "viable": 49,
+    "evaluated": 193
+   },
+   {
+    "gen": 5,
+    "best": -0.00408,
+    "viable": 57,
+    "evaluated": 225
+   },
+   {
+    "gen": 6,
+    "best": -0.00408,
+    "viable": 55,
+    "evaluated": 265
+   },
+   {
+    "gen": 7,
+    "best": -0.00408,
+    "viable": 56,
+    "evaluated": 294
+   },
+   {
+    "gen": 8,
+    "best": -0.00174,
+    "viable": 54,
+    "evaluated": 332
+   },
+   {
+    "gen": 9,
+    "best": 0.00272,
+    "viable": 55,
+    "evaluated": 366
+   },
+   {
+    "gen": 10,
+    "best": 0.0032,
+    "viable": 55,
+    "evaluated": 402
+   },
+   {
+    "gen": 11,
+    "best": 0.00328,
+    "viable": 53,
+    "evaluated": 446
+   },
+   {
+    "gen": 12,
+    "best": 0.02794,
+    "viable": 56,
+    "evaluated": 482
+   }
+  ],
+  "1d": [
+   {
+    "gen": 1,
+    "best": -0.01138,
+    "viable": 2,
+    "evaluated": 60
+   },
+   {
+    "gen": 2,
+    "best": -0.01138,
+    "viable": 3,
+    "evaluated": 104
+   },
+   {
+    "gen": 3,
+    "best": -0.01138,
+    "viable": 8,
+    "evaluated": 151
+   },
+   {
+    "gen": 4,
+    "best": 0.00674,
+    "viable": 14,
+    "evaluated": 197
+   },
+   {
+    "gen": 5,
+    "best": 0.00674,
+    "viable": 32,
+    "evaluated": 230
+   },
+   {
+    "gen": 6,
+    "best": 0.00674,
+    "viable": 43,
+    "evaluated": 254
+   },
+   {
+    "gen": 7,
+    "best": 0.00674,
+    "viable": 47,
+    "evaluated": 267
+   },
+   {
+    "gen": 8,
+    "best": 0.0132,
+    "viable": 50,
+    "evaluated": 286
+   },
+   {
+    "gen": 9,
+    "best": 0.0132,
+    "viable": 50,
+    "evaluated": 302
+   },
+   {
+    "gen": 10,
+    "best": 0.0132,
+    "viable": 45,
+    "evaluated": 321
+   },
+   {
+    "gen": 11,
+    "best": 0.0132,
+    "viable": 46,
+    "evaluated": 337
+   },
+   {
+    "gen": 12,
+    "best": 0.0132,
+    "viable": 45,
+    "evaluated": 352
+   }
+  ]
+ },
+ "n_viable": 103,
+ "genomes": [
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_regime": "low",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 BKK 19\u201323h \u00b7 low-vol \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.02794,
+   "n": 120,
+   "net_pct": 148.1,
+   "train": {
+    "n": 57,
+    "exp_r": 0.2948,
+    "dd_r": 10.55,
+    "score": 0.02794
+   },
+   "holdout": {
+    "n": 63,
+    "exp_r": 0.5956,
+    "dd_r": 6.86,
+    "score": 0.08679
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "rsi_min": 60,
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 RSI\u226560 \u00b7 MA-stack bull \u00b7 high-vol \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": 0.02783,
+   "n": 87,
+   "net_pct": 38.3,
+   "train": {
+    "n": 45,
+    "exp_r": 0.2702,
+    "dd_r": 5.42,
+    "score": 0.04985
+   },
+   "holdout": {
+    "n": 42,
+    "exp_r": 0.1571,
+    "dd_r": 5.65,
+    "score": 0.02783
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "macd": "bull",
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MACD bull \u00b7 MA-stack bull \u00b7 high-vol \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.02278,
+   "n": 97,
+   "net_pct": 42.8,
+   "train": {
+    "n": 48,
+    "exp_r": 0.2657,
+    "dd_r": 7.7,
+    "score": 0.03451
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": 0.1743,
+    "dd_r": 7.65,
+    "score": 0.02278
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "high",
+    "ma_align": "bull",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 2.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 high-vol \u00b7 MA-stack bull \u00b7 BKK 19\u201323h \u00b7 2.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.01511,
+   "n": 122,
+   "net_pct": 57.3,
+   "train": {
+    "n": 62,
+    "exp_r": 0.3275,
+    "dd_r": 11.67,
+    "score": 0.02807
+   },
+   "holdout": {
+    "n": 60,
+    "exp_r": 0.1422,
+    "dd_r": 9.41,
+    "score": 0.01511
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "rsi_min": 60,
+    "atr_regime": "high",
+    "atr_stop_mult": 3.0,
+    "rr": 2.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 RSI\u226560 \u00b7 high-vol \u00b7 3.0\u00d7ATR stop \u00b7 2.0R",
+   "fitness": 0.01438,
+   "n": 106,
+   "net_pct": 23.2,
+   "train": {
+    "n": 54,
+    "exp_r": 0.1462,
+    "dd_r": 7.74,
+    "score": 0.01889
+   },
+   "holdout": {
+    "n": 52,
+    "exp_r": 0.0938,
+    "dd_r": 6.53,
+    "score": 0.01438
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "bb": "above_upper",
+    "candle": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 BB >upper \u00b7 bear bar \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.01339,
+   "n": 81,
+   "net_pct": 21.0,
+   "train": {
+    "n": 40,
+    "exp_r": 0.1496,
+    "dd_r": 11.18,
+    "score": 0.01339
+   },
+   "holdout": {
+    "n": 41,
+    "exp_r": 0.1538,
+    "dd_r": 7.38,
+    "score": 0.02085
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 0.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.0132,
+   "n": 113,
+   "net_pct": 43.2,
+   "train": {
+    "n": 52,
+    "exp_r": 0.3206,
+    "dd_r": 9.37,
+    "score": 0.0342
+   },
+   "holdout": {
+    "n": 61,
+    "exp_r": 0.1375,
+    "dd_r": 10.42,
+    "score": 0.0132
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "vol_spike": true,
+    "atr_regime": "high",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 vol spike \u00b7 high-vol \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.01108,
+   "n": 109,
+   "net_pct": 37.1,
+   "train": {
+    "n": 59,
+    "exp_r": 0.1379,
+    "dd_r": 12.45,
+    "score": 0.01108
+   },
+   "holdout": {
+    "n": 50,
+    "exp_r": 0.2301,
+    "dd_r": 10.03,
+    "score": 0.02294
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 2.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 BKK 19\u201323h \u00b7 MA-stack bull \u00b7 high-vol \u00b7 2.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.01052,
+   "n": 149,
+   "net_pct": 41.5,
+   "train": {
+    "n": 74,
+    "exp_r": 0.1469,
+    "dd_r": 13.96,
+    "score": 0.01052
+   },
+   "holdout": {
+    "n": 75,
+    "exp_r": 0.1572,
+    "dd_r": 9.38,
+    "score": 0.01675
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.5,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 0.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00674,
+   "n": 125,
+   "net_pct": 16.3,
+   "train": {
+    "n": 57,
+    "exp_r": 0.1354,
+    "dd_r": 8.88,
+    "score": 0.01525
+   },
+   "holdout": {
+    "n": 68,
+    "exp_r": 0.0838,
+    "dd_r": 12.44,
+    "score": 0.00674
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "rsi_min": 60,
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 RSI\u226560 \u00b7 MA-stack bull \u00b7 high-vol \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.00512,
+   "n": 95,
+   "net_pct": 37.9,
+   "train": {
+    "n": 47,
+    "exp_r": 0.3743,
+    "dd_r": 6.29,
+    "score": 0.05948
+   },
+   "holdout": {
+    "n": 48,
+    "exp_r": 0.0393,
+    "dd_r": 7.68,
+    "score": 0.00512
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.75,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.75,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 0.75\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.0035,
+   "n": 86,
+   "net_pct": 6.3,
+   "train": {
+    "n": 39,
+    "exp_r": 0.0372,
+    "dd_r": 10.63,
+    "score": 0.0035
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": 0.1159,
+    "dd_r": 9.47,
+    "score": 0.01223
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "trend": "down",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 trend down \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": 0.00328,
+   "n": 104,
+   "net_pct": 19.3,
+   "train": {
+    "n": 51,
+    "exp_r": 0.0199,
+    "dd_r": 6.06,
+    "score": 0.00328
+   },
+   "holdout": {
+    "n": 53,
+    "exp_r": 0.1779,
+    "dd_r": 6.25,
+    "score": 0.02849
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": 0.0032,
+   "n": 193,
+   "net_pct": 7.5,
+   "train": {
+    "n": 100,
+    "exp_r": 0.0247,
+    "dd_r": 7.71,
+    "score": 0.0032
+   },
+   "holdout": {
+    "n": 93,
+    "exp_r": 0.0442,
+    "dd_r": 10.02,
+    "score": 0.00442
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "vol_spike": true,
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 vol spike \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.00275,
+   "n": 112,
+   "net_pct": 43.4,
+   "train": {
+    "n": 51,
+    "exp_r": 0.4031,
+    "dd_r": 6.51,
+    "score": 0.06191
+   },
+   "holdout": {
+    "n": 61,
+    "exp_r": 0.0252,
+    "dd_r": 9.15,
+    "score": 0.00275
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": 0.00272,
+   "n": 121,
+   "net_pct": 29.5,
+   "train": {
+    "n": 60,
+    "exp_r": 0.2455,
+    "dd_r": 9.66,
+    "score": 0.02542
+   },
+   "holdout": {
+    "n": 61,
+    "exp_r": 0.0275,
+    "dd_r": 10.1,
+    "score": 0.00272
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 BKK 19\u201323h \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00263,
+   "n": 88,
+   "net_pct": 2.0,
+   "train": {
+    "n": 46,
+    "exp_r": 0.1003,
+    "dd_r": 13.33,
+    "score": 0.00753
+   },
+   "holdout": {
+    "n": 42,
+    "exp_r": 0.0362,
+    "dd_r": 13.76,
+    "score": 0.00263
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 0.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 3e-05,
+   "n": 140,
+   "net_pct": -3.7,
+   "train": {
+    "n": 68,
+    "exp_r": 0.0003,
+    "dd_r": 10.4,
+    "score": 3e-05
+   },
+   "holdout": {
+    "n": 72,
+    "exp_r": 0.038,
+    "dd_r": 10.01,
+    "score": 0.0038
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "macd": "bear",
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MACD bear \u00b7 MA-stack bull \u00b7 high-vol \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00131,
+   "n": 78,
+   "net_pct": 26.0,
+   "train": {
+    "n": 33,
+    "exp_r": 0.4547,
+    "dd_r": 6.36,
+    "score": 0.07144
+   },
+   "holdout": {
+    "n": 45,
+    "exp_r": -0.0157,
+    "dd_r": 11.97,
+    "score": -0.00131
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 1.5,
+    "rr": 2.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 1.5\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.00174,
+   "n": 223,
+   "net_pct": -13.9,
+   "train": {
+    "n": 110,
+    "exp_r": -0.0235,
+    "dd_r": 13.5,
+    "score": -0.00174
+   },
+   "holdout": {
+    "n": 113,
+    "exp_r": -0.0011,
+    "dd_r": 14.9,
+    "score": -7e-05
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "candle": "bull",
+    "hour_from": 19,
+    "hour_to": 23,
+    "ma_align": "bear",
+    "atr_stop_mult": 1.5,
+    "rr": 2.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 bull bar \u00b7 BKK 19\u201323h \u00b7 MA-stack bear \u00b7 1.5\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.00248,
+   "n": 105,
+   "net_pct": -2.1,
+   "train": {
+    "n": 50,
+    "exp_r": 0.0555,
+    "dd_r": 9.08,
+    "score": 0.00611
+   },
+   "holdout": {
+    "n": 55,
+    "exp_r": -0.0294,
+    "dd_r": 11.85,
+    "score": -0.00248
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "rsi_min": 70,
+    "atr_regime": "high",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 RSI\u226570 \u00b7 high-vol \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00439,
+   "n": 145,
+   "net_pct": -9.8,
+   "train": {
+    "n": 78,
+    "exp_r": 0.0422,
+    "dd_r": 16.94,
+    "score": 0.00249
+   },
+   "holdout": {
+    "n": 67,
+    "exp_r": -0.069,
+    "dd_r": 15.69,
+    "score": -0.00439
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "vol_spike": true,
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 vol spike \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00468,
+   "n": 135,
+   "net_pct": -7.9,
+   "train": {
+    "n": 70,
+    "exp_r": 0.0405,
+    "dd_r": 12.1,
+    "score": 0.00335
+   },
+   "holdout": {
+    "n": 65,
+    "exp_r": -0.0496,
+    "dd_r": 10.6,
+    "score": -0.00468
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "atr_regime": "high",
+    "candle": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 high-vol \u00b7 bear bar \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00508,
+   "n": 465,
+   "net_pct": -72.5,
+   "train": {
+    "n": 217,
+    "exp_r": -0.1384,
+    "dd_r": 27.25,
+    "score": -0.00508
+   },
+   "holdout": {
+    "n": 248,
+    "exp_r": -0.1199,
+    "dd_r": 24.05,
+    "score": -0.00499
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "macd": "bull",
+    "atr_stop_mult": 2.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 MACD bull \u00b7 2.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.0056,
+   "n": 102,
+   "net_pct": -0.7,
+   "train": {
+    "n": 47,
+    "exp_r": -0.0731,
+    "dd_r": 13.06,
+    "score": -0.0056
+   },
+   "holdout": {
+    "n": 55,
+    "exp_r": 0.1058,
+    "dd_r": 8.66,
+    "score": 0.01223
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00591,
+   "n": 97,
+   "net_pct": 24.6,
+   "train": {
+    "n": 44,
+    "exp_r": 0.4477,
+    "dd_r": 9.27,
+    "score": 0.0483
+   },
+   "holdout": {
+    "n": 53,
+    "exp_r": -0.0774,
+    "dd_r": 13.09,
+    "score": -0.00591
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00595,
+   "n": 223,
+   "net_pct": -38.7,
+   "train": {
+    "n": 98,
+    "exp_r": 0.1273,
+    "dd_r": 19.25,
+    "score": 0.00662
+   },
+   "holdout": {
+    "n": 125,
+    "exp_r": -0.1964,
+    "dd_r": 33.02,
+    "score": -0.00595
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "macd": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MACD bull \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00601,
+   "n": 532,
+   "net_pct": -86.9,
+   "train": {
+    "n": 269,
+    "exp_r": -0.1459,
+    "dd_r": 30.97,
+    "score": -0.00471
+   },
+   "holdout": {
+    "n": 263,
+    "exp_r": -0.2156,
+    "dd_r": 35.91,
+    "score": -0.00601
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 1.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.0061,
+   "n": 297,
+   "net_pct": -47.0,
+   "train": {
+    "n": 145,
+    "exp_r": -0.0448,
+    "dd_r": 18.5,
+    "score": -0.00242
+   },
+   "holdout": {
+    "n": 152,
+    "exp_r": -0.1362,
+    "dd_r": 22.32,
+    "score": -0.0061
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00628,
+   "n": 203,
+   "net_pct": -28.1,
+   "train": {
+    "n": 96,
+    "exp_r": 0.0221,
+    "dd_r": 13.29,
+    "score": 0.00167
+   },
+   "holdout": {
+    "n": 107,
+    "exp_r": -0.1243,
+    "dd_r": 19.79,
+    "score": -0.00628
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 2.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.0063,
+   "n": 223,
+   "net_pct": -41.4,
+   "train": {
+    "n": 107,
+    "exp_r": -0.0027,
+    "dd_r": 19.14,
+    "score": -0.00014
+   },
+   "holdout": {
+    "n": 116,
+    "exp_r": -0.1648,
+    "dd_r": 26.16,
+    "score": -0.0063
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "macd": "bear",
+    "candle": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MACD bear \u00b7 bull bar \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.0064,
+   "n": 496,
+   "net_pct": -88.4,
+   "train": {
+    "n": 234,
+    "exp_r": -0.1629,
+    "dd_r": 29.66,
+    "score": -0.00549
+   },
+   "holdout": {
+    "n": 262,
+    "exp_r": -0.2448,
+    "dd_r": 38.23,
+    "score": -0.0064
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.0064,
+   "n": 271,
+   "net_pct": -53.6,
+   "train": {
+    "n": 140,
+    "exp_r": -0.1344,
+    "dd_r": 20.98,
+    "score": -0.0064
+   },
+   "holdout": {
+    "n": 131,
+    "exp_r": -0.1183,
+    "dd_r": 19.13,
+    "score": -0.00618
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "candle": "bear",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.5,
+    "rr": 1.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 bear bar \u00b7 BKK 19\u201323h \u00b7 1.5\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.00648,
+   "n": 315,
+   "net_pct": -64.5,
+   "train": {
+    "n": 154,
+    "exp_r": -0.1302,
+    "dd_r": 23.44,
+    "score": -0.00555
+   },
+   "holdout": {
+    "n": 161,
+    "exp_r": -0.1667,
+    "dd_r": 25.72,
+    "score": -0.00648
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 1.5,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 1.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 1.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.0065,
+   "n": 631,
+   "net_pct": -97.0,
+   "train": {
+    "n": 308,
+    "exp_r": -0.2479,
+    "dd_r": 41.23,
+    "score": -0.00601
+   },
+   "holdout": {
+    "n": 323,
+    "exp_r": -0.276,
+    "dd_r": 42.47,
+    "score": -0.0065
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 0.75,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_regime": "low",
+    "atr_stop_mult": 0.75,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 BKK 19\u201323h \u00b7 low-vol \u00b7 0.75\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00654,
+   "n": 171,
+   "net_pct": -34.1,
+   "train": {
+    "n": 82,
+    "exp_r": -0.1516,
+    "dd_r": 23.2,
+    "score": -0.00654
+   },
+   "holdout": {
+    "n": 89,
+    "exp_r": 0.0239,
+    "dd_r": 19.61,
+    "score": 0.00122
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 2.5,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00667,
+   "n": 186,
+   "net_pct": -30.0,
+   "train": {
+    "n": 90,
+    "exp_r": -0.0175,
+    "dd_r": 16.36,
+    "score": -0.00107
+   },
+   "holdout": {
+    "n": 96,
+    "exp_r": -0.118,
+    "dd_r": 17.68,
+    "score": -0.00667
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "macd": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MACD bear \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00668,
+   "n": 525,
+   "net_pct": -91.4,
+   "train": {
+    "n": 242,
+    "exp_r": -0.1643,
+    "dd_r": 30.16,
+    "score": -0.00545
+   },
+   "holdout": {
+    "n": 283,
+    "exp_r": -0.2729,
+    "dd_r": 40.87,
+    "score": -0.00668
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 2.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.0067,
+   "n": 176,
+   "net_pct": -27.4,
+   "train": {
+    "n": 88,
+    "exp_r": -0.027,
+    "dd_r": 13.09,
+    "score": -0.00207
+   },
+   "holdout": {
+    "n": 88,
+    "exp_r": -0.1139,
+    "dd_r": 17.01,
+    "score": -0.0067
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00675,
+   "n": 517,
+   "net_pct": -92.8,
+   "train": {
+    "n": 248,
+    "exp_r": -0.2438,
+    "dd_r": 36.11,
+    "score": -0.00675
+   },
+   "holdout": {
+    "n": 269,
+    "exp_r": -0.2429,
+    "dd_r": 38.51,
+    "score": -0.00631
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 2.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.0,
+    "rr": 2.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 1.0\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.00689,
+   "n": 496,
+   "net_pct": -93.7,
+   "train": {
+    "n": 242,
+    "exp_r": -0.2355,
+    "dd_r": 38.62,
+    "score": -0.0061
+   },
+   "holdout": {
+    "n": 254,
+    "exp_r": -0.2774,
+    "dd_r": 40.24,
+    "score": -0.00689
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00691,
+   "n": 197,
+   "net_pct": -44.1,
+   "train": {
+    "n": 99,
+    "exp_r": -0.0212,
+    "dd_r": 18.8,
+    "score": -0.00113
+   },
+   "holdout": {
+    "n": 98,
+    "exp_r": -0.1656,
+    "dd_r": 23.96,
+    "score": -0.00691
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.5,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 1.5\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00693,
+   "n": 320,
+   "net_pct": -65.0,
+   "train": {
+    "n": 153,
+    "exp_r": -0.1132,
+    "dd_r": 23.8,
+    "score": -0.00475
+   },
+   "holdout": {
+    "n": 167,
+    "exp_r": -0.1904,
+    "dd_r": 27.46,
+    "score": -0.00693
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 2.5,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "candle": "bull",
+    "atr_stop_mult": 1.0,
+    "rr": 2.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 bull bar \u00b7 1.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00707,
+   "n": 488,
+   "net_pct": -93.8,
+   "train": {
+    "n": 229,
+    "exp_r": -0.2652,
+    "dd_r": 37.52,
+    "score": -0.00707
+   },
+   "holdout": {
+    "n": 259,
+    "exp_r": -0.2528,
+    "dd_r": 38.35,
+    "score": -0.00659
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 2.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "atr_stop_mult": 1.0,
+    "rr": 2.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 1.0\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.00722,
+   "n": 388,
+   "net_pct": -84.5,
+   "train": {
+    "n": 192,
+    "exp_r": -0.2111,
+    "dd_r": 34.13,
+    "score": -0.00619
+   },
+   "holdout": {
+    "n": 196,
+    "exp_r": -0.2266,
+    "dd_r": 31.41,
+    "score": -0.00722
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "high",
+    "trend": "up",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 high-vol \u00b7 trend up \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00749,
+   "n": 109,
+   "net_pct": 24.6,
+   "train": {
+    "n": 48,
+    "exp_r": 0.4628,
+    "dd_r": 9.61,
+    "score": 0.04818
+   },
+   "holdout": {
+    "n": 61,
+    "exp_r": -0.1233,
+    "dd_r": 16.45,
+    "score": -0.00749
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "high",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 high-vol \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00762,
+   "n": 162,
+   "net_pct": -11.8,
+   "train": {
+    "n": 77,
+    "exp_r": 0.2051,
+    "dd_r": 10.42,
+    "score": 0.01968
+   },
+   "holdout": {
+    "n": 85,
+    "exp_r": -0.2092,
+    "dd_r": 27.47,
+    "score": -0.00762
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.5,
+    "rr": 2.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 1.5\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.00763,
+   "n": 304,
+   "net_pct": -72.7,
+   "train": {
+    "n": 143,
+    "exp_r": -0.1773,
+    "dd_r": 25.56,
+    "score": -0.00694
+   },
+   "holdout": {
+    "n": 161,
+    "exp_r": -0.2083,
+    "dd_r": 27.28,
+    "score": -0.00763
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 1.5,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "macd": "bear",
+    "atr_stop_mult": 1.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 MACD bear \u00b7 1.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.00768,
+   "n": 444,
+   "net_pct": -86.6,
+   "train": {
+    "n": 226,
+    "exp_r": -0.1451,
+    "dd_r": 27.61,
+    "score": -0.00525
+   },
+   "holdout": {
+    "n": 218,
+    "exp_r": -0.2783,
+    "dd_r": 36.21,
+    "score": -0.00768
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00778,
+   "n": 282,
+   "net_pct": -63.1,
+   "train": {
+    "n": 129,
+    "exp_r": -0.1277,
+    "dd_r": 18.98,
+    "score": -0.00673
+   },
+   "holdout": {
+    "n": 153,
+    "exp_r": -0.1988,
+    "dd_r": 25.55,
+    "score": -0.00778
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 BKK 14\u201318h \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00791,
+   "n": 144,
+   "net_pct": -29.6,
+   "train": {
+    "n": 75,
+    "exp_r": -0.1531,
+    "dd_r": 19.35,
+    "score": -0.00791
+   },
+   "holdout": {
+    "n": 69,
+    "exp_r": -0.0326,
+    "dd_r": 11.96,
+    "score": -0.00273
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 6,
+    "hour_to": 11,
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 06\u201311h \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00807,
+   "n": 238,
+   "net_pct": -59.4,
+   "train": {
+    "n": 118,
+    "exp_r": 0.0047,
+    "dd_r": 20.85,
+    "score": 0.00023
+   },
+   "holdout": {
+    "n": 120,
+    "exp_r": -0.2747,
+    "dd_r": 34.04,
+    "score": -0.00807
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 BKK 14\u201318h \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.0081,
+   "n": 147,
+   "net_pct": -23.8,
+   "train": {
+    "n": 76,
+    "exp_r": -0.0404,
+    "dd_r": 12.39,
+    "score": -0.00326
+   },
+   "holdout": {
+    "n": 71,
+    "exp_r": -0.1169,
+    "dd_r": 14.42,
+    "score": -0.0081
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "bb": "above_upper",
+    "atr_regime": "high",
+    "candle": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 BB >upper \u00b7 high-vol \u00b7 bull bar \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.0083,
+   "n": 144,
+   "net_pct": -30.9,
+   "train": {
+    "n": 80,
+    "exp_r": -0.0809,
+    "dd_r": 16.94,
+    "score": -0.00478
+   },
+   "holdout": {
+    "n": 64,
+    "exp_r": -0.1303,
+    "dd_r": 15.7,
+    "score": -0.0083
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "rsi_min": 60,
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 RSI\u226560 \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00842,
+   "n": 111,
+   "net_pct": -24.6,
+   "train": {
+    "n": 52,
+    "exp_r": 0.0173,
+    "dd_r": 14.35,
+    "score": 0.00121
+   },
+   "holdout": {
+    "n": 59,
+    "exp_r": -0.1764,
+    "dd_r": 20.94,
+    "score": -0.00842
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "candle": "bear",
+    "rsi_min": 60,
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 bear bar \u00b7 RSI\u226560 \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00843,
+   "n": 365,
+   "net_pct": -84.8,
+   "train": {
+    "n": 168,
+    "exp_r": -0.2541,
+    "dd_r": 30.15,
+    "score": -0.00843
+   },
+   "holdout": {
+    "n": 197,
+    "exp_r": -0.241,
+    "dd_r": 31.2,
+    "score": -0.00772
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00845,
+   "n": 135,
+   "net_pct": -10.5,
+   "train": {
+    "n": 63,
+    "exp_r": 0.1373,
+    "dd_r": 11.19,
+    "score": 0.01227
+   },
+   "holdout": {
+    "n": 72,
+    "exp_r": -0.1471,
+    "dd_r": 17.41,
+    "score": -0.00845
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "candle": "bull",
+    "atr_stop_mult": 2.0,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 bull bar \u00b7 2.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00875,
+   "n": 127,
+   "net_pct": -31.8,
+   "train": {
+    "n": 70,
+    "exp_r": -0.1346,
+    "dd_r": 15.39,
+    "score": -0.00875
+   },
+   "holdout": {
+    "n": 57,
+    "exp_r": -0.1043,
+    "dd_r": 12.56,
+    "score": -0.0083
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "long",
+   "k": 0.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1d \u00b7 bear bar \u00b7 0.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00884,
+   "n": 114,
+   "net_pct": -29.0,
+   "train": {
+    "n": 52,
+    "exp_r": -0.022,
+    "dd_r": 10.74,
+    "score": -0.00205
+   },
+   "holdout": {
+    "n": 62,
+    "exp_r": -0.1626,
+    "dd_r": 18.39,
+    "score": -0.00884
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "down",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend down \u00b7 BKK 19\u201323h \u00b7 1.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.00889,
+   "n": 312,
+   "net_pct": -79.7,
+   "train": {
+    "n": 148,
+    "exp_r": -0.2522,
+    "dd_r": 28.36,
+    "score": -0.00889
+   },
+   "holdout": {
+    "n": 164,
+    "exp_r": -0.2288,
+    "dd_r": 28.12,
+    "score": -0.00814
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 1.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00914,
+   "n": 117,
+   "net_pct": -26.8,
+   "train": {
+    "n": 57,
+    "exp_r": 0.0242,
+    "dd_r": 18.32,
+    "score": 0.00132
+   },
+   "holdout": {
+    "n": 60,
+    "exp_r": -0.1843,
+    "dd_r": 20.16,
+    "score": -0.00914
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00925,
+   "n": 282,
+   "net_pct": -73.2,
+   "train": {
+    "n": 129,
+    "exp_r": -0.1742,
+    "dd_r": 21.67,
+    "score": -0.00804
+   },
+   "holdout": {
+    "n": 153,
+    "exp_r": -0.2642,
+    "dd_r": 28.57,
+    "score": -0.00925
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 2.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00937,
+   "n": 219,
+   "net_pct": -60.5,
+   "train": {
+    "n": 108,
+    "exp_r": -0.152,
+    "dd_r": 22.07,
+    "score": -0.00689
+   },
+   "holdout": {
+    "n": 111,
+    "exp_r": -0.2214,
+    "dd_r": 23.64,
+    "score": -0.00937
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 2.5,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 2.5\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.00947,
+   "n": 141,
+   "net_pct": -12.9,
+   "train": {
+    "n": 74,
+    "exp_r": -0.0864,
+    "dd_r": 9.12,
+    "score": -0.00947
+   },
+   "holdout": {
+    "n": 67,
+    "exp_r": 0.0246,
+    "dd_r": 9.53,
+    "score": 0.00258
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_regime": "low",
+    "atr_stop_mult": 0.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 low-vol \u00b7 0.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00964,
+   "n": 89,
+   "net_pct": 4.3,
+   "train": {
+    "n": 37,
+    "exp_r": 0.3,
+    "dd_r": 6.7,
+    "score": 0.04478
+   },
+   "holdout": {
+    "n": 52,
+    "exp_r": -0.1142,
+    "dd_r": 11.85,
+    "score": -0.00964
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 0.75,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "trend": "down",
+    "atr_stop_mult": 0.75,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 trend down \u00b7 0.75\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.00969,
+   "n": 366,
+   "net_pct": -91.8,
+   "train": {
+    "n": 175,
+    "exp_r": -0.2805,
+    "dd_r": 32.78,
+    "score": -0.00855
+   },
+   "holdout": {
+    "n": 191,
+    "exp_r": -0.3755,
+    "dd_r": 38.76,
+    "score": -0.00969
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "macd": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 MACD bull \u00b7 2.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00971,
+   "n": 176,
+   "net_pct": -35.5,
+   "train": {
+    "n": 88,
+    "exp_r": 0.006,
+    "dd_r": 14.13,
+    "score": 0.00042
+   },
+   "holdout": {
+    "n": 88,
+    "exp_r": -0.2028,
+    "dd_r": 20.89,
+    "score": -0.00971
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "candle": "bull",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 bull bar \u00b7 BKK 19\u201323h \u00b7 1.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00979,
+   "n": 175,
+   "net_pct": -32.8,
+   "train": {
+    "n": 87,
+    "exp_r": -0.228,
+    "dd_r": 23.28,
+    "score": -0.00979
+   },
+   "holdout": {
+    "n": 88,
+    "exp_r": 0.0614,
+    "dd_r": 13.54,
+    "score": 0.00454
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 1.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "down",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 1.5,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend down \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 1.5\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.0098,
+   "n": 142,
+   "net_pct": -10.3,
+   "train": {
+    "n": 69,
+    "exp_r": -0.0781,
+    "dd_r": 7.97,
+    "score": -0.0098
+   },
+   "holdout": {
+    "n": 73,
+    "exp_r": 0.0181,
+    "dd_r": 6.1,
+    "score": 0.00297
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "rsi_min": 60,
+    "trend": "up",
+    "atr_stop_mult": 3.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 RSI\u226560 \u00b7 trend up \u00b7 3.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.00991,
+   "n": 117,
+   "net_pct": 2.0,
+   "train": {
+    "n": 62,
+    "exp_r": 0.1981,
+    "dd_r": 9.02,
+    "score": 0.02197
+   },
+   "holdout": {
+    "n": 55,
+    "exp_r": -0.1465,
+    "dd_r": 14.78,
+    "score": -0.00991
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "macd": "bear",
+    "atr_stop_mult": 2.5,
+    "rr": 1.5
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 MACD bear \u00b7 2.5\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01029,
+   "n": 254,
+   "net_pct": -75.4,
+   "train": {
+    "n": 119,
+    "exp_r": -0.2715,
+    "dd_r": 26.38,
+    "score": -0.01029
+   },
+   "holdout": {
+    "n": 135,
+    "exp_r": -0.25,
+    "dd_r": 27.37,
+    "score": -0.00914
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "down",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bull",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend down \u00b7 BKK 14\u201318h \u00b7 MACD bull \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01048,
+   "n": 98,
+   "net_pct": -16.1,
+   "train": {
+    "n": 41,
+    "exp_r": -0.0821,
+    "dd_r": 7.83,
+    "score": -0.01048
+   },
+   "holdout": {
+    "n": 57,
+    "exp_r": -0.0685,
+    "dd_r": 8.5,
+    "score": -0.00806
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 1.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "vol_spike": true,
+    "ma_align": "bull",
+    "candle": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 vol spike \u00b7 MA-stack bull \u00b7 bull bar \u00b7 3.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.01079,
+   "n": 196,
+   "net_pct": -54.2,
+   "train": {
+    "n": 99,
+    "exp_r": -0.2494,
+    "dd_r": 23.11,
+    "score": -0.01079
+   },
+   "holdout": {
+    "n": 97,
+    "exp_r": -0.1272,
+    "dd_r": 14.23,
+    "score": -0.00893
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01115,
+   "n": 188,
+   "net_pct": -50.3,
+   "train": {
+    "n": 97,
+    "exp_r": -0.0941,
+    "dd_r": 15.8,
+    "score": -0.00596
+   },
+   "holdout": {
+    "n": 91,
+    "exp_r": -0.2532,
+    "dd_r": 22.71,
+    "score": -0.01115
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 2.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 2.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 2.0R",
+   "fitness": -0.01122,
+   "n": 186,
+   "net_pct": -60.0,
+   "train": {
+    "n": 93,
+    "exp_r": -0.2093,
+    "dd_r": 20.2,
+    "score": -0.01036
+   },
+   "holdout": {
+    "n": 93,
+    "exp_r": -0.2424,
+    "dd_r": 21.61,
+    "score": -0.01122
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 2.5,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "down",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 1.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend down \u00b7 BKK 14\u201318h \u00b7 1.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.01149,
+   "n": 251,
+   "net_pct": -81.4,
+   "train": {
+    "n": 123,
+    "exp_r": -0.2091,
+    "dd_r": 26.66,
+    "score": -0.00784
+   },
+   "holdout": {
+    "n": 128,
+    "exp_r": -0.4058,
+    "dd_r": 35.32,
+    "score": -0.01149
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "vol_spike": true,
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 vol spike \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01168,
+   "n": 172,
+   "net_pct": -44.7,
+   "train": {
+    "n": 83,
+    "exp_r": 0.0762,
+    "dd_r": 15.9,
+    "score": 0.00479
+   },
+   "holdout": {
+    "n": 89,
+    "exp_r": -0.3469,
+    "dd_r": 29.71,
+    "score": -0.01168
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_regime": "low",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 low-vol \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01177,
+   "n": 171,
+   "net_pct": -56.4,
+   "train": {
+    "n": 90,
+    "exp_r": -0.3384,
+    "dd_r": 28.76,
+    "score": -0.01177
+   },
+   "holdout": {
+    "n": 81,
+    "exp_r": -0.0716,
+    "dd_r": 15.54,
+    "score": -0.00461
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01184,
+   "n": 100,
+   "net_pct": -2.3,
+   "train": {
+    "n": 42,
+    "exp_r": 0.2906,
+    "dd_r": 9.88,
+    "score": 0.02941
+   },
+   "holdout": {
+    "n": 58,
+    "exp_r": -0.1738,
+    "dd_r": 14.68,
+    "score": -0.01184
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "trend": "down",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 trend down \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01212,
+   "n": 136,
+   "net_pct": -19.5,
+   "train": {
+    "n": 63,
+    "exp_r": -0.1512,
+    "dd_r": 12.47,
+    "score": -0.01212
+   },
+   "holdout": {
+    "n": 73,
+    "exp_r": 0.0099,
+    "dd_r": 8.94,
+    "score": 0.00111
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "candle": "bull",
+    "hour_from": 19,
+    "hour_to": 23,
+    "macd": "bull",
+    "atr_stop_mult": 1.0,
+    "rr": 2.5
+   },
+   "desc": "LONG \u00b7 4h \u00b7 bull bar \u00b7 BKK 19\u201323h \u00b7 MACD bull \u00b7 1.0\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.01237,
+   "n": 243,
+   "net_pct": -79.8,
+   "train": {
+    "n": 120,
+    "exp_r": -0.1939,
+    "dd_r": 23.03,
+    "score": -0.00842
+   },
+   "holdout": {
+    "n": 123,
+    "exp_r": -0.4098,
+    "dd_r": 33.14,
+    "score": -0.01237
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 1.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "macd": "bear",
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 2.5,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MACD bear \u00b7 MA-stack bull \u00b7 high-vol \u00b7 2.5\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.01301,
+   "n": 217,
+   "net_pct": -76.2,
+   "train": {
+    "n": 108,
+    "exp_r": -0.269,
+    "dd_r": 23.42,
+    "score": -0.01149
+   },
+   "holdout": {
+    "n": 109,
+    "exp_r": -0.3689,
+    "dd_r": 28.36,
+    "score": -0.01301
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "down",
+    "macd": "bear",
+    "atr_stop_mult": 2.0,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend down \u00b7 MACD bear \u00b7 2.0\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.0132,
+   "n": 147,
+   "net_pct": -21.1,
+   "train": {
+    "n": 69,
+    "exp_r": -0.1425,
+    "dd_r": 10.79,
+    "score": -0.0132
+   },
+   "holdout": {
+    "n": 78,
+    "exp_r": -0.0073,
+    "dd_r": 6.56,
+    "score": -0.00111
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "rsi_min": 60,
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 RSI\u226560 \u00b7 BKK 14\u201318h \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01323,
+   "n": 92,
+   "net_pct": -2.7,
+   "train": {
+    "n": 45,
+    "exp_r": 0.262,
+    "dd_r": 11.37,
+    "score": 0.02305
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": -0.1912,
+    "dd_r": 14.45,
+    "score": -0.01323
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bull",
+    "atr_stop_mult": 0.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bull bar \u00b7 0.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01418,
+   "n": 107,
+   "net_pct": -33.4,
+   "train": {
+    "n": 51,
+    "exp_r": 0.0068,
+    "dd_r": 17.7,
+    "score": 0.00038
+   },
+   "holdout": {
+    "n": 56,
+    "exp_r": -0.2724,
+    "dd_r": 19.21,
+    "score": -0.01418
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 1.5,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "macd": "bear",
+    "ma_align": "bear",
+    "atr_stop_mult": 1.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 MACD bear \u00b7 MA-stack bear \u00b7 1.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01422,
+   "n": 142,
+   "net_pct": -54.1,
+   "train": {
+    "n": 66,
+    "exp_r": -0.2395,
+    "dd_r": 17.69,
+    "score": -0.01354
+   },
+   "holdout": {
+    "n": 76,
+    "exp_r": -0.2745,
+    "dd_r": 19.3,
+    "score": -0.01422
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.5,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.5,
+    "rr": 2.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 1.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.0145,
+   "n": 197,
+   "net_pct": -68.7,
+   "train": {
+    "n": 102,
+    "exp_r": -0.1586,
+    "dd_r": 20.36,
+    "score": -0.00779
+   },
+   "holdout": {
+    "n": 95,
+    "exp_r": -0.3904,
+    "dd_r": 26.92,
+    "score": -0.0145
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 2.5,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 19,
+    "hour_to": 23,
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 2.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 BKK 19\u201323h \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 2.5R",
+   "fitness": -0.01466,
+   "n": 146,
+   "net_pct": -46.5,
+   "train": {
+    "n": 77,
+    "exp_r": -0.1194,
+    "dd_r": 13.49,
+    "score": -0.00886
+   },
+   "holdout": {
+    "n": 69,
+    "exp_r": -0.2663,
+    "dd_r": 18.17,
+    "score": -0.01466
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 1.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "bb": "below_lower",
+    "atr_stop_mult": 2.5,
+    "rr": 1.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 BB <lower \u00b7 2.5\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.01476,
+   "n": 145,
+   "net_pct": -48.8,
+   "train": {
+    "n": 79,
+    "exp_r": -0.1959,
+    "dd_r": 16.24,
+    "score": -0.01207
+   },
+   "holdout": {
+    "n": 66,
+    "exp_r": -0.2501,
+    "dd_r": 16.94,
+    "score": -0.01476
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "atr_regime": "high",
+    "ma_align": "bull",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 2.0,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 high-vol \u00b7 MA-stack bull \u00b7 BKK 19\u201323h \u00b7 2.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01479,
+   "n": 164,
+   "net_pct": -72.5,
+   "train": {
+    "n": 85,
+    "exp_r": -0.3821,
+    "dd_r": 29.27,
+    "score": -0.01306
+   },
+   "holdout": {
+    "n": 79,
+    "exp_r": -0.3299,
+    "dd_r": 22.31,
+    "score": -0.01479
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "macd": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 MACD bull \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01512,
+   "n": 89,
+   "net_pct": 2.1,
+   "train": {
+    "n": 48,
+    "exp_r": 0.3116,
+    "dd_r": 12.94,
+    "score": 0.02407
+   },
+   "holdout": {
+    "n": 41,
+    "exp_r": -0.2433,
+    "dd_r": 16.09,
+    "score": -0.01512
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01517,
+   "n": 183,
+   "net_pct": -73.7,
+   "train": {
+    "n": 97,
+    "exp_r": -0.2664,
+    "dd_r": 23.91,
+    "score": -0.01114
+   },
+   "holdout": {
+    "n": 86,
+    "exp_r": -0.4153,
+    "dd_r": 27.38,
+    "score": -0.01517
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "down",
+    "hour_from": 19,
+    "hour_to": 23,
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend down \u00b7 BKK 19\u201323h \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01537,
+   "n": 155,
+   "net_pct": -58.2,
+   "train": {
+    "n": 77,
+    "exp_r": -0.4273,
+    "dd_r": 27.79,
+    "score": -0.01537
+   },
+   "holdout": {
+    "n": 78,
+    "exp_r": -0.041,
+    "dd_r": 17.3,
+    "score": -0.00237
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.0155,
+   "n": 220,
+   "net_pct": -79.4,
+   "train": {
+    "n": 123,
+    "exp_r": -0.1643,
+    "dd_r": 24.24,
+    "score": -0.00678
+   },
+   "holdout": {
+    "n": 97,
+    "exp_r": -0.4968,
+    "dd_r": 32.06,
+    "score": -0.0155
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 2.0,
+   "rr": 1.5,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 14,
+    "hour_to": 18,
+    "macd": "bear",
+    "atr_stop_mult": 2.0,
+    "rr": 1.5
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 BKK 14\u201318h \u00b7 MACD bear \u00b7 2.0\u00d7ATR stop \u00b7 1.5R",
+   "fitness": -0.01551,
+   "n": 107,
+   "net_pct": -11.4,
+   "train": {
+    "n": 59,
+    "exp_r": 0.0466,
+    "dd_r": 5.27,
+    "score": 0.00884
+   },
+   "holdout": {
+    "n": 48,
+    "exp_r": -0.1496,
+    "dd_r": 9.64,
+    "score": -0.01551
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 0.75,
+   "rr": 1.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "trend": "down",
+    "candle": "bear",
+    "atr_stop_mult": 0.75,
+    "rr": 1.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 14\u201318h \u00b7 trend down \u00b7 bear bar \u00b7 0.75\u00d7ATR stop \u00b7 1.0R",
+   "fitness": -0.01578,
+   "n": 172,
+   "net_pct": -70.9,
+   "train": {
+    "n": 78,
+    "exp_r": -0.2295,
+    "dd_r": 18.1,
+    "score": -0.01268
+   },
+   "holdout": {
+    "n": 94,
+    "exp_r": -0.4446,
+    "dd_r": 28.17,
+    "score": -0.01578
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "ma_align": "bear",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 MA-stack bear \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01701,
+   "n": 142,
+   "net_pct": -72.2,
+   "train": {
+    "n": 79,
+    "exp_r": -0.5375,
+    "dd_r": 31.6,
+    "score": -0.01701
+   },
+   "holdout": {
+    "n": 63,
+    "exp_r": -0.2449,
+    "dd_r": 15.46,
+    "score": -0.01584
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "ma_align": "bear",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 MA-stack bear \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01825,
+   "n": 104,
+   "net_pct": -52.3,
+   "train": {
+    "n": 61,
+    "exp_r": -0.2324,
+    "dd_r": 15.18,
+    "score": -0.01531
+   },
+   "holdout": {
+    "n": 43,
+    "exp_r": -0.4193,
+    "dd_r": 22.98,
+    "score": -0.01825
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bear \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.02049,
+   "n": 101,
+   "net_pct": -46.0,
+   "train": {
+    "n": 44,
+    "exp_r": -0.0258,
+    "dd_r": 10.8,
+    "score": -0.00239
+   },
+   "holdout": {
+    "n": 57,
+    "exp_r": -0.4713,
+    "dd_r": 23.01,
+    "score": -0.02049
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "long",
+   "k": 0.75,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1d",
+    "candle": "bear",
+    "atr_stop_mult": 0.75,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1d \u00b7 bear bar \u00b7 0.75\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.02088,
+   "n": 94,
+   "net_pct": -50.1,
+   "train": {
+    "n": 43,
+    "exp_r": -0.3029,
+    "dd_r": 14.51,
+    "score": -0.02088
+   },
+   "holdout": {
+    "n": 51,
+    "exp_r": -0.3636,
+    "dd_r": 19.93,
+    "score": -0.01824
+   }
+  },
+  {
+   "tf": "1d",
+   "direction": "short",
+   "k": 0.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1d",
+    "candle": "bear",
+    "macd": "bull",
+    "atr_stop_mult": 0.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 1d \u00b7 bear bar \u00b7 MACD bull \u00b7 0.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.02119,
+   "n": 75,
+   "net_pct": -17.7,
+   "train": {
+    "n": 32,
+    "exp_r": 0.0639,
+    "dd_r": 5.66,
+    "score": 0.01128
+   },
+   "holdout": {
+    "n": 43,
+    "exp_r": -0.2192,
+    "dd_r": 10.34,
+    "score": -0.02119
+   }
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "ma_align": "bear",
+    "hour_from": 19,
+    "hour_to": 23,
+    "vol_spike": true,
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 MA-stack bear \u00b7 BKK 19\u201323h \u00b7 vol spike \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.02244,
+   "n": 79,
+   "net_pct": -37.4,
+   "train": {
+    "n": 32,
+    "exp_r": -0.2712,
+    "dd_r": 12.09,
+    "score": -0.02244
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": -0.2333,
+    "dd_r": 15.61,
+    "score": -0.01494
+   }
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 4,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "macd": "bull",
+    "vol_spike": true,
+    "ma_align": "bull",
+    "atr_regime": "high",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MACD bull \u00b7 vol spike \u00b7 MA-stack bull \u00b7 high-vol \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.02754,
+   "n": 104,
+   "net_pct": -70.9,
+   "train": {
+    "n": 57,
+    "exp_r": -0.4558,
+    "dd_r": 23.01,
+    "score": -0.01981
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": -0.707,
+    "dd_r": 25.67,
+    "score": -0.02754
+   }
+  }
+ ]
+}
