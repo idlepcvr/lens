@@ -9,6 +9,7 @@ Run: python3 test_atr_stop.py
 import numpy as np
 import pandas as pd
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.backtest_engine import add_indicators, _run_backtest
 
 n = 400

@@ -7,6 +7,7 @@ import datetime
 import os
 import tempfile
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app import database
 from app.models import TradeCreate
 

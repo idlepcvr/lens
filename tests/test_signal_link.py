@@ -5,8 +5,9 @@ because of them. Run: python test_signal_link.py
 """
 import os, tempfile, sqlite3
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 _tmp = tempfile.mkdtemp()
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 import app.database as db
 db.DB_PATH = os.path.join(_tmp, "t.db")
 db.init_db()

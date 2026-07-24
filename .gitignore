@@ -25,10 +25,12 @@ env/
 .DS_Store
 Thumbs.db
 
-# Logs
-lens.log
-setup_scan.log
+# Logs — all of them live in logs/ since 2026-07-24 (systemd + the three cron
+# jobs redirect there). The directory itself is tracked via logs/.gitkeep so a
+# fresh clone has somewhere to write; without it the cron redirects fail.
 *.log
+logs/*
+!logs/.gitkeep
 
 # Node
 node_modules/

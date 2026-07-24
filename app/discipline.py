@@ -20,12 +20,12 @@ Rejected signals are still STORED (with status='rejected', rejection_reason
 set) so the dataset stays complete — we can audit what would have happened
 if a filter had been disabled, and re-run analyses going forward.
 
-Robustness (permutation test, perm_test.py, 10k shuffles, 2026-07-13):
+Robustness (permutation test, research/perm_test.py, 10k shuffles, 2026-07-13):
   • 09:00 BKK: p=0.007 if hour 9 had been picked in advance — but it wasn't,
     it was the worst of 24 buckets, and SOME hour looks this bad in 26% of
     pure-noise shuffles (p=0.26). Verdict: suggestive, NOT proven. Kept anyway
     (cheap insurance: one skipped hour vs a possibly-real bleed). The stored
-    rejected signals are the out-of-sample evidence — re-run perm_test.py
+    rejected signals are the out-of-sample evidence — re-run research/perm_test.py
     after ~50 more trades.
   • Saturday: its "best day" status is unremarkable (p=0.85), but the removed
     veto only needed Saturday to be not-bad, which it clearly is. Stands.

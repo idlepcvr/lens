@@ -1,8 +1,12 @@
 """One-off research: sweep scalp entry filters × SL/TP to find what beats the
 realized 41.8% WR baseline. Reuses the live backtest engine (same fills, same
-fee model). Not wired into the app — pure analysis."""
+fee model). Not wired into the app — pure analysis.
+Run from the repo root:  python3 research/scalp_sweep.py"""
 import sqlite3
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd; precedes `app`
 import pandas as pd
+
 from app.backtest_engine import add_indicators, _run_backtest, _compute_metrics
 
 MONTHS = 30

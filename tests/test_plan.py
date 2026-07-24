@@ -5,6 +5,7 @@
 import os, tempfile
 from datetime import date
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app import database
 
 database.DB_PATH = os.path.join(tempfile.mkdtemp(), "test_plan.db")

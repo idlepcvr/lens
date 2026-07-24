@@ -10,6 +10,7 @@ import itertools
 
 import numpy as np
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.strategy_dedup import _active, _cluster, _correlation, _jaccard, _matrix
 from app.strategy_search import SLOTS, combo_params
 

@@ -1,6 +1,6 @@
 """One-off research: re-mine the real trades in ICT / visual-trading language.
 
-edge_miner.py found WHAT contexts win (flush short, RSI/slope vetoes) but not
+research/edge_miner.py found WHAT contexts win (flush short, RSI/slope vetoes) but not
 WHY you picked the 35 winning flushes out of ~1,400 occurrences. This script
 adds ICT-style features (liquidity sweeps, prior-day-level raids, FVGs,
 premium/discount of the dealing range, killzones, displacement) and asks two
@@ -13,7 +13,7 @@ questions:
      you SKIPPED — and does any ICT-filtered subset have *mechanical* edge
      at the exit geometry you actually traded (0.63% SL / 0.95% TP)?
 
-Not wired into the app — pure analysis. Run: python3 ict_miner.py
+Not wired into the app — pure analysis. Run: python3 research/ict_miner.py
 """
 import datetime
 import itertools

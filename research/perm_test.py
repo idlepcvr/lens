@@ -2,10 +2,12 @@
 Permutation robustness check for the discipline filters — CLI twin of /robustness.
 
 Engine lives in app/robustness_page.py (the page and this script share it).
-Run from the repo root:  python3 perm_test.py [--selftest]
+Run from the repo root:  python3 research/perm_test.py [--selftest]
 """
 
 import sys
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path; must precede `app`
 
 from app.robustness_page import load_trades, perm_test
 

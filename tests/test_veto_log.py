@@ -21,8 +21,8 @@ Run: .venv/bin/python3 test_veto_log.py
 import os
 import tempfile
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 import app.database as database
 
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)

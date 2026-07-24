@@ -8,6 +8,8 @@ Two failure modes this locks down:
 
 Offline, no DB. Run: .venv/bin/python test_nav_parity.py
 """
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.theme import (HEDGE_MAIN, NAV_HEDGE, NAV_NEUTRAL, NAV_PROP, PROP_MAIN,
                        page_mode)
 

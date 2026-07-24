@@ -7,6 +7,8 @@ the key actually separates the inputs that change the answer.
 
     .venv/bin/python3 test_trade_log_cache.py
 """
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.backtest_engine import STRATEGIES
 from app.prop_eval import EVALS, _cached_df, _cached_trade_log, _trade_log
 from app.prop_goal import MONTHS, _basket

@@ -9,8 +9,8 @@ WorkingDirectory=/home/mini/lens
 ExecStart=/home/mini/lens/.venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8765
 Restart=on-failure
 RestartSec=5
-StandardOutput=append:/home/mini/lens/lens.log
-StandardError=append:/home/mini/lens/lens.log
+StandardOutput=append:/home/mini/lens/logs/lens.log
+StandardError=append:/home/mini/lens/logs/lens.log
 EnvironmentFile=/home/mini/lens/.env
 
 [Install]

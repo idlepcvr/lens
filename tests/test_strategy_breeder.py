@@ -7,6 +7,7 @@ still runs, still reports a champion, and the champion is garbage.
 
 import random
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.strategy_breeder import (GEO_K, GEO_R, MAX_CONDS, _crossover, _fitness,
                                   _key, _mutate, _random_genome, _score)
 from app.strategy_search import MIN_N, SLOTS

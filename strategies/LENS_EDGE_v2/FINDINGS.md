@@ -21,7 +21,7 @@
 ## Source Data
 - **464 closed trades** from Kraken futures, Apr 2025 – Jun 2026
 - Base: 41.8% WR, €+736, exp €+1.59/trade
-- Mined with `edge_miner.py`: 10 entry-context features, all 1–3 condition
+- Mined with `research/edge_miner.py`: 10 entry-context features, all 1–3 condition
   combos (n≥20), then **robustness-filtered** — every candidate had to survive
   (a) dropping its 2 biggest wins, (b) old-half vs new-half WR split, and
   (c) size-independent avg price move > 0.

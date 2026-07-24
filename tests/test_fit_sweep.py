@@ -7,6 +7,7 @@ Run: python3 test_fit_sweep.py
 """
 import datetime as _dt
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.fit_sweep import evaluate, build_axes, total_cells, start, CELL_CAP
 
 # Horizons are relative: the sweep gates on weeks-REMAINING, so a hardcoded date

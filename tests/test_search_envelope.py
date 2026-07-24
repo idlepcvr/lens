@@ -4,6 +4,8 @@ Asserts scored distance (not a hard box): inside → FITS, outside → ranked by
 far outside and on which axis. Pure math, offline (no candles, no DB, no HTTP).
 Run: python3 test_search_envelope.py
 """
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.search_custom import annotate, score_row
 
 ENV = {"wr":   {"min": 0.40, "max": 0.60},

@@ -41,13 +41,13 @@ The crons that keep the loop alive (installed on the miniPC):
 
 ```bash
 # hourly HEDGE scanner (minute 2, right after the 1H close)
-2 * * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.setups >> setup_scan.log 2>&1
+2 * * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.setups >> logs/setup_scan.log 2>&1
 # hourly Kraken fill sync (closes the loop — trades self-tag)
 5 * * * *  curl -s -X POST http://localhost:8765/api/sync/kraken >/dev/null
 # PROP scanner on 4H closes (gates internally to the Asian 00/04 UTC windows)
-5 3,7,11,15,19,23 * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.prop_scan >> prop_scan.log 2>&1
+5 3,7,11,15,19,23 * * *  cd /home/mini/lens && /home/mini/lens/.venv/bin/python3 -m app.prop_scan >> logs/prop_scan.log 2>&1
 # weekly strategy R-sweep re-rank (Mon 04:17)
-17 4 * * 1  cd /home/mini/lens && .venv/bin/python3 -m app.strategy_eval >> strategy_eval.log 2>&1
+17 4 * * 1  cd /home/mini/lens && .venv/bin/python3 -m app.strategy_eval >> logs/strategy_eval.log 2>&1
 ```
 
 Phone alerts need `LENS_NTFY_TOPIC` and `LENS_BASE_URL` (the server address
@@ -55,6 +55,28 @@ Phone alerts need `LENS_NTFY_TOPIC` and `LENS_BASE_URL` (the server address
 
 Health: `curl localhost:8765/health` · API docs: http://localhost:8765/docs ·
 deploy: `systemctl --user restart lens.service`
+
+## Layout
+
+```
+app/          the server — FastAPI, pages, engines, scanners
+strategies/   Pine strategies, one folder each + BASELINE/FINDINGS
+research/     one-off analysis scripts, not wired into the app
+tests/        assert-based self-checks, run directly (no framework)
+docs/         reference docs + screenshots
+logs/         everything systemd and cron redirect into
+lens.db       the ledger. DB_PATH is relative, so the app runs from repo root
+```
+
+Scripts in `research/` and `tests/` open with `import _bootstrap`, which puts
+the repo root on `sys.path` and makes it the cwd — they import `app` and some
+open `lens.db` by its bare relative name, which only works from the root. Run
+them from anywhere:
+
+```bash
+.venv/bin/python3 tests/test_veto_log.py
+for t in tests/test_*.py; do .venv/bin/python3 "$t" || echo "FAIL $t"; done
+```
 
 ## Docs
 

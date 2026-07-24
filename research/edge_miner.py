@@ -4,7 +4,7 @@ Enriches every closed real trade with entry-context features (more than
 trade_review.py: session, weekday, EMA slope, distance from 4H EMA, ATR
 regime, bar streak), then mines 1–3 condition combos ranked by win rate
 and expectancy. Output = candidate setups for LENS_EDGE_v2.
-Not wired into the app — pure analysis. Run: python3 edge_miner.py
+Not wired into the app — pure analysis. Run: python3 research/edge_miner.py
 """
 import itertools
 from collections import defaultdict

@@ -4,6 +4,7 @@ Run: python3 test_kraken_sync.py
 """
 from datetime import datetime, timezone, timedelta
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.kraken_sync import _build_trades
 
 T0 = datetime(2026, 7, 1, 23, 53, tzinfo=timezone.utc)

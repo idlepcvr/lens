@@ -14,7 +14,7 @@ trades (see strategies/LENS_EDGE_v3_ICT/FINDINGS.md). Three consumers:
      old/new halves so drift from the mined numbers is visible. When enough
      tagged trades accumulate, re-mine (v4) against this ground truth.
 
-Indicator math intentionally mirrors trade_review.py / ict_miner.py so tags
+Indicator math intentionally mirrors trade_review.py / research/ict_miner.py so tags
 match the research that defined the setups.
 """
 from __future__ import annotations

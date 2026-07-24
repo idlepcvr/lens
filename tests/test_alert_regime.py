@@ -15,7 +15,7 @@ Run: .venv/bin/python3 test_alert_regime.py
 """
 import os
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 import app.setups as setups
 
 SIG = {

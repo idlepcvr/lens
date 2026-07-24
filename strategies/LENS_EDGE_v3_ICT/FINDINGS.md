@@ -11,7 +11,7 @@
 > it (33% WR), and never enter inside an FVG retrace (38% WR). The remaining work
 > is sticking to the checklist, not adding to it.
 
-> Mined with `ict_miner.py` from 464 closed real trades (Apr 2025 – Jun 2026,
+> Mined with `research/ict_miner.py` from 464 closed real trades (Apr 2025 – Jun 2026,
 > baseline 41.8% WR, €+736) plus all 580 mechanical flush-short occurrences in
 > the same window. Same robustness bar as v2: every rule below survived
 > (a) dropping its 2 biggest wins and (b) old-half vs new-half WR ≥ 45%.

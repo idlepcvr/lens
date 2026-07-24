@@ -6,8 +6,9 @@ Run: python test_excursion.py
 import os, sqlite3, tempfile
 from pathlib import Path
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 _tmp = Path(tempfile.mkdtemp()) / "t.db"
+
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 import app.excursion as ex
 ex._DB_PATH = _tmp
 

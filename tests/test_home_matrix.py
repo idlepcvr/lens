@@ -7,6 +7,7 @@ front door.
 
 import re
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.home_page import NARROW, WIDE, _matrix, _runs
 
 

@@ -1,13 +1,13 @@
 """LENS /robustness — are the discipline rules signal, or luck?
 
-Runs the permutation test from perm_test.py server-side and renders the verdict:
+Runs the permutation test from research/perm_test.py server-side and renders the verdict:
 shuffle P&L across the ledger's timestamps a few thousand times and ask how often
 chance alone produces buckets as extreme as the ones the rules were derived from
 (the 09:00 BKK bleed hour, the removed Saturday veto). Also tracks the conviction
 calibration question — the journal fields are the dataset, still filling up.
 
 Results are cached per ledger size, so the page recomputes only when a new
-trade lands. CLI twin: `python3 perm_test.py` (10k shuffles).
+trade lands. CLI twin: `python3 research/perm_test.py` (10k shuffles).
 """
 
 import random
@@ -257,7 +257,7 @@ hour vs a possibly-real bleed), not proved. Rejected 09:00 signals are stored, s
 out-of-sample evidence accumulates on its own — check back every ~50 trades.</p>
 </div>
 
-<div class="foot">engine: perm_test.py · {N_SHUFFLES:,} shuffles · buckets by opened_at,
+<div class="foot">engine: research/perm_test.py · {N_SHUFFLES:,} shuffles · buckets by opened_at,
 Bangkok clock · pnl only, never balance_after</div>
 """
     return shell("/robustness", "Robustness", body, meta="is it luck?")

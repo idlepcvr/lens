@@ -28,10 +28,26 @@ different set of later signals gets taken. So `k` and `rr` are bred as part of
 the genome and every genome is scored whole — never a condition set scored once
 with geometry swept over it afterwards.
 
+**The window is the lever, not the population** (changed 2026-07-24, second
+pass). The first run on 30 months found exactly ONE viable genome above 3
+conditions out of 103, and the depth profile said why: at 5 conditions, 111 of
+120 random genomes selected under 40 bars in the whole window. Depth was not
+failing on fitness or on search — it was failing on evidence. Scaling the
+population would have searched the same empty room with more agents. So the
+default window is now the 7-year Binance set that `strategy_search3` stage 3
+already used for deep confirmation: ~2.8x the bars, which is what moves a
+condition set from untestable to testable.
+
+The price is that `deep` is Binance **spot** while `w30` is Bybit **perp** —
+no funding, different microstructure. Both windows stay runnable (`--window`)
+and every result records which one produced it, because they are different
+instruments and must never be compared bar-for-bar.
+
 Paper-only R&D. Auto-execution is not in scope and never will be.
 
 Results → strategy_breeder.json. Run from repo root (needs .venv):
-    .venv/bin/python -m app.strategy_breeder
+    .venv/bin/python -m app.strategy_breeder                  # 84mo Binance spot
+    .venv/bin/python -m app.strategy_breeder --window w30     # 30mo Bybit perp
     .venv/bin/python -m app.strategy_breeder --tf 4h --generations 20
 """
 
@@ -51,6 +67,23 @@ from .strategy_search3 import RISK, _geo, _load
 MAX_CONDS   = 6       # the point of the GA — grid search stopped at 3
 POP         = 60
 GENERATIONS = 12
+
+# Window. The 2026-07-24 run measured that depth fails on DATA, not on search:
+# at 5 conditions, 111 of 120 random genomes selected under 40 bars in 30
+# months, so there was nothing to score, let alone validate out-of-sample.
+# More population searches the same empty room. More bars is the actual lever,
+# so the deep window is now the default (2026-07-24).
+#
+# ⚠ The two windows are NOT the same instrument. "w30" is Bybit BTC/USDT perp;
+# "deep" is Binance BTC/USDT SPOT resampled up from 1h — spot has no funding and
+# a different microstructure, which is the price of the extra history (the same
+# trade `strategy_search3` stage 3 already makes for deep confirmation). Compare
+# the two windows as separate evidence, never bar-for-bar.
+WINDOWS = {
+    "w30":  {"months": MONTHS, "exchange": None,      "desc": "Bybit BTC/USDT perp"},
+    "deep": {"months": 84,     "exchange": "binance", "desc": "Binance BTC/USDT spot, 1h resampled"},
+}
+DEFAULT_WINDOW = "deep"
 ELITE       = 6       # copied to the next generation untouched
 TOURNAMENT  = 3
 P_CROSSOVER = 0.7
@@ -195,9 +228,11 @@ def _select(pop, rng):
     return max(rng.sample(pop, TOURNAMENT), key=lambda p: p["ev"]["fitness"])
 
 
-def evolve(tf, generations=GENERATIONS, pop_size=POP, seed=0, verbose=True):
+def evolve(tf, generations=GENERATIONS, pop_size=POP, seed=0, verbose=True,
+           window=DEFAULT_WINDOW):
     rng = random.Random(seed)
-    df = _load(tf, MONTHS)
+    w = WINDOWS[window]
+    df = _load(tf, w["months"], exchange=w["exchange"])
     ctx = {"df": df, "masks": _masks(df), "nb": len(df),
            "mid": df.index[len(df) // 2].isoformat()}
     cache, t0 = {}, time.time()
@@ -255,14 +290,16 @@ def _row(p, tf):
 
 
 def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
-        pop_size=POP, seed=0):
+        pop_size=POP, seed=0, window=DEFAULT_WINDOW, out="strategy_breeder.json"):
+    w = WINDOWS[window]
     t0, out_rows, hist = time.time(), [], {}
     print(f"breeder: pop {pop_size} × {generations} gens × {list(timeframes)} "
           f"· ≤{MAX_CONDS} conditions · fitness = min(train, holdout) of "
           f"expectancy-R / drawdown-R · holdout n ≥ {MIN_N}", flush=True)
+    print(f"window: {window} — {w['months']} months, {w['desc']}", flush=True)
 
     for tf in timeframes:
-        pop, history, cache = evolve(tf, generations, pop_size, seed)
+        pop, history, cache = evolve(tf, generations, pop_size, seed, window=window)
         hist[tf] = history
         seen = set()
         for p in pop:
@@ -277,7 +314,11 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
     out_rows.sort(key=lambda r: r["fitness"], reverse=True)
     result = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
-        "months": MONTHS, "capital": CAPITAL, "risk": RISK,
+        # Window is recorded because the two are different instruments, not just
+        # different lengths — without this the two output files are
+        # indistinguishable and silently non-comparable.
+        "window": window, "months": w["months"], "data": w["desc"],
+        "capital": CAPITAL, "risk": RISK,
         "max_conditions": MAX_CONDS, "min_n_holdout": MIN_N,
         "population": pop_size, "generations": generations, "seed": seed,
         "fitness": "min(train, holdout) of expectancy_R / max(drawdown_R, 1)",
@@ -285,7 +326,7 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
         "n_viable": len(out_rows),
         "genomes": out_rows[:200],
     }
-    with open("strategy_breeder.json", "w") as f:
+    with open(out, "w") as f:
         json.dump(result, f, indent=1,
                   default=lambda o: o.item() if hasattr(o, "item") else str(o))
 
@@ -303,7 +344,9 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
               f"{r['conditions']:>4}  {r['desc']}")
     deep = [r for r in out_rows if r["conditions"] > 3]
     print(f"\n{len(deep)} of {len(out_rows)} viable genomes use >3 conditions "
-          f"— the region grid search could not reach → strategy_breeder.json")
+          f"— the region grid search could not reach → {out}")
+    print(f"(w30 baseline for this line was 1 of 103. If this window did not "
+          f"move it, depth is not a data problem after all.)")
     return result
 
 
@@ -313,5 +356,11 @@ if __name__ == "__main__":
     ap.add_argument("--generations", type=int, default=GENERATIONS)
     ap.add_argument("--pop", type=int, default=POP)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--window", choices=sorted(WINDOWS), default=DEFAULT_WINDOW,
+                    help="deep = 84mo Binance spot (default); w30 = 30mo Bybit perp")
+    ap.add_argument("--out", default=None,
+                    help="output json (defaults to strategy_breeder[_w30].json)")
     a = ap.parse_args()
-    run(tuple(a.tf), a.generations, a.pop, a.seed)
+    out = a.out or ("strategy_breeder.json" if a.window == "deep"
+                    else f"strategy_breeder_{a.window}.json")
+    run(tuple(a.tf), a.generations, a.pop, a.seed, window=a.window, out=out)

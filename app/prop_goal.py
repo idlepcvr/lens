@@ -13,7 +13,7 @@ the same eval walls as /prop and /survival), so this page can never disagree wit
 them. Two honest caveats are rendered on the page itself:
 
   1. The cone is drawn on BACKTEST geometry. The measured edge from the live
-     ledger is worse (see eval_mc.py, 2026-07-09). Both numbers are shown.
+     ledger is worse (see research/eval_mc.py, 2026-07-09). Both numbers are shown.
   2. Widening the basket buys trades/month, not edge. It shortens the median time
      to target AND lowers the pass-rate. The page prices both sides.
 """

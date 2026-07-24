@@ -10,6 +10,7 @@ Offline (no Kraken, no network). Run: .venv/bin/python test_prop_ticket.py
 import os
 import tempfile
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app import database
 
 

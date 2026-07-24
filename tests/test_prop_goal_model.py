@@ -18,6 +18,7 @@ Offline maths only. Run: .venv/bin/python test_prop_goal_model.py
 """
 import datetime as dt
 
+import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app.calculator import CalcError, compute_goal
 from app.prop_goal import _losses_to_floor
 
