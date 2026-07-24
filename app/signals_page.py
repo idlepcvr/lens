@@ -88,6 +88,54 @@ function pendingCard(s){
   </div>`;
 }
 
+// ── blocked cards ────────────────────────────────────────────────────────────
+// A setup that matched and was vetoed. No buttons: blocked is not actionable,
+// it's evidence. The ledger line is the whole point — it's the denominator for
+// "would taking the vetoed ones have made money?", which /robustness cannot
+// answer because it only ever sees setups that became trades.
+function vetoRules(s){
+  const r = s.rejection_reason||'';
+  return r.startsWith('veto:') ? r.slice(5).split(',').filter(Boolean) : [];
+}
+function ledgerLine(rules){
+  const exact = VETO_LEDGER.combos[rules.slice().sort().join(',')];
+  if(exact) return {txt:`this exact veto bucket, realized: <b>${exact.n} trades · €${exact.pnl>0?'+':'−'}${money(Math.abs(exact.pnl))} · ${exact.wr}% WR</b>`, pnl:exact.pnl};
+  const parts = rules.map(r=>{
+    const x = VETO_LEDGER.rules[r];
+    return x ? `${r} ${x.n}t €${x.pnl>0?'+':'−'}${money(Math.abs(x.pnl))}` : null;
+  }).filter(Boolean);
+  if(!parts.length) return {txt:'no realized trades in this bucket yet', pnl:0};
+  // No trade ever hit this exact combination — fall back to each rule's own
+  // record so the card still cites something measured, and say which it is.
+  return {txt:`no trade hit this exact combination · per rule: <b>${parts.join(' · ')}</b>`,
+          pnl:rules.reduce((a,r)=>a+((VETO_LEDGER.rules[r]||{}).pnl||0),0)};
+}
+function blockedCard(s){
+  const dir = s.direction, rules = vetoRules(s);
+  const led = ledgerLine(rules);
+  const checks = Array.isArray(s.mtf_confluence)?s.mtf_confluence:[];
+  return `<div class="scard" style="opacity:.86">
+    <div class="sh">
+      <span class="sid">${s.trigger_type||'?'} <span class="d-${dir}">${ARROW[dir]||''} ${VLAB[dir]||dir}</span></span>
+      <span class="badge rejected">blocked · ${ago(s.received_at)}</span>
+    </div>
+    <div class="sname">${s.strategy_name||''} ${s.entry_price?('· '+money(s.entry_price)):''}</div>
+    ${checks.length?`<div style="font-size:12px;margin:8px 0 2px"><span class="g">setup ✓</span> <span class="m">${checks.join(' · ')}</span></div>`:''}
+    <div style="font-size:12px;margin:8px 0 2px"><span class="r">blocked ✗</span></div>
+    <ul style="margin:2px 0 0 16px;padding:0;font-size:12px;color:var(--dim)">
+      <!-- description only. VETO_LABELS bakes in the stat from the original
+           mining pass, and it has already drifted (fvg_entry reads "−€15/trade"
+           while the live book has it +€1,569). One number per card, and it's
+           the live one on the line below. -->
+      ${rules.map(r=>`<li>${(VETO_LABELS[r]||r).split(' — ')[0]}</li>`).join('')}
+    </ul>
+    <!-- colour is inverted on purpose: a bucket that LOST money means the veto
+         saved you (green). A bucket in profit means this veto is costing you
+         and deserves a second look (amber) — that's the finding worth seeing. -->
+    <div style="font-size:12px;margin-top:10px" class="${led.pnl<0?'g':'a'}">${led.txt}</div>
+  </div>`;
+}
+
 function fmtTs(iso){
   if(!iso) return '—';
   const d = new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z');
@@ -188,7 +236,13 @@ async function decide(id, status, conviction){
 function render(all){
   const pending = all.filter(s=>s.status==='pending')
                      .sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''));
-  const decided = all.filter(s=>s.status!=='pending')
+  const isBlocked = s=>(s.rejection_reason||'').startsWith('veto:');
+  const blocked = all.filter(isBlocked)
+                     .sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''))
+                     .slice(0,20);
+  // blocked rows are decisions too, but they get their own section — mixed into
+  // recent decisions they'd read as things you skipped, which you didn't.
+  const decided = all.filter(s=>s.status!=='pending' && !isBlocked(s))
                      .sort((a,b)=>(b.decided_at||b.received_at||'').localeCompare(a.decided_at||a.received_at||''))
                      .slice(0,25);
 
@@ -206,6 +260,7 @@ function render(all){
     + `<li><code>filter:bad_venue_&lt;x&gt;</code> — Kraken only. Bybit cost €1,874 in 84 trades (PF 0.40), auto-rejected.</li>`
     + `<li><code>filter:cooldown_&lt;n&gt;min</code> — anti-revenge: &lt;5 min since the last accepted signal on the same symbol. Overtrading cost €1,946.</li>`
     + `</ul>`
+    + `<h4>blocked</h4>A setup can match and still be stood down by a <b>veto rule</b> — context the loss fingerprint says is where the money went. Those land in <b>blocked</b>: setup ✓, which rules ✗, and what that veto bucket actually did in your ledger. No alert fires — blocked isn't actionable, it's evidence. Before 2026-07-24 these were discarded silently, which is why the feed looked long-only for 10 days while the engine was correctly refusing shorts. <b>Read the ledger line:</b> a bucket in the red means the veto saved you; a bucket in profit means the rule is costing you and wants a second look.`
     + `<h4>why skips matter</h4>A skip is recorded too — it trains the veto map (where you correctly stood down). Don't ignore them.`
     + `<h4>conviction</h4>The number feeds your conviction win-rate metric. Be honest: A+ only for genuine A+ context, not FOMO.`
     + `<h4>you still place the trade</h4>Approving here logs the decision — it does <b>not</b> place an order. Execute on Kraken yourself.`
@@ -223,6 +278,22 @@ function render(all){
         + ` <span class="mono">${zoneLabel(c)}</span> — one trade idea rescanned hourly; decide each</div>`
         + `<div class="grid-auto">${c.members.map(pendingCard).join('')}</div></div>`;
     }).join('');
+  }
+  html += `</div>`;
+
+  // blocked — setups that matched and were vetoed. Collapsed by default: this
+  // is the audit trail, not the queue. Nothing here is actionable.
+  // ponytail: no clustering here, unlike the pending queue — a context that
+  // persists for four hours genuinely produced four blocked bars, and that
+  // repetition IS the denominator. If the wall of near-identical cards starts
+  // hiding the interesting ones, group by setup+veto-combo (clusterize() groups
+  // by price zone, which would merge rows whose veto reasons differ).
+  html += `<div class="sect closed" id="h-blocked" onclick="tog('blocked')"><span class="caret">▾</span><span class="ttl">⃠ blocked · ${blocked.length}</span><span class="line"></span></div>`
+    + `<div class="sec-body closed" id="s-blocked">`;
+  if(blocked.length===0){
+    html += `<div class="panel dim" style="text-align:center;color:var(--dim)">no blocked setups logged yet — they appear here when a setup matches and a veto rule stands it down</div>`;
+  } else {
+    html += `<div class="grid-auto">${blocked.map(blockedCard).join('')}</div>`;
   }
   html += `</div>`;
 
@@ -269,4 +340,18 @@ setInterval(load, 60000);
 
 
 def render() -> str:
-    return shell("/signals", "Signals", BODY, script=SCRIPT, meta="approve / reject")
+    # Veto labels + the realized ledger are baked in at render time: they change
+    # only when the book does, and a second endpoint for two small dicts would
+    # be a round trip the page doesn't need.
+    import json
+
+    from .setups import VETO_LABELS, veto_bucket_stats
+
+    try:
+        ledger = veto_bucket_stats()
+    except Exception:
+        ledger = {"rules": {}, "combos": {}}   # a dead stat never blanks the page
+    preamble = (f"const VETO_LABELS={json.dumps(VETO_LABELS)};\n"
+                f"const VETO_LEDGER={json.dumps(ledger)};\n")
+    return shell("/signals", "Signals", BODY, script=preamble + SCRIPT,
+                 meta="approve / reject")

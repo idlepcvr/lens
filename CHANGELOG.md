@@ -5,6 +5,35 @@ live in `LENS_PLAN.md`; commit detail is in `git log`.
 
 ---
 
+## 2026-07-24
+
+**Vetoed setups are logged instead of silently discarded** (breeder wishlist
+Item 0). A setup that matched and was stood down by a veto rule left no row, no
+trace and no notification: `emit_signals` dropped every non-clean match and
+`run_scan_cli` filtered them out before it. Cost was double — the feed showed
+longs only for 10 days while the engine was in fact working and correctly
+refusing shorts, so it looked asleep; and with no row there was no
+**denominator**, so "would taking the vetoed ones have made money?" could not be
+asked (`/robustness`' veto counterfactual runs on closed trades and cannot see
+setups that never became trades). They now persist as `rejected` rows with
+reason `veto:<rules>`, deduped per bar+setup. Blocked is not actionable, so they
+never notify — the push path only takes `pending`.
+
+**`/signals` gained a `blocked` section** — setup ✓, which rules ✗, and the
+realized ledger for that exact veto bucket via `setups.veto_bucket_stats()`
+(re-read from the book every render; the numbers frozen into `VETO_LABELS` have
+already drifted). Colour is inverted deliberately: a bucket in the red means the
+veto saved you, a bucket in profit means the rule is costing you.
+
+**What the replay already says**, over the last 30 days of bars:
+· **S4 is dead code** — 25 matches, **25 vetoed, zero emitted**. It's a long on
+`rsi<40` in discount, which trips `slope_against` structurally every time.
+· **S2 is effectively dead** — 5 matches, 5 vetoed (as suspected 2026-07-18),
+though by varying rules rather than one structural pair.
+· **`fvg_entry` is the most-fired veto (69 hits) and the only one in profit** —
++€2,000 over 26 trades, while its frozen label still reads "−€15/trade". It is
+blocking the most and justifying it the least. Worth a hard look.
+
 ## 2026-07-13 → 14
 
 **Landing page rebuilt as the cockpit front door.** Aperture mark scaled into
