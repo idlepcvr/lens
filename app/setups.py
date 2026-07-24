@@ -427,20 +427,34 @@ def scan_latest() -> dict:
 
 
 def emit_signals(scan: dict) -> list[dict]:
-    """Insert one pending signal per clean setup match (discipline applies)."""
+    """Insert one signal per setup match. Clean matches land pending (discipline
+    applies); vetoed matches land as rejected `veto:<rules>` rows.
+
+    Vetoed matches used to be dropped here (fixed 2026-07-24). Two costs: the
+    feed showed longs only for 10 days while the engine was in fact working and
+    correctly standing down on shorts — it looked asleep; and with no row there
+    is no denominator, so "would taking the vetoed ones have made money?" was
+    unanswerable (/robustness' veto counterfactual runs on closed trades and
+    cannot see setups that never became trades). Blocked is not actionable, so
+    these rows never notify — run_scan_cli only pushes status == 'pending'."""
     from . import discipline
     from .database import get_last_non_rejected_signal_for_symbol, insert_signal
 
+    # Vetoed rows are deduped per bar+setup: the scanner re-runs the same closed
+    # bar on retry, and a context that persists for hours would otherwise mint a
+    # fresh row every run. One row per bar per setup IS the denominator.
+    bar_tag = scan["bar_ts"][:13].replace("-", "").replace("T", "")
+
     emitted = []
     for m in scan["matches"]:
-        if not m["clean"]:
-            continue
         price = scan["close"]
         long_ = m["direction"] == "long"
         sl = price * (1 - SL_PCT / 100) if long_ else price * (1 + SL_PCT / 100)
         tp = price * (1 + TP_PCT / 100) if long_ else price * (1 - TP_PCT / 100)
+        blocked = "veto:" + ",".join(m["vetoes"]) if m["vetoes"] else None
         payload = {
-            "signal_id": f"v3-{m['setup']}-{uuid.uuid4().hex[:8]}",
+            "signal_id": (f"v3veto-{m['setup']}-{bar_tag}" if blocked
+                          else f"v3-{m['setup']}-{uuid.uuid4().hex[:8]}"),
             "strategy_name": "LENS_EDGE_v3",
             "strategy_version": "3.0",
             "symbol": "BTC/USD",
@@ -454,9 +468,14 @@ def emit_signals(scan: dict) -> list[dict]:
             "mtf_confluence": m["checks"],
             "confluence_count": min(len(m["checks"]), 5),
         }
-        reason = discipline.evaluate(
+        # The veto is why it was blocked — it outranks any discipline filter that
+        # would also have caught it, and keeps the reason string parseable.
+        reason = blocked or discipline.evaluate(
             payload, get_last_non_rejected_signal_for_symbol(payload["symbol"]))
-        emitted.append(insert_signal(payload, auto_rejection_reason=reason))
+        try:
+            emitted.append(insert_signal(payload, auto_rejection_reason=reason))
+        except ValueError:
+            continue                 # same bar+setup already logged as blocked
     return emitted
 
 
@@ -538,6 +557,36 @@ VETO_LABELS = {
     "fvg_entry":            "entry inside FVG retrace — 38% WR, −€15/trade",
     "ny_pm_kz":             "NY PM 18–21 UTC, your worst hours — 39% WR",
 }
+
+
+def veto_bucket_stats() -> dict:
+    """Realized ledger for VETO-tagged trades, per rule and per exact rule-set.
+
+    The numbers baked into VETO_LABELS are frozen from the original mining pass;
+    these are re-read from the ledger every call, so a blocked card cites what
+    the book actually did, not what it did in 2026-06. Source is trades.setup_tag
+    written by classify() — `VETO:a,b` or `S3|VETO:a,b`."""
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT setup_tag, pnl FROM trades "
+        "WHERE setup_tag LIKE '%VETO:%' AND pnl IS NOT NULL"
+    ).fetchall()
+    conn.close()
+
+    rules: dict[str, list] = {}
+    combos: dict[str, list] = {}
+    for tag, pnl in rows:
+        names = tag.split("VETO:", 1)[1].split(",")
+        combos.setdefault(",".join(sorted(names)), []).append(pnl)
+        for r in names:
+            rules.setdefault(r, []).append(pnl)
+
+    def agg(p: list) -> dict:
+        return {"n": len(p), "pnl": round(sum(p)),
+                "wr": round(100 * sum(1 for x in p if x > 0) / len(p))}
+
+    return {"rules": {k: agg(v) for k, v in rules.items()},
+            "combos": {k: agg(v) for k, v in combos.items()}}
 
 
 def _setup_checklists(ctx: BarContext) -> list[dict]:
@@ -1043,10 +1092,13 @@ def run_scan_cli():
     # timing inside the context (audit 2026-07-02: S3 mechanically dead yet
     # +€614 realized). Before this, /desk could say ENTER while the scanner
     # stayed silent. Skip setups the board already emitted this run.
+    # Vetoed matches are passed through too — emit_signals logs them as blocked
+    # rows (2026-07-24). Filtering them here was the second half of the same
+    # silent discard; both call sites had to change or the log stays empty.
     board_fired = {(s.get("trigger_type") or "").split(" ")[0] for s in emitted}
     scan_playbook = dict(scan)
     scan_playbook["matches"] = [m for m in scan["matches"]
-                                if m["clean"] and m["setup"] not in board_fired]
+                                if m["setup"] not in board_fired]
     emitted += emit_signals(scan_playbook)
     # Freshness pass (2026-07-04): drift-expire BEFORE notifying so a stale
     # ticket never buzzes the phone; same-idea auto-approve so a direction
