@@ -418,17 +418,29 @@ def nav_html(current_path: str) -> str:
 
 
 def footer_html(current_path: str) -> str:
-    """Secondary pages for the current mode — the chips not in the top nav."""
+    """Secondary pages for the current mode, in two labelled groups.
+
+    Previously one undifferentiated run of 14 links: the five remaining TRADING
+    pages (Journal, Analytics, Plan, Goal, Edge) sat next to nine utility pages
+    (Style, Sitemap, Health, Manual, Audit…) with nothing to tell them apart, so
+    finding Edge meant reading the whole strip. The split is purely visual —
+    every page stays exactly as reachable as it was."""
     mode = page_mode(current_path)
     items = NAV_PROP if mode == "prop" else NAV_HEDGE
     main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
-    out = ['<a href="%s" class="%s">%s</a>' % (href, "cur" if href == current_path else "", label)
-           for href, label in items if href not in main]
-    out += ['<a href="%s" class="%s">%s</a>' % (href, "cur" if href == current_path else "", label)
-            for href, label in NAV_NEUTRAL]
-    if not out:
+    link = lambda href, label: '<a href="%s" class="%s">%s</a>' % (
+        href, "cur" if href == current_path else "", label)
+
+    book = [link(h, l) for h, l in items if h not in main]
+    tools = [link(h, l) for h, l in NAV_NEUTRAL]
+    if not book and not tools:
         return ""
-    return '<footer class="navftr"><span class="ftl">more</span>' + "".join(out) + "</footer>"
+    out = '<footer class="navftr">'
+    if book:
+        out += '<span class="ftl">more</span>' + "".join(book)
+    if tools:
+        out += '<span class="ftl ftl2">system</span>' + "".join(tools)
+    return out + "</footer>"
 
 
 def shell(current_path: str, page_label: str, body: str, *,
@@ -456,6 +468,10 @@ def shell(current_path: str, page_label: str, body: str, *,
         "border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:7px 15px;align-items:center}"
         "footer.navftr .ftl{font-family:var(--mono);font-size:9px;letter-spacing:.18em;"
         "text-transform:uppercase;color:var(--faint);margin-right:4px}"
+        # the SYSTEM group starts a new line so the trading pages above it read
+        # as their own set — the whole point of splitting the strip in two
+        "footer.navftr .ftl2{flex-basis:100%;margin-top:9px;padding-top:9px;"
+        "border-top:1px solid var(--line)}"
         "footer.navftr a{color:var(--dim);font-size:11.5px;text-decoration:none}"
         "footer.navftr a:hover{color:var(--ink)}"
         "footer.navftr a.cur{color:var(--accent)}"
