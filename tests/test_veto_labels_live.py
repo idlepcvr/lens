@@ -49,3 +49,49 @@ for rule in VETO_LABELS:
     assert veto_label_live(rule, {"rules": {}, "combos": {}}) == VETO_LABELS[rule]
 
 print("ok — veto labels carry no frozen stats; live figures come from the ledger")
+
+
+# ── era scoping (added 2026-07-25) ───────────────────────────────────────
+# 469 of 509 trades predate the signal loop. Pooling them is how "fvg_entry is
+# the only veto in profit, +€2,010" got reported; live-era only it is -€79 over
+# 10 trades. The pre-system trades are NOT deleted — they are the sample the
+# veto rules were mined from — they are just not the system's track record.
+import sqlite3          # noqa: E402
+import tempfile         # noqa: E402
+import os               # noqa: E402
+
+from app.setups import SYSTEM_START   # noqa: E402
+import app.setups as setups           # noqa: E402
+
+fd, tmp = tempfile.mkstemp(suffix=".db")
+os.close(fd)
+c = sqlite3.connect(tmp)
+c.execute("CREATE TABLE trades (setup_tag TEXT, pnl REAL, opened_at TEXT)")
+c.executemany("INSERT INTO trades VALUES (?,?,?)", [
+    ("VETO:fvg_entry", 500.0, "2025-05-01"),   # pre-system winner
+    ("VETO:fvg_entry", 500.0, "2025-06-01"),   # pre-system winner
+    ("VETO:fvg_entry", -20.0, "2026-07-01"),   # live-era loser
+])
+c.commit(); c.close()
+
+_real, setups.DB_PATH = setups.DB_PATH, tmp
+try:
+    live = setups.veto_bucket_stats("live")["rules"]["fvg_entry"]
+    allt = setups.veto_bucket_stats("all")["rules"]["fvg_entry"]
+    # the exact shape of the 2026-07-25 false finding: pooled looks great,
+    # live-era says otherwise, and the default must be the honest one
+    assert allt == {"n": 3, "pnl": 980, "wr": 67}, allt
+    assert live == {"n": 1, "pnl": -20, "wr": 0}, live
+    assert setups.veto_bucket_stats()["rules"]["fvg_entry"] == live, \
+        "default era must be 'live' — the system's own record, not the mining sample"
+    try:
+        setups.veto_bucket_stats("recent")
+        raise AssertionError("a typo'd era must raise, not silently pool everything")
+    except ValueError:
+        pass
+finally:
+    setups.DB_PATH = _real
+    os.unlink(tmp)
+
+assert SYSTEM_START == "2026-06-16"
+print("ok — veto stats default to the live era; pre-system trades kept, not counted")

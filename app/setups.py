@@ -574,18 +574,39 @@ def veto_label_live(rule: str, ledger: dict) -> str:
     return f"{desc} — {s['wr']}% WR, €{s['pnl']:+,} over {s['n']}"
 
 
-def veto_bucket_stats() -> dict:
+# The day the signal loop went live. Trades before this were executed without
+# LENS in the room: they are the evidence the vetoes were MINED from, which is
+# exactly why they must not be deleted — and exactly why they must not be
+# reported as the system's track record either.
+#
+# 469 of 509 trades predate it. Quoting the pooled number is how "fvg_entry is
+# the only veto in profit, +€2,010" got reported on 2026-07-25; live-era only,
+# that bucket is -€79 over 10 trades and the finding evaporates.
+SYSTEM_START = "2026-06-16"
+
+
+def veto_bucket_stats(era: str = "live") -> dict:
     """Realized ledger for VETO-tagged trades, per rule and per exact rule-set.
+
+    era="live" (default) counts only trades since SYSTEM_START — what THIS
+    system has done. era="all" pools in the pre-system history; it is the wider
+    sample the rules were mined from, so it is the right call for mining and the
+    wrong one for "how am I doing".
 
     Re-read from the ledger every call, so a blocked card cites what the book
     actually did, not what it did in 2026-06. This is the only source of veto
     stats — VETO_LABELS is description-only. Source is trades.setup_tag
     written by classify() — `VETO:a,b` or `S3|VETO:a,b`."""
+    if era not in ("live", "all"):
+        raise ValueError(f"era must be 'live' or 'all', got {era!r}")
+    sql = ("SELECT setup_tag, pnl FROM trades "
+           "WHERE setup_tag LIKE '%VETO:%' AND pnl IS NOT NULL")
+    args: tuple = ()
+    if era == "live":
+        sql += " AND opened_at >= ?"
+        args = (SYSTEM_START,)
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute(
-        "SELECT setup_tag, pnl FROM trades "
-        "WHERE setup_tag LIKE '%VETO:%' AND pnl IS NOT NULL"
-    ).fetchall()
+    rows = conn.execute(sql, args).fetchall()
     conn.close()
 
     rules: dict[str, list] = {}
