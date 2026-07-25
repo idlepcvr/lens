@@ -29,18 +29,21 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 #   /analytics  →  /prop-analytics         shared render, book="prop" locked
 #   /position   →  /prop-position          shared render, book="prop" locked
 #   /edge       →  /prop-edge              shared render, book="prop" locked
+# Same order as NAV_HEDGE — test_nav_parity enforces it, so the two modes stay
+# muscle-memory compatible. Prop-only pages (Cone, Engines, Ledger, Income) are
+# appended after the shared spine rather than interleaved.
 NAV_PROP = [
-    ("/overview", "Overview"),
-    ("/prop-dashboard", "Plan"),
-    ("/prop-goal", "Goal"),
-    ("/prop-cone", "Cone"),
-    ("/prop-position", "Position"),
     ("/prop-desk", "Desk"),
     ("/prop-signals", "Signals"),
+    ("/prop-position", "Position"),
     ("/prop-calendar", "Calendar"),
-    ("/prop-analytics", "Analytics"),
+    ("/overview", "Overview"),
     ("/prop-journal", "Journal"),
+    ("/prop-analytics", "Analytics"),
+    ("/prop-dashboard", "Plan"),
+    ("/prop-goal", "Goal"),
     ("/prop-edge", "Edge"),
+    ("/prop-cone", "Cone"),
     ("/prop", "Engines"),
     ("/prop-ledger", "Ledger"),
     ("/prop-income", "Income"),
@@ -48,22 +51,28 @@ NAV_PROP = [
     # nav entry — they're the engine cards on /prop. Their pages still render
     # with the prop nav (page_mode defaults to prop).
 ]
+# Ordered by the daily loop, not by subject: what do I do now (Desk) → what am I
+# being asked to decide (Signals) → what am I already exposed to (Position) →
+# how did it go (Calendar/Journal/Analytics) → is the plan still sane (Plan/Goal)
+# → research (Edge). Desk and Signals used to sit in the "more" footer while
+# Plan and Goal held top-nav slots, so the two pages an entry/exit decision
+# actually needs were the two furthest away.
 NAV_HEDGE = [
-    ("/overview-hedge", "Overview"),
-    ("/dashboard", "Plan"),
-    ("/goal", "Goal"),
-    ("/position", "Position"),
     ("/desk", "Desk"),
     ("/signals", "Signals"),
+    ("/position", "Position"),
     ("/calendar", "Calendar"),
-    ("/analytics", "Analytics"),
+    ("/overview-hedge", "Overview"),
     ("/journal", "Journal"),
+    ("/analytics", "Analytics"),
+    ("/dashboard", "Plan"),
+    ("/goal", "Goal"),
     ("/edge", "Edge"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.
-PROP_MAIN  = {"/overview", "/prop-dashboard", "/prop-desk", "/prop-ledger", "/prop-calendar"}
-HEDGE_MAIN = {"/overview-hedge", "/dashboard", "/position", "/calendar"}
+PROP_MAIN  = {"/overview", "/prop-desk", "/prop-signals", "/prop-ledger", "/prop-dashboard"}
+HEDGE_MAIN = {"/desk", "/signals", "/position", "/calendar", "/overview-hedge"}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.

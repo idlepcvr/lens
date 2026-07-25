@@ -584,7 +584,25 @@ def delete_trade(trade_id: int) -> bool:
 # ponytail: symbol is deliberately NOT matched — trades carry BTC/USD:USD and
 # signals carry BTCUSDT.P for the same instrument. LENS is BTC-only; add a
 # symbol predicate the day a second instrument exists, not before.
-_SIGNAL_WINDOW_DAYS = 0.25    # 6h: a decision older than this didn't cause this fill
+#
+# ⚠ The "decision precedes fill" rule was measured wrong (fixed 2026-07-25).
+# It was inferred from the two hand-linked rows, both of which happened to be
+# approve-then-execute. Across the whole live era the opposite is the norm: of
+# 27 unlinked fills with a price-compatible approved signal, 24 have their
+# decision AFTER the fill. He trades, then marks the signal approved afterwards.
+# A strict precedes-rule therefore rejects his actual workflow and the link rate
+# sat at 5 of 40.
+#
+# So the window is SYMMETRIC: a decision and a fill within a few hours of each
+# other, same direction and price, are one intent regardless of which row was
+# written first. It stays narrow on purpose — the gap distribution has a tight
+# cluster inside a few hours and then jumps to 20h, 60h, 300h+. Those far ones
+# are coincidental price matches, and inventing links for them would poison the
+# signal→trade dataset that is the entire point of the system. A missed link
+# costs a row of evidence; a false link costs the truth of every number built
+# on it.
+_SIGNAL_WINDOW_DAYS = 0.25    # 6h before the fill (decision → execution)
+_SIGNAL_AFTER_DAYS  = 0.25    # 6h after it (execution → logged the decision)
 _SIGNAL_ENTRY_TOL   = 0.025   # 2.5%
 
 
@@ -600,16 +618,21 @@ def _link_signal(c, trade_id: int, direction: str, entry: float, opened_at: str)
     cur = c.execute("SELECT linked_signal_id FROM trades WHERE id = ?", (trade_id,)).fetchone()
     if cur is None or cur["linked_signal_id"]:
         return None
+    # Symmetric window, nearest decision first — whichever side of the fill it
+    # falls on. ORDER BY the ABSOLUTE gap, so a decision 10 minutes after the
+    # fill beats one 5 hours before it; the old ORDER BY decided_at DESC would
+    # have taken the stalest qualifying signal on the early side.
     row = c.execute("""
         SELECT signal_id FROM signals
          WHERE status = 'approved' AND direction = ?
            AND linked_trade_id IS NULL AND decided_at IS NOT NULL
-           AND julianday(?) >= julianday(decided_at)
            AND julianday(?) - julianday(decided_at) <= ?
+           AND julianday(decided_at) - julianday(?) <= ?
            AND entry_price > 0 AND ABS(? - entry_price) / entry_price < ?
-      ORDER BY julianday(decided_at) DESC LIMIT 1
-    """, (direction, opened_at, opened_at, _SIGNAL_WINDOW_DAYS,
-          entry, _SIGNAL_ENTRY_TOL)).fetchone()
+      ORDER BY ABS(julianday(decided_at) - julianday(?)) ASC LIMIT 1
+    """, (direction, opened_at, _SIGNAL_WINDOW_DAYS,
+          opened_at, _SIGNAL_AFTER_DAYS,
+          entry, _SIGNAL_ENTRY_TOL, opened_at)).fetchone()
     if not row:
         return None
     sid = row["signal_id"]

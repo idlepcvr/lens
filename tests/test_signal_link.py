@@ -47,10 +47,35 @@ assert _linked(t.id) == "s-550", "1.12% entry drift must still link"
 t2 = _fill("short", 60390.0, "2026-06-24T16:34:00+00:00", "o550b")
 assert _linked(t2.id) is None, "signal already claimed"
 
-# 3. a decision AFTER the fill did not cause the fill.
+# 3. a decision shortly AFTER the fill is the SAME intent, logged late.
+#
+#    This assertion was inverted on 2026-07-25. It used to read "decision must
+#    precede fill", inferred from the two hand-linked rows — both of which
+#    happened to be approve-then-execute. Measured across the whole live era the
+#    opposite is the norm: of 27 unlinked fills with a price-compatible approved
+#    signal, 24 had their decision AFTER the fill. He trades, then marks the
+#    signal approved. The old rule encoded a workflow he does not have and held
+#    the link rate at 5 of 40.
 _signal("s-late", "long", 60000.0, "2026-07-01T12:00:00")
 t3 = _fill("long", 60000.0, "2026-07-01T11:00:00+00:00", "o-late")
-assert _linked(t3.id) is None, "decision must precede fill"
+assert _linked(t3.id) == "s-late", "a decision logged 1h after the fill is the same trade"
+
+# 3b. but only just after. The gap distribution clusters inside a few hours and
+#     then jumps to 20h, 60h, 300h+ — those are coincidental price matches, and
+#     inventing links for them would poison the dataset the system exists to
+#     build. A missed link costs one row of evidence; a false link costs the
+#     truth of every number resting on it.
+_signal("s-way-late", "long", 60000.0, "2026-07-03T12:00:00")
+t3b = _fill("long", 60000.0, "2026-07-01T11:00:00+00:00", "o-way-late")
+assert _linked(t3b.id) is None, "a decision 2 days later is not this fill"
+
+# 3c. nearest decision wins, on whichever side of the fill it falls. The old
+#     ORDER BY decided_at DESC took the stalest qualifying signal on the early
+#     side; a decision 10 minutes after the fill is the better match.
+_signal("s-far-before", "short", 50000.0, "2026-07-05T06:00:00")
+_signal("s-just-after", "short", 50000.0, "2026-07-05T10:10:00")
+t3c = _fill("short", 50000.0, "2026-07-05T10:00:00+00:00", "o-nearest")
+assert _linked(t3c.id) == "s-just-after", "nearest decision wins, not the earliest"
 
 # 4. cross-symbol signal quoting a far-away book (the 95234-vs-76655 case).
 _signal("s-far", "short", 95234.5, "2026-05-26T04:51:36")
@@ -83,4 +108,5 @@ assert c.execute("SELECT linked_trade_id FROM signals WHERE signal_id='s-550'"
                  ).fetchone()["linked_trade_id"] == t.id, "signal must point back"
 c.close()
 
-print("ok — 9 checks passed")
+print("ok — signal↔fill linking: symmetric window, nearest decision wins, "
+      "one signal per trade, 12 checks")
