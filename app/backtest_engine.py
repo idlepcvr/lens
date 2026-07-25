@@ -1854,6 +1854,13 @@ def run_custom(params: dict, months: int = 30, initial_capital: float = 637.0) -
     if params.get("ma_align"): bits.append(f"MA-stack {params['ma_align']}")
     if params.get("vol_spike"): bits.append("vol spike")
     if params.get("atr_regime"): bits.append(f"{params['atr_regime']}-vol")
+    # chart structure + HTF — omitting these would describe the strategy as
+    # looser than the one that was actually tested
+    if params.get("pattern"):   bits.append(params["pattern"].replace("_", " "))
+    if params.get("structure"): bits.append(f"structure {params['structure']}")
+    if params.get("breakout"):  bits.append(f"breakout {params['breakout']}")
+    if params.get("htf4h"):     bits.append(f"4h trend {params['htf4h']}")
+    if params.get("htf1d"):     bits.append(f"1d trend {params['htf1d']}")
     if params.get("mayer_max") is not None: bits.append(f"2yMA≤{params['mayer_max']:g}")
     if params.get("mayer_min") is not None: bits.append(f"2yMA≥{params['mayer_min']:g}")
     if params.get("hour_from") is not None and params.get("hour_to") is not None:

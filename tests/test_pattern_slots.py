@@ -88,5 +88,21 @@ assert "pattern" not in plain, "combo_params leaked an unset slot"
 fires = sum(_signal_custom(df, i, plain) is not None for i in range(60, nb))
 assert fires > 0, "a plain trend strategy stopped firing — pattern gate is too eager"
 
+# ── every slot must survive being described ───────────────────────────────
+# A breeder run on 2026-07-25 completed its whole 1h phase — 12 generations,
+# ~14 minutes — and then died with KeyError('htf4h') in _describe while writing
+# results. Every generation was lost to a missing label. Formatting must never
+# be able to kill a search, so: describe every option of every slot.
+from app.strategy_search import _describe   # noqa: E402
+
+for slot, opts in SLOTS.items():
+    for opt in opts:
+        text = _describe("long", {slot: opt}, "1h")
+        assert text and "LONG" in text, f"_describe returned nothing for {slot}={opt}"
+
+# and an unknown slot degrades instead of raising — the guard, not just the fix
+assert _describe("long", {"not_a_slot": "x"}, "1h"), \
+    "_describe must not raise on an unknown slot; a lost run is worse than an ugly label"
+
 print(f"ok — {len(SLOTS)} slots; mask and replay agree on {len(CASES)} pattern combos "
-      f"across {nb} bars")
+      f"across {nb} bars; every slot describable")

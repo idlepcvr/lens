@@ -155,8 +155,17 @@ def _describe(direction, active, tf):
            "hours": lambda o: f"BKK {o[0]:02d}–{o[1]:02d}h",
            "bb": lambda o: "BB " + ("<lower" if o == "below_lower" else ">upper"),
            "td": lambda o: f"TD {o}", "ma_align": lambda o: f"MA-stack {o}",
-           "vol": lambda o: "vol spike", "atr": lambda o: f"{o}-vol"}
-    bits += [lab[s](o) for s, o in active.items()]
+           "vol": lambda o: "vol spike", "atr": lambda o: f"{o}-vol",
+           "pattern": lambda o: o.replace("_", " "),
+           "structure": lambda o: f"structure {o}",
+           "breakout": lambda o: f"breakout {o}",
+           "htf4h": lambda o: f"4h trend {o}",
+           "htf1d": lambda o: f"1d trend {o}"}
+    # A slot with no label must not crash the run. This cost a 14-minute breeder
+    # run on 2026-07-25: the 1h phase completed, then _describe raised KeyError
+    # on the new 'htf4h' slot while writing results, and every generation was
+    # lost. Formatting is not worth a lost search.
+    bits += [lab.get(s, lambda o, s=s: f"{s} {o}")(o) for s, o in active.items()]
     return " · ".join(bits)
 
 
