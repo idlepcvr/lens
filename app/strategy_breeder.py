@@ -348,6 +348,12 @@ def _score_against_baseline(rows, window):
                                  if mine is not None and theirs is not None else None)
         r["beats_baseline"] = bool(r["edge_vs_baseline"] is not None
                                    and r["edge_vs_baseline"] > 0)
+        # beats_baseline alone is NOT a finding, and the w30 run proved it: five
+        # shorts beat their baseline while losing 24-48% of the account. The
+        # baseline is direction-matched, so for shorts in an up-window it is
+        # catastrophic, and "less catastrophic" clears it. A strategy that ends
+        # the window down is not tradeable whatever it beat.
+        r["tradeable"] = bool(r["beats_baseline"] and (r.get("net_pct") or 0) > 0)
 
 
 def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
@@ -400,8 +406,11 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
               "the fitness clamp is doing its job.")
         return result
     n_beat = sum(1 for r in out_rows if r.get("beats_baseline"))
+    n_trade = sum(1 for r in out_rows if r.get("tradeable"))
     print(f"{n_beat} of {len(out_rows)} beat entering EVERY bar at the same "
-          f"geometry — that is the only column that means anything.")
+          f"geometry; {n_trade} of those also END THE WINDOW UP.")
+    print("The second number is the real one. The baseline is direction-matched, "
+          "so a short can beat it by losing less than always-shorting.")
     print(f"{'fit':>9} {'trainR':>7} {'holdR':>7} {'n':>5} {'net%':>7} "
           f"{'edge':>7} {'cond':>4}  desc")
     for r in out_rows[:25]:

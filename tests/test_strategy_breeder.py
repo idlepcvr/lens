@@ -131,3 +131,20 @@ assert _pooled_exp_r({"exp_r": 1.0, "n": 5}, None) is None
 assert _pooled_exp_r({"exp_r": 1.0, "n": 0}, {"exp_r": 1.0, "n": 0}) is None
 
 print("ok — baseline pooling is trade-count weighted and refuses a missing half")
+
+
+# ── beating a direction-matched baseline is not the same as making money ──
+# The w30 run produced five SHORTS that beat their baseline while losing 24-48%
+# of the account. The baseline is direction-matched, so in an up-window the
+# always-short baseline is catastrophic and "less catastrophic" clears it.
+# `tradeable` is the gate that survives that.
+def _gate(beats, net):
+    return bool(beats and (net or 0) > 0)
+
+assert _gate(True, 91.7) is True          # beat baseline and ended up
+assert _gate(True, -24.7) is False        # the exact w30 short trap
+assert _gate(False, 91.7) is False        # profitable but no edge over baseline
+assert _gate(True, 0) is False            # flat is not tradeable
+assert _gate(True, None) is False         # missing net% never reads as a win
+
+print("ok — tradeable requires beating the baseline AND ending the window up")

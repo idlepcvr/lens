@@ -1,0 +1,2462 @@
+{
+ "ran_at": "2026-07-25T10:43:01.195796+00:00",
+ "window": "w30",
+ "months": 30,
+ "data": "Bybit BTC/USDT perp",
+ "capital": 1000.0,
+ "risk": {
+  "risk_pct": 2.0,
+  "leverage": 5.0,
+  "slippage_pct": 0.03,
+  "stop_pct": 1.0,
+  "tp_pct": 2.0
+ },
+ "max_conditions": 6,
+ "min_n_holdout": 40,
+ "population": 60,
+ "generations": 12,
+ "seed": 0,
+ "fitness": "min(train, holdout) of expectancy_R / max(drawdown_R, 1)",
+ "history": {
+  "1h": [
+   {
+    "gen": 1,
+    "best": -0.0023,
+    "viable": 26,
+    "evaluated": 60
+   },
+   {
+    "gen": 2,
+    "best": -0.0023,
+    "viable": 39,
+    "evaluated": 110
+   },
+   {
+    "gen": 3,
+    "best": -0.0023,
+    "viable": 49,
+    "evaluated": 156
+   },
+   {
+    "gen": 4,
+    "best": -0.00063,
+    "viable": 55,
+    "evaluated": 201
+   },
+   {
+    "gen": 5,
+    "best": 0.01896,
+    "viable": 54,
+    "evaluated": 241
+   },
+   {
+    "gen": 6,
+    "best": 0.01896,
+    "viable": 53,
+    "evaluated": 280
+   },
+   {
+    "gen": 7,
+    "best": 0.01896,
+    "viable": 53,
+    "evaluated": 315
+   },
+   {
+    "gen": 8,
+    "best": 0.01896,
+    "viable": 52,
+    "evaluated": 344
+   },
+   {
+    "gen": 9,
+    "best": 0.01896,
+    "viable": 48,
+    "evaluated": 371
+   },
+   {
+    "gen": 10,
+    "best": 0.01896,
+    "viable": 40,
+    "evaluated": 401
+   },
+   {
+    "gen": 11,
+    "best": 0.01959,
+    "viable": 48,
+    "evaluated": 427
+   },
+   {
+    "gen": 12,
+    "best": 0.01959,
+    "viable": 45,
+    "evaluated": 453
+   }
+  ],
+  "4h": [
+   {
+    "gen": 1,
+    "best": -0.00572,
+    "viable": 13,
+    "evaluated": 60
+   },
+   {
+    "gen": 2,
+    "best": 0.00199,
+    "viable": 29,
+    "evaluated": 110
+   },
+   {
+    "gen": 3,
+    "best": 0.00199,
+    "viable": 47,
+    "evaluated": 156
+   },
+   {
+    "gen": 4,
+    "best": 0.00199,
+    "viable": 49,
+    "evaluated": 195
+   },
+   {
+    "gen": 5,
+    "best": 0.00199,
+    "viable": 52,
+    "evaluated": 231
+   },
+   {
+    "gen": 6,
+    "best": 0.00293,
+    "viable": 53,
+    "evaluated": 268
+   },
+   {
+    "gen": 7,
+    "best": 0.00293,
+    "viable": 52,
+    "evaluated": 306
+   },
+   {
+    "gen": 8,
+    "best": 0.00593,
+    "viable": 51,
+    "evaluated": 338
+   },
+   {
+    "gen": 9,
+    "best": 0.00593,
+    "viable": 57,
+    "evaluated": 366
+   },
+   {
+    "gen": 10,
+    "best": 0.00593,
+    "viable": 58,
+    "evaluated": 387
+   },
+   {
+    "gen": 11,
+    "best": 0.00593,
+    "viable": 53,
+    "evaluated": 409
+   },
+   {
+    "gen": 12,
+    "best": 0.0204,
+    "viable": 50,
+    "evaluated": 433
+   }
+  ]
+ },
+ "n_viable": 60,
+ "genomes": [
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 3.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "candle": "bull",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 bull bar \u00b7 trend up \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.0204,
+   "n": 100,
+   "net_pct": 50.2,
+   "train": {
+    "n": 55,
+    "exp_r": 0.2905,
+    "dd_r": 11.33,
+    "score": 0.02564
+   },
+   "holdout": {
+    "n": 45,
+    "exp_r": 0.1786,
+    "dd_r": 8.75,
+    "score": 0.0204
+   },
+   "baseline": {
+    "net_pct": -43.1,
+    "n": 205,
+    "exp_r": -0.1063
+   },
+   "edge_vs_baseline": 0.3464,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "macd": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 MACD bear \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.01959,
+   "n": 105,
+   "net_pct": 91.7,
+   "train": {
+    "n": 57,
+    "exp_r": 0.2709,
+    "dd_r": 13.83,
+    "score": 0.01959
+   },
+   "holdout": {
+    "n": 48,
+    "exp_r": 0.5043,
+    "dd_r": 10.87,
+    "score": 0.04639
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.3355,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.01896,
+   "n": 110,
+   "net_pct": 69.9,
+   "train": {
+    "n": 59,
+    "exp_r": 0.3303,
+    "dd_r": 10.83,
+    "score": 0.03051
+   },
+   "holdout": {
+    "n": 51,
+    "exp_r": 0.2774,
+    "dd_r": 14.62,
+    "score": 0.01896
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.2637,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": 0.01461,
+   "n": 109,
+   "net_pct": 40.8,
+   "train": {
+    "n": 57,
+    "exp_r": 0.2438,
+    "dd_r": 10.35,
+    "score": 0.02356
+   },
+   "holdout": {
+    "n": 52,
+    "exp_r": 0.1368,
+    "dd_r": 9.36,
+    "score": 0.01461
+   },
+   "baseline": {
+    "net_pct": -43.1,
+    "n": 205,
+    "exp_r": -0.1063
+   },
+   "edge_vs_baseline": 0.2991,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "htf4h": "up",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 4h trend up \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00947,
+   "n": 143,
+   "net_pct": 62.6,
+   "train": {
+    "n": 75,
+    "exp_r": 0.2875,
+    "dd_r": 14.88,
+    "score": 0.01933
+   },
+   "holdout": {
+    "n": 68,
+    "exp_r": 0.1765,
+    "dd_r": 18.63,
+    "score": 0.00947
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": 0.2821,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "trend": "up",
+    "structure": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 trend up \u00b7 structure up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00856,
+   "n": 98,
+   "net_pct": 12.9,
+   "train": {
+    "n": 49,
+    "exp_r": 0.1144,
+    "dd_r": 13.37,
+    "score": 0.00856
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": 0.132,
+    "dd_r": 15.03,
+    "score": 0.00878
+   },
+   "baseline": {
+    "net_pct": -74.6,
+    "n": 249,
+    "exp_r": -0.2253
+   },
+   "edge_vs_baseline": 0.3485,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "candle": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 bull bar \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00684,
+   "n": 91,
+   "net_pct": 25.9,
+   "train": {
+    "n": 51,
+    "exp_r": 0.1113,
+    "dd_r": 16.26,
+    "score": 0.00684
+   },
+   "holdout": {
+    "n": 40,
+    "exp_r": 0.2553,
+    "dd_r": 8.82,
+    "score": 0.02893
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.2868,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "structure": "up",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 structure up \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00593,
+   "n": 95,
+   "net_pct": 12.7,
+   "train": {
+    "n": 45,
+    "exp_r": 0.1733,
+    "dd_r": 13.22,
+    "score": 0.01311
+   },
+   "holdout": {
+    "n": 50,
+    "exp_r": 0.0757,
+    "dd_r": 12.76,
+    "score": 0.00593
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.0798,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00593,
+   "n": 95,
+   "net_pct": 27.1,
+   "train": {
+    "n": 52,
+    "exp_r": 0.0961,
+    "dd_r": 16.2,
+    "score": 0.00593
+   },
+   "holdout": {
+    "n": 43,
+    "exp_r": 0.269,
+    "dd_r": 9.64,
+    "score": 0.02791
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.2866,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "htf4h": "up",
+    "trend": "down",
+    "atr_stop_mult": 2.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 4h trend up \u00b7 trend down \u00b7 2.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00513,
+   "n": 85,
+   "net_pct": 15.1,
+   "train": {
+    "n": 41,
+    "exp_r": 0.2205,
+    "dd_r": 7.02,
+    "score": 0.0314
+   },
+   "holdout": {
+    "n": 44,
+    "exp_r": 0.0484,
+    "dd_r": 9.44,
+    "score": 0.00513
+   },
+   "baseline": {
+    "net_pct": -10.9,
+    "n": 132,
+    "exp_r": -0.0005
+   },
+   "edge_vs_baseline": 0.1319,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "macd": "bear",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 MACD bear \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00348,
+   "n": 143,
+   "net_pct": 14.7,
+   "train": {
+    "n": 78,
+    "exp_r": 0.1422,
+    "dd_r": 18.45,
+    "score": 0.00771
+   },
+   "holdout": {
+    "n": 65,
+    "exp_r": 0.0685,
+    "dd_r": 19.68,
+    "score": 0.00348
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": 0.1561,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "structure": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 structure up \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00293,
+   "n": 140,
+   "net_pct": 2.7,
+   "train": {
+    "n": 70,
+    "exp_r": 0.0443,
+    "dd_r": 15.12,
+    "score": 0.00293
+   },
+   "holdout": {
+    "n": 70,
+    "exp_r": 0.0707,
+    "dd_r": 12.82,
+    "score": 0.00551
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.2691,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "trend": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 trend up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00207,
+   "n": 140,
+   "net_pct": 47.1,
+   "train": {
+    "n": 67,
+    "exp_r": 0.3849,
+    "dd_r": 12.16,
+    "score": 0.03164
+   },
+   "holdout": {
+    "n": 73,
+    "exp_r": 0.0352,
+    "dd_r": 16.97,
+    "score": 0.00207
+   },
+   "baseline": {
+    "net_pct": -74.6,
+    "n": 249,
+    "exp_r": -0.2253
+   },
+   "edge_vs_baseline": 0.4278,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00199,
+   "n": 163,
+   "net_pct": 0.2,
+   "train": {
+    "n": 80,
+    "exp_r": 0.0662,
+    "dd_r": 15.2,
+    "score": 0.00436
+   },
+   "holdout": {
+    "n": 83,
+    "exp_r": 0.0301,
+    "dd_r": 15.1,
+    "score": 0.00199
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.2594,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.0013,
+   "n": 132,
+   "net_pct": 39.5,
+   "train": {
+    "n": 66,
+    "exp_r": 0.3287,
+    "dd_r": 10.59,
+    "score": 0.03103
+   },
+   "holdout": {
+    "n": 66,
+    "exp_r": 0.0204,
+    "dd_r": 15.68,
+    "score": 0.0013
+   },
+   "baseline": {
+    "net_pct": -1.4,
+    "n": 78,
+    "exp_r": 0.0343
+   },
+   "edge_vs_baseline": 0.1403,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": 0.00124,
+   "n": 76,
+   "net_pct": 46.9,
+   "train": {
+    "n": 32,
+    "exp_r": 0.7325,
+    "dd_r": 7.45,
+    "score": 0.09831
+   },
+   "holdout": {
+    "n": 44,
+    "exp_r": 0.0157,
+    "dd_r": 12.65,
+    "score": 0.00124
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.2754,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 BKK 14\u201318h \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": 0.00068,
+   "n": 189,
+   "net_pct": -3.8,
+   "train": {
+    "n": 95,
+    "exp_r": 0.0623,
+    "dd_r": 17.25,
+    "score": 0.00361
+   },
+   "holdout": {
+    "n": 94,
+    "exp_r": 0.0124,
+    "dd_r": 18.2,
+    "score": 0.00068
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.2491,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "htf4h": "up",
+    "atr_stop_mult": 3.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 4h trend up \u00b7 3.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00053,
+   "n": 165,
+   "net_pct": -0.9,
+   "train": {
+    "n": 89,
+    "exp_r": 0.0651,
+    "dd_r": 12.51,
+    "score": 0.0052
+   },
+   "holdout": {
+    "n": 76,
+    "exp_r": -0.0097,
+    "dd_r": 18.42,
+    "score": -0.00053
+   },
+   "baseline": {
+    "net_pct": -35.3,
+    "n": 143,
+    "exp_r": -0.1218
+   },
+   "edge_vs_baseline": 0.1524,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00063,
+   "n": 82,
+   "net_pct": 42.8,
+   "train": {
+    "n": 37,
+    "exp_r": 0.632,
+    "dd_r": 7.73,
+    "score": 0.08181
+   },
+   "holdout": {
+    "n": 45,
+    "exp_r": -0.0084,
+    "dd_r": 13.42,
+    "score": -0.00063
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.2384,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00117,
+   "n": 108,
+   "net_pct": 14.9,
+   "train": {
+    "n": 54,
+    "exp_r": 0.2399,
+    "dd_r": 11.02,
+    "score": 0.02177
+   },
+   "holdout": {
+    "n": 54,
+    "exp_r": -0.0183,
+    "dd_r": 15.73,
+    "score": -0.00117
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.223,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00119,
+   "n": 129,
+   "net_pct": 19.4,
+   "train": {
+    "n": 56,
+    "exp_r": 0.3236,
+    "dd_r": 9.85,
+    "score": 0.03286
+   },
+   "holdout": {
+    "n": 73,
+    "exp_r": -0.022,
+    "dd_r": 18.45,
+    "score": -0.00119
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": 0.1754,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00236,
+   "n": 105,
+   "net_pct": 21.7,
+   "train": {
+    "n": 46,
+    "exp_r": 0.3925,
+    "dd_r": 12.58,
+    "score": 0.0312
+   },
+   "holdout": {
+    "n": 59,
+    "exp_r": -0.0325,
+    "dd_r": 13.78,
+    "score": -0.00236
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": 0.2011,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "candle": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 4h trend up \u00b7 bull bar \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00385,
+   "n": 101,
+   "net_pct": 15.3,
+   "train": {
+    "n": 54,
+    "exp_r": 0.2915,
+    "dd_r": 11.27,
+    "score": 0.02586
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": -0.0585,
+    "dd_r": 15.2,
+    "score": -0.00385
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.0865,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "rsi_min": 60,
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 RSI\u226560 \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00407,
+   "n": 152,
+   "net_pct": -1.0,
+   "train": {
+    "n": 78,
+    "exp_r": 0.1649,
+    "dd_r": 14.32,
+    "score": 0.01152
+   },
+   "holdout": {
+    "n": 74,
+    "exp_r": -0.0826,
+    "dd_r": 20.31,
+    "score": -0.00407
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.256,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00432,
+   "n": 159,
+   "net_pct": -13.6,
+   "train": {
+    "n": 74,
+    "exp_r": 0.0721,
+    "dd_r": 13.93,
+    "score": 0.00518
+   },
+   "holdout": {
+    "n": 85,
+    "exp_r": -0.0879,
+    "dd_r": 20.36,
+    "score": -0.00432
+   },
+   "baseline": {
+    "net_pct": -47.9,
+    "n": 206,
+    "exp_r": -0.1275
+   },
+   "edge_vs_baseline": 0.1141,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_regime": "low",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 BKK 14\u201318h \u00b7 low-vol \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00457,
+   "n": 129,
+   "net_pct": -11.6,
+   "train": {
+    "n": 68,
+    "exp_r": -0.1071,
+    "dd_r": 23.44,
+    "score": -0.00457
+   },
+   "holdout": {
+    "n": 61,
+    "exp_r": 0.142,
+    "dd_r": 14.09,
+    "score": 0.01008
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": 0.0581,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00468,
+   "n": 170,
+   "net_pct": 7.9,
+   "train": {
+    "n": 82,
+    "exp_r": 0.2685,
+    "dd_r": 13.48,
+    "score": 0.01991
+   },
+   "holdout": {
+    "n": 88,
+    "exp_r": -0.094,
+    "dd_r": 20.1,
+    "score": -0.00468
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.0387,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00591,
+   "n": 182,
+   "net_pct": -36.8,
+   "train": {
+    "n": 86,
+    "exp_r": 0.027,
+    "dd_r": 18.62,
+    "score": 0.00145
+   },
+   "holdout": {
+    "n": 96,
+    "exp_r": -0.1582,
+    "dd_r": 26.76,
+    "score": -0.00591
+   },
+   "baseline": {
+    "net_pct": -74.6,
+    "n": 249,
+    "exp_r": -0.2253
+   },
+   "edge_vs_baseline": 0.1546,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "down",
+    "macd": "bull",
+    "candle": "bear",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend down \u00b7 MACD bull \u00b7 bear bar \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00596,
+   "n": 89,
+   "net_pct": -7.8,
+   "train": {
+    "n": 40,
+    "exp_r": 0.0955,
+    "dd_r": 9.98,
+    "score": 0.00957
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": -0.082,
+    "dd_r": 13.76,
+    "score": -0.00596
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.11,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00641,
+   "n": 222,
+   "net_pct": -42.8,
+   "train": {
+    "n": 106,
+    "exp_r": 0.0434,
+    "dd_r": 17.49,
+    "score": 0.00248
+   },
+   "holdout": {
+    "n": 116,
+    "exp_r": -0.1949,
+    "dd_r": 30.41,
+    "score": -0.00641
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.1305,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "vol_spike": true,
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 vol spike \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00722,
+   "n": 135,
+   "net_pct": -10.8,
+   "train": {
+    "n": 69,
+    "exp_r": 0.1415,
+    "dd_r": 14.67,
+    "score": 0.00965
+   },
+   "holdout": {
+    "n": 66,
+    "exp_r": -0.1377,
+    "dd_r": 19.08,
+    "score": -0.00722
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": 0.2166,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "structure": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 structure up \u00b7 1.0\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00792,
+   "n": 218,
+   "net_pct": -59.2,
+   "train": {
+    "n": 106,
+    "exp_r": -0.1478,
+    "dd_r": 20.63,
+    "score": -0.00716
+   },
+   "holdout": {
+    "n": 112,
+    "exp_r": -0.1968,
+    "dd_r": 24.84,
+    "score": -0.00792
+   },
+   "baseline": {
+    "net_pct": -87.0,
+    "n": 459,
+    "exp_r": -0.1909
+   },
+   "edge_vs_baseline": 0.018,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00819,
+   "n": 214,
+   "net_pct": -26.0,
+   "train": {
+    "n": 106,
+    "exp_r": 0.132,
+    "dd_r": 16.55,
+    "score": 0.00798
+   },
+   "holdout": {
+    "n": 108,
+    "exp_r": -0.1817,
+    "dd_r": 22.19,
+    "score": -0.00819
+   },
+   "baseline": {
+    "net_pct": -1.4,
+    "n": 78,
+    "exp_r": 0.0343
+   },
+   "edge_vs_baseline": -0.0606,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "structure": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 structure up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.00889,
+   "n": 134,
+   "net_pct": -28.0,
+   "train": {
+    "n": 68,
+    "exp_r": 0.081,
+    "dd_r": 15.67,
+    "score": 0.00517
+   },
+   "holdout": {
+    "n": 66,
+    "exp_r": -0.2184,
+    "dd_r": 24.58,
+    "score": -0.00889
+   },
+   "baseline": {
+    "net_pct": -74.6,
+    "n": 249,
+    "exp_r": -0.2253
+   },
+   "edge_vs_baseline": 0.1588,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.00916,
+   "n": 136,
+   "net_pct": -12.1,
+   "train": {
+    "n": 69,
+    "exp_r": 0.1524,
+    "dd_r": 15.01,
+    "score": 0.01016
+   },
+   "holdout": {
+    "n": 67,
+    "exp_r": -0.1651,
+    "dd_r": 18.04,
+    "score": -0.00916
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.1082,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 3.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "candle": "bull",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 bull bar \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.00951,
+   "n": 203,
+   "net_pct": -58.4,
+   "train": {
+    "n": 102,
+    "exp_r": -0.2523,
+    "dd_r": 26.51,
+    "score": -0.00951
+   },
+   "holdout": {
+    "n": 101,
+    "exp_r": -0.1195,
+    "dd_r": 17.78,
+    "score": -0.00672
+   },
+   "baseline": {
+    "net_pct": -64.8,
+    "n": 248,
+    "exp_r": -0.181
+   },
+   "edge_vs_baseline": -0.0053,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "hour_from": 14,
+    "hour_to": 18,
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 BKK 14\u201318h \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01129,
+   "n": 145,
+   "net_pct": -48.2,
+   "train": {
+    "n": 75,
+    "exp_r": -0.0561,
+    "dd_r": 17.73,
+    "score": -0.00317
+   },
+   "holdout": {
+    "n": 70,
+    "exp_r": -0.3076,
+    "dd_r": 27.24,
+    "score": -0.01129
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": -0.1301,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 4,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "hour_from": 6,
+    "hour_to": 11,
+    "htf4h": "up",
+    "macd": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 low-vol \u00b7 BKK 06\u201311h \u00b7 4h trend up \u00b7 MACD bear \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01169,
+   "n": 106,
+   "net_pct": -43.3,
+   "train": {
+    "n": 57,
+    "exp_r": -0.2598,
+    "dd_r": 24.84,
+    "score": -0.01046
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": -0.1695,
+    "dd_r": 14.49,
+    "score": -0.01169
+   },
+   "baseline": {
+    "net_pct": -45.4,
+    "n": 96,
+    "exp_r": -0.2719
+   },
+   "edge_vs_baseline": 0.0538,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bear",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend up \u00b7 MACD bear \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01309,
+   "n": 94,
+   "net_pct": -20.2,
+   "train": {
+    "n": 45,
+    "exp_r": 0.066,
+    "dd_r": 14.49,
+    "score": 0.00455
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": -0.2099,
+    "dd_r": 16.04,
+    "score": -0.01309
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": 0.0344,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01339,
+   "n": 256,
+   "net_pct": -85.5,
+   "train": {
+    "n": 139,
+    "exp_r": -0.2338,
+    "dd_r": 29.76,
+    "score": -0.00786
+   },
+   "holdout": {
+    "n": 117,
+    "exp_r": -0.4624,
+    "dd_r": 34.53,
+    "score": -0.01339
+   },
+   "baseline": {
+    "net_pct": -87.0,
+    "n": 405,
+    "exp_r": -0.2107
+   },
+   "edge_vs_baseline": -0.1276,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01343,
+   "n": 194,
+   "net_pct": -74.5,
+   "train": {
+    "n": 106,
+    "exp_r": -0.2596,
+    "dd_r": 26.51,
+    "score": -0.00979
+   },
+   "holdout": {
+    "n": 88,
+    "exp_r": -0.3774,
+    "dd_r": 28.11,
+    "score": -0.01343
+   },
+   "baseline": {
+    "net_pct": -87.0,
+    "n": 405,
+    "exp_r": -0.2107
+   },
+   "edge_vs_baseline": -0.1024,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 3.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "macd": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 3.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 MACD bull \u00b7 2.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01385,
+   "n": 86,
+   "net_pct": -17.0,
+   "train": {
+    "n": 45,
+    "exp_r": -0.0147,
+    "dd_r": 12.2,
+    "score": -0.0012
+   },
+   "holdout": {
+    "n": 41,
+    "exp_r": -0.1479,
+    "dd_r": 10.68,
+    "score": -0.01385
+   },
+   "baseline": {
+    "net_pct": 6.9,
+    "n": 65,
+    "exp_r": 0.0831
+   },
+   "edge_vs_baseline": -0.1614,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01492,
+   "n": 166,
+   "net_pct": -71.0,
+   "train": {
+    "n": 85,
+    "exp_r": -0.2443,
+    "dd_r": 25.17,
+    "score": -0.00971
+   },
+   "holdout": {
+    "n": 81,
+    "exp_r": -0.4122,
+    "dd_r": 27.62,
+    "score": -0.01492
+   },
+   "baseline": {
+    "net_pct": -55.8,
+    "n": 151,
+    "exp_r": -0.2242
+   },
+   "edge_vs_baseline": -0.102,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "candle": "bull",
+    "trend": "down",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 bull bar \u00b7 trend down \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01515,
+   "n": 93,
+   "net_pct": -30.5,
+   "train": {
+    "n": 45,
+    "exp_r": -0.0381,
+    "dd_r": 10.88,
+    "score": -0.0035
+   },
+   "holdout": {
+    "n": 48,
+    "exp_r": -0.2668,
+    "dd_r": 17.61,
+    "score": -0.01515
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": -0.0439,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "down",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend down \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01527,
+   "n": 91,
+   "net_pct": -26.7,
+   "train": {
+    "n": 42,
+    "exp_r": 0.0387,
+    "dd_r": 9.94,
+    "score": 0.00389
+   },
+   "holdout": {
+    "n": 49,
+    "exp_r": -0.2766,
+    "dd_r": 18.12,
+    "score": -0.01527
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": -0.0189,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "structure": "down",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 structure down \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01577,
+   "n": 103,
+   "net_pct": -24.7,
+   "train": {
+    "n": 56,
+    "exp_r": 0.0843,
+    "dd_r": 15.04,
+    "score": 0.0056
+   },
+   "holdout": {
+    "n": 47,
+    "exp_r": -0.2832,
+    "dd_r": 17.96,
+    "score": -0.01577
+   },
+   "baseline": {
+    "net_pct": -45.4,
+    "n": 96,
+    "exp_r": -0.2719
+   },
+   "edge_vs_baseline": 0.1885,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MA-stack bull \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01594,
+   "n": 134,
+   "net_pct": -61.4,
+   "train": {
+    "n": 71,
+    "exp_r": -0.2465,
+    "dd_r": 20.44,
+    "score": -0.01206
+   },
+   "holdout": {
+    "n": 63,
+    "exp_r": -0.3839,
+    "dd_r": 24.08,
+    "score": -0.01594
+   },
+   "baseline": {
+    "net_pct": -55.8,
+    "n": 151,
+    "exp_r": -0.2242
+   },
+   "edge_vs_baseline": -0.0869,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "macd": "bull",
+    "rsi_min": 60,
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 MACD bull \u00b7 RSI\u226560 \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01663,
+   "n": 134,
+   "net_pct": -38.8,
+   "train": {
+    "n": 63,
+    "exp_r": 0.2021,
+    "dd_r": 14.7,
+    "score": 0.01375
+   },
+   "holdout": {
+    "n": 71,
+    "exp_r": -0.4487,
+    "dd_r": 26.99,
+    "score": -0.01663
+   },
+   "baseline": {
+    "net_pct": -33.4,
+    "n": 133,
+    "exp_r": -0.1122
+   },
+   "edge_vs_baseline": -0.0305,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 3.0,
+   "conditions": 4,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "structure": "up",
+    "candle": "bull",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 3.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 structure up \u00b7 bull bar \u00b7 trend up \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 3.0R",
+   "fitness": -0.01681,
+   "n": 111,
+   "net_pct": -34.1,
+   "train": {
+    "n": 53,
+    "exp_r": -0.2573,
+    "dd_r": 15.31,
+    "score": -0.01681
+   },
+   "holdout": {
+    "n": 58,
+    "exp_r": -0.0658,
+    "dd_r": 9.57,
+    "score": -0.00687
+   },
+   "baseline": {
+    "net_pct": -64.8,
+    "n": 248,
+    "exp_r": -0.181
+   },
+   "edge_vs_baseline": 0.0237,
+   "beats_baseline": true
+  },
+  {
+   "tf": "4h",
+   "direction": "long",
+   "k": 1.0,
+   "rr": 4.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "4h",
+    "trend": "down",
+    "atr_stop_mult": 1.0,
+    "rr": 4.0
+   },
+   "desc": "LONG \u00b7 4h \u00b7 trend down \u00b7 1.0\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01692,
+   "n": 162,
+   "net_pct": -65.1,
+   "train": {
+    "n": 79,
+    "exp_r": -0.0037,
+    "dd_r": 14.65,
+    "score": -0.00025
+   },
+   "holdout": {
+    "n": 83,
+    "exp_r": -0.5548,
+    "dd_r": 32.79,
+    "score": -0.01692
+   },
+   "baseline": {
+    "net_pct": -79.7,
+    "n": 315,
+    "exp_r": -0.2116
+   },
+   "edge_vs_baseline": -0.0744,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "hour_from": 19,
+    "hour_to": 23,
+    "trend": "up",
+    "structure": "up",
+    "atr_stop_mult": 1.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 BKK 19\u201323h \u00b7 trend up \u00b7 structure up \u00b7 1.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01716,
+   "n": 133,
+   "net_pct": -63.8,
+   "train": {
+    "n": 68,
+    "exp_r": -0.4304,
+    "dd_r": 25.08,
+    "score": -0.01716
+   },
+   "holdout": {
+    "n": 65,
+    "exp_r": -0.2338,
+    "dd_r": 19.34,
+    "score": -0.01209
+   },
+   "baseline": {
+    "net_pct": -77.2,
+    "n": 315,
+    "exp_r": -0.1834
+   },
+   "edge_vs_baseline": -0.1509,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 4.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "macd": "bull",
+    "atr_stop_mult": 1.5,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 MACD bull \u00b7 1.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.01781,
+   "n": 125,
+   "net_pct": -54.0,
+   "train": {
+    "n": 73,
+    "exp_r": -0.2716,
+    "dd_r": 23.26,
+    "score": -0.01168
+   },
+   "holdout": {
+    "n": 52,
+    "exp_r": -0.2757,
+    "dd_r": 15.48,
+    "score": -0.01781
+   },
+   "baseline": {
+    "net_pct": -60.0,
+    "n": 172,
+    "exp_r": -0.2291
+   },
+   "edge_vs_baseline": -0.0442,
+   "beats_baseline": false
+  },
+  {
+   "tf": "4h",
+   "direction": "short",
+   "k": 1.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "4h",
+    "trend": "up",
+    "atr_stop_mult": 1.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 4h \u00b7 trend up \u00b7 1.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.0179,
+   "n": 126,
+   "net_pct": -51.2,
+   "train": {
+    "n": 73,
+    "exp_r": -0.1678,
+    "dd_r": 18.94,
+    "score": -0.00886
+   },
+   "holdout": {
+    "n": 53,
+    "exp_r": -0.3332,
+    "dd_r": 18.62,
+    "score": -0.0179
+   },
+   "baseline": {
+    "net_pct": -46.7,
+    "n": 146,
+    "exp_r": -0.1681
+   },
+   "edge_vs_baseline": -0.0693,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 2,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01826,
+   "n": 130,
+   "net_pct": -48.5,
+   "train": {
+    "n": 71,
+    "exp_r": -0.0966,
+    "dd_r": 21.33,
+    "score": -0.00453
+   },
+   "holdout": {
+    "n": 59,
+    "exp_r": -0.3373,
+    "dd_r": 18.47,
+    "score": -0.01826
+   },
+   "baseline": {
+    "net_pct": -45.4,
+    "n": 96,
+    "exp_r": -0.2719
+   },
+   "edge_vs_baseline": 0.0661,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "atr_regime": "low",
+    "htf4h": "up",
+    "trend": "down",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 low-vol \u00b7 4h trend up \u00b7 trend down \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01837,
+   "n": 93,
+   "net_pct": -43.2,
+   "train": {
+    "n": 48,
+    "exp_r": -0.2576,
+    "dd_r": 17.98,
+    "score": -0.01433
+   },
+   "holdout": {
+    "n": 45,
+    "exp_r": -0.2481,
+    "dd_r": 13.51,
+    "score": -0.01837
+   },
+   "baseline": {
+    "net_pct": -55.8,
+    "n": 151,
+    "exp_r": -0.2242
+   },
+   "edge_vs_baseline": -0.0288,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01842,
+   "n": 99,
+   "net_pct": -45.3,
+   "train": {
+    "n": 58,
+    "exp_r": -0.3087,
+    "dd_r": 18.42,
+    "score": -0.01676
+   },
+   "holdout": {
+    "n": 41,
+    "exp_r": -0.1907,
+    "dd_r": 10.35,
+    "score": -0.01842
+   },
+   "baseline": {
+    "net_pct": -45.4,
+    "n": 96,
+    "exp_r": -0.2719
+   },
+   "edge_vs_baseline": 0.0121,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "ma_align": "bull",
+    "htf4h": "up",
+    "macd": "bear",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 MA-stack bull \u00b7 4h trend up \u00b7 MACD bear \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.01871,
+   "n": 79,
+   "net_pct": 7.5,
+   "train": {
+    "n": 31,
+    "exp_r": 0.5955,
+    "dd_r": 6.58,
+    "score": 0.09046
+   },
+   "holdout": {
+    "n": 48,
+    "exp_r": -0.2139,
+    "dd_r": 11.43,
+    "score": -0.01871
+   },
+   "baseline": {
+    "net_pct": -1.3,
+    "n": 57,
+    "exp_r": 0.0421
+   },
+   "edge_vs_baseline": 0.0616,
+   "beats_baseline": true
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 3.0,
+   "rr": 5.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "ma_align": "bull",
+    "atr_stop_mult": 3.0,
+    "rr": 5.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 MA-stack bull \u00b7 3.0\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.02095,
+   "n": 123,
+   "net_pct": -56.4,
+   "train": {
+    "n": 67,
+    "exp_r": -0.2047,
+    "dd_r": 22.7,
+    "score": -0.00902
+   },
+   "holdout": {
+    "n": 56,
+    "exp_r": -0.3956,
+    "dd_r": 18.89,
+    "score": -0.02095
+   },
+   "baseline": {
+    "net_pct": -45.4,
+    "n": 96,
+    "exp_r": -0.2719
+   },
+   "edge_vs_baseline": -0.0197,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "short",
+   "k": 2.5,
+   "rr": 4.0,
+   "conditions": 3,
+   "params": {
+    "direction": "short",
+    "timeframe": "1h",
+    "htf4h": "up",
+    "atr_regime": "low",
+    "trend": "down",
+    "atr_stop_mult": 2.5,
+    "rr": 4.0
+   },
+   "desc": "SHORT \u00b7 1h \u00b7 4h trend up \u00b7 low-vol \u00b7 trend down \u00b7 2.5\u00d7ATR stop \u00b7 4.0R",
+   "fitness": -0.02097,
+   "n": 94,
+   "net_pct": -50.1,
+   "train": {
+    "n": 48,
+    "exp_r": -0.3201,
+    "dd_r": 17.8,
+    "score": -0.01798
+   },
+   "holdout": {
+    "n": 46,
+    "exp_r": -0.341,
+    "dd_r": 16.26,
+    "score": -0.02097
+   },
+   "baseline": {
+    "net_pct": -61.5,
+    "n": 207,
+    "exp_r": -0.1912
+   },
+   "edge_vs_baseline": -0.1392,
+   "beats_baseline": false
+  },
+  {
+   "tf": "1h",
+   "direction": "long",
+   "k": 2.5,
+   "rr": 5.0,
+   "conditions": 1,
+   "params": {
+    "direction": "long",
+    "timeframe": "1h",
+    "trend": "down",
+    "atr_stop_mult": 2.5,
+    "rr": 5.0
+   },
+   "desc": "LONG \u00b7 1h \u00b7 trend down \u00b7 2.5\u00d7ATR stop \u00b7 5.0R",
+   "fitness": -0.02173,
+   "n": 85,
+   "net_pct": -21.9,
+   "train": {
+    "n": 45,
+    "exp_r": 0.2039,
+    "dd_r": 10.51,
+    "score": 0.0194
+   },
+   "holdout": {
+    "n": 40,
+    "exp_r": -0.4321,
+    "dd_r": 19.88,
+    "score": -0.02173
+   },
+   "baseline": {
+    "net_pct": -20.2,
+    "n": 113,
+    "exp_r": -0.0474
+   },
+   "edge_vs_baseline": -0.048,
+   "beats_baseline": false
+  }
+ ]
+}
