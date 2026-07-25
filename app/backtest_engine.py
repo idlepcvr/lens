@@ -190,7 +190,14 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["mult200w"] = (daily_close / ma1400).reindex(df.index, method="ffill")
 
     # 4H resampled EMAs (for 1H MTF signals — ffill each 4H bar into its 4 child 1H bars)
-    h4_close      = c.resample("4h").last()
+    #
+    # ⚠ The .shift(1) is a LOOKAHEAD FIX (2026-07-25). A 4h bar labelled T spans
+    # T..T+4h and its .last() is the close at T+3h. Reindexing that onto the 1h
+    # index by ffill handed the bars at T, T+1h and T+2h a close that had not
+    # happened yet — three of every four bars knew their own 4h outcome. Shifting
+    # one HTF bar means a 1h bar sees only the last CLOSED 4h bar, which is all a
+    # live trader can see. Same rule as app/patterns.htf_trend().
+    h4_close      = c.resample("4h").last().shift(1)
     df["h4_ema21"] = h4_close.ewm(span=21, adjust=False).mean().reindex(df.index, method="ffill")
     df["h4_ema50"] = h4_close.ewm(span=50, adjust=False).mean().reindex(df.index, method="ffill")
     df["h4_close"] = h4_close.reindex(df.index, method="ffill")
@@ -212,6 +219,13 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Rolling structure highs/lows (for TREND_4R breakout)
     df["hi20"] = df["high"].shift(1).rolling(20).max()
     df["lo20"] = df["low"].shift(1).rolling(20).min()
+
+    # Chart patterns + HTF trend as columns, so a strategy the search finds can
+    # be REPLAYED by _signal_custom bar-by-bar. Without these the new slots
+    # would be discoverable but not tradeable. ~0.4s per 22k bars.
+    from .patterns import pattern_masks
+    for (slot, opt), arr in pattern_masks(df).items():
+        df[f"pat_{slot}_{opt}"] = arr
 
     return df
 
@@ -1597,6 +1611,17 @@ def _signal_custom(df, i, params):
     if my_min is not None and not (row["mayer2y"] == row["mayer2y"]
                                    and row["mayer2y"] >= my_min):
         return None
+    # chart structure + HTF trend — columns added by add_indicators(); a missing
+    # column means an older cached frame, and an unmet condition must FAIL the
+    # entry rather than silently pass, or the replay is looser than the search.
+    for slot in ("pattern", "structure", "breakout", "htf4h", "htf1d"):
+        opt = params.get(slot)
+        if opt is None:
+            continue
+        col = f"pat_{slot}_{opt}"
+        if col not in df.columns or not bool(row[col]):
+            return None
+
     hf, ht = params.get("hour_from"), params.get("hour_to")
     if hf is not None and ht is not None:
         h = (df.index[i].hour + 7) % 24     # Bangkok hour (UTC+7, no DST)
@@ -1642,6 +1667,15 @@ def to_pinescript(params: dict) -> str:
         hf, ht = p["hour_from"], p["hour_to"]
         conds.append(f"bkkHour >= {hf} and bkkHour <= {ht}" if hf <= ht
                      else f"(bkkHour >= {hf} or bkkHour <= {ht})")
+    # ponytail: pattern/HTF conditions are not translated to Pine yet. Silently
+    # dropping them would export a LOOSER strategy than the one that was tested
+    # — it would fire more often on TradingView than in the backtest and read as
+    # a charting discrepancy rather than a missing condition. Say so in the
+    # script instead. Upgrade path: port app/patterns.py to Pine (ta.pivothigh /
+    # ta.pivotlow and request.security for the HTF trend).
+    untranslated = [f"{s}={p[s]}" for s in
+                    ("pattern", "structure", "breakout", "htf4h", "htf1d")
+                    if p.get(s) is not None]
     cond_str = " and ".join(conds) if conds else "true"
 
     title = " · ".join([direction.upper(), p.get("timeframe", "1h")] + conds[:3])
@@ -1666,8 +1700,14 @@ def to_pinescript(params: dict) -> str:
     sl_price = "close * (1 - effSl)" if long_ else "close * (1 + effSl)"
     tp_price = "close * (1 + effTp)" if long_ else "close * (1 - effTp)"
 
+    warning = ("" if not untranslated else
+               "// ⚠ INCOMPLETE EXPORT — these conditions are NOT in this script:\n"
+               + "".join(f"//     {u}\n" for u in untranslated)
+               + "//   This Pine will fire MORE OFTEN than the LENS backtest.\n"
+               "//   Do not read a difference as a charting bug — it is this.\n\n")
+
     return f'''//@version=5
-strategy("LENS · {title}", overlay=true, initial_capital=1000,
+{warning}strategy("LENS · {title}", overlay=true, initial_capital=1000,
      default_qty_type=strategy.percent_of_equity, default_qty_value=100,
      commission_type=strategy.commission.percent, commission_value=0.15,
      process_orders_on_close=true)

@@ -14,6 +14,7 @@ import time
 import numpy as np
 
 from .backtest_engine import load_ohlcv, add_indicators, _run_backtest
+from .patterns import PATTERN_SLOTS
 from .strategy_search import (CAPITAL, MIN_N, MAX_CONDS, SLOTS, _masks,
                               _combo_mask, _sig_fn, combo_params, _describe, _eval)
 from .strategy_search3 import RISK, FINE_K, FINE_R
@@ -64,12 +65,25 @@ def _grid(vals, lo, hi):
 
 def _blank_slots(req, pins):
     """Slots to sweep = every slot not pinned. RSI/hours count as pinned when
-    the user set them (handled by the base mask), so drop them from the sweep."""
+    the user set them (handled by the base mask), so drop them from the sweep.
+
+    Pattern/HTF slots are excluded unless explicitly asked for. The /edge form
+    has no field to pin them, so sweeping them would mean every interactive
+    search silently explores conditions the user cannot see or switch off — and
+    multiplies the eval count against the cap (a fully-specified combo went from
+    1 cell to 131). The research pipeline (grid search + breeder) reads SLOTS
+    directly and does get the new vocabulary.
+
+    ponytail: opt-in flag rather than UI work. Upgrade path — add the five
+    selects to the /edge form, then default `patterns` to True and delete this.
+    """
     free = set(pins)
     if req.get("rsi_max") is not None or req.get("rsi_min") is not None:
         free.add("rsi")
     if req.get("hour_from") is not None and req.get("hour_to") is not None:
         free.add("hours")
+    if not req.get("patterns"):
+        free |= set(PATTERN_SLOTS)
     return [s for s in SLOTS if s not in free]
 
 

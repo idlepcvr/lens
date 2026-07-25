@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest_engine import load_ohlcv, add_indicators, _run_backtest
+from .patterns import PATTERN_SLOTS, pattern_masks
 from .paths import SEARCH_JSON
 
 CAPITAL    = 1000.0
@@ -65,6 +66,12 @@ SLOTS = {
     "atr":      ["low", "high"],
 }
 
+# Chart structure + higher-timeframe trend (see app/patterns.py). Merged rather
+# than written inline so the vocabulary sits next to the code that computes it.
+# This takes the grid search from 2,934 combos to 9,694 (×3.3) at MAX_CONDS=3;
+# the breeder samples randomly so it pays nothing for the extra slots.
+SLOTS.update(PATTERN_SLOTS)
+
 
 def _masks(df) -> dict:
     """Vectorized condition arrays — one pass, then every combo is ANDs."""
@@ -93,6 +100,7 @@ def _masks(df) -> dict:
     }
     for hf, ht in SLOTS["hours"]:
         m[("hours", (hf, ht))] = ((hour_bkk >= hf) & (hour_bkk <= ht))
+    m.update(pattern_masks(df))
     return m
 
 

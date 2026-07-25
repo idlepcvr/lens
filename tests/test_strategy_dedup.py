@@ -24,7 +24,11 @@ for r in (1, 2, 3):
             back = _active(combo_params("long", active, "4h"))
             assert back == active, f"roundtrip lost {active} → {back}"
             checked += 1
-assert checked == 1467, f"slot space changed: {checked} combos, expected 1467"
+# 1467 → 4847 on 2026-07-25, when the five pattern/HTF slots joined SLOTS.
+# The roundtrip above passed on every one of them unchanged, which is the part
+# that matters: combo_params/_active handle the new slots generically. This
+# number is a canary for "the vocabulary moved" — update it deliberately.
+assert checked == 4847, f"slot space changed: {checked} combos, expected 4847"
 
 # an rsi_min combo must not come back as rsi_max, and vice versa
 assert _active({"rsi_min": 70}) == {"rsi": ("rsi_min", 70)}
