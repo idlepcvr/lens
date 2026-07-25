@@ -110,3 +110,24 @@ assert _key(g1) != _key({**g1, "rr": 5.0}), "geometry dropped from identity"
 print("ok — drawdown penalty bites, the out-of-sample clamp kills curve-fits "
       "and thin holdouts, genome ops respect MAX_CONDS/grids/1d, cache key "
       "is order-free and geometry-aware")
+
+
+# ── the baseline gate (added 2026-07-25) ─────────────────────────────────
+# The breeder had NO baseline. Its 7-year run returned 65 long genomes out of
+# 78 over a period when BTC rose ~10x, and that read as a finding. It was not:
+# measured after adding this, 0 of 74 beat buy-and-hold (best +325% vs +702%).
+from app.strategy_breeder import _pooled_exp_r   # noqa: E402
+
+# weighted by trade count, not a plain mean — halves are split by TIME and
+# rarely hold the same number of trades
+assert _pooled_exp_r({"exp_r": 1.0, "n": 90}, {"exp_r": 0.0, "n": 10}) == 0.9
+assert _pooled_exp_r({"exp_r": 1.0, "n": 10}, {"exp_r": 0.0, "n": 90}) == 0.1
+# a plain mean would call both of those 0.5 — that is the bug being prevented
+assert _pooled_exp_r({"exp_r": 1.0, "n": 50}, {"exp_r": 0.0, "n": 50}) == 0.5
+
+# a missing half means "no answer", never a silently optimistic one
+assert _pooled_exp_r(None, {"exp_r": 1.0, "n": 5}) is None
+assert _pooled_exp_r({"exp_r": 1.0, "n": 5}, None) is None
+assert _pooled_exp_r({"exp_r": 1.0, "n": 0}, {"exp_r": 1.0, "n": 0}) is None
+
+print("ok — baseline pooling is trade-count weighted and refuses a missing half")

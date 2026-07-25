@@ -63,7 +63,7 @@ from .backtest_engine import _run_backtest
 from .strategy_search import (CAPITAL, MIN_N, MONTHS, SLOTS, _combo_mask,
                               _describe, _masks, _sig_fn, combo_params)
 from .strategy_search3 import RISK, _geo, _load
-from .paths import BREEDER_JSON
+from .paths import BREEDER_JSON, RESULTS
 
 MAX_CONDS   = 6       # the point of the GA — grid search stopped at 3
 POP         = 60
@@ -290,6 +290,66 @@ def _row(p, tf):
     }
 
 
+def _pooled_exp_r(train, hold):
+    """Expectancy in R across both halves, weighted by trade count.
+
+    Weighted, not averaged: the split is by TIME, so the halves rarely hold the
+    same number of trades and a plain mean would let a thin half swing the
+    result. Uses the genome's own _score numbers (not strategy_search._eval), so
+    the baseline comparison is like-for-like with how fitness was computed."""
+    if not train or not hold:
+        return None
+    n = train["n"] + hold["n"]
+    if not n:
+        return None
+    return (train["exp_r"] * train["n"] + hold["exp_r"] * hold["n"]) / n
+
+
+def _score_against_baseline(rows, window):
+    """Gate every champion against entering EVERY bar at its own geometry.
+
+    Until now the breeder had no baseline at all, which is how a 7-year run
+    returned 65 long genomes out of 78 over a period when BTC rose ~10x and
+    that read as a finding. It is not: a wide-stop long entered at random rides
+    the drift. Measured after this was added — on the deep window not one of the
+    74 genomes beat buy-and-hold (best +325% vs +702%).
+
+    Baseline definition matches strategy_search3.rescore_baselines() on purpose:
+    same (tf, direction, k, rr), entry on every bar, compared on per-trade
+    expectancy. A second definition of 'baseline' in the same repo would be
+    worse than none.
+    """
+    w = WINDOWS[window]
+    every = lambda d: (lambda df, i, p: d if i >= 60 else None)
+
+    pooled = _pooled_exp_r
+    regimes = sorted({(r["tf"], r["direction"], r["k"], r["rr"]) for r in rows})
+    base = {}
+    for tf in sorted({t for t, *_ in regimes}):
+        df = _load(tf, w["months"], exchange=w["exchange"])
+        mid = df.index[len(df) // 2].isoformat()
+        for t, d, k, rr in regimes:
+            if t != tf:
+                continue
+            res = _run_backtest(df, every(d), _geo(k, rr), CAPITAL)
+            tr = res["trades"]
+            bt = _score([x for x in tr if x["entry_ts"] < mid])
+            bh = _score([x for x in tr if x["entry_ts"] >= mid])
+            base[(t, d, k, rr)] = {"exp_r": pooled(bt, bh), "n": len(tr),
+                                   "net_pct": round(res["final_equity"] / CAPITAL * 100 - 100, 1)}
+
+    for r in rows:
+        b = base.get((r["tf"], r["direction"], r["k"], r["rr"]))
+        mine = pooled(r.get("train"), r.get("holdout"))
+        theirs = b["exp_r"] if b else None
+        r["baseline"] = ({"net_pct": b["net_pct"], "n": b["n"],
+                          "exp_r": round(theirs, 4)} if theirs is not None else None)
+        r["edge_vs_baseline"] = (round(mine - theirs, 4)
+                                 if mine is not None and theirs is not None else None)
+        r["beats_baseline"] = bool(r["edge_vs_baseline"] is not None
+                                   and r["edge_vs_baseline"] > 0)
+
+
 def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
         pop_size=POP, seed=0, window=DEFAULT_WINDOW, out=BREEDER_JSON):
     w = WINDOWS[window]
@@ -312,7 +372,9 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
             seen.add(k)
             out_rows.append(_row(p, tf))
 
-    out_rows.sort(key=lambda r: r["fitness"], reverse=True)
+    _score_against_baseline(out_rows, window)
+    out_rows.sort(key=lambda r: (r.get("beats_baseline", False), r["fitness"]),
+                  reverse=True)
     result = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         # Window is recorded because the two are different instruments, not just
@@ -337,11 +399,16 @@ def run(timeframes=("1h", "4h", "1d"), generations=GENERATIONS,
         print("No genome survived out-of-sample. That is a result, not a bug — "
               "the fitness clamp is doing its job.")
         return result
+    n_beat = sum(1 for r in out_rows if r.get("beats_baseline"))
+    print(f"{n_beat} of {len(out_rows)} beat entering EVERY bar at the same "
+          f"geometry — that is the only column that means anything.")
     print(f"{'fit':>9} {'trainR':>7} {'holdR':>7} {'n':>5} {'net%':>7} "
-          f"{'cond':>4}  desc")
+          f"{'edge':>7} {'cond':>4}  desc")
     for r in out_rows[:25]:
+        edge = r.get("edge_vs_baseline")
         print(f"{r['fitness']:>9.5f} {r['train']['exp_r']:>7} "
               f"{r['holdout']['exp_r']:>7} {r['n']:>5} {r['net_pct']:>7} "
+              f"{('—' if edge is None else f'{edge:+.4f}'):>7} "
               f"{r['conditions']:>4}  {r['desc']}")
     deep = [r for r in out_rows if r["conditions"] > 3]
     print(f"\n{len(deep)} of {len(out_rows)} viable genomes use >3 conditions "
@@ -362,6 +429,10 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=None,
                     help="output json (defaults to strategy_breeder[_w30].json)")
     a = ap.parse_args()
-    out = a.out or ("strategy_breeder.json" if a.window == "deep"
-                    else f"strategy_breeder_{a.window}.json")
+    # Bare filenames here wrote results to the CWD — the repo root — while
+    # everything else reads them from results/. A deep-window run then looked
+    # like it had silently done nothing, because results/strategy_breeder.json
+    # still held the previous run. Anchor both names to RESULTS.
+    out = a.out or (BREEDER_JSON if a.window == "deep"
+                    else str(RESULTS / f"strategy_breeder_{a.window}.json"))
     run(tuple(a.tf), a.generations, a.pop, a.seed, window=a.window, out=out)
