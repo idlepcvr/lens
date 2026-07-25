@@ -123,11 +123,9 @@ function blockedCard(s){
     ${checks.length?`<div style="font-size:12px;margin:8px 0 2px"><span class="g">setup ✓</span> <span class="m">${checks.join(' · ')}</span></div>`:''}
     <div style="font-size:12px;margin:8px 0 2px"><span class="r">blocked ✗</span></div>
     <ul style="margin:2px 0 0 16px;padding:0;font-size:12px;color:var(--dim)">
-      <!-- description only. VETO_LABELS bakes in the stat from the original
-           mining pass, and it has already drifted (fvg_entry reads "−€15/trade"
-           while the live book has it +€1,569). One number per card, and it's
-           the live one on the line below. -->
-      ${rules.map(r=>`<li>${(VETO_LABELS[r]||r).split(' — ')[0]}</li>`).join('')}
+      <!-- VETO_LABELS is description-only now, so no stat to strip. One number
+           per card, and it's the live one on the line below. -->
+      ${rules.map(r=>`<li>${VETO_LABELS[r]||r}</li>`).join('')}
     </ul>
     <!-- colour is inverted on purpose: a bucket that LOST money means the veto
          saved you (green). A bucket in profit means this veto is costing you

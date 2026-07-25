@@ -548,23 +548,38 @@ def emit_board_signals() -> list[dict]:
     return emitted
 
 
+# Description only — no stats. Every number a veto cites is read from the
+# ledger at render time by veto_label_live(); a frozen stat that drifts is
+# worse than no stat, and fvg_entry drifted from "−€15/trade" to +€2,000.
 VETO_LABELS = {
-    "rsi_neutral":          "RSI 40–55 dead zone — 34.7% WR, −€1,243",
-    "slope_against":        "1h EMA21 slope against trade — 38.1% WR, −€1,177",
-    "sweep_fade":           "fading a liquidity sweep — 33% WR",
-    "pd_raid_fade":         "fading a prior-day level raid — 37% WR",
-    "displacement_against": "displacement candle against trade — 35% WR",
-    "fvg_entry":            "entry inside FVG retrace — 38% WR, −€15/trade",
-    "ny_pm_kz":             "NY PM 18–21 UTC, your worst hours — 39% WR",
+    "rsi_neutral":          "RSI 40–55 dead zone",
+    "slope_against":        "1h EMA21 slope against trade",
+    "sweep_fade":           "fading a liquidity sweep",
+    "pd_raid_fade":         "fading a prior-day level raid",
+    "displacement_against": "displacement candle against trade",
+    "fvg_entry":            "entry inside FVG retrace",
+    "ny_pm_kz":             "NY PM 18–21 UTC, your worst hours",
 }
+
+
+def veto_label_live(rule: str, ledger: dict) -> str:
+    """`<description> — <live WR, live PnL, n>`, or bare description if unseen.
+
+    ledger is one veto_bucket_stats() result, passed in so a caller rendering
+    several rules pays for one DB read, not one per rule."""
+    desc = VETO_LABELS.get(rule, rule)
+    s = ledger.get("rules", {}).get(rule)
+    if not s:
+        return desc
+    return f"{desc} — {s['wr']}% WR, €{s['pnl']:+,} over {s['n']}"
 
 
 def veto_bucket_stats() -> dict:
     """Realized ledger for VETO-tagged trades, per rule and per exact rule-set.
 
-    The numbers baked into VETO_LABELS are frozen from the original mining pass;
-    these are re-read from the ledger every call, so a blocked card cites what
-    the book actually did, not what it did in 2026-06. Source is trades.setup_tag
+    Re-read from the ledger every call, so a blocked card cites what the book
+    actually did, not what it did in 2026-06. This is the only source of veto
+    stats — VETO_LABELS is description-only. Source is trades.setup_tag
     written by classify() — `VETO:a,b` or `S3|VETO:a,b`."""
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute(
@@ -661,6 +676,15 @@ def desk_state(refresh: bool = True) -> dict:
     v_long = vetoes(ctx, "long")
     v_short = vetoes(ctx, "short")
 
+    # one ledger read for both directions; skipped entirely when nothing is vetoed
+    if v_long or v_short:
+        try:
+            _ledger = veto_bucket_stats()
+        except Exception:
+            _ledger = {"rules": {}, "combos": {}}   # a dead stat never blanks the desk
+    else:
+        _ledger = {"rules": {}, "combos": {}}
+
     verdicts = {}
     for direction, v in (("long", v_long), ("short", v_short)):
         active = [c for c in checklists
@@ -677,7 +701,7 @@ def desk_state(refresh: bool = True) -> dict:
                       else "blocked" if active and v
                       else "veto" if v else "stand_down"),
             "setups": [c["id"] for c in active],
-            "vetoes": [VETO_LABELS[k] for k in v],
+            "vetoes": [veto_label_live(k, _ledger) for k in v],
             "plan": (lambda slp, tpp: {
                 "entry": round(price, 1),
                 "stop": round(price * (1 - slp / 100) if long_ else price * (1 + slp / 100), 1),
