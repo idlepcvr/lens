@@ -6,6 +6,71 @@ holes), archived at `docs/NEXT_SESSION_20260724.md`. Full suite green
 
 ---
 
+## 🔴 FIRST: lens.restedpc.com is public and unauthenticated
+
+Measured 2026-07-25, not theoretical:
+
+```
+curl https://lens.restedpc.com/api/money        -> 200
+curl https://lens.restedpc.com/openapi.json     -> 200
+```
+
+`/api/money` returns `personal`, `business`, `total`, `curve`, `transfers` to
+anyone who asks. `app = FastAPI(title="LENS")` leaves Swagger on, so
+`/docs`, `/redoc`, `/openapi.json` and `/docs/oauth2-redirect` are all live —
+`openapi.json` is a published index of every endpoint. CORS is
+`allow_origins=["*"]` and there is **no auth dependency anywhere in main.py**.
+
+He was annoyed that `/money` misrepresents his spending. It also publishes it.
+
+Options, cheapest first: put it behind Tailscale only · add HTTP basic auth at
+the NPM reverse proxy (he already runs NPM with a wildcard cert) · `FastAPI(...,
+docs_url=None, redoc_url=None, openapi_url=None)` to at least stop advertising
+the surface. **Do not treat this as done until a `curl` from off-tailnet fails.**
+
+---
+
+## His stated position on the architecture (2026-07-25) — recorded, not actioned
+
+Venting captured verbatim in intent so it stops occupying his head. **He
+explicitly said he is NOT asking for this to be fixed now.** Do not start it;
+raise it when he opens the topic.
+
+> "I almost feel like I should have two separate engines… almost have them just
+> be two separate websites. One for prop and one for hedge. While they might use
+> the same tool, same library, same things, it just feels so different."
+
+Worth taking seriously rather than filing as a mood: the prop book is an
+evaluation with hard drawdown walls and a pass/fail end state, the hedge book is
+his own money with a 150 BTC end state. They share code but almost no decisions,
+and the mode switcher exists precisely because one interface kept having to be
+two. `test_nav_parity` currently *enforces* that the two modes mirror each other
+— if the split happens, that test is the first thing to reconsider.
+
+**His page-by-page complaints, all verified as real:**
+
+| page | what it actually is | verdict |
+|---|---|---|
+| `/audit` | plain-English view of the **2026-07-02** audit vs current config | dated document, nothing actionable |
+| `/audit-report` | serves the static `strategies/_research/STRATEGY_AUDIT_20260702.html` | merge with `/audit` or archive |
+| `/docs/oauth2-redirect` | **not a page** — FastAPI Swagger helper | disappears when docs are disabled |
+| `/money` | only sees the `transfers` table (kraken_spot EUR + biz futures) | reports a PARTIAL number as a TOTAL — he wants to supply the real figure and have it stored |
+| `/prop-cone` | Monte-Carlo cone for the eval: pass odds, milestone ladder, basket | genuinely prop-only; but `/goal` + `/prop-goal` + `/prop-cone` is three goal pages |
+| `/robustness` | permutation test, 4,000 shuffles: how often does chance beat the rule | honest, but **40 live trades cannot answer it** — label it, don't delete |
+| `/risk` `/rules` `/survival` | prop engine cards, deliberately no nav entry | fine as-is |
+| `/strategy` `/strategy-hedge` `/prop-goal-old` | **301 redirects**, legacy URLs kept so bookmarks survive | not pages at all |
+
+**The reframe that matters:** five of the nine are not destinations — three are
+redirect stubs, two are framework endpoints. **The sitemap advertises routes,
+not pages.** Teaching it to skip redirects and framework routes removes most of
+the complaint without deleting anything. Do that before proposing deletions.
+
+**⚠ He wants to redo the hedge nav himself.** Today's commit already reorders it
+(Desk · Signals first, footer split MORE/SYSTEM) — tell him it is already in
+PR #1 so he does not redo work, then leave the nav to him.
+
+---
+
 ## The headline: the short side has no edge
 
 The previous spec called the short gap a **coverage bug** — LENS is structurally
