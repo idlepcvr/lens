@@ -33,15 +33,15 @@ plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080
 # muscle-memory compatible. Prop-only pages (Cone, Engines, Ledger, Income) are
 # appended after the shared spine rather than interleaved.
 NAV_PROP = [
-    ("/prop-desk", "Desk"),
-    ("/prop-signals", "Signals"),
-    ("/prop-position", "Position"),
-    ("/prop-calendar", "Calendar"),
     ("/overview", "Overview"),
-    ("/prop-journal", "Journal"),
-    ("/prop-analytics", "Analytics"),
+    ("/prop-signals", "Signals"),
+    ("/prop-desk", "Desk"),
     ("/prop-dashboard", "Plan"),
     ("/prop-goal", "Goal"),
+    ("/prop-position", "Position"),
+    ("/prop-calendar", "Calendar"),
+    ("/prop-journal", "Journal"),
+    ("/prop-analytics", "Analytics"),
     ("/prop-edge", "Edge"),
     ("/prop-cone", "Cone"),
     ("/prop", "Engines"),
@@ -51,28 +51,31 @@ NAV_PROP = [
     # nav entry — they're the engine cards on /prop. Their pages still render
     # with the prop nav (page_mode defaults to prop).
 ]
-# Ordered by the daily loop, not by subject: what do I do now (Desk) → what am I
-# being asked to decide (Signals) → what am I already exposed to (Position) →
-# how did it go (Calendar/Journal/Analytics) → is the plan still sane (Plan/Goal)
-# → research (Edge). Desk and Signals used to sit in the "more" footer while
-# Plan and Goal held top-nav slots, so the two pages an entry/exit decision
-# actually needs were the two furthest away.
+# Order specified by Lucky, 2026-07-25 — his flow, not a derived one:
+# overview → signals → desk → plan → goal → position → calendar → journal →
+# analytics → edge. Every entry is a top-bar chip (HEDGE_MAIN below is the full
+# set), because the previous 5-chip bar pushed half the book into a "more"
+# footer: "the nav bar here is too small, it's too little".
 NAV_HEDGE = [
-    ("/desk", "Desk"),
-    ("/signals", "Signals"),
-    ("/position", "Position"),
-    ("/calendar", "Calendar"),
     ("/overview-hedge", "Overview"),
-    ("/journal", "Journal"),
-    ("/analytics", "Analytics"),
+    ("/signals", "Signals"),
+    ("/desk", "Desk"),
     ("/dashboard", "Plan"),
     ("/goal", "Goal"),
+    ("/position", "Position"),
+    ("/calendar", "Calendar"),
+    ("/journal", "Journal"),
+    ("/analytics", "Analytics"),
     ("/edge", "Edge"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.
-PROP_MAIN  = {"/overview", "/prop-desk", "/prop-signals", "/prop-ledger", "/prop-dashboard"}
-HEDGE_MAIN = {"/desk", "/signals", "/position", "/calendar", "/overview-hedge"}
+# The whole book is in the top bar. Previously five chips, with Journal,
+# Analytics, Plan, Goal and Edge exiled to the footer — he asked for all of it
+# up top. The bar already wraps (.nav flex-wrap at >=1080px) and scrolls
+# horizontally below that, so a longer list costs layout nothing.
+HEDGE_MAIN = {h for h, _ in NAV_HEDGE}
+PROP_MAIN  = {h for h, _ in NAV_PROP}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
@@ -81,6 +84,21 @@ NAV_NEUTRAL = [("/glossary", "Learn"), ("/system", "System"), ("/robustness", "R
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
 _PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
+
+
+def page_book(path: str) -> str | None:
+    """'prop' | 'hedge' | None — which BOOK a page belongs to, or None if it
+    belongs to neither (glossary, system, health…).
+
+    Distinct from page_mode() on purpose: page_mode defaults unknown paths to
+    'prop' so the nav always has something to draw, which is right for chrome
+    and wrong for labelling. Prefixing /glossary with "PROP —" would be a lie.
+    """
+    if "book=prop" in path:
+        return "prop"
+    if "book=hedge" in path:
+        return "hedge"
+    return _PAGE_MODE.get(path.split("?")[0])
 
 
 def page_mode(path: str) -> str:
@@ -406,6 +424,12 @@ def nav_html(current_path: str) -> str:
             continue
         cur = " cur" if href == current_path else ""
         out.append('<a href="%s" class="%s">%s</a>' % (href, cur.strip(), label))
+    # Sitemap rides at the end of the chips rather than inside NAV_HEDGE/NAV_PROP:
+    # it is mode-neutral, and test_nav_parity (rightly) refuses to let a neutral
+    # page be owned by one book's nav. This gives it the chip he asked for
+    # without pretending it belongs to hedge.
+    out.append('<a href="/sitemap" class="%s ntl">Sitemap</a>'
+               % ("cur" if current_path == "/sitemap" else ""))
     sw = (
         '<div class="modesw">'
         '<a href="/overview" class="%s">◎ PROP</a>'
@@ -432,7 +456,9 @@ def footer_html(current_path: str) -> str:
         href, "cur" if href == current_path else "", label)
 
     book = [link(h, l) for h, l in items if h not in main]
-    tools = [link(h, l) for h, l in NAV_NEUTRAL]
+    # /sitemap is a top-bar chip now (and the ☰); listing it here too made it
+    # the only page reachable three ways from the same screen.
+    tools = [link(h, l) for h, l in NAV_NEUTRAL if h != "/sitemap"]
     if not book and not tools:
         return ""
     out = '<footer class="navftr">'
@@ -441,6 +467,19 @@ def footer_html(current_path: str) -> str:
     if tools:
         out += '<span class="ftl ftl2">system</span>' + "".join(tools)
     return out + "</footer>"
+
+
+def _booked(path: str, label: str) -> str:
+    """"HEDGE — Overview" / "PROP — Overview"; neutral pages keep a bare label.
+
+    Applied centrally rather than at ~25 call sites: every page already passes
+    its own label to shell(), so one place decides how a book is announced and
+    no page can forget. Idempotent — a label that already names its book is left
+    alone, so a page may still hard-code a special one."""
+    book = page_book(path)
+    if not book or label.upper().startswith(book.upper()):
+        return label
+    return f"{book.upper()} — {label}"
 
 
 def shell(current_path: str, page_label: str, body: str, *,
@@ -458,7 +497,7 @@ def shell(current_path: str, page_label: str, body: str, *,
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, "
         "maximum-scale=1.0, user-scalable=no\">"
         "<meta name=\"theme-color\" content=\"#06080c\">"
-        "<title>LENS // " + page_label + "</title>"
+        "<title>LENS // " + _booked(current_path, page_label) + "</title>"
         + FONT_LINKS +
         "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon.svg\">"
         "<link rel=\"apple-touch-icon\" href=\"/assets/favicon.svg\">"
@@ -483,7 +522,7 @@ def shell(current_path: str, page_label: str, body: str, *,
         head += (
             "<div class=\"bar\">"
             "<div class=\"logo\">LEN<span class=\"s\">S</span> "
-            "<span class=\"pg\">" + page_label + "</span></div>"
+            "<span class=\"pg\">" + _booked(current_path, page_label) + "</span></div>"
             + (right or ("<div class=\"live\"><span class=\"dot\"></span>" + meta + "</div>")) +
             "</div>"
             + nav_html(current_path)
