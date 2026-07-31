@@ -125,15 +125,6 @@ def home():
     return render()
 
 
-@app.get("/system", response_class=HTMLResponse)
-def system_page():
-    """The instrument plate: the ledger drawn as a dot-matrix, the loop, the two
-    books. This is the craft showcase — it used to be "/", and it assumes you
-    already know what a trade is. "/" now explains that first."""
-    from .home_page import render
-    return render()
-
-
 @app.get("/dashboard", response_class=HTMLResponse)
 def landing():
     # Scoped to the hedge book. This counted EVERY book, so its trade count was

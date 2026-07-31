@@ -53,7 +53,12 @@ Rules carried over from the prose version, all still binding:
 Cost: one SQL read, no network, no JS. The diagrams are inline SVG and a span
 grid — they render in a print view, a paused tab and a headless screenshot.
 
-The instrument plate lives at /system.
+There is one way out of this page and it goes to the desk. /system — the
+instrument plate that used to be "/" — was deleted 2026-07-31, not relinked:
+it was a craft showcase aimed at nobody. Its whole content was gauges and a
+P&L matrix, and every one of those is banned here by the no-numbers rule, so
+there was nothing to fold in. Both books stay reachable from the nav. If you
+want it back it is in git, at 43468ca and earlier.
 """
 
 import sqlite3
@@ -258,8 +263,7 @@ _CSS = r"""<style>
 /* The entrance moves, it never fades. `both` fill-mode applies the from-state
    during the delay, so an opacity:0 keyframe means a headless screenshot, a
    print view or a paused tab ships the hero — the one line that has to land —
-   completely blank. Same rule as the /system matrix: animation is additive,
-   never load-bearing. */
+   completely blank. Animation is additive here, never load-bearing. */
 @media (prefers-reduced-motion:no-preference){
   .rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
   @keyframes rise{from{transform:translateY(9px)}to{transform:none}}
@@ -340,7 +344,6 @@ def render() -> str:
       everything right and still lose that day. <b>LENS doesn't remove that. It makes sure
       that when I lose, I lost for a reason I can point at.</b></p>
     <div class="out">
-      <a href="/system">the instrument itself <span>&rarr;</span></a>
       <a href="/dashboard">go to the desk <span>&rarr;</span></a>
     </div>
   </section>

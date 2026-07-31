@@ -67,6 +67,16 @@ def test_diagrams_survive_without_css_or_js():
         assert label in html
 
 
+def test_one_way_out():
+    """/system was deleted 2026-07-31 for being a craft showcase aimed at
+    nobody. The front door has exactly one exit and it goes to the desk."""
+    html = _html()
+    assert "/system" not in html, "the deleted instrument plate is linked again"
+    out = re.search(r'<div class="out">(.*?)</div>', html, re.S).group(1)
+    assert out.count("<a ") == 1, "the front door should offer one way out"
+    assert "/dashboard" in out
+
+
 def test_both_outcomes_are_shown():
     """Showing only the winning trade would be the most dishonest thing here."""
     html = _html()
