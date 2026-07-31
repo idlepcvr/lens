@@ -2,8 +2,10 @@
 
 > **CLOSED SESSION — built 2026-07-24.** Strategy breeder + veto visibility. Renamed from
 > `NEXT_SESSION*` on 2026-07-31: three files named "next session" all
-> described finished work. The one live handoff is `NEXT_SESSION.md` at
-> the repo root — nothing in `docs/` is pending.
+> described finished work. As of 2026-07-31 there is no live handoff at all —
+> the last one was archived alongside this file once its final item was built.
+> Nothing in this repository is pending. A session with real scope should
+> create a fresh `NEXT_SESSION.md` at the root.
 
 
 > ## ✅ BOTH ITEMS BUILT — 2026-07-24. Nothing here is outstanding.

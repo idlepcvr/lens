@@ -1,5 +1,19 @@
 # NEXT SESSION — LENS
 
+> **CLOSED SESSION — 2026-07-31.** Everything in this file is done, moot, or
+> deliberately moved out of the repo. It was `NEXT_SESSION.md` at the root until
+> its last item was built on 2026-07-31; it is archived here so that no file in
+> this repository claims to be pending work when none is.
+>
+> **There is deliberately no `NEXT_SESSION.md` right now.** That is the honest
+> state, not an oversight — see `## ▶ NOTHING IS PENDING IN THIS REPO` below.
+> The next session that genuinely has scope should create a fresh one.
+>
+> Still worth reading here: the out-of-sample disarm of S2–S5, the short-side
+> "no edge" finding, his recorded position on splitting the prop and hedge
+> engines (raise only when he opens the topic), and the 2026-07-25 log.
+
+
 *Revised 2026-07-31 — one priority only. Supersedes the 2026-07-25 spec, whose
 public-exposure alarm was wrong (see below). Prior spec archived at
 `docs/DONE-2026-07-24-short-gap-discipline-holes.md`.*
@@ -173,7 +187,23 @@ feature set, and mining is the wrong tool for finding it.
 
 ---
 
-## Open decisions — asked, not yet answered
+## ✅ Open decisions — ALL THREE CLOSED 2026-07-31
+
+  1. **The front door** — answered. `/` was rebuilt as five diagrams
+     (`explain_page.py`); `/system` and `app/home_page.py` were deleted outright
+     rather than moved, so "which page did he mean" is moot. No `/about`, no
+     cockpit: he asked for one visual front door and one exit to the desk.
+  2. **Cockpit content** — moot, nothing was built. The two rules survive in
+     `explain_page.py`: no P&L or balance on the front door, and if a verdict
+     ever appears there it reuses `desk_state(refresh=False)` rather than
+     re-deriving one that could disagree with `/desk`.
+  3. **Kill S4 and S2?** — **answered: yes, plus S3 and S5.** "Raised twice, not
+     decided" is now decided on out-of-sample evidence rather than on how often
+     the vetoes were catching them. See the disarm section at the top.
+
+The original text of all three, as written 2026-07-25:
+
+## Open decisions — as asked on 2026-07-25 (kept for the reasoning)
 
 **1. The front door.** `/` is `explain_page.py`: a plain-English explainer, no
 numbers, no jargon, written to his own brief for a non-trading reader (a
