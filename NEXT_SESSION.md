@@ -1,34 +1,114 @@
 # NEXT SESSION — LENS
 
-*Written 2026-07-25. Supersedes the 2026-07-24 spec (short gap + discipline
-holes), archived at `docs/NEXT_SESSION_20260724.md`. Full suite green
-(24 test files).*
+*Revised 2026-07-31 — one priority only. Supersedes the 2026-07-25 spec, whose
+public-exposure alarm was wrong (see below). Prior spec archived at
+`docs/DONE-2026-07-24-short-gap-discipline-holes.md`.*
 
 ---
 
-## 🔴 FIRST: lens.restedpc.com is public and unauthenticated
+## ✅ DONE 2026-07-31 — negative-expectancy setups disarmed
 
-Measured 2026-07-25, not theoretical:
+Was the top item here. Built and deployed the same day, so it is no longer
+pending. `app/setups.py` now carries `ARMED_SETUPS = frozenset({"S1"})`.
 
-```
-curl https://lens.restedpc.com/api/money        -> 200
-curl https://lens.restedpc.com/openapi.json     -> 200
-```
+**Why.** S1–S5 were mined from 464 of his own trades and showed 57–91% win
+rates *in that sample*. Scored out-of-sample over 63,270 candles, 2019-05 →
+2026-07 (`results/strategy_scores.json`, 2026-07-26):
 
-`/api/money` returns `personal`, `business`, `total`, `curve`, `transfers` to
-anyone who asks. `app = FastAPI(title="LENS")` leaves Swagger on, so
-`/docs`, `/redoc`, `/openapi.json` and `/docs/oauth2-redirect` are all live —
-`openapi.json` is a published index of every endpoint. CORS is
-`allow_origins=["*"]` and there is **no auth dependency anywhere in main.py**.
+| setup | in-sample claim | out-of-sample net R | n | |
+|---|---|---|---|---|
+| S1 | 90.9% (n=11) | **+0.042** | 431 | armed — the only non-negative one |
+| S2 | 65% (n=23) | −0.256 | 1,649 | disarmed |
+| S3 | 56.7% (n=30) | −0.146 | 9,340 | disarmed |
+| S4 | 62% (n=29) | −0.296 | 4,060 | disarmed |
+| S5 | 60% (n=5) | −0.086 | 2,714 | disarmed |
 
-He was annoyed that `/money` misrepresents his spending. It also publishes it.
+The setups were fit to the data that produced them and the edge did not
+survive. This is the mechanism behind the hedge book: 496 fills, 39.5% WR,
+−€4,347. Measured effect of the change, over a 5,800-bar window: **1,588 live
+signals → 30.**
 
-Options, cheapest first: put it behind Tailscale only · add HTTP basic auth at
-the NPM reverse proxy (he already runs NPM with a wildcard cert) · `FastAPI(...,
-docs_url=None, redoc_url=None, openapi_url=None)` to at least stop advertising
-the surface. **Do not treat this as done until a `curl` from off-tailnet fails.**
+**What was gated, and what deliberately was not.**
 
----
+  · `scan_latest()` — the signals pipeline. Gated.
+  · `desk_state()` — the ENTER / STAND DOWN verdict. Gated.
+  · The desk labels no longer advertise the in-sample win rates. Each setup now
+    reads `ARMED · +0.04R out-of-sample (n=431)` or `DISARMED · −0.26R …`.
+  · `classify()` / `backfill_setup_tags()` — **NOT gated, on purpose.** They tag
+    trades that already happened. Filtering them would silently rewrite every
+    historical S2–S5 tag to NONE and destroy the realized-vs-mined scoreboard —
+    which is the only evidence that could ever justify re-arming a setup.
+
+`tests/test_armed_setups.py` locks both halves: the live surfaces must be gated,
+the tagger must not be.
+
+**To re-arm anything**, edit the one frozenset — but only against a fresh
+`strategy_scores.json`, not against a realized run of 20 trades. The 57–91%
+numbers came from exactly that mistake.
+
+## ▶ NOTHING IS PENDING IN THIS REPO
+
+That is the honest state as of 2026-07-31, and it is deliberate — the two things
+that matter next are not LENS work:
+
+1. **Months-of-burn.** One number, one hour. Kiki, not here (see below).
+2. **Ten paper trades on `ASIAN_RSI_DIP_v1` as written** — 2x, killzone bars
+   only. His desk work, not a Claude session. It is #1 of 27 by net R
+   (+0.653R/trade); the busted eval ran it at 5x, 8 trades in 11 days, with
+   1 of 8 following the plan.
+
+⚠️ **Do not open this repo looking for something to build.** The pattern
+`focus-doctrine-2026-07.md` names — converting "take a position" into "build an
+instrument" — runs through a session that starts by hunting for work here.
+
+## ⤴ MOVED OUT: months-of-burn is not a LENS task
+
+Previously listed here as the top priority. It does not belong in this repo and
+cannot be computed from `lens.db`. `/money` tracks **Kraken transfers** —
+€51,783 deposited, −€11,334 withdrawn — i.e. cash in and out of the exchange.
+There is no expenses table, no rent, no food, no visa, no spending of any kind.
+
+It is a personal-finance item and belongs in Kiki. Still outstanding since
+2026-07-06, still worth an hour, still not this repo's job.
+
+## ✅ RESOLVED: the public-exposure alarm above was wrong
+
+The previous version of this file opened with a 🔴 "lens.restedpc.com is public
+and unauthenticated, measured not theoretical". **It is not.** Public DNS
+resolves `lens.restedpc.com` to `fox.tail390a75.ts.net` → `100.103.43.66`, which
+is CGNAT and unroutable off-tailnet. The original `curl` was run from inside the
+tailnet, so it only ever proved the service was up. Corrected 2026-07-31.
+
+Still worth doing cheaply when convenient — `FastAPI(docs_url=None,
+redoc_url=None, openapi_url=None)` stops advertising the surface — but it is
+housekeeping, not an emergency, and it is **not** this session's job.
+
+## 📌 Findings from 2026-07-31 — already answered, do not re-derive
+
+- **The eval busted, it did not stall.** 8 trades, 9–20 Jul, −$301.59 = −6.03%
+  against `BREAKOUT_1STEP_CLASSIC`'s 6.0% static wall. Account closed.
+- **It was never a strategy failure — the strategy was never run.** Trade 1 has
+  `followed_plan=1, followed_strategy=1` and is the only winner (+$49.79). The
+  other seven are `None`/`0` and all lost. Trade 3's own note: *"No signal."*
+  Six of eight ran **5x** leverage against a plan that specifies **2x**, and he
+  took **8 trades in 11 days** against a model of **~1.5/month**.
+- **The "which eval can I afford" question is closed.** `BREAKOUT_5K_PLAN.md`
+  (15 Jun): *"rules are %-based, so odds are identical at any account size. Pass
+  the cheap $5k first, then buy the biggest eval direct (don't ladder)."* Evals
+  are ~$20. No hedge-book grinding is needed to afford one.
+- **His action, not a Claude session:** run `ASIAN_RSI_DIP_v1` as written — 2x,
+  killzone bars only — on paper for 10 trades. Kraken CLI has a free
+  paper-trading mode against live prices with no API keys. If he can follow it
+  for ten, buy the $20 eval. If not, the eval was never the problem.
+- ⚠️ **Do not wire order placement into LENS.** The front door's "LENS holds no
+  keys, it cannot place an order" is now a drawn diagram on `/`. Giving Kraken
+  CLI trade-permissioned keys makes that page false.
+
+## 🗑️ Deleted 2026-07-31
+
+`/system` and `app/home_page.py` are gone — the instrument plate was a craft
+showcase with no audience. `/` is now five diagrams; its only exit is `/dashboard`.
+The dot-matrix renderer lives in git at `43468ca` if it ever wants a home.
 
 ## His stated position on the architecture (2026-07-25) — recorded, not actioned
 

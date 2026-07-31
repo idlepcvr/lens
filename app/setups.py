@@ -42,6 +42,31 @@ SL_PCT, TP_PCT = 0.63, 1.5
 
 # ── alert ticket sizing (tunable in .env; falls back to these defaults) ──
 MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%
+# ── Which setups are allowed to fire ────────────────────────────────────────
+# S1–S5 were mined from 464 of his own trades (docstring above) and showed
+# 57–91% win rates *in that sample*. Scored OUT of sample over 63,270 candles,
+# 2019-05 → 2026-07 (results/strategy_scores.json, generated 2026-07-26), they
+# come back at 24–30% WR and negative net R per trade. The in-sample numbers did
+# not survive; the setups were fit to the data that produced them.
+#
+#   S1  +0.042R  n=431     armed — marginal, the only non-negative one
+#   S2  −0.256R  n=1,649   DISARMED
+#   S3  −0.146R  n=9,340   DISARMED
+#   S4  −0.296R  n=4,060   DISARMED
+#   S5  −0.086R  n=2,714   DISARMED
+#
+# This is the mechanism behind the hedge book: 496 fills, 39.5% WR, −€4,347.
+# Note the shape — the disarmed four fire 1,649–9,340 times over the window and
+# the armed one fires 431. Frequency and edge run opposite here, every time.
+#
+# This gates the two LIVE surfaces only — scan_latest() (the signals pipeline)
+# and desk_state() (the desk verdict). classify()/backfill_setup_tags() are
+# deliberately NOT gated: they tag history, and history still happened.
+#
+# ponytail: a frozenset, not a config table — five setups, one knob. Move it to
+# lens_config only if it needs changing without a deploy.
+ARMED_SETUPS = frozenset({"S1"})
+
 SETUP_NAMES = {
     "S1": "NY AM flush · RSI<40, 13-16 UTC",
     "S2": "Premium + bearish displacement",
@@ -408,7 +433,8 @@ def scan_latest() -> dict:
 
     eng = SetupEngine(c1h)
     ctx = eng.context(i)
-    matches = matched_setups(ctx)
+    matches = [m for m in matched_setups(ctx)
+               if m["setup"] in ARMED_SETUPS]
     for m in matches:
         m["vetoes"] = vetoes(ctx, m["direction"])
         m["clean"] = not m["vetoes"]
@@ -629,33 +655,33 @@ def _setup_checklists(ctx: BarContext) -> list[dict]:
     rsi_ok = ctx.rsi is not None
     return [
         {"id": "S1", "name": "NY AM Killzone Flush Short", "direction": "short",
-         "wr": "90.9% realized (n=11)",
+         "wr": "ARMED · +0.04R out-of-sample (n=431)",
          "conds": [
              {"label": "RSI(14) < 40 (oversold flush)", "ok": rsi_ok and ctx.rsi < 40},
              {"label": "NY AM killzone — 13:00–16:00 UTC", "ok": ctx.killzone == "ny_am_kz"},
              {"label": "3 consecutive bear closes", "ok": ctx.bear_streak3},
          ]},
         {"id": "S2", "name": "Premium Displacement Short", "direction": "short",
-         "wr": "65% mined (n=23)",
+         "wr": "DISARMED · −0.26R out-of-sample (n=1,649)",
          "conds": [
              {"label": "price in premium of 7d range (>55%)", "ok": ctx.pd_zone == "premium"},
              {"label": "bearish displacement bar (range >1.5× ATR)", "ok": ctx.displacement == "bear"},
          ]},
         {"id": "S3", "name": "Continuation Long", "direction": "long",
-         "wr": "56.7% realized (n=30)",
+         "wr": "DISARMED · −0.15R out-of-sample (n=9,340)",
          "conds": [
              {"label": "RSI(14) > 55 (momentum)", "ok": rsi_ok and ctx.rsi > 55},
              {"label": "buyside sweep — trade WITH the raid", "ok": ctx.sweep == "buyside"},
          ]},
         {"id": "S4", "name": "Discount Dip Long", "direction": "long",
-         "wr": "62% mined (n=29)",
+         "wr": "DISARMED · −0.30R out-of-sample (n=4,060)",
          "conds": [
              {"label": "RSI(14) < 40 (oversold)", "ok": rsi_ok and ctx.rsi < 40},
              {"label": "price in discount of 7d range (<45%)", "ok": ctx.pd_zone == "discount"},
              {"label": "no recent liquidity sweep (quiet)", "ok": ctx.sweep is None},
          ]},
         {"id": "S5", "name": "London Momentum Long", "direction": "long",
-         "wr": "60% realized (n=5)",
+         "wr": "DISARMED · −0.09R out-of-sample (n=2,714)",
          "conds": [
              {"label": "RSI(14) > 55 (momentum)", "ok": rsi_ok and ctx.rsi > 55},
              {"label": "London killzone — 07:00–10:00 UTC", "ok": ctx.killzone == "london_kz"},
@@ -709,10 +735,15 @@ def desk_state(refresh: bool = True) -> dict:
     verdicts = {}
     for direction, v in (("long", v_long), ("short", v_short)):
         active = [c for c in checklists
-                  if c["direction"] == direction and all(x["ok"] for x in c["conds"])]
+                  if c["direction"] == direction and c["id"] in ARMED_SETUPS
+                  and all(x["ok"] for x in c["conds"])]
         for c in checklists:
             if c["direction"] == direction:
-                c["active"] = all(x["ok"] for x in c["conds"])
+                c["armed"] = c["id"] in ARMED_SETUPS
+                # a disarmed setup still renders its checklist — seeing the
+                # conditions tick green and the verdict stay STAND DOWN is the
+                # point — but it can never reach "active" and prompt a trade.
+                c["active"] = c["armed"] and all(x["ok"] for x in c["conds"])
                 c["vetoed"] = c["active"] and bool(v)
         price = ctx.close
         long_ = direction == "long"

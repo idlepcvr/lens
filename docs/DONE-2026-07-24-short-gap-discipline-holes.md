@@ -1,8 +1,14 @@
 # NEXT SESSION — LENS: close the short gap, then the discipline holes
 
+> **CLOSED SESSION — built 2026-07-24.** Close the short gap, then the discipline holes. Renamed from
+> `NEXT_SESSION*` on 2026-07-31: three files named "next session" all
+> described finished work. The one live handoff is `NEXT_SESSION.md` at
+> the repo root — nothing in `docs/` is pending.
+
+
 *Written 2026-07-24 from evidence gathered that day. The previous spec
 (DAILY_BREAK trailing/pyramiding, ✅ built, ❌ NO-GO) is archived at
-`docs/NEXT_SESSION.md`. Items are ordered by measured cost, not by effort.*
+`docs/DONE-2026-07-24-daily-break-trailing-pyramiding.md`. Items are ordered by measured cost, not by effort.*
 
 ---
 

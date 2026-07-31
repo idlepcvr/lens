@@ -1,5 +1,11 @@
 # NEXT SESSION — LENS: Structure-trailing + pyramiding eval for DAILY_BREAK_v1
 
+> **CLOSED SESSION — built 2026-07-24.** Structure-trailing + pyramiding eval for DAILY_BREAK_v1. Renamed from
+> `NEXT_SESSION*` on 2026-07-31: three files named "next session" all
+> described finished work. The one live handoff is `NEXT_SESSION.md` at
+> the repo root — nothing in `docs/` is pending.
+
+
 > ## ✅ BUILT — 2026-07-24 (`1caa742`). Verdict: ❌ **NO-GO**.
 >
 > Full write-up in `strategies/DAILY_BREAK_v1/BASELINE.md`; summary in CHANGELOG.
