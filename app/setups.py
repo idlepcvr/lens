@@ -160,7 +160,8 @@ def _killzone(hour):
 class BarContext:
     """All direction-independent features for one closed 1h bar."""
 
-    def __init__(self, c1h, i, rsi14, ema21, atr14, day_levels, fvgs):
+    def __init__(self, c1h, i, rsi14, ema21, atr14, day_levels, fvgs,
+                 highs=None, lows=None):
         self.i = i
         ts, o, hi, lo, cl, *_ = c1h[i]
         self.ts_ms = ts
@@ -170,8 +171,13 @@ class BarContext:
         self.killzone = _killzone(dt.hour)
         self.rsi = rsi14[i]
 
-        highs = [r[2] for r in c1h]
-        lows = [r[3] for r in c1h]
+        # Only local windows are read below (sweep lookback, range, i-1), so
+        # rebuilding these per bar was O(n) work for O(1) use — invisible at 500
+        # trades, quadratic when sweeping all 63k bars. The engine hands them in.
+        if highs is None:
+            highs = [r[2] for r in c1h]
+        if lows is None:
+            lows = [r[3] for r in c1h]
 
         # EMA21 slope over last 3 bars: 'up' | 'down' | None
         self.slope = None
@@ -279,10 +285,13 @@ class SetupEngine:
         self.atr14 = _atr(c1h)
         self.day_levels = _day_levels(c1h)
         self.fvg_list = _fvgs(c1h)
+        self.highs = [r[2] for r in c1h]
+        self.lows = [r[3] for r in c1h]
 
     def context(self, i) -> BarContext:
         return BarContext(self.c1h, i, self.rsi14, self.ema21, self.atr14,
-                          self.day_levels, self.fvg_list)
+                          self.day_levels, self.fvg_list,
+                          self.highs, self.lows)
 
     def bar_for_ts(self, ts_ms) -> Optional[int]:
         i = bisect.bisect_right(self.ts, ts_ms) - 1
