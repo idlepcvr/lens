@@ -1,0 +1,23 @@
+{
+ "generated": "2026-08-01",
+ "timeframe": "15m",
+ "barrier_pct": 2.8302,
+ "friction_pct": 0.085,
+ "trades": 41,
+ "per_week": 0.3086021505376344,
+ "win_rate": 0.7560975609756098,
+ "breakeven_wr": 0.5150166066002403,
+ "net_per_trade": 0.9254620631077428,
+ "halves": [
+  1.3637752023742873,
+  0.508020978091986
+ ],
+ "leverage": 6.860592755214051,
+ "weekly": 0.017878615923465846,
+ "max_drawdown": 0.19999999999999996,
+ "permutations": 25000,
+ "perm_beat_win_rate": 0,
+ "perm_beat_net": 0,
+ "perm_p_upper_95": 0.00012,
+ "bonferroni_threshold": 0.00013698630136986303
+}
