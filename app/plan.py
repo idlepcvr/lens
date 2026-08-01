@@ -366,3 +366,63 @@ def measured(days: int = None, book: str = None) -> dict:
         "enough": n >= MEASURED_MIN_N,
         "min_n": MEASURED_MIN_N,
     }
+
+
+def validated() -> dict:
+    """The /short system's parameters, for the goal model's third source.
+
+    `measured()` answers "what has the whole book done?" and the honest answer
+    is a negative edge — it averages the long side (worse than random) and the
+    VETO contexts together with the one thing that works. Feeding that into the
+    goal model is correct and useless: it says no target is reachable.
+
+    This feeds the model the SURVIVING cell instead — non-VETO shorts at R:R 1,
+    the only cell to clear four gates plus permutation, split-sweep and
+    leave-one-month-out (research/short_edge.py, research/short_robustness.py).
+    It is what the account would do if it traded only the thing that works.
+
+    The catch travels with the numbers: `trades_per_week` is 1.5, not the 7 the
+    target needs, and that gap is the whole remaining problem. The caller shows
+    both so the model can never quietly assume a cadence he doesn't have.
+    """
+    import json
+    from .paths import RESULTS
+    try:
+        with open(RESULTS / "short_edge.json") as fh:
+            b = json.load(fh).get("best")
+        if not b:
+            return {"n": 0}
+    except Exception:
+        return {"n": 0}
+
+    mech = None
+    try:
+        with open(RESULTS / "setup_search.json") as fh:
+            ss = json.load(fh)
+        surv = [r for r in ss.get("cells", [])
+                if r.get("perm_p") is not None and r["perm_p"] < 0.05]
+        if surv:
+            mech = {"rules": len(surv),
+                    "long": sum(1 for r in surv if r["direction"] == "long"),
+                    "short": sum(1 for r in surv if r["direction"] == "short"),
+                    # candidates only — uncorrected for ~1,700 combinations tried
+                    "per_week": round(sum(r["per_week"] for r in surv), 2)}
+    except Exception:
+        pass
+
+    return {
+        "n": b["n"],
+        "win_rate": round(b["win_rate"], 4),
+        "rr_ratio": round(b["rr"], 2),
+        "trades_per_week": round(b["trades_per_week"], 2),
+        "stop_pct": b["stop_pct"], "target_pct": b["target_pct"],
+        "breakeven_wr": round(b["breakeven_wr"], 4),
+        "net_pct": round(b["net_pct"], 4),
+        "median_hold_h": b["median_hold_h"],
+        "matched_random": round(b["matched_random"], 4),
+        "edge_pp": round(b["edge_pp"], 2),
+        "cell": b["cell"],
+        "mechanical": mech,
+        "enough": b["n"] >= MEASURED_MIN_N,
+        "min_n": MEASURED_MIN_N,
+    }

@@ -109,6 +109,26 @@ function renderPillars(g){
     const M=window.MEAS;
     const f=document.getElementById("goal-form")||document.forms[0];
     if(!M||!M.n||M.rr_ratio==null||!f){ box.hidden=true; return; }
+    // "validated" is measured too — on the surviving cell rather than the whole
+    // book — so the typed-vs-measured warning would be wrong. Different note.
+    // Detect the validated source from the VALUES, not from a flag: recompute()
+    // re-renders and any flag set before it gets clobbered. Comparing the form
+    // to the validated triple is stateless and cannot drift out of sync.
+    const Vv=window.VALIDATED;
+    const isVal = Vv && Vv.n
+      && Math.abs(parseFloat(f.elements.win_rate?.value)-Vv.win_rate)<1e-6
+      && Math.abs(parseFloat(f.elements.rr_ratio?.value)-Vv.rr_ratio)<1e-6;
+    if(isVal){
+      const V=Vv;
+      box.innerHTML="◆ <b>Running on the validated cell, not the whole book.</b> "
+        +(V?("<b>"+V.cell+"</b>, n="+V.n+" — the only cell to clear every gate. "):"")
+        +"The whole book (n="+M.n+") is <b>"+(M.win_rate*M.rr_ratio-(1-M.win_rate)).toFixed(3)
+        +"R</b> per trade because it averages the long side and the VETO contexts in."
+        +"<span class='dsub'>Legitimate, but it assumes you trade <i>only</i> that cell"
+        +(V?" — and it fires <b>"+V.trades_per_week+"/wk</b>, not the ~7 the target needs. "
+            +"Cadence here is what you generate, not what you need.":"")+"</span>";
+      box.hidden=false; return;
+    }
     const tR=parseFloat(f.elements.rr_ratio?.value), tW=parseFloat(f.elements.win_rate?.value);
     if(!isFinite(tR)||!isFinite(tW)){ box.hidden=true; return; }
     const bits=[];

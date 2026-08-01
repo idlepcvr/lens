@@ -171,8 +171,10 @@ BODY = r"""
           <div style="display:flex;gap:6px;align-items:center;margin-top:7px">
             <button type="button" class="btn" id="measured-btn" disabled>Use measured</button>
             <button type="button" class="btn" id="measured-win" title="window">all</button>
+            <button type="button" class="btn" id="validated-btn" disabled title="the /short system — the only cell that survived every gate">Use validated</button>
           </div>
           <div class="calc-tip" id="measured-note" style="margin-top:5px">—</div>
+          <div class="calc-tip" id="validated-note" style="margin-top:4px">—</div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Risk</div>
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
@@ -481,7 +483,7 @@ RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config"+BQ)
   });
   recompute();
   // auto-fills read the populated form, so they run strictly after populate()
-  loadLadder(); loadMeasured(); refreshVol();
+  loadLadder(); loadMeasured(); loadValidated(); refreshVol();
 })();
 
 // ── ATR noise floor + live-price auto-fill (same behaviour as /dashboard) ────
@@ -667,14 +669,48 @@ async function loadMeasured(){
 }
 document.getElementById("measured-win").addEventListener("click",async e=>{
   MEAS_DAYS=MEAS_DAYS?null:90; e.target.textContent=MEAS_DAYS?"90d":"all"; await loadMeasured(); });
+// ── "Use validated": the /short system — the surviving cell, not the whole book.
+// measured() averages the long side (worse than random) with the one thing that
+// works, so it correctly reports a negative edge and no reachable target. This
+// loads what the account would do trading only the cell that cleared every gate.
+let VAL=null;
+window.GOAL_SRC="typed";   // typed | measured | validated — read by the hero banner
+async function loadValidated(){
+  try{ VAL=await fetch("/api/goal/validated").then(r=>r.json()); }catch(e){ return; }
+  window.VALIDATED=VAL;   // the hero banner detects the validated source from these
+  const btn=document.getElementById("validated-btn"), note=document.getElementById("validated-note");
+  if(!btn||!note) return;
+  if(!VAL||!VAL.n){ note.textContent="no validated cell — run research/short_edge.py"; return; }
+  btn.disabled=!VAL.enough;
+  const short=(VAL.trades_per_week||0);
+  note.innerHTML=`<b>${VAL.cell}</b> @ R:R ${VAL.rr_ratio} · n=${VAL.n} · WR `
+    +`${(VAL.win_rate*100).toFixed(1)}% vs ${(VAL.matched_random*100).toFixed(1)}% random `
+    +`(${VAL.edge_pp>0?"+":""}${VAL.edge_pp}pp) · stop ${VAL.stop_pct.toFixed(2)}% / `
+    +`target ${VAL.target_pct.toFixed(2)}% · ~${VAL.median_hold_h}h hold`
+    +`<br><span style="color:var(--amber)">⚠ fires ${short}/wk — the target needs ~7. `
+    +`Loading this sets cadence to what you actually generate, not what you need.</span>`
+    +(VAL.mechanical?`<br><span style="color:var(--faint)">+${VAL.mechanical.rules} mechanical `
+      +`candidates (${VAL.mechanical.long}L/${VAL.mechanical.short}S, ~${VAL.mechanical.per_week}/wk) `
+      +`— uncorrected for multiple comparisons, not counted here.</span>`:"");
+}
+document.getElementById("validated-btn").addEventListener("click",()=>{
+  if(!VAL||!VAL.enough) return;
+  FORM.elements.win_rate.value=VAL.win_rate;
+  FORM.elements.rr_ratio.value=VAL.rr_ratio;
+  FORM.elements.trades_per_week.value=VAL.trades_per_week;
+  ["win_rate","rr_ratio","trades_per_week"].forEach(k=>{
+    const el=document.getElementById("src-"+k);
+    if(el){ el.textContent="validated"; el.className="msrc measured"; }});
+  window.GOAL_SRC="validated"; recompute();
+});
 document.getElementById("measured-btn").addEventListener("click",()=>{
   if(!MEAS||!MEAS.enough) return;
   FORM.elements.win_rate.value=MEAS.win_rate;
   FORM.elements.rr_ratio.value=MEAS.rr_ratio;
   FORM.elements.trades_per_week.value=MEAS.trades_per_week;
-  markSrc(true); recompute();
+  window.GOAL_SRC="measured"; markSrc(true); recompute();
 });
-FORM.addEventListener("input",()=>markSrc(false));
+FORM.addEventListener("input",()=>{ window.GOAL_SRC="typed"; markSrc(false); });
 
 // Target BTC helper — type a BTC count → fills Target € at TODAY's price (price cancels).
 const TBTC=document.getElementById("target_btc");
