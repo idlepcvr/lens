@@ -240,6 +240,74 @@ def config(sigma_daily_pct: float, hold_days: float, rr: float, win_rate: float,
     }
 
 
+# ─── target-first: what does a given weekly return actually demand? ──────────
+#
+# The rest of this module answers "what does this geometry earn?". These two
+# invert it: name the weekly return you want, and get back the win rate it
+# requires — stated as an edge over the MEASURED random-entry baseline rather
+# than over zero, because zero is not the competition. A cell needing +5pp over
+# random is a research problem; one needing +40pp is a fantasy, and the only
+# honest way to tell them apart is to price both against the same floor.
+
+def win_rate_for(weekly_target: float, rr: float, risk_pct: float,
+                 trades_per_week: float, stop_pct: float,
+                 friction_pct: float = FRICTION_PCT) -> float | None:
+    """Win rate needed to compound `weekly_target` (0.10 = 10%/week).
+
+    Per trade the account must gain (1+target)^(1/N) − 1. A win pays
+    risk × net_R, a loss costs risk, so solving for w:
+
+        w = (need/risk + 1) / (net_R + 1)
+
+    Returns None when the answer is ≥100% — the cell cannot deliver the target
+    at that risk budget no matter how good the entries are.
+    """
+    if risk_pct <= 0 or trades_per_week <= 0:
+        raise GeometryError("risk_pct and trades_per_week must be positive")
+    target = stop_pct * rr
+    net_r = (target - friction_pct) / (stop_pct + friction_pct)
+    if net_r <= 0:
+        return None
+    need = (1.0 + weekly_target) ** (1.0 / trades_per_week) - 1.0
+    w = (need / (risk_pct / 100.0) + 1.0) / (net_r + 1.0)
+    return None if w >= 1.0 else w
+
+
+def target_cell(weekly_target: float, rr: float, risk_pct: float,
+                trades_per_week: float, sigma_daily_pct: float,
+                random_wr: float, hold_days: float = 2.5,
+                friction_pct: float = FRICTION_PCT) -> dict | None:
+    """One cell of the feasibility map, priced against a measured baseline."""
+    g = solve(sigma_daily_pct, hold_days, rr, friction_pct)
+    w = win_rate_for(weekly_target, rr, risk_pct, trades_per_week,
+                     g["stop_pct"], friction_pct)
+    if w is None:
+        return None
+    # Drawdown from a losing run, and how often such a run shows up. Both are
+    # needed: a 60% drawdown that never happens is noise, one that happens
+    # monthly is the end of the account.
+    dd = lambda k: 1.0 - (1.0 - risk_pct / 100.0) ** k
+    return {
+        "rr": rr, "risk_pct": risk_pct, "trades_per_week": trades_per_week,
+        "stop_pct": g["stop_pct"], "target_pct": g["target_pct"],
+        "need_wr": w, "random_wr": random_wr,
+        "edge_pp": (w - random_wr) * 100,
+        "breakeven_wr": g["breakeven_wr"],
+        "dd_5": dd(5), "dd_10": dd(10), "dd_20": dd(20),
+        # P(a k-loss run appears in a week) — the drawdown you actually meet
+        "streak_5_wk": min(1.0, (1 - w) ** 5 * trades_per_week),
+        "leverage": leverage_for(risk_pct, g["stop_pct"], friction_pct),
+    }
+
+
+def max_risk_for_drawdown_cap(max_drawdown: float, losses_tolerated: int) -> float:
+    """Inverse of risk_for_drawdown — the biggest risk/trade that survives
+    `losses_tolerated` in a row inside a hard drawdown cap. This is the binding
+    constraint on a prop account, where breaching ends the account outright
+    rather than merely hurting."""
+    return risk_for_drawdown(max_drawdown, losses_tolerated) * 100
+
+
 if __name__ == "__main__":   # ponytail: one runnable check
     SIGMA = 1.79   # live daily_sigma when this was written, % per day
 

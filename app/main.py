@@ -928,6 +928,12 @@ def robustness_page():
     return render()
 
 
+@app.get("/target", response_class=HTMLResponse)
+def target_page():
+    from .target_page import render
+    return render()
+
+
 @app.get("/geometry", response_class=HTMLResponse)
 def geometry_page():
     from .geometry_page import render

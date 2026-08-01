@@ -159,6 +159,28 @@ def save_baseline(bars, sl: float, tp: float) -> dict:
     out["breakeven_wr"] = (sl + FRICTION_PCT) / ((tp - FRICTION_PCT) + (sl + FRICTION_PCT))
     out["edge_needed_pp"] = (out["breakeven_wr"] - out["win_rate"]) * 100
 
+    # Random-entry win rate per R:R, at the stop the barrier identity gives for
+    # a 2.5-day design hold. This is the baseline /target states every required
+    # edge against — a measured floor rather than the model's 1/(1+R).
+    from app.geometry import solve
+    from app.geometry_page import _sigma
+    sigma, _ = _sigma()
+    rr_base = {}
+    for rr in (1.0, 2.0, 3.0, 4.0, 6.0, 8.0):
+        g = solve(sigma, 2.5, rr)
+        w = n_ = 0
+        for d in ("long", "short"):
+            r = simulate(bars, g["stop_pct"], g["target_pct"], d, step=3)
+            if r:
+                w += r["win_rate"] * r["n"]; n_ += r["n"]
+        if n_:
+            rr_base[str(rr)] = {"win_rate": w / n_, "n": n_,
+                                "stop_pct": g["stop_pct"], "target_pct": g["target_pct"]}
+            print(f"    R:R {rr:.0f}: random WR {w/n_:.2%}  "
+                  f"({g['stop_pct']:.2f}%/{g['target_pct']:.2f}%)")
+    out["rr_baseline"] = rr_base
+    out["sigma"] = sigma
+
     path = os.path.join(__file__.rsplit("/research/", 1)[0], "results",
                         "barrier_baseline.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
