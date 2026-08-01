@@ -1106,6 +1106,13 @@ def api_goal_measured(days: Optional[int] = Query(None, description="window; omi
     return plan.measured(days, book=book)
 
 
+@app.get("/api/goal/validated")
+def api_goal_validated():
+    """The /short system's params — the surviving cell, not the whole book."""
+    from . import plan
+    return plan.validated()
+
+
 @app.get("/api/goal/hero")
 def api_goal_hero():
     """C6 — stage, next rung, progress, the C3 status word, and coverage."""
