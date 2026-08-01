@@ -38,6 +38,7 @@ import pandas as pd
 
 sys.path.insert(0, __file__.rsplit("/research/", 1)[0])
 
+from app.chart_patterns import pattern_masks as chart_masks   # noqa: E402
 from app.database import DB_PATH                  # noqa: E402
 from app.geometry import FRICTION_PCT             # noqa: E402
 from app.patterns import pattern_masks            # noqa: E402
@@ -163,6 +164,18 @@ def main() -> None:
             side = DIRECTION[key]
             combo = (key[0] + "+4h", key[1])
             masks[combo] = masks[key] & masks[("htf4h", "up" if side == "long" else "down")]
+            DIRECTION[combo] = side
+
+        # Wedges, triangles and pennants — the shapes his indicator draws. The
+        # direction is baked into the option name, and each also gets the 4h
+        # confirmation variant, since that combination was the best of every
+        # timeframe in the per-signal run.
+        for key, m in list(chart_masks(df).items()):
+            side = key[1].rsplit("_", 1)[1]
+            masks[key] = m
+            DIRECTION[key] = side
+            combo = ("chart+4h", key[1])
+            masks[combo] = m & masks[("htf4h", "up" if side == "long" else "down")]
             DIRECTION[combo] = side
 
         print(f"═══ {tf}  ({len(df):,} bars · {weeks:.0f} weeks · hold cap {cap} bars)")
