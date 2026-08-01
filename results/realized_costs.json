@@ -1,0 +1,15 @@
+{
+ "trades": 512,
+ "win_rate_realised": 0.388671875,
+ "win_rate_price_only": 0.408203125,
+ "realised_pnl": -4848.577,
+ "total_costs": 5535.988843,
+ "gross_pnl_before_costs": 687.4118429999999,
+ "inverted_pnl": -6223.400686,
+ "avg_move_pct": 0.026717949348699296,
+ "cost_per_trade": 10.812478208984375,
+ "gross_edge_per_trade": 1.3426012558593747,
+ "measured_friction_pct": 0.07940595078206551,
+ "median_notional": 5347.9324435,
+ "generated": "2026-08-01"
+}
