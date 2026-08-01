@@ -270,6 +270,10 @@ def landing():
           <div class="frow"><label>R:R ratio</label><input type="text" inputmode="decimal" name="rr_ratio"></div>
           <div class="frow"><label>Leverage</label><input type="text" inputmode="decimal" name="leverage"></div>
           <div class="frow"><label>Trades / week</label><input type="text" inputmode="decimal" name="trades_per_week"></div>
+          <div style="margin-top:7px">
+            <button type="button" class="btn" id="validated-btn" disabled title="the /short system — the only cell that survived every gate">Use validated</button>
+          </div>
+          <div class="calc-tip" id="validated-note" style="margin-top:5px">—</div>
         </div>
         <div class="fsec">
           <div class="fsec-lbl">Risk</div>
@@ -348,6 +352,33 @@ def landing():
 function tog(id){{ document.getElementById('h-'+id).classList.toggle('closed'); document.getElementById('s-'+id).classList.toggle('closed'); }}
 const FORM     = document.getElementById("goal-form");
 const ERR      = document.getElementById("err");
+// ── "Use validated": the /short system — the surviving cell, not the whole book.
+// Same source as /goal so Plan and Goal can never disagree about what the edge is.
+let VAL=null;
+async function loadValidated(){{
+  try{{ VAL=await fetch("/api/goal/validated").then(r=>r.json()); }}catch(e){{ return; }}
+  const btn=document.getElementById("validated-btn"), note=document.getElementById("validated-note");
+  if(!btn||!note) return;
+  if(!VAL||!VAL.n){{ note.textContent="no validated cell — run research/short_edge.py"; return; }}
+  btn.disabled=!VAL.enough;
+  note.innerHTML="<b>"+VAL.cell+"</b> @ R:R "+VAL.rr_ratio+" · n="+VAL.n+" · WR "
+    +(VAL.win_rate*100).toFixed(1)+"% vs "+(VAL.matched_random*100).toFixed(1)+"% random ("
+    +(VAL.edge_pp>0?"+":"")+VAL.edge_pp+"pp) · stop "+VAL.stop_pct.toFixed(2)+"% / target "
+    +VAL.target_pct.toFixed(2)+"% · ~"+VAL.median_hold_h+"h hold"
+    +"<br><span style='color:var(--amber)'>⚠ fires "+VAL.trades_per_week
+    +"/wk — the target needs ~7. This sets cadence to what you generate, not what you need.</span>";
+}}
+document.addEventListener("DOMContentLoaded",function(){{
+  const b=document.getElementById("validated-btn");
+  if(b) b.addEventListener("click",function(){{
+    if(!VAL||!VAL.enough) return;
+    FORM.elements.win_rate.value=VAL.win_rate;
+    FORM.elements.rr_ratio.value=VAL.rr_ratio;
+    FORM.elements.trades_per_week.value=VAL.trades_per_week;
+    recompute();
+  }});
+  loadValidated();
+}});
 const SAVED    = document.getElementById("saved-pulse");
 const SAVE_BTN = document.getElementById("save-btn");
 const RESET    = document.getElementById("reset-btn");
