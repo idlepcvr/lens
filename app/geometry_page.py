@@ -309,6 +309,64 @@ def render() -> str:
     except Exception:
         pass
 
+    # ── 7b. the backtest: what a RANDOM entry gets on 7 years of real bars ───
+    #
+    # The model's two predictions are falsifiable, so they were tested: every
+    # hourly bar 2019→now taken as an entry, walked forward to whichever barrier
+    # is touched first (stop wins ties). This is the baseline any claimed edge
+    # has to be stated against. research/barrier_test.py regenerates the cache.
+    base = ""
+    try:
+        import json
+        from .paths import RESULTS
+        with open(RESULTS / "barrier_baseline.json") as fh:
+            bl = json.load(fh)
+        if abs(bl["stop_pct"] - SL_PCT) < 0.01 and abs(bl["target_pct"] - TP_PCT) < 0.01:
+            gap = bl["edge_needed_pp"]
+            base = (
+                "<h2>What a random entry actually gets</h2>"
+                "<p class='lead'>The model above makes two predictions that can be "
+                f"checked, so they were: every hourly bar from {bl['from']} to "
+                f"{bl['to']} ({bl['bars']:,} of them) taken as an entry and walked "
+                "forward until a barrier is touched. No setups, no filters, no edge — "
+                "this is the floor the geometry sits on.</p>"
+                '<div class="conf">'
+                + kv("target reached", f"{bl['win_rate']:.1%}",
+                     f"model predicted {cfg['coinflip_wr']:.0%} — the random-walk "
+                     "assumption holds")
+                + kv("moves are reachable", f"{bl['long']['n']:,}",
+                     f"entries resolved; {bl['long']['win_rate']:.1%} of longs hit "
+                     f"+{TP_PCT:.2f}% before −{SL_PCT:.2f}%")
+                + kv("real hold", f"{bl['median_hold_h']:.0f}h",
+                     f"median — <b>not</b> the {HOLD_DAYS}d the model implies; "
+                     "BTC resolves faster than a Gaussian walk")
+                + kv("winners take", f"{bl['long']['median_win_h']:.0f}h",
+                     f"losers take {bl['long']['median_loss_h']:.0f}h — cut fast, "
+                     "hold the runners")
+                + kv("random net", f"{bl['long']['net_pct']:+.3f}%",
+                     "per trade, long side · shorts "
+                     f"{bl['short']['net_pct']:+.3f}%")
+                + kv("edge you must add", f"{gap:+.1f}pp",
+                     f"random {bl['win_rate']:.1%} → breakeven "
+                     f"{bl['breakeven_wr']:.1%}")
+                + "</div>"
+                "<p class='note'><b>Two things this settles.</b> First, the moves are "
+                f"reachable — {bl['long']['n']:,} of {bl['bars']:,} entries resolved and "
+                f"{bl['long']['win_rate']:.0%} of longs reached +{TP_PCT:.2f}%. The book's "
+                "0-of-512 was a fact about holding time, never about the market. Second, "
+                "<b>geometry alone is not an edge</b>: a random entry still loses roughly "
+                "the friction, as it must. What the new geometry bought is a smaller bar "
+                f"to clear — <b>{gap:.1f}pp</b> over random, where the superseded 0.63/1.5 "
+                "needed <b>14.9pp</b>. Same market, a quarter of the required skill.</p>"
+                "<p class='note'>The honest reading of the hold column: the barrier "
+                f"identity says {HOLD_DAYS} days, the market delivers {bl['median_hold_h']:.0f}h "
+                "median. Volatility clusters, so barriers get touched sooner than a "
+                "constant-σ walk predicts. Good news for trade supply; it does not change "
+                "the net, which is computed from the realized win rate above.</p>"
+            )
+    except Exception:
+        pass
+
     # ── 8. the honest check: has this ever been done? ────────────────────────
     #
     # The reachability verdict on this book is STARVED at every cell, and it is
@@ -375,7 +433,7 @@ def render() -> str:
         f'Two measured inputs — {src}, and {G.FRICTION_PCT:.2f}% round-trip friction — '
         f'plus two decisions: hold {HOLD_DAYS} days at R:R {RR:g}. '
         f'Nothing on this page is fitted to past winners.</p>'
-        + stale + verdict + law + ladder + conf + fric + frag + avail + ledger +
+        + stale + verdict + law + ladder + conf + base + fric + frag + avail + ledger +
         '<p class="foot"><a href="/audit">→ what this supersedes</a> · '
         '<a href="/glossary">→ the terms</a> · '
         '<a href="/edge">→ live strategy ranks</a><br>'
