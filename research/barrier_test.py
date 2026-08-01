@@ -57,23 +57,28 @@ def load_bars() -> list[tuple[int, float, float, float]]:
 
 
 def simulate(bars, stop_pct: float, target_pct: float, direction: str = "long",
-             step: int = 1) -> dict:
+             step: int = 1, entries=None, max_bars: int = MAX_HOURS) -> dict:
     """Every `step`-th bar becomes an entry at its close. Walk forward until a
-    barrier is touched; record which, and how long it took."""
+    barrier is touched; record which, and how long it took.
+
+    `entries` restricts entries to those bar indices (a setup's signal bars)
+    instead of every step-th bar; `max_bars` caps the walk. Both default to the
+    old behaviour. Holds are counted in BARS, which equals hours only when
+    `bars` is hourly — sub-hourly callers must convert."""
     wins = losses = unresolved = 0
     hold_win: list[int] = []
     hold_loss: list[int] = []
     n = len(bars)
     long_ = direction == "long"
 
-    for i in range(0, n - 1, step):
+    for i in (range(0, n - 1, step) if entries is None else entries):
         entry = bars[i][3]
         if long_:
             tp, sl = entry * (1 + target_pct / 100), entry * (1 - stop_pct / 100)
         else:
             tp, sl = entry * (1 - target_pct / 100), entry * (1 + stop_pct / 100)
 
-        end = min(i + 1 + MAX_HOURS, n)
+        end = min(i + 1 + max_bars, n)
         for j in range(i + 1, end):
             _, hi, lo, _ = bars[j]
             hit_sl = lo <= sl if long_ else hi >= sl
