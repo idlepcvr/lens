@@ -224,6 +224,57 @@ def render() -> str:
     except Exception:
         pass
 
+    # ── mechanical candidates, both directions ───────────────────────────────
+    mech = ""
+    try:
+        with open(RESULTS / "setup_search.json") as fh:
+            ss = json.load(fh)
+        surv = [r for r in ss["cells"] if r.get("perm_p") is not None
+                and r["perm_p"] < 0.05]
+        nl = sum(1 for r in surv if r["direction"] == "long")
+        ns = len(surv) - nl
+        rows = "".join(
+            f"<tr><td class='m {'pos' if r['direction']=='long' else 'neg'}'>"
+            f"{r['direction']}</td><td class='m' style='white-space:normal'>{r['rule']}</td>"
+            f"<td class='m'>{r['n']}</td><td class='m'>{r['win_rate']:.1%}</td>"
+            f"<td class='m'>{r['baseline']:.1%}</td>"
+            f"<td class='m edge'>{r['edge_pp']:+.1f}pp</td>"
+            f"<td class='m'>{r['net_pct']:+.3f}%</td>"
+            f"<td class='m'>{r['per_week']:.2f}</td>"
+            f"<td class='m'>{r['perm_p']:.3f}</td></tr>"
+            for r in sorted(surv, key=lambda r: -r["net_pct"]))
+        mech = (
+            "<h2>Mechanical candidates — both directions</h2>"
+            "<p class='lead'>The edge above lives in his head, so it cannot be "
+            "scanned for. This is the search for a rule that can: every hourly bar "
+            f"2019→2026 resolved at this geometry, then {ss['bars']:,} bars sliced by "
+            "every combination of RSI band, daily-trend side, MACD sign, "
+            "Bollinger/volume state and Bangkok session. Long and short searched "
+            "identically — a trader who only shorts is half a trader, and the gates "
+            f"decide. <b>{nl} long and {ns} short rules survive.</b> The long book he "
+            "actually traded was worse than random; mechanical long rules are not. "
+            "Those are different claims and only the first was ever tested.</p>"
+            "<table><tr><th>dir</th><th>rule</th><th>n</th><th>WR</th><th>base</th>"
+            "<th>edge</th><th>net</th><th>/wk</th><th>perm p</th></tr>" + rows + "</table>"
+            "<p class='note'><b>Together they trade 3.51×/week at +0.127%/trade</b> "
+            "(long book 2.38/wk at +0.132%, short 1.15/wk at +0.086%; both positive in "
+            "both halves). At 6% risk that is <b>+0.86%/week, +3.8%/month</b> — real, "
+            "positive, and more than double the discretionary cadence.</p>"
+            "<p class='note'><b>But it is 5.7× weaker per trade than his own judgement</b> "
+            "(+0.127% against +0.726%). The scanner buys frequency and sells quality, and "
+            "at this ratio the trade is not obviously worth making. The discretionary "
+            "filter remains the better edge; what it lacks is a way to fire more often.</p>"
+            "<div class='warn-b'><b>Treat these as candidates, not findings.</b> The "
+            "search tried roughly 1,700 combinations. Each p-value above is per-cell and "
+            "uncorrected, so at p&lt;0.05 chance alone would hand back dozens of winners; "
+            "a Bonferroni threshold here would be p&lt;0.00003 and none of them clear it. "
+            "The split-half gate mitigates this but does not remove it. <b>This is exactly "
+            "how S1–S5 happened.</b> The only test that settles it is forward trades on "
+            "bars the search never saw.</div>"
+        )
+    except Exception:
+        pass
+
     # ── honest limits ────────────────────────────────────────────────────────
     limits = (
         "<h2>What this does not prove</h2>"
@@ -240,7 +291,7 @@ def render() -> str:
         "bottom of the confidence interval, not the point estimate.</p>"
     )
 
-    body = (head + spec + evidence + long_sec + gap_sec + rob + limits +
+    body = (head + spec + evidence + long_sec + gap_sec + rob + mech + limits +
             '<p class="foot"><a href="/target">→ what the target costs</a> · '
             '<a href="/geometry">→ where the geometry comes from</a><br>'
             '<span class="m">python3 research/short_edge.py</span> reruns all four '
