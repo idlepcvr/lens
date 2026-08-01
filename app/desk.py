@@ -142,8 +142,8 @@ function render(){
     + `<div class="sec-body closed" id="s-help"><div class="help-body">`
     + `<h4>what this page is</h4>A <b>live read of the 1H candle that just closed</b> — not a trade log. It answers one thing: <b>can I enter right now, long or short?</b> Refreshes every 60s.`
     + `<h4>the verdict</h4><b class="g">ENTER</b> = real signal, the context where you historically win is live → it also buzzes your phone + lights the buttons below. <b class="r">BLOCKED / NO TRADE</b> = do not take it. <b>STAND DOWN</b> = nothing here. LONG and SHORT both always show so you see both sides.`
-    + `<h4>the only knob is risk €</h4>You don't set entry/stop/target — the <b>strategy</b> does (entry = price now, stop −0.63%, target +1.5% — the ONE validated geometry, every surface reads it). You only type how many <b>€ you'll risk</b>; it shows position size + exact €-win / €-loss.`
-    + `<h4>R : R</h4>reward ÷ risk → target 1.5% ÷ stop 0.63% = <b>2.38</b>. The 2026-07-02 audit: the old 0.95% target was too tight — half your winners ran to 1.5%+.`
+    + `<h4>the only knob is risk €</h4>You don't set entry/stop/target — the <b>strategy</b> does (entry = price now, stop −${GEO.sl}%, target +${GEO.tp}% — the ONE geometry, every surface reads it). You only type how many <b>€ you'll risk</b>; it shows position size + exact €-win / €-loss.`
+    + `<h4>R : R</h4>reward ÷ risk → target ${GEO.tp}% ÷ stop ${GEO.sl}% = <b>${GEO.rr}</b>. These are derived, not fitted: the stop is σ·√(hold ÷ R:R) for a trade meant to resolve in ~${GEO.hold} days. <a href="/geometry" style="color:var(--accent)">why</a>.`
     + `<h4>you place the trade, not LENS</h4>LENS is read-only. You execute on Kraken yourself; it syncs your fills after and tags <i>which setup</i> it was.`
     + `<h4>sections below</h4><b>context</b> = the readings that caused the verdict (the why). <b>checklists</b> = all 5 recipes, ✓/✗ per condition. <b>scoreboard</b> = how each setup really performed. Tap any header to collapse.`
     + `</div></div>`;
@@ -259,4 +259,14 @@ load();
 setInterval(load, 60000);
 """
 
-DESK_HTML = shell("/desk", "Desk", BODY, script=SCRIPT, right=RIGHT, meta="can I enter?")
+# Geometry into the help prose from the one source, so the explainer can never
+# quote a stop the desk no longer uses. SCRIPT is a raw literal full of JS
+# template braces, so it's prepended rather than .format()ed.
+from .geometry_page import HOLD_DAYS as _HOLD           # noqa: E402
+from .setups import SL_PCT as _SL, TP_PCT as _TP        # noqa: E402
+
+_GEO_JS = (f"const GEO={{sl:{_SL},tp:{_TP},"
+           f"rr:'{_TP / _SL:.2f}',hold:{_HOLD:g}}};\n")
+
+DESK_HTML = shell("/desk", "Desk", BODY, script=_GEO_JS + SCRIPT, right=RIGHT,
+                  meta="can I enter?")
