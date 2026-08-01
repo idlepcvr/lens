@@ -1,9 +1,9 @@
 {
   "generated": "2026-08-01",
-  "bars": 63397,
+  "bars": 63407,
   "from": "2019-05-06",
   "to": "2026-08-01",
-  "friction_pct": 0.3,
+  "friction_pct": 0.085,
   "stop_pct": 1.42,
   "target_pct": 5.66,
   "long": {
@@ -13,7 +13,7 @@
     "median_win_h": 48,
     "median_loss_h": 13,
     "n": 63366,
-    "net_pct": -0.16726256983240195
+    "net_pct": 0.047737430167597905
   },
   "short": {
     "win_rate": 0.196128971046348,
@@ -22,12 +22,12 @@
     "median_win_h": 43,
     "median_loss_h": 14.0,
     "n": 63239,
-    "net_pct": -0.33140688499185633
+    "net_pct": -0.11640688499185603
   },
   "win_rate": 0.20773271197819992,
   "median_hold_h": 18.0,
-  "breakeven_wr": 0.24293785310734461,
-  "edge_needed_pp": 3.5205141129144693,
+  "breakeven_wr": 0.21257062146892652,
+  "edge_needed_pp": 0.48379094907265996,
   "rr_baseline": {
     "1.0": {
       "win_rate": 0.4995259989571977,

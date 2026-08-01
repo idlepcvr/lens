@@ -42,17 +42,33 @@ from __future__ import annotations
 
 from math import sqrt
 
-# Round-trip friction, % of price. 0.15%/side Kraken taker — matches
-# calculator.compute_projection's fee_roundtrip default. Maker fills roughly
-# halve it, which is the single biggest lever on this page.
-FRICTION_PCT = 0.30
+# Round-trip friction, % of price. MEASURED, 2026-08-01, not assumed.
+#
+# This was 0.30% on a comment reading "0.15%/side Kraken taker". That rate is
+# wrong by 3x: Kraken FUTURES Tier 1 is 0.02% maker / 0.05% taker, and the whole
+# book trades PF_XBTUSD, a futures contract. 0.15%/side is nearer Kraken SPOT.
+# The error mattered — at 0.30% the one validated edge scored -0.74%/week, and
+# at the real cost it scores +0.53%/week. It was flipping signs, not shading
+# decimals. See research/realized_costs.py.
+#
+# 512 closed trades, 7,481,136 of notional, 5,537.19 of fees and funding, so the
+# blended realised rate is 0.0740%. 0.085% adds ~0.01% for the spread an IOC
+# order crosses, which the `fees` column does not contain.
+#
+# ⚠ This is fees + spread, NOT slippage. Only 6 of 512 trades carry a signal
+# link, so the gap between the bar close a backtest fills at and the price he
+# actually gets is still unmeasured. Backfill that link before trusting the
+# second decimal. Erring high is the safe direction and 0.085% already does.
+FRICTION_PCT = 0.085
 
-# Kraken maker/taker, both sides, for the friction ladder.
+# Kraken FUTURES Tier 1: 0.02% maker / 0.05% taker per side, plus ~0.01% spread
+# when crossing. Tier 1 holds below $5M of 30-day volume; the entire two-year
+# book is 7.5M, so he is not leaving Tier 1 by trading more.
 FRICTION_LADDER = {
-    "taker both sides": 0.30,
-    "taker in, maker out": 0.20,
-    "maker both sides": 0.10,
-    "maker + rebate": 0.05,
+    "taker both sides": 0.110,
+    "taker in, maker out": 0.080,
+    "maker both sides": 0.045,
+    "maker + rebate": 0.020,
 }
 
 
@@ -331,14 +347,22 @@ if __name__ == "__main__":   # ponytail: one runnable check
     short, long_ = solve(SIGMA, 4 / 24, 4.0), solve(SIGMA, 5.0, 4.0)
     assert short["friction_share_of_stop"] > long_["friction_share_of_stop"]
     assert short["breakeven_wr"] > long_["breakeven_wr"]
-    # a 4h hold at R:R 4 demands far more edge over a coin than a 5-day one
-    assert short["edge_needed_pp"] > 10 > long_["edge_needed_pp"]
+    # A 4h hold at R:R 4 demands far more edge over a coin than a 5-day one.
+    # Stated as a ratio, not an absolute: the old form hardcoded ">10pp", which
+    # was really a statement about FRICTION_PCT being 0.30 and broke the moment
+    # friction was measured rather than guessed.
+    assert short["edge_needed_pp"] > 3 * long_["edge_needed_pp"] > 0
     # with zero friction the breakeven collapses to the coin flip
     free = solve(SIGMA, 4 / 24, 4.0, friction_pct=0.0)
     assert abs(free["breakeven_wr"] - free["coinflip_wr"]) < 1e-9
 
     # ── a target thinner than the toll is not merely hard, it's undefined ────
-    doomed = solve(SIGMA, 0.001, 4.0)
+    # Derived from friction rather than hardcoded: target = σ·√(hold·R:R), so a
+    # hold below f²/(σ²·R:R) cannot produce a target that clears the toll. The
+    # old literal 0.001 days encoded FRICTION_PCT=0.30 and silently became a
+    # VIABLE geometry once friction was measured.
+    doomed_hold = FRICTION_PCT ** 2 / (SIGMA ** 2 * 4.0) / 2
+    doomed = solve(SIGMA, doomed_hold, 4.0)
     assert not doomed["viable"] and doomed["breakeven_wr"] is None
 
     # ── min viable: at or below the coin flip, no stop width rescues it ──────
@@ -361,10 +385,17 @@ if __name__ == "__main__":   # ponytail: one runnable check
     # ── the recommendation, and the friction lever ───────────────────────────
     c = config(SIGMA, 2.5, 4.0, 0.25)
     assert c["positive"] and c["monthly_pct"] > 0
-    cheap = config(SIGMA, 2.5, 4.0, 0.25, friction_pct=0.10)
+    # Half the live friction, whatever the live friction happens to be — the old
+    # literal 0.10 stopped being "cheap" the moment FRICTION_PCT dropped below it.
+    cheap = config(SIGMA, 2.5, 4.0, 0.25, friction_pct=FRICTION_PCT / 2)
     assert cheap["monthly_pct"] > c["monthly_pct"], "cheaper fills must pay more"
-    # and the fragility: a couple of points of win rate flips it
-    assert not config(SIGMA, 2.5, 4.0, 0.22)["positive"]
+    # And the fragility: a point or two of win rate still flips it, but the
+    # threshold moved with the measured friction. At 0.30% the edge needed over
+    # a coin flip was 4.24pp; at 0.085% it is 1.20pp. Pin the assertion to the
+    # solved breakeven rather than to a literal win rate that silently decays.
+    edge = solve(SIGMA, 2.5, 4.0)["breakeven_wr"]
+    assert not config(SIGMA, 2.5, 4.0, edge - 0.005)["positive"]
+    assert config(SIGMA, 2.5, 4.0, edge + 0.005)["positive"]
 
     print(f"σ {SIGMA}%/d · hold 2.5d · R:R 4")
     print(f"  stop {c['stop_pct']:.2f}%  target {c['target_pct']:.2f}%  "

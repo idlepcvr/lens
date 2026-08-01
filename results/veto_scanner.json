@@ -1,6 +1,6 @@
 {
   "generated": "2026-08-01",
-  "bars": 63400,
+  "bars": 63407,
   "stop_pct": 2.8302,
   "target_pct": 2.8302,
   "cells": [
@@ -9,60 +9,60 @@
       "all_bars": {
         "n": 63091,
         "win_rate": 0.5062687229557307,
-        "net_pct": -0.264516520581382
+        "net_pct": -0.04951652058138212
       },
       "no_veto": {
         "n": 17047,
         "win_rate": 0.5197395436147123,
-        "net_pct": -0.18826628732328232
+        "net_pct": 0.026733712676717758
       },
       "veto": {
         "n": 46044,
         "win_rate": 0.5012813830249326,
-        "net_pct": -0.29274685952567103
+        "net_pct": -0.07774685952567117
       },
       "edge_pp": 1.3470820658981641,
-      "per_week": 45.17186119873817,
+      "per_week": 45.16687431987004,
       "perm_p": 0.0,
-      "h1_net": -0.18629102131128428,
-      "h2_net": -0.19027120567375855,
+      "h1_net": 0.02870897868871536,
+      "h2_net": 0.02472879432624131,
       "gates": {
         "beats_all_bars": true,
-        "net_positive": false,
-        "both_halves": false,
+        "net_positive": true,
+        "both_halves": true,
         "permutation": true
       },
-      "gates_passed": 2
+      "gates_passed": 4
     },
     {
       "direction": "short",
       "all_bars": {
         "n": 63091,
         "win_rate": 0.49273271940530344,
-        "net_pct": -0.34113571507821994
+        "net_pct": -0.1261357150782203
       },
       "no_veto": {
         "n": 8913,
         "win_rate": 0.5220464490070683,
-        "net_pct": -0.17520828004039024
+        "net_pct": 0.03979171995960962
       },
       "veto": {
         "n": 54178,
         "win_rate": 0.4879102218612721,
-        "net_pct": -0.3684329801764554
+        "net_pct": -0.15343298017645557
       },
       "edge_pp": 2.9313729601764873,
-      "per_week": 23.618044164037858,
+      "per_week": 23.615436781427917,
       "perm_p": 0.0,
-      "h1_net": -0.14189501066098043,
-      "h2_net": -0.21220549372483988,
+      "h1_net": 0.07310498933901921,
+      "h2_net": 0.0027945062751599803,
       "gates": {
         "beats_all_bars": true,
-        "net_positive": false,
-        "both_halves": false,
+        "net_positive": true,
+        "both_halves": true,
         "permutation": true
       },
-      "gates_passed": 2
+      "gates_passed": 4
     }
   ]
 }
