@@ -31,6 +31,9 @@ HERO_CSS = r"""
 .statusline .sl-txt{color:var(--dim)}.statusline .sl-txt b{color:var(--ink);font-weight:700}
 .statusline.danger{border-color:var(--short);background:var(--short-d)}.statusline.danger .sl-dot{background:var(--short);box-shadow:0 0 7px var(--short)}
 .statusline.warn{border-color:var(--amber);background:var(--amber-d)}.statusline.warn .sl-dot{background:var(--amber);box-shadow:0 0 7px var(--amber)}
+.diverge{margin-top:9px;padding:10px 13px;border-radius:8px;border:1px solid var(--amber);
+  background:var(--amber-d);font-size:12.5px;line-height:1.55;color:var(--ink)}
+.diverge b{font-weight:700}.diverge .dsub{color:var(--dim);font-size:11.5px;display:block;margin-top:4px}
 .statusline.ok .sl-dot{background:var(--long);box-shadow:0 0 7px var(--long)}
 @media(prefers-reduced-motion:reduce){.hcard,.hcard::after,.statusline{transition:none}}
 """
@@ -44,6 +47,7 @@ HERO_HTML = r"""
       <div class="hcard" id="hc-size"><span class="hstate" id="st-size"></span><div class="hbig" id="h-size">—</div><div class="hlbl">Risk sizing<a class="qh" href="/glossary#kelly" target="_blank" rel="noopener" title="used vs optimal risk">?</a></div><div class="hsub" id="h-size-sub">—</div></div>
     </div>
     <div id="statusline" class="statusline ok"><span class="sl-dot"></span><span class="sl-txt">enter your parameters…</span></div>
+    <div id="divergence" class="diverge" hidden></div>
 """
 
 # ── behaviour — call renderPillars(g) after each /api/goal response ────────────
@@ -93,6 +97,38 @@ function renderPillars(g){
   // 4 · Risk sizing — used vs optimal
   setTxt("h-size", isFinite(over)?over.toFixed(1)+"×":"∞");
   setTxt("h-size-sub", fmtPct(used)+" vs "+fmtPct(opt)+" opt");
+
+  // 5 · Typed-vs-measured divergence.
+  // The hero cards are computed from whatever is in the form. If the typed R:R
+  // or win rate is well above what the ledger has ever produced, "Enough" is a
+  // statement about the typing, not about the edge — so say so rather than let
+  // a green card confirm a payoff that has never been taken.
+  (function(){
+    const box=document.getElementById("divergence");
+    if(!box) return;
+    const M=window.MEAS;
+    const f=document.getElementById("goal-form")||document.forms[0];
+    if(!M||!M.n||M.rr_ratio==null||!f){ box.hidden=true; return; }
+    const tR=parseFloat(f.elements.rr_ratio?.value), tW=parseFloat(f.elements.win_rate?.value);
+    if(!isFinite(tR)||!isFinite(tW)){ box.hidden=true; return; }
+    const bits=[];
+    if(tR>M.rr_ratio*1.15)
+      bits.push("R:R <b>"+tR+"</b> is <b>"+(tR/M.rr_ratio).toFixed(1)+"×</b> your measured <b>"+M.rr_ratio+"</b>");
+    if(tW>M.win_rate+0.03)
+      bits.push("win rate <b>"+(tW*100).toFixed(1)+"%</b> vs measured <b>"+(M.win_rate*100).toFixed(1)+"%</b>");
+    if(!bits.length){ box.hidden=true; return; }
+    // Per-trade edge in R at the MEASURED pair — the number the cards would show
+    // if the form held what the ledger actually did.
+    const mEdge=M.win_rate*M.rr_ratio-(1-M.win_rate);
+    box.innerHTML="⚠ <b>These cards are computed from typed values, not measured ones.</b> "
+      +bits.join(", ")+"."
+      +"<span class='dsub'>At the measured pair the per-trade edge is <b>"
+      +(mEdge>=0?"+":"")+mEdge.toFixed(3)+"R</b>"
+      +(mEdge<=0?" — negative, so no risk level reaches the target and the sizing "
+                 +"below is solving an unsolvable problem":"")
+      +". n="+M.n+". Press <b>Use measured</b> to see it.</span>";
+    box.hidden=false;
+  })();
   setHero("hc-size","st-size", over<=1.5?true:over<=3?"warn":false, over<=1.5?"Sane":over<=3?"Hot":"Reckless");
 
   // status line — one-sentence takeaway on the binding constraint

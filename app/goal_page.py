@@ -650,6 +650,8 @@ document.getElementById("sn-date").value=new Date().toISOString().slice(0,10);
 
 // ── "Use measured": the ledger's own WR / R / frequency, never silently mixed with typed ──
 let MEAS=null, MEAS_DAYS=null;
+// exposed so the hero can flag typed-vs-measured divergence (goal_hero.py)
+Object.defineProperty(window,"MEAS",{get:()=>MEAS});
 function markSrc(measured){ ["win_rate","rr_ratio","trades_per_week"].forEach(k=>{
   const el=document.getElementById("src-"+k); el.textContent=measured?"measured":"typed";
   el.className="msrc "+(measured?"measured":"typed"); }); }
