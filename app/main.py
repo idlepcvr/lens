@@ -928,6 +928,12 @@ def robustness_page():
     return render()
 
 
+@app.get("/short", response_class=HTMLResponse)
+def short_page():
+    from .short_page import render
+    return render()
+
+
 @app.get("/target", response_class=HTMLResponse)
 def target_page():
     from .target_page import render
