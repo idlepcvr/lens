@@ -185,6 +185,45 @@ def render() -> str:
         "same setup.</p>"
     )
 
+    # ── robustness ───────────────────────────────────────────────────────────
+    rob = ""
+    try:
+        with open(RESULTS / "short_robustness.json") as fh:
+            rb = json.load(fh)
+        rob = (
+            "<h2>Robustness</h2>"
+            "<p class='lead'>The four gates all take the non-VETO label as given. "
+            "If you slice 91 trades out of 293 by <i>any</i> rule and the slice looks "
+            "good, a significance test on the slice will happily agree — the label was "
+            "chosen partly because it looked good, and no gate above can see that. "
+            "Three tests that can:</p>"
+            "<ul class='gates'>"
+            f"<li class='{'y' if rb['perm_p'] < 0.05 else 'n'}'>"
+            f"{'✓' if rb['perm_p'] < 0.05 else '✗'} <b>Label permutation</b> — shuffle "
+            f"VETO/non-VETO across all {rb['n_shorts']} shorts {rb['perm_n']:,} times, "
+            f"group sizes held. The real gap is <b>{rb['gap_pp']:+.1f}pp</b>; chance "
+            f"produces one that big with <b>p = {rb['perm_p']:.3f}</b>. The filter is "
+            f"selecting, not merely labelling.</li>"
+            f"<li class='{'y' if rb['splits_ok'] == rb['splits_total'] else 'n'}'>"
+            f"{'✓' if rb['splits_ok'] == rb['splits_total'] else '✗'} <b>Split-point "
+            f"sweep</b> — \"positive in both halves\" is one arbitrary cut. Sweeping it "
+            f"from 30% to 70%, <b>{rb['splits_ok']}/{rb['splits_total']}</b> split points "
+            f"are positive on both sides. The result is not an artefact of where the "
+            f"line was drawn.</li>"
+            f"<li class='{'y' if rb['months_survived'] == rb['months_total'] else 'n'}'>"
+            f"{'✓' if rb['months_survived'] == rb['months_total'] else '✗'} "
+            f"<b>Leave-one-month-out</b> — drop each calendar month and refit. "
+            f"<b>{rb['months_survived']}/{rb['months_total']}</b> months can be removed "
+            f"with the edge intact, so no single month is carrying it.</li>"
+            "</ul>"
+            "<p class='note'>None of these rescue the sample from being his own "
+            "selection — they establish only that, <i>within</i> it, the filter does "
+            "work. That distinction is the difference between this and S1–S5, which "
+            "never faced a permutation test.</p>"
+        )
+    except Exception:
+        pass
+
     # ── honest limits ────────────────────────────────────────────────────────
     limits = (
         "<h2>What this does not prove</h2>"
@@ -201,7 +240,7 @@ def render() -> str:
         "bottom of the confidence interval, not the point estimate.</p>"
     )
 
-    body = (head + spec + evidence + long_sec + gap_sec + limits +
+    body = (head + spec + evidence + long_sec + gap_sec + rob + limits +
             '<p class="foot"><a href="/target">→ what the target costs</a> · '
             '<a href="/geometry">→ where the geometry comes from</a><br>'
             '<span class="m">python3 research/short_edge.py</span> reruns all four '

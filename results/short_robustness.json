@@ -1,0 +1,15 @@
+{
+  "generated": "2026-08-01",
+  "n_shorts": 293,
+  "n_non_veto": 91,
+  "gap_pp": 13.18137308236318,
+  "perm_p": 0.021,
+  "perm_n": 5000,
+  "splits_ok": 9,
+  "splits_total": 9,
+  "months_survived": 12,
+  "months_total": 12,
+  "wr_non_veto": 0.6813186813186813,
+  "net_non_veto": 0.7263362637362641,
+  "robust": true
+}
