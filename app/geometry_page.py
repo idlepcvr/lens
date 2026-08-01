@@ -60,6 +60,29 @@ def _fmt_hold(days: float) -> str:
     return f"{h:.0f}h" if h < 48 else f"{days:.1f}d"
 
 
+def _holds() -> list[float]:
+    """Realized holding periods in hours, from the closed book."""
+    import sqlite3
+    from datetime import datetime
+
+    from .database import DB_PATH
+    rows = sqlite3.connect(DB_PATH).execute(
+        "SELECT opened_at, closed_at FROM trades "
+        "WHERE closed_at IS NOT NULL AND opened_at IS NOT NULL").fetchall()
+
+    def p(s):
+        return datetime.fromisoformat(s.replace("Z", ""))
+    out = []
+    for a, b in rows:
+        try:
+            h = (p(b) - p(a)).total_seconds() / 3600
+        except Exception:
+            continue
+        if h >= 0:
+            out.append(h)
+    return sorted(out)
+
+
 def render() -> str:
     sigma, live = _sigma()
     cfg = G.config(sigma, HOLD_DAYS, RR, WIN_RATE, max_drawdown=MAX_DD, streak=STREAK)
@@ -286,6 +309,53 @@ def render() -> str:
     except Exception:
         pass
 
+    # ── 8. the honest check: has this ever been done? ────────────────────────
+    #
+    # The reachability verdict on this book is STARVED at every cell, and it is
+    # tempting to read that as "the geometry is wrong". It isn't — reach is
+    # measured over the trades he TOOK, at the holds he CHOSE, and those holds
+    # are hours. A 5.66% move takes ~2.5 days to arrive; a 2-hour trade cannot
+    # reach it, so 0/512 is what the barrier math predicts rather than evidence
+    # against it. What the ledger genuinely establishes is the harder point:
+    # the config needs a holding period with essentially no precedent here.
+    ledger = ""
+    try:
+        from .excursion import reachability
+        holds = _holds()
+        r = reachability(cfg["target_pct"], cfg["stop_pct"])
+        if holds and r:
+            n = len(holds)
+            med = holds[n // 2]
+            over = sum(1 for h in holds if h >= HOLD_DAYS * 24) / n
+            over_min = sum(1 for h in holds if h >= (min_hold or 99) * 24) / n
+            typical_move = sigma * sqrt(med / 24)
+            ledger = (
+                "<h2>Has this ever been done?</h2>"
+                f'<div class="warn-b" style="border-color:var(--amber);'
+                f'background:var(--amber-d)">'
+                f'<b>No — and that is the real constraint, not the arithmetic.</b> '
+                f'Median hold across {n} closed trades is <b>{med:.1f} hours</b>. '
+                f'Only <b>{over:.1%}</b> were held the {HOLD_DAYS} days this geometry '
+                f'assumes, and only {over_min:.1%} cleared even the {_fmt_hold(min_hold)} '
+                f'breakeven floor.</div>'
+                f"<p class='note'><b>{r['hit']}/{r['n']}</b> fills ever travelled "
+                f"{cfg['target_pct']:.2f}%, so the book's reachability verdict on this "
+                f"geometry is <b>{r['badge']}</b>. That is not evidence against it: a "
+                f"{med:.1f}-hour trade moves about {typical_move:.2f}% "
+                f"(σ·√t), so it <i>cannot</i> reach {cfg['target_pct']:.2f}% — the zero is "
+                "what the barrier math predicts, not a refutation of it. The old 0.63/1.5 "
+                "scored better on this test purely because its target was small enough to "
+                "be reachable inside a two-hour trade, which is also why it lost money.</p>"
+                "<p class='note'>What the ledger does establish is that this configuration "
+                "is <b>untested</b> here. Every number on this page is theory until trades "
+                "are actually held for days, and holding is the part that has never been "
+                "done. Treat the first fifty as an experiment in <i>holding</i>, not in "
+                "entry selection — the entry is the part the ledger already says isn't the "
+                "binding constraint.</p>"
+            )
+    except Exception:
+        pass
+
     stale = ""
     if drift:
         stale = (
@@ -305,7 +375,7 @@ def render() -> str:
         f'Two measured inputs — {src}, and {G.FRICTION_PCT:.2f}% round-trip friction — '
         f'plus two decisions: hold {HOLD_DAYS} days at R:R {RR:g}. '
         f'Nothing on this page is fitted to past winners.</p>'
-        + stale + verdict + law + ladder + conf + fric + frag + avail +
+        + stale + verdict + law + ladder + conf + fric + frag + avail + ledger +
         '<p class="foot"><a href="/audit">→ what this supersedes</a> · '
         '<a href="/glossary">→ the terms</a> · '
         '<a href="/edge">→ live strategy ranks</a><br>'
