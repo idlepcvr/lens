@@ -34,11 +34,26 @@ OHLCV_SYMBOL = "binance:BTC/USDT"
 # also loaded by the systemd unit as EnvironmentFile, so env vars win at runtime.
 ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 
-# Exit geometry — validated 2026-07-02 (strategies/_research/STRATEGY_AUDIT_20260702.md):
-# SL 0.63% = p80-85 of real playbook winners' MAE (keeps ~85% of winners).
-# TP 1.5%  = p50 of winners' MFE; breakeven WR drops 59%→44% after 0.3% RT fees
-# (the old 0.95% target needed 59% WR just to beat fees). 2.4R gross, ~1.3R net.
-SL_PCT, TP_PCT = 0.63, 1.5
+# Exit geometry — DERIVED 2026-08-01 (app/geometry.py, rendered at /geometry).
+#
+# Replaces the 2026-07-02 audit's 0.63% / 1.5%. That pair was fitted to the
+# MAE/MFE of *winning* trades — a sample selected by the outcome it was meant to
+# predict — and, more decisively, it never asked how long the resulting trade
+# takes to resolve. On the barrier identity E[hold] = SL·TP/σ², 0.63/1.5 resolves
+# in about 5 hours, over which the 0.30% round trip is HALF the stop. It needed a
+# ~34% win rate against a 30% coin flip just to break even, and the ledger's
+# −6.6%/mo is what losing that bet looks like.
+#
+# These come from the same identity run forwards instead: pick the hold, and the
+# stop follows. SL = σ·√(hold/R:R) at σ = 1.79%/day, hold 2.5 days, R:R 4 — the
+# shortest hold that clears friction with margin (the floor is ~43h at a 25% win
+# rate). Breakeven WR 24.2% against a 20% coin flip, so the edge required is
+# +4pp rather than +4 and a prayer.
+#
+# ⚠ σ drifts, and these do not. /geometry compares them against live σ and shows
+# a STALE banner past 15% divergence — deliberately a manual edit, because the
+# scanner must not silently move its own stop. Re-derive there, don't guess here.
+SL_PCT, TP_PCT = 1.42, 5.66
 
 # ── alert ticket sizing (tunable in .env; falls back to these defaults) ──
 MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%

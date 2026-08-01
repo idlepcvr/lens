@@ -79,7 +79,7 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
-NAV_NEUTRAL = [("/glossary", "Learn"), ("/robustness", "Robustness"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+NAV_NEUTRAL = [("/glossary", "Learn"), ("/robustness", "Robustness"), ("/money", "Money"), ("/geometry", "Geometry"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}

@@ -41,11 +41,18 @@ from .paths import SEARCH_JSON
 
 CAPITAL    = 1000.0
 MONTHS     = 30
-BASE_GEO   = {"stop_pct": 0.63, "tp_pct": 1.5, "leverage": 10.0, "slippage_pct": 0.03}
+# Baseline = whatever the scanner is actually armed with, so the search always
+# reports "better than what I run", not better than a number frozen in 2026-07.
+from .setups import SL_PCT as _SL, TP_PCT as _TP   # noqa: E402
+
+BASE_GEO   = {"stop_pct": _SL, "tp_pct": _TP, "leverage": 10.0, "slippage_pct": 0.03}
+# Grid straddles the live geometry rather than the old intraday cluster — the
+# 2.5-day barrier config sits mid-grid, and the tight/short end is kept so the
+# search can still say "the narrow stop was worse" out loud.
 GEO_GRID   = [{"stop_pct": sl, "tp_pct": tp, "leverage": lev,
                "atr_floor_mult": af, "slippage_pct": 0.03}
-              for sl in (0.5, 0.63, 1.0)
-              for tp in (0.95, 1.5, 2.5, 4.0)
+              for sl in (0.63, 1.0, _SL, 2.0)
+              for tp in (1.5, 3.0, _TP, 8.0)
               for lev in (5.0, 10.0)
               for af in (0.0, 1.0)]
 MIN_N      = 40

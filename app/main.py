@@ -928,45 +928,73 @@ def robustness_page():
     return render()
 
 
+@app.get("/geometry", response_class=HTMLResponse)
+def geometry_page():
+    from .geometry_page import render
+    return render()
+
+
 @app.get("/audit", response_class=HTMLResponse)
 def audit_page():
     """Plain-English home for the 2026-07-02 strategy-audit recommendations,
     compared LIVE against the current goal config. The 'where do I see this'
-    page — recommendations were previously only in code comments and git."""
+    page — recommendations were previously only in code comments and git.
+
+    2026-08-01: the geometry rows are SUPERSEDED by /geometry, which derives the
+    stop and target from live σ instead of fitting them to past winners. The
+    goal-model rows below still stand — they were always about the config being
+    consistent with the alerts, and that question survives the geometry change.
+    """
+    from . import geometry as G
+    from .geometry_page import HOLD_DAYS, RR, WIN_RATE, _sigma
     from .setups import SL_PCT, TP_PCT
     from .theme import shell
     cfg = get_lens_config()
     rr_live = round(TP_PCT / SL_PCT, 2)
     rr_cfg = cfg.get("rr_ratio")
     wr_cfg = cfg.get("win_rate")
+    sigma, _ = _sigma()
+    derived = G.config(sigma, HOLD_DAYS, RR, WIN_RATE)
     rows = []
 
     def row(ok, what, current, rec, why):
-        badge = ('<span style="color:var(--green)">✓</span>' if ok
-                 else '<span style="color:var(--red)">✗ fix</span>')
+        badge = ('<span style="color:var(--long)">✓</span>' if ok
+                 else '<span style="color:var(--short)">✗ fix</span>')
         rows.append(f"<tr><td>{badge}</td><td>{what}</td><td class='m'>{current}</td>"
                     f"<td class='m'>{rec}</td><td class='why'>{why}</td></tr>")
 
-    row(True, "Alert stop", f"{SL_PCT}%", "0.63%",
-        "From your own winners: 80–85% of winning playbook trades never went more "
-        "than ~0.55% against you. Keep it. (Not the daily-range metric — that one "
-        "belongs to the goal model's sizing floor.)")
-    row(abs(TP_PCT - 1.5) < 0.01, "Alert target", f"{TP_PCT}%", "1.5%",
-        "Half your playbook winners ran to +1.5%, a quarter past +2.0% — the old "
-        "0.95% sold half the move. After 0.3% round-trip fees the break-even win "
-        "rate falls from ~59% to ~44%; you actually win 46–58% in playbook contexts.")
+    row(abs(SL_PCT - derived["stop_pct"]) / derived["stop_pct"] <= 0.15,
+        "Alert stop", f"{SL_PCT}%", f"{derived['stop_pct']:.2f}%",
+        "Superseded. The old 0.63% came from the MAE of winning trades — a sample "
+        "picked by the outcome it was supposed to predict — and implied a ~5 hour "
+        "hold, over which the 0.30% round trip was half the stop. The figure on the "
+        "right is σ·√(hold/R:R) at live volatility. See /geometry.")
+    row(abs(TP_PCT - derived["target_pct"]) / derived["target_pct"] <= 0.15,
+        "Alert target", f"{TP_PCT}%", f"{derived['target_pct']:.2f}%",
+        "Superseded. The old 1.5% was the median MFE of winners, which is a "
+        "description of the past, not a target that clears friction. The new one "
+        f"is the stop × R:R {RR:g}, giving a {derived['breakeven_wr']:.1%} breakeven "
+        f"win rate against a {derived['coinflip_wr']:.0%} coin flip.")
     row(rr_cfg is not None and abs(rr_cfg - rr_live) < 0.2,
         "Goal-model R:R (Dashboard → Parameters)", f"{rr_cfg}", f"{rr_live}",
         f"Your projections on /goal and /dashboard are computed with this payoff. "
         f"The alerts actually deliver {rr_live}R gross (~1.3R net of fees) — set it "
         f"to {rr_live} so the projections stop assuming a payoff you never take.")
-    row(wr_cfg is not None and 0.40 <= wr_cfg <= 0.50,
-        "Goal-model win rate", f"{wr_cfg}", "0.44–0.50",
-        "0.44 is exactly the new geometry's break-even — conservative and honest. "
-        "Realized playbook WR is 46–58%.")
-    row(True, "Leverage reality (10x all-in)", "—", "—",
-        "Each stop-out ≈ −9% of account (6.3% move + ~3% fees). Each 1.5% target "
-        "≈ +12% after fees. If −9% per loss feels heavy, lower leverage — not the stop.")
+    row(wr_cfg is not None and derived["breakeven_wr"] <= wr_cfg <= 0.32,
+        "Goal-model win rate", f"{wr_cfg}",
+        f"{derived['breakeven_wr']:.2f}–0.30",
+        f"Must be read against the payoff. At R:R {RR:g} the coin-flip win rate is "
+        f"{derived['coinflip_wr']:.0%} and breakeven is {derived['breakeven_wr']:.1%}, so "
+        f"{wr_cfg} is not conservative here — paired with a 4R payoff it implies an "
+        "enormous edge and the projections inherit it. The old 0.44–0.50 range belonged "
+        "to the 2.4R geometry and does not transfer.")
+    row(False, "Leverage reality", "10x all-in", f"{derived['leverage']:.2f}×",
+        "Superseded, and the old framing was backwards. Leverage multiplies the win "
+        "and the loss by the same factor, so it cannot make a negative system "
+        "positive — it sets the size of the P&L, never its sign. It is a drawdown "
+        f"dial: {derived['leverage']:.2f}× is what caps a 15-loss streak at 25% of "
+        f"the account at a {derived['risk_pct']:.2f}% risk budget. At 10× the toll "
+        "was multiplied by ten alongside everything else.")
     row(False, "Goal target €" + format(int(cfg.get("target_balance") or 0), ","),
         "€52,950 by Oct", "keep as north star, don't trust the ETA",
         "At honest numbers (44–50% WR, ~1.3R net, 2 trades/wk from your balance) the "
@@ -974,7 +1002,16 @@ def audit_page():
         "€53k through the old 3R assumption. The goal is yours; the timeline isn't data.")
 
     body = (
-        '<div class="card" style="background:var(--card);border:1px solid var(--line);'
+        '<div class="card" style="background:var(--panel);border:1px solid var(--amber);'
+        'border-radius:10px;padding:16px 18px;margin:14px 0">'
+        '<b>Superseded 2026-08-01 by <a href="/geometry" style="color:var(--accent)">'
+        "/geometry</a>.</b> This audit set the stop and target from the MAE/MFE of "
+        "<i>winning</i> trades — fitted to a sample selected by the outcome it was "
+        "meant to predict, and never asking how long the resulting trade takes to "
+        "resolve. setups.py already records that the S1–S5 edge those numbers were "
+        "built on did not survive out of sample. The geometry rows below are kept so "
+        "the change is legible, not because they are still the recommendation.</div>"
+        '<div class="card" style="background:var(--panel);border:1px solid var(--line);'
         'border-radius:10px;padding:16px 18px;margin:14px 0">'
         "<b>What changed 2026-07-02:</b> every scanner alert now carries the validated "
         "geometry below, and clean S1–S5 playbook matches alert again (previously only "
@@ -983,8 +1020,10 @@ def audit_page():
         "phone-stays-silent bug.)</div>"
         "<table><tr><th></th><th>Setting</th><th>Current</th><th>Recommended</th>"
         "<th>Why (plain English)</th></tr>" + "".join(rows) + "</table>"
-        '<p style="margin-top:18px"><a href="/audit-report" style="color:var(--accent)">'
-        "→ Full audit report (visual)</a> · "
+        '<p style="margin-top:18px"><a href="/geometry" style="color:var(--accent)">'
+        "→ Where the geometry now comes from</a> · "
+        '<a href="/audit-report" style="color:var(--accent)">'
+        "→ Full audit report (visual, historical)</a> · "
         '<a href="/strategy" style="color:var(--accent)">→ live strategy re-ranks (H12/H13 watch)</a></p>'
     )
     css = ("<style>table{border-collapse:collapse;width:100%;font-size:13.5px}"
@@ -1700,7 +1739,7 @@ function customBody() {{
     vol_spike: document.getElementById('c-vs').checked,
     rsi_max: num('c-rsimax'), rsi_min: num('c-rsimin'),
     hour_from: num('c-hf'), hour_to: num('c-ht'),
-    stop_pct: num('c-sl') || 0.63, tp_pct: num('c-tp') || 1.5, leverage: num('c-lev') || 10,
+    stop_pct: num('c-sl') || {setups.SL_PCT}, tp_pct: num('c-tp') || {setups.TP_PCT}, leverage: num('c-lev') || 10,
     slippage_pct: num('c-slip') !== null ? num('c-slip') : 0.03,
     atr_floor_mult: num('c-atrf') || 0,
     // single-run geometry = the FROM (left) values
@@ -2138,6 +2177,9 @@ def api_backtest_sweep(req: BtRunRequest):
         return {"error": str(e), "trace": traceback.format_exc()}
 
 
+from . import setups   # noqa: E402  — module level: the defaults below need it
+
+
 class BtCustomRequest(BaseModel):
     months: int = 24
     initial_capital: float = 637.0
@@ -2157,8 +2199,8 @@ class BtCustomRequest(BaseModel):
     mayer_min: float | None = None
     hour_from: int | None = None    # Bangkok hours, window may wrap midnight
     hour_to: int | None = None
-    stop_pct: float = 0.63
-    tp_pct: float = 1.5
+    stop_pct: float = setups.SL_PCT   # defaults track the armed geometry, so an
+    tp_pct: float = setups.TP_PCT     # unspecified search tests what he runs
     leverage: float = 10.0
     slippage_pct: float = 0.03     # per-side market-order fill cost
     atr_floor_mult: float = 0.0    # stop >= mult × entry-bar ATR% (0 = off)
