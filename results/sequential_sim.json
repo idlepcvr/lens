@@ -1,0 +1,6354 @@
+{
+ "generated": "2026-08-01",
+ "symbol": "bybit:BTC/USDT:USDT",
+ "friction_pct": 0.3,
+ "hold_cap_h": 24,
+ "one_position_at_a_time": true,
+ "band": [
+  0.05,
+  0.2
+ ],
+ "cells": [
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 6092,
+   "per_week": 45.8539346398396,
+   "win_rate": 0.4906434668417597,
+   "avg_move_pct": -0.009250103938584133,
+   "net_per_trade": -0.3092501039385841,
+   "mean_hold_h": 1.5590528562048587,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31371964010738845,
+    -0.3047805677697798
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 5947,
+   "per_week": 44.76253271554926,
+   "win_rate": 0.4913401715150496,
+   "avg_move_pct": -0.00896375607800367,
+   "net_per_trade": -0.30896375607800364,
+   "mean_hold_h": 1.7555069783083908,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2943275978295742,
+    -0.3235949929551324
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 3203,
+   "per_week": 24.10869216208244,
+   "win_rate": 0.49547299406806117,
+   "avg_move_pct": -0.004157936050298345,
+   "net_per_trade": -0.30415793605029834,
+   "mean_hold_h": 1.3714486418982204,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3055885527794748,
+    -0.3027282123403036
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 2962,
+   "per_week": 22.29470689481367,
+   "win_rate": 0.4902093180283592,
+   "avg_move_pct": -0.009685244802437373,
+   "net_per_trade": -0.30968524480243736,
+   "mean_hold_h": 1.8893765473778976,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2933554510628128,
+    -0.32601503854206193
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 9942,
+   "per_week": 74.83253745720376,
+   "win_rate": 0.4981894990947495,
+   "avg_move_pct": -0.0018346210651600957,
+   "net_per_trade": -0.30183462106516007,
+   "mean_hold_h": 1.0582545430161605,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3107624220478777,
+    -0.2929068200824425
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 10153,
+   "per_week": 76.42071542979177,
+   "win_rate": 0.48941199645425,
+   "avg_move_pct": -0.010640903795139694,
+   "net_per_trade": -0.3106409037951397,
+   "mean_hold_h": 1.166814406251026,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.312392496848004,
+    -0.30888965574780086
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 11014,
+   "per_week": 82.90138478712957,
+   "win_rate": 0.5021790448520065,
+   "avg_move_pct": 0.0022128107942152556,
+   "net_per_trade": -0.29778718920578473,
+   "mean_hold_h": 0.9964060892197809,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30338923366343706,
+    -0.2921851447481324
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 9137,
+   "per_week": 68.7733750499367,
+   "win_rate": 0.4951296924592317,
+   "avg_move_pct": -0.004862142444428677,
+   "net_per_trade": -0.30486214244442866,
+   "mean_hold_h": 1.260908029623144,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3017663799879633,
+    -0.307957227342904
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 6637,
+   "per_week": 49.95610049320673,
+   "win_rate": 0.5033900858821757,
+   "avg_move_pct": 0.003206640124507226,
+   "net_per_trade": -0.29679335987549277,
+   "mean_hold_h": 1.892333383556828,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2955345101240864,
+    -0.29805183034104454
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 6623,
+   "per_week": 49.850723755689046,
+   "win_rate": 0.5015853842669485,
+   "avg_move_pct": 0.0013967346912160158,
+   "net_per_trade": -0.29860326530878395,
+   "mean_hold_h": 1.9002969449896825,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30590353073488286,
+    -0.29130520406910604
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 3295,
+   "per_week": 24.801167865770108,
+   "win_rate": 0.5031866464339909,
+   "avg_move_pct": 0.0031503469532236034,
+   "net_per_trade": -0.2968496530467764,
+   "mean_hold_h": 2.0579160343955487,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2941677779582312,
+    -0.2995299007839329
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 3396,
+   "per_week": 25.561385757862,
+   "win_rate": 0.502944640753828,
+   "avg_move_pct": 0.0024914265123619594,
+   "net_per_trade": -0.29750857348763804,
+   "mean_hold_h": 1.7483559089124463,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3138016726745536,
+    -0.2812154743007224
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 10167,
+   "per_week": 76.52609216730946,
+   "win_rate": 0.5012294678862989,
+   "avg_move_pct": 0.0010096858849690156,
+   "net_per_trade": -0.29899031411503096,
+   "mean_hold_h": 1.3635454575259827,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30508077372510234,
+    -0.29290105247105125
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 9387,
+   "per_week": 70.6551025056097,
+   "win_rate": 0.49227655267923726,
+   "avg_move_pct": -0.007811184068655308,
+   "net_per_trade": -0.3078111840686553,
+   "mean_hold_h": 1.4997514292816305,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2965816412318437,
+    -0.31903833458701
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 5618,
+   "per_week": 42.2861793838836,
+   "win_rate": 0.5044499822000712,
+   "avg_move_pct": 0.004440419016713951,
+   "net_per_trade": -0.29555958098328605,
+   "mean_hold_h": 1.188249080337012,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2974825152668502,
+    -0.2936366466997219
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 4552,
+   "per_week": 34.26249351289394,
+   "win_rate": 0.49318980667838314,
+   "avg_move_pct": -0.0067795291447584165,
+   "net_per_trade": -0.3067795291447584,
+   "mean_hold_h": 1.6349589923842998,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2996749685934394,
+    -0.3138840896960774
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 3155,
+   "per_week": 23.74740049059323,
+   "win_rate": 0.48938193343898573,
+   "avg_move_pct": -0.015514143009875758,
+   "net_per_trade": -0.31551414300987574,
+   "mean_hold_h": 4.843132593766509,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3369502288292347,
+    -0.2940916415288054
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2972,
+   "per_week": 22.369975993040594,
+   "win_rate": 0.49360699865410496,
+   "avg_move_pct": -0.012261203019583786,
+   "net_per_trade": -0.31226120301958377,
+   "mean_hold_h": 5.417255495738,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2809395086273202,
+    -0.3435828974118474
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1709,
+   "per_week": 12.86348888698061,
+   "win_rate": 0.5020479812755998,
+   "avg_move_pct": 0.011410132977472417,
+   "net_per_trade": -0.2885898670225276,
+   "mean_hold_h": 4.282767700409596,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29285117294287993,
+    -0.2843335450857078
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1453,
+   "per_week": 10.93659997237146,
+   "win_rate": 0.49346180316586374,
+   "avg_move_pct": -0.003115097942106718,
+   "net_per_trade": -0.3031150979421067,
+   "mean_hold_h": 5.926932782748337,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28133419644419944,
+    -0.3248660394654639
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2957,
+   "per_week": 22.257072345700212,
+   "win_rate": 0.49746364558674333,
+   "avg_move_pct": -0.006659944423050681,
+   "net_per_trade": -0.30665994442305067,
+   "mean_hold_h": 3.5690452034719873,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3234901749235084,
+    -0.28984109338878666
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2991,
+   "per_week": 22.51298727967174,
+   "win_rate": 0.4958207957204948,
+   "avg_move_pct": -0.010473948409110409,
+   "net_per_trade": -0.3104739484091104,
+   "mean_hold_h": 3.98180653070322,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3190920637696488,
+    -0.3018615938208718
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 3331,
+   "per_week": 25.072136619387017,
+   "win_rate": 0.5031522065445813,
+   "avg_move_pct": 0.004931499278388769,
+   "net_per_trade": -0.2950685007216112,
+   "mean_hold_h": 3.334509156409487,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31142100404183376,
+    -0.27872581282955206
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2676,
+   "per_week": 20.142010685523765,
+   "win_rate": 0.500373692077728,
+   "avg_move_pct": -0.0013013157914343208,
+   "net_per_trade": -0.3013013157914343,
+   "mean_hold_h": 4.365097159940209,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28562339021816746,
+    -0.3169792413647012
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2730,
+   "per_week": 20.54846381594913,
+   "win_rate": 0.5043956043956044,
+   "avg_move_pct": -0.00028039615165759217,
+   "net_per_trade": -0.3002803961516576,
+   "mean_hold_h": 5.950915750915751,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2872341211906027,
+    -0.31332667111271245
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2789,
+   "per_week": 20.99255149548796,
+   "win_rate": 0.4998207242739333,
+   "avg_move_pct": 0.005920399808388947,
+   "net_per_trade": -0.29407960019161106,
+   "mean_hold_h": 5.8017808055455955,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30670683698488443,
+    -0.28146141518098516
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1336,
+   "per_week": 10.055951523116498,
+   "win_rate": 0.5104790419161677,
+   "avg_move_pct": 0.01220553505953276,
+   "net_per_trade": -0.28779446494046723,
+   "mean_hold_h": 6.589196606786427,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2881300129737222,
+    -0.28745891690721226
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1478,
+   "per_week": 11.124772717938761,
+   "win_rate": 0.5196211096075778,
+   "avg_move_pct": 0.044987414064978436,
+   "net_per_trade": -0.2550125859350216,
+   "mean_hold_h": 5.308694181326117,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2710399870406698,
+    -0.23898518482937334
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 3941,
+   "per_week": 29.66355161122913,
+   "win_rate": 0.4986044151230652,
+   "avg_move_pct": 0.001913896380482388,
+   "net_per_trade": -0.2980861036195176,
+   "mean_hold_h": 4.538209422312442,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3105319529157162,
+    -0.2856465688079948
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 3630,
+   "per_week": 27.322682656371924,
+   "win_rate": 0.4991735537190083,
+   "avg_move_pct": -0.0015471952152858947,
+   "net_per_trade": -0.3015471952152859,
+   "mean_hold_h": 4.959366391184573,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2743198157847481,
+    -0.3287745746458236
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2203,
+   "per_week": 16.581782339390454,
+   "win_rate": 0.5043123014071721,
+   "avg_move_pct": 0.012065400454457241,
+   "net_per_trade": -0.28793459954554274,
+   "mean_hold_h": 3.9702678166137084,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2891056640819514,
+    -0.2867645976811272
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1731,
+   "per_week": 13.029080903079834,
+   "win_rate": 0.5101097631426921,
+   "avg_move_pct": 0.02072232451251201,
+   "net_per_trade": -0.279277675487488,
+   "mean_hold_h": 5.501155401502022,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2777665673014041,
+    -0.28078703874495053
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1993,
+   "per_week": 15.001131276625136,
+   "win_rate": 0.4897139989964877,
+   "avg_move_pct": -0.0016586960389133765,
+   "net_per_trade": -0.3016586960389134,
+   "mean_hold_h": 8.861431677538048,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3382447868862065,
+    -0.2651093013710057
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1883,
+   "per_week": 14.173171196129017,
+   "win_rate": 0.5018587360594795,
+   "avg_move_pct": -0.00936514731671898,
+   "net_per_trade": -0.309365147316719,
+   "mean_hold_h": 9.647238449283059,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25263251796862524,
+    -0.36603755094363644
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1078,
+   "per_week": 8.114008788861964,
+   "win_rate": 0.4972170686456401,
+   "avg_move_pct": 0.028027576656412263,
+   "net_per_trade": -0.27197242334358773,
+   "mean_hold_h": 7.985930735930736,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30162497758829476,
+    -0.24231986909888065
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 917,
+   "per_week": 6.9021763074085545,
+   "win_rate": 0.5016357688113413,
+   "avg_move_pct": 0.017577086745563575,
+   "net_per_trade": -0.2824229132544364,
+   "mean_hold_h": 10.482188295165395,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2304041204589134,
+    -0.33432837534670123
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1398,
+   "per_week": 10.522619932123401,
+   "win_rate": 0.488555078683834,
+   "avg_move_pct": -0.02570139314036638,
+   "net_per_trade": -0.3257013931403664,
+   "mean_hold_h": 7.563900810681927,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3832819401467452,
+    -0.26812084613398757
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1515,
+   "per_week": 11.403268381378364,
+   "win_rate": 0.5016501650165016,
+   "avg_move_pct": -0.017348591956560095,
+   "net_per_trade": -0.31734859195656007,
+   "mean_hold_h": 7.874092409240925,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33844671880122024,
+    -0.2962782990523282
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1614,
+   "per_week": 12.14843245382487,
+   "win_rate": 0.4944237918215613,
+   "avg_move_pct": -0.0001019639433496569,
+   "net_per_trade": -0.30010196394334965,
+   "mean_hold_h": 6.965613382899629,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3309365436887429,
+    -0.26926738419795637
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1357,
+   "per_week": 10.21401662939303,
+   "win_rate": 0.5047899778924098,
+   "avg_move_pct": 0.00013412299213553603,
+   "net_per_trade": -0.29986587700786443,
+   "mean_hold_h": 8.741832473593712,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.26092061647518894,
+    -0.3387537807503593
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1719,
+   "per_week": 12.93875798520753,
+   "win_rate": 0.5171611401977894,
+   "avg_move_pct": 0.019127847258077015,
+   "net_per_trade": -0.28087215274192295,
+   "mean_hold_h": 10.526711266240062,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2567931963988155,
+    -0.304923110298585
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1743,
+   "per_week": 13.119403820952138,
+   "win_rate": 0.4968445209409065,
+   "avg_move_pct": -0.000911586038961085,
+   "net_per_trade": -0.30091158603896107,
+   "mean_hold_h": 10.353270223752151,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31656956838856265,
+    -0.2852715600911366
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 862,
+   "per_week": 6.488196267160495,
+   "win_rate": 0.5232018561484919,
+   "avg_move_pct": 0.05072732434464522,
+   "net_per_trade": -0.24927267565535477,
+   "mean_hold_h": 11.347447795823665,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.24531751563066664,
+    -0.25322783568004287
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 922,
+   "per_week": 6.939810856522015,
+   "win_rate": 0.5151843817787418,
+   "avg_move_pct": 0.07555648101287715,
+   "net_per_trade": -0.22444351898712284,
+   "mean_hold_h": 9.638105567606653,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21994277835828113,
+    -0.22894425961596454
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 2219,
+   "per_week": 16.702212896553526,
+   "win_rate": 0.491212257773772,
+   "avg_move_pct": -0.012675594257093825,
+   "net_per_trade": -0.3126755942570938,
+   "mean_hold_h": 8.76130389064143,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3285468936372447,
+    -0.29681859334485294
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 2122,
+   "per_week": 15.972102643752402,
+   "win_rate": 0.5009425070688031,
+   "avg_move_pct": 0.0007560249828354931,
+   "net_per_trade": -0.2992439750171645,
+   "mean_hold_h": 9.225259189443921,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.24949873157499722,
+    -0.3489892184593318
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1229,
+   "per_week": 9.250572172088456,
+   "win_rate": 0.4955248169243287,
+   "avg_move_pct": 0.008467300285354603,
+   "net_per_trade": -0.2915326997146454,
+   "mean_hold_h": 7.850827230810959,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29652444225586777,
+    -0.2865490738279616
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1042,
+   "per_week": 7.843040035245053,
+   "win_rate": 0.5047984644913628,
+   "avg_move_pct": 0.02208424146717895,
+   "net_per_trade": -0.277915758532821,
+   "mean_hold_h": 10.027751119641716,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2392983902941834,
+    -0.3165331267714587
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1483,
+   "per_week": 11.16240726705222,
+   "win_rate": 0.4868509777478085,
+   "avg_move_pct": -0.025871168665177326,
+   "net_per_trade": -0.3258711686651773,
+   "mean_hold_h": 12.593560350640594,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.36398953405241613,
+    -0.28780417573802913
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1431,
+   "per_week": 10.771007956272237,
+   "win_rate": 0.4975541579315164,
+   "avg_move_pct": -0.019206535541791723,
+   "net_per_trade": -0.31920653554179174,
+   "mean_hold_h": 13.269566736547867,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2678539486650248,
+    -0.37048740092850724
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 818,
+   "per_week": 6.157012234962048,
+   "win_rate": 0.4902200488997555,
+   "avg_move_pct": 0.009396632261292802,
+   "net_per_trade": -0.2906033677387072,
+   "mean_hold_h": 11.366442542787286,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3306819850923732,
+    -0.2505247503850412
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 704,
+   "per_week": 5.298944515175161,
+   "win_rate": 0.4971590909090909,
+   "avg_move_pct": 0.010819647092335674,
+   "net_per_trade": -0.2891803529076643,
+   "mean_hold_h": 14.413352272727273,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2062616162592757,
+    -0.372099089556053
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 932,
+   "per_week": 7.015079954748934,
+   "win_rate": 0.48283261802575106,
+   "avg_move_pct": -0.04040774819291705,
+   "net_per_trade": -0.340407748192917,
+   "mean_hold_h": 11.323408440629471,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4460272150404362,
+    -0.2347882813453979
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1008,
+   "per_week": 7.587125101273526,
+   "win_rate": 0.5079365079365079,
+   "avg_move_pct": 0.007818064868734667,
+   "net_per_trade": -0.29218193513126534,
+   "mean_hold_h": 11.833416005291006,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3142546282300631,
+    -0.27010924203246756
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1053,
+   "per_week": 7.925836043294665,
+   "win_rate": 0.5014245014245015,
+   "avg_move_pct": 0.018802372595305837,
+   "net_per_trade": -0.2811976274046942,
+   "mean_hold_h": 10.843146565368787,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3576749234365989,
+    -0.2048654495815786
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 944,
+   "per_week": 7.105402872621238,
+   "win_rate": 0.5084745762711864,
+   "avg_move_pct": 0.023067080274344103,
+   "net_per_trade": -0.27693291972565587,
+   "mean_hold_h": 12.694650423728813,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22000859120366367,
+    -0.3338572482476481
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1345,
+   "per_week": 10.123693711520726,
+   "win_rate": 0.5144981412639406,
+   "avg_move_pct": -0.011403880987668848,
+   "net_per_trade": -0.31140388098766886,
+   "mean_hold_h": 14.236679058240394,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2757267116911127,
+    -0.34702803814559713
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1367,
+   "per_week": 10.28928572761995,
+   "win_rate": 0.49378200438917336,
+   "avg_move_pct": 0.020691146540956485,
+   "net_per_trade": -0.2793088534590435,
+   "mean_hold_h": 13.957205559619604,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2975234162287726,
+    -0.2611209201670479
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 673,
+   "per_week": 5.065610310671709,
+   "win_rate": 0.5156017830609212,
+   "avg_move_pct": 0.012211879520492918,
+   "net_per_trade": -0.2877881204795071,
+   "mean_hold_h": 15.37184249628529,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.26351403504644355,
+    -0.3119901759854695
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 726,
+   "per_week": 5.464536531274384,
+   "win_rate": 0.5151515151515151,
+   "avg_move_pct": 0.10182520441771716,
+   "net_per_trade": -0.19817479558228285,
+   "mean_hold_h": 13.195247933884298,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21097242061274774,
+    -0.18537717055181796
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1602,
+   "per_week": 12.058109535952568,
+   "win_rate": 0.4875156054931336,
+   "avg_move_pct": -0.013103846592610635,
+   "net_per_trade": -0.31310384659261065,
+   "mean_hold_h": 12.581200582605078,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3735282566371443,
+    -0.25267943654807695
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1538,
+   "per_week": 11.57638730730028,
+   "win_rate": 0.5013003901170351,
+   "avg_move_pct": -0.014973947901078975,
+   "net_per_trade": -0.31497394790107897,
+   "mean_hold_h": 13.139466840052016,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2548448631391588,
+    -0.37510303266299916
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 870,
+   "per_week": 6.548411545742031,
+   "win_rate": 0.4804597701149425,
+   "avg_move_pct": -0.0047804673696329415,
+   "net_per_trade": -0.30478046736963293,
+   "mean_hold_h": 11.636302681992337,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.36935566206709647,
+    -0.24020527267216937
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 768,
+   "per_week": 5.780666743827448,
+   "win_rate": 0.5013020833333334,
+   "avg_move_pct": 0.026679655058164203,
+   "net_per_trade": -0.27332034494183577,
+   "mean_hold_h": 14.119791666666666,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.17052512248388765,
+    -0.3761155673997839
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 1122,
+   "per_week": 8.445192821060413,
+   "win_rate": 0.48663101604278075,
+   "avg_move_pct": -0.031769846031536285,
+   "net_per_trade": -0.33176984603153625,
+   "mean_hold_h": 17.374108734402853,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.42056000302403734,
+    -0.24297968903903522
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 1089,
+   "per_week": 8.196804796911577,
+   "win_rate": 0.4986225895316804,
+   "avg_move_pct": -0.018691675363025153,
+   "net_per_trade": -0.3186916753630251,
+   "mean_hold_h": 18.06114172023263,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22712223411724541,
+    -0.41009309928541815
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 585,
+   "per_week": 4.4032422462748135,
+   "win_rate": 0.49914529914529915,
+   "avg_move_pct": 0.052773783259997986,
+   "net_per_trade": -0.247226216740002,
+   "mean_hold_h": 16.762820512820515,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28208328115651876,
+    -0.212488118413644
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 560,
+   "per_week": 4.215069500707514,
+   "win_rate": 0.49642857142857144,
+   "avg_move_pct": 0.011334329326581204,
+   "net_per_trade": -0.2886656706734188,
+   "mean_hold_h": 18.833035714285714,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2004639600094157,
+    -0.3768673813374219
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 632,
+   "per_week": 4.757007007941337,
+   "win_rate": 0.47310126582278483,
+   "avg_move_pct": -0.05332590225183067,
+   "net_per_trade": -0.35332590225183064,
+   "mean_hold_h": 16.773338607594937,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4785989748867595,
+    -0.22805282961690182
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 718,
+   "per_week": 5.404321252692848,
+   "win_rate": 0.5041782729805014,
+   "avg_move_pct": 0.006660419704838668,
+   "net_per_trade": -0.29333958029516133,
+   "mean_hold_h": 16.641364902506965,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2506124632361138,
+    -0.33606669735420885
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 707,
+   "per_week": 5.321525244643237,
+   "win_rate": 0.49222065063649223,
+   "avg_move_pct": 0.03485589544374087,
+   "net_per_trade": -0.26514410455625914,
+   "mean_hold_h": 16.163719943422915,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33627579795266405,
+    -0.1942133481468497
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 689,
+   "per_week": 5.186040867834781,
+   "win_rate": 0.5123367198838897,
+   "avg_move_pct": 0.04266319143214927,
+   "net_per_trade": -0.25733680856785074,
+   "mean_hold_h": 17.437953555878085,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.17833241006957107,
+    -0.3361122088096136
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 1094,
+   "per_week": 8.234439346025036,
+   "win_rate": 0.5109689213893968,
+   "avg_move_pct": -0.01270640561038526,
+   "net_per_trade": -0.31270640561038526,
+   "mean_hold_h": 18.28564899451554,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28050366015778966,
+    -0.34490915106298087
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 1096,
+   "per_week": 8.24949316567042,
+   "win_rate": 0.4844890510948905,
+   "avg_move_pct": 0.014285220851203349,
+   "net_per_trade": -0.2857147791487966,
+   "mean_hold_h": 18.234793187347933,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34016625961766417,
+    -0.2312632986799291
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 567,
+   "per_week": 4.267757869466358,
+   "win_rate": 0.5167548500881834,
+   "avg_move_pct": 0.04342299939708475,
+   "net_per_trade": -0.2565770006029152,
+   "mean_hold_h": 19.060993533215758,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22273678174904205,
+    -0.2902980637565987
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 569,
+   "per_week": 4.2828116891117425,
+   "win_rate": 0.5008787346221442,
+   "avg_move_pct": 0.13187761712374696,
+   "net_per_trade": -0.16812238287625303,
+   "mean_hold_h": 17.71236086701816,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.1955914051894279,
+    -0.14074974309751032
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 1193,
+   "per_week": 8.979603418471545,
+   "win_rate": 0.47778709136630343,
+   "avg_move_pct": -0.020096902834690143,
+   "net_per_trade": -0.3200969028346901,
+   "mean_hold_h": 17.35498742665549,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3700036633019632,
+    -0.2702737382810976
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 1186,
+   "per_week": 8.926915049712699,
+   "win_rate": 0.515177065767285,
+   "avg_move_pct": -0.0031716631203676134,
+   "net_per_trade": -0.3031716631203676,
+   "mean_hold_h": 17.509204609331086,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21807421912784336,
+    -0.38826910711289186
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 625,
+   "per_week": 4.704318639182493,
+   "win_rate": 0.4736,
+   "avg_move_pct": 0.040143154602332094,
+   "net_per_trade": -0.2598568453976679,
+   "mean_hold_h": 16.792533333333335,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31992749847056,
+    -0.19997811134417798
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "5m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 617,
+   "per_week": 4.644103360600957,
+   "win_rate": 0.5121555915721232,
+   "avg_move_pct": 0.0476351338096637,
+   "net_per_trade": -0.25236486619033627,
+   "mean_hold_h": 18.18517017828201,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.13126993882137294,
+    -0.373067900590468
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 2770,
+   "per_week": 20.849462365591396,
+   "win_rate": 0.4906137184115523,
+   "avg_move_pct": -0.009028949613549903,
+   "net_per_trade": -0.3090289496135499,
+   "mean_hold_h": 1.6367328519855595,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3141858625592651,
+    -0.30387203666783463
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 2880,
+   "per_week": 21.677419354838708,
+   "win_rate": 0.49027777777777776,
+   "avg_move_pct": -0.009505685980611203,
+   "net_per_trade": -0.3095056859806112,
+   "mean_hold_h": 1.8649305555555555,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30399275991931307,
+    -0.31501861204190934
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 1474,
+   "per_week": 11.094623655913978,
+   "win_rate": 0.49525101763907736,
+   "avg_move_pct": -0.004545160163561561,
+   "net_per_trade": -0.30454516016356153,
+   "mean_hold_h": 1.3794097693351424,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3020352781546811,
+    -0.30705504217244195
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 1480,
+   "per_week": 11.139784946236558,
+   "win_rate": 0.49527027027027026,
+   "avg_move_pct": -0.004430013857092385,
+   "net_per_trade": -0.3044300138570924,
+   "mean_hold_h": 1.897972972972973,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2945945945945946,
+    -0.31426543311959015
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 8203,
+   "per_week": 61.74301075268817,
+   "win_rate": 0.4864074119224674,
+   "avg_move_pct": -0.01353747144701352,
+   "net_per_trade": -0.3135374714470135,
+   "mean_hold_h": 1.2812995245641838,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32377468910021945,
+    -0.30330274945876445
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 8224,
+   "per_week": 61.9010752688172,
+   "win_rate": 0.48394941634241245,
+   "avg_move_pct": -0.016073584678918926,
+   "net_per_trade": -0.31607358467891894,
+   "mean_hold_h": 1.4403878891050583,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31593554677106234,
+    -0.3162116225867755
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 8905,
+   "per_week": 67.02688172043011,
+   "win_rate": 0.4926445816956766,
+   "avg_move_pct": -0.007222843028130436,
+   "net_per_trade": -0.3072228430281304,
+   "mean_hold_h": 1.2306569343065694,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31361071646181826,
+    -0.3008364041045332
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 7564,
+   "per_week": 56.93333333333333,
+   "win_rate": 0.49405076679005816,
+   "avg_move_pct": -0.005877934860533958,
+   "net_per_trade": -0.30587793486053394,
+   "mean_hold_h": 1.5265401903754627,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30416945812965207,
+    -0.30758641159141586
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 3147,
+   "per_week": 23.68709677419355,
+   "win_rate": 0.4963457260883381,
+   "avg_move_pct": -0.003977450642507983,
+   "net_per_trade": -0.303977450642508,
+   "mean_hold_h": 2.253972036860502,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30004647353370223,
+    -0.3079059303071531
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 3153,
+   "per_week": 23.732258064516127,
+   "win_rate": 0.4846178242943229,
+   "avg_move_pct": -0.01514394342534636,
+   "net_per_trade": -0.31514394342534635,
+   "mean_hold_h": 2.2792578496669837,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3261076009412905,
+    -0.3041872381335721
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 1588,
+   "per_week": 11.952688172043011,
+   "win_rate": 0.49622166246851385,
+   "avg_move_pct": -0.0030768509541847476,
+   "net_per_trade": -0.30307685095418474,
+   "mean_hold_h": 2.508028967254408,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3009267338108558,
+    -0.3052269680975137
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 1540,
+   "per_week": 11.591397849462366,
+   "win_rate": 0.4805194805194805,
+   "avg_move_pct": -0.01888552801095075,
+   "net_per_trade": -0.3188855280109507,
+   "mean_hold_h": 2.1314935064935066,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.31980076558260023,
+    -0.31797029043930125
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 6551,
+   "per_week": 49.30860215053763,
+   "win_rate": 0.4982445428178904,
+   "avg_move_pct": -0.0016990431643092167,
+   "net_per_trade": -0.30169904316430923,
+   "mean_hold_h": 1.5676614257365287,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.308941954930772,
+    -0.294458342298874
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 6458,
+   "per_week": 48.608602150537635,
+   "win_rate": 0.49117373799938063,
+   "avg_move_pct": -0.008954627834072323,
+   "net_per_trade": -0.3089546278340723,
+   "mean_hold_h": 1.709701145865593,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2991027117101707,
+    -0.31880654395797386
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 3666,
+   "per_week": 27.593548387096774,
+   "win_rate": 0.5038188761593017,
+   "avg_move_pct": 0.0038468045255267186,
+   "net_per_trade": -0.2961531954744733,
+   "mean_hold_h": 1.3487452264048008,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30785467245467485,
+    -0.2844517184942717
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 3234,
+   "per_week": 24.341935483870966,
+   "win_rate": 0.4842300556586271,
+   "avg_move_pct": -0.01549457810421241,
+   "net_per_trade": -0.3154945781042124,
+   "mean_hold_h": 1.8467068645640075,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30309722455700816,
+    -0.3278919316514166
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1836,
+   "per_week": 13.819354838709677,
+   "win_rate": 0.49673202614379086,
+   "avg_move_pct": -0.002355297121397931,
+   "net_per_trade": -0.3023552971213979,
+   "mean_hold_h": 5.09504357298475,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3072791168829535,
+    -0.2974314773598423
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1816,
+   "per_week": 13.668817204301074,
+   "win_rate": 0.4961453744493392,
+   "avg_move_pct": -0.0021876434722785825,
+   "net_per_trade": -0.30218764347227856,
+   "mean_hold_h": 5.8374174008810575,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2525755544743347,
+    -0.3517997324702224
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 987,
+   "per_week": 7.429032258064516,
+   "win_rate": 0.5106382978723404,
+   "avg_move_pct": 0.026251308141647525,
+   "net_per_trade": -0.2737486918583525,
+   "mean_hold_h": 4.289260385005066,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2817708112783696,
+    -0.265742811546473
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 919,
+   "per_week": 6.917204301075269,
+   "win_rate": 0.5125136017410229,
+   "avg_move_pct": 0.031385330983309326,
+   "net_per_trade": -0.2686146690166907,
+   "mean_hold_h": 6.055495103373231,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25381050550040424,
+    -0.2833866495688112
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2673,
+   "per_week": 20.119354838709675,
+   "win_rate": 0.494949494949495,
+   "avg_move_pct": -0.009602785776319607,
+   "net_per_trade": -0.3096027857763196,
+   "mean_hold_h": 3.9415450804339693,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3281140141229727,
+    -0.29110540277622343
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2680,
+   "per_week": 20.172043010752688,
+   "win_rate": 0.491044776119403,
+   "avg_move_pct": -0.018107751594919827,
+   "net_per_trade": -0.31810775159491983,
+   "mean_hold_h": 4.448880597014925,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3197832241261207,
+    -0.31643227906371896
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2974,
+   "per_week": 22.384946236559138,
+   "win_rate": 0.5030262273032953,
+   "avg_move_pct": 0.007202213824911819,
+   "net_per_trade": -0.29279778617508817,
+   "mean_hold_h": 3.726546738399462,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2990181200056065,
+    -0.2865774523445698
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2445,
+   "per_week": 18.403225806451612,
+   "win_rate": 0.49611451942740287,
+   "avg_move_pct": -0.0075587275796733236,
+   "net_per_trade": -0.3075587275796733,
+   "mean_hold_h": 4.779550102249488,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2957786835480265,
+    -0.3193291395229868
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1500,
+   "per_week": 11.29032258064516,
+   "win_rate": 0.5113333333333333,
+   "avg_move_pct": 0.01871898179514113,
+   "net_per_trade": -0.28128101820485885,
+   "mean_hold_h": 6.853166666666667,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.24844973549411992,
+    -0.3141123009155978
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1545,
+   "per_week": 11.629032258064516,
+   "win_rate": 0.46601941747572817,
+   "avg_move_pct": -0.06218603876979493,
+   "net_per_trade": -0.36218603876979494,
+   "mean_hold_h": 6.590291262135922,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3941735986512485,
+    -0.3302398599489901
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 766,
+   "per_week": 5.765591397849462,
+   "win_rate": 0.52088772845953,
+   "avg_move_pct": 0.039325173136647164,
+   "net_per_trade": -0.2606748268633528,
+   "mean_hold_h": 7.436031331592689,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2715333967198543,
+    -0.2498162570068513
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 758,
+   "per_week": 5.705376344086021,
+   "win_rate": 0.47229551451187335,
+   "avg_move_pct": -0.038855894056527694,
+   "net_per_trade": -0.33885589405652766,
+   "mean_hold_h": 6.230870712401056,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3425144988058479,
+    -0.3351972893072075
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2807,
+   "per_week": 21.127956989247313,
+   "win_rate": 0.4980406127538297,
+   "avg_move_pct": 0.0020017487033289964,
+   "net_per_trade": -0.297998251296671,
+   "mean_hold_h": 4.9817420733879585,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33280168946659805,
+    -0.26321960190036925
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2757,
+   "per_week": 20.751612903225805,
+   "win_rate": 0.4925643815741748,
+   "avg_move_pct": -0.016531746221671667,
+   "net_per_trade": -0.3165317462216717,
+   "mean_hold_h": 5.291167936162496,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30449425441464945,
+    -0.328560508883076
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1599,
+   "per_week": 12.035483870967742,
+   "win_rate": 0.5178236397748592,
+   "avg_move_pct": 0.04048472200917422,
+   "net_per_trade": -0.25951527799082574,
+   "mean_hold_h": 4.214040025015635,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2882925753656911,
+    -0.23077395223767905
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1390,
+   "per_week": 10.46236559139785,
+   "win_rate": 0.49640287769784175,
+   "avg_move_pct": -0.009682730297490741,
+   "net_per_trade": -0.3096827302974907,
+   "mean_hold_h": 5.666726618705036,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27970163274277104,
+    -0.3396638278522104
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1345,
+   "per_week": 10.123655913978494,
+   "win_rate": 0.5048327137546469,
+   "avg_move_pct": 0.02186148941782979,
+   "net_per_trade": -0.2781385105821702,
+   "mean_hold_h": 9.052416356877323,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2578062475751932,
+    -0.29844056220280696
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1313,
+   "per_week": 9.882795698924731,
+   "win_rate": 0.49581111957349583,
+   "avg_move_pct": -0.0032666036426011354,
+   "net_per_trade": -0.3032666036426011,
+   "mean_hold_h": 10.34996191926885,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27075545886762353,
+    -0.3357282641789562
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 740,
+   "per_week": 5.569892473118279,
+   "win_rate": 0.5,
+   "avg_move_pct": 0.012305388665207572,
+   "net_per_trade": -0.2876946113347924,
+   "mean_hold_h": 7.771621621621621,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2874721715092808,
+    -0.287917051160304
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 672,
+   "per_week": 5.058064516129032,
+   "win_rate": 0.4880952380952381,
+   "avg_move_pct": -0.01726107118937044,
+   "net_per_trade": -0.3172610711893704,
+   "mean_hold_h": 10.881696428571429,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28167462673926785,
+    -0.352847515639473
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1320,
+   "per_week": 9.935483870967742,
+   "win_rate": 0.4863636363636364,
+   "avg_move_pct": -0.028786047826017253,
+   "net_per_trade": -0.3287860478260172,
+   "mean_hold_h": 7.996780303030303,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4010930604984405,
+    -0.25647903515359394
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1431,
+   "per_week": 10.770967741935484,
+   "win_rate": 0.4919636617749825,
+   "avg_move_pct": -0.02131869561411527,
+   "net_per_trade": -0.32131869561411525,
+   "mean_hold_h": 8.342068483577918,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3395627820894012,
+    -0.3031000897065322
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1511,
+   "per_week": 11.373118279569892,
+   "win_rate": 0.5023163467902052,
+   "avg_move_pct": 0.013372090521566906,
+   "net_per_trade": -0.2866279094784331,
+   "mean_hold_h": 7.444076770350761,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.316999197950076,
+    -0.25629679466878974
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1289,
+   "per_week": 9.702150537634408,
+   "win_rate": 0.5003878975950349,
+   "avg_move_pct": 0.0035647262770285197,
+   "net_per_trade": -0.29643527372297146,
+   "mean_hold_h": 9.180178432893715,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2514318224941219,
+    -0.3413689521592182
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1086,
+   "per_week": 8.174193548387096,
+   "win_rate": 0.5276243093922652,
+   "avg_move_pct": 0.041909290701641545,
+   "net_per_trade": -0.2580907092983584,
+   "mean_hold_h": 11.575276243093922,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.221862199641654,
+    -0.29431921895506286
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1083,
+   "per_week": 8.151612903225805,
+   "win_rate": 0.48291782086795937,
+   "avg_move_pct": -0.028200615614729,
+   "net_per_trade": -0.32820061561472896,
+   "mean_hold_h": 11.68005540166205,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.37630675874975394,
+    -0.28018322920135535
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 553,
+   "per_week": 4.162365591397849,
+   "win_rate": 0.5443037974683544,
+   "avg_move_pct": 0.0904417166093434,
+   "net_per_trade": -0.20955828339065657,
+   "mean_hold_h": 12.72242314647378,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.20546452709213747,
+    -0.21363726078557094
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 531,
+   "per_week": 3.996774193548387,
+   "win_rate": 0.4896421845574388,
+   "avg_move_pct": 0.04703557758294539,
+   "net_per_trade": -0.2529644224170546,
+   "mean_hold_h": 11.10969868173258,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.26183241204283914,
+    -0.24412977109813394
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1709,
+   "per_week": 12.863440860215054,
+   "win_rate": 0.49151550614394385,
+   "avg_move_pct": -0.0023551749234088895,
+   "net_per_trade": -0.30235517492340885,
+   "mean_hold_h": 9.410912814511411,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3349702076974502,
+    -0.26977828838653023
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1708,
+   "per_week": 12.855913978494623,
+   "win_rate": 0.5117096018735363,
+   "avg_move_pct": 0.015116792598141427,
+   "net_per_trade": -0.2848832074018586,
+   "mean_hold_h": 9.70755269320843,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25410063106303865,
+    -0.3156657837406785
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 952,
+   "per_week": 7.165591397849462,
+   "win_rate": 0.5063025210084033,
+   "avg_move_pct": 0.056812811942735554,
+   "net_per_trade": -0.24318718805726444,
+   "mean_hold_h": 8.280987394957982,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27567629281517375,
+    -0.21069808329935513
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 860,
+   "per_week": 6.473118279569892,
+   "win_rate": 0.5151162790697674,
+   "avg_move_pct": 0.03983122861327063,
+   "net_per_trade": -0.26016877138672934,
+   "mean_hold_h": 10.367732558139535,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2112536707471783,
+    -0.3090838720262804
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1076,
+   "per_week": 8.098924731182796,
+   "win_rate": 0.5,
+   "avg_move_pct": 0.022801277992022622,
+   "net_per_trade": -0.27719872200797735,
+   "mean_hold_h": 12.946328996282528,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2922126856503774,
+    -0.26218475836557736
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1090,
+   "per_week": 8.204301075268816,
+   "win_rate": 0.48073394495412847,
+   "avg_move_pct": -0.06289207122297731,
+   "net_per_trade": -0.3628920712229773,
+   "mean_hold_h": 13.616284403669725,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2959672544925842,
+    -0.4298168879533704
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 582,
+   "per_week": 4.380645161290323,
+   "win_rate": 0.5103092783505154,
+   "avg_move_pct": 0.0786411276149361,
+   "net_per_trade": -0.2213588723850639,
+   "mean_hold_h": 11.362542955326461,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.23018223239871832,
+    -0.21253551237140944
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 561,
+   "per_week": 4.22258064516129,
+   "win_rate": 0.48128342245989303,
+   "avg_move_pct": -0.035798365139358704,
+   "net_per_trade": -0.3357983651393587,
+   "mean_hold_h": 14.14572192513369,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2528245997377704,
+    -0.41847685023702674
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 893,
+   "per_week": 6.721505376344086,
+   "win_rate": 0.47928331466965285,
+   "avg_move_pct": -0.04688130055095511,
+   "net_per_trade": -0.3468813005509551,
+   "mean_hold_h": 11.829227323628219,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4190830471745128,
+    -0.27484107908762906
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 964,
+   "per_week": 7.255913978494624,
+   "win_rate": 0.5051867219917012,
+   "avg_move_pct": -0.0033093996252295827,
+   "net_per_trade": -0.30330939962522957,
+   "mean_hold_h": 12.381483402489627,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2722139230662985,
+    -0.33440487618416065
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1008,
+   "per_week": 7.587096774193548,
+   "win_rate": 0.49206349206349204,
+   "avg_move_pct": 0.010554163901924667,
+   "net_per_trade": -0.28944583609807534,
+   "mean_hold_h": 11.28670634920635,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.35305865638588046,
+    -0.22583301581027015
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 906,
+   "per_week": 6.819354838709677,
+   "win_rate": 0.5055187637969095,
+   "avg_move_pct": 0.021187736969605856,
+   "net_per_trade": -0.27881226303039414,
+   "mean_hold_h": 13.20971302428256,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21003010341165293,
+    -0.3475944226491353
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 908,
+   "per_week": 6.834408602150537,
+   "win_rate": 0.525330396475771,
+   "avg_move_pct": 0.05031828347914165,
+   "net_per_trade": -0.24968171652085835,
+   "mean_hold_h": 15.25385462555066,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22702024685286892,
+    -0.2723431861888478
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 917,
+   "per_week": 6.902150537634409,
+   "win_rate": 0.495092693565976,
+   "avg_move_pct": 0.002481139987463164,
+   "net_per_trade": -0.2975188600125368,
+   "mean_hold_h": 15.215376226826608,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2878435442982914,
+    -0.30717309660757913
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 468,
+   "per_week": 3.52258064516129,
+   "win_rate": 0.532051282051282,
+   "avg_move_pct": 0.09632252478300654,
+   "net_per_trade": -0.20367747521699345,
+   "mean_hold_h": 16.30181623931624,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.13903247093185583,
+    -0.26832247950213106
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 453,
+   "per_week": 3.4096774193548387,
+   "win_rate": 0.5011037527593819,
+   "avg_move_pct": 0.09990302236450496,
+   "net_per_trade": -0.20009697763549503,
+   "mean_hold_h": 14.664459161147903,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.14963509331407548,
+    -0.2503365629070405
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 1302,
+   "per_week": 9.799999999999999,
+   "win_rate": 0.49001536098310294,
+   "avg_move_pct": 0.003838264773539189,
+   "net_per_trade": -0.2961617352264608,
+   "mean_hold_h": 13.177803379416282,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3599550502997225,
+    -0.23236842015319906
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 1310,
+   "per_week": 9.86021505376344,
+   "win_rate": 0.5068702290076336,
+   "avg_move_pct": -0.004976409918523835,
+   "net_per_trade": -0.3049764099185238,
+   "mean_hold_h": 13.474427480916031,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2532083973217289,
+    -0.35674442251531874
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 721,
+   "per_week": 5.426881720430107,
+   "win_rate": 0.5034674063800277,
+   "avg_move_pct": 0.06895410301115537,
+   "net_per_trade": -0.23104589698884462,
+   "mean_hold_h": 11.977808599167822,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2734899365964994,
+    -0.18871943089810853
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 673,
+   "per_week": 5.065591397849462,
+   "win_rate": 0.4933135215453195,
+   "avg_move_pct": -0.02587221998449795,
+   "net_per_trade": -0.32587221998449795,
+   "mean_hold_h": 14.13521545319465,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25143783920896573,
+    -0.4000857272265716
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 881,
+   "per_week": 6.631182795698924,
+   "win_rate": 0.4982973893303065,
+   "avg_move_pct": 0.02987795724483581,
+   "net_per_trade": -0.27012204275516416,
+   "mean_hold_h": 17.427639046538026,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29424357955056646,
+    -0.24605520332210973
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 881,
+   "per_week": 6.631182795698924,
+   "win_rate": 0.4778660612939841,
+   "avg_move_pct": -0.04369335843437638,
+   "net_per_trade": -0.3436933584343764,
+   "mean_hold_h": 18.17338251986379,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25384991930933,
+    -0.43333307094009155
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 462,
+   "per_week": 3.47741935483871,
+   "win_rate": 0.5086580086580087,
+   "avg_move_pct": 0.04401433718923671,
+   "net_per_trade": -0.2559856628107633,
+   "mean_hold_h": 16.22077922077922,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3317804674601658,
+    -0.18019085816136074
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 452,
+   "per_week": 3.4021505376344083,
+   "win_rate": 0.48451327433628316,
+   "avg_move_pct": 0.014969331900377206,
+   "net_per_trade": -0.2850306680996228,
+   "mean_hold_h": 18.883849557522122,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.18930390184706586,
+    -0.3807574343521797
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 633,
+   "per_week": 4.764516129032258,
+   "win_rate": 0.4676145339652449,
+   "avg_move_pct": -0.058538381875361936,
+   "net_per_trade": -0.3585383818753619,
+   "mean_hold_h": 16.732227488151658,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.49125676141782443,
+    -0.22623867229991035
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 705,
+   "per_week": 5.306451612903226,
+   "win_rate": 0.5049645390070922,
+   "avg_move_pct": 0.012176850487779788,
+   "net_per_trade": -0.2878231495122202,
+   "mean_hold_h": 16.950709219858155,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2358060587261337,
+    -0.3396928831006124
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 700,
+   "per_week": 5.268817204301075,
+   "win_rate": 0.4928571428571429,
+   "avg_move_pct": 0.012804111989124168,
+   "net_per_trade": -0.2871958880108758,
+   "mean_hold_h": 16.27,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4073055743813355,
+    -0.16708620164041613
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 679,
+   "per_week": 5.110752688172043,
+   "win_rate": 0.5110456553755522,
+   "avg_move_pct": 0.05203916253560293,
+   "net_per_trade": -0.24796083746439707,
+   "mean_hold_h": 17.73379970544919,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.17221858066429727,
+    -0.3234803229209671
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 800,
+   "per_week": 6.021505376344086,
+   "win_rate": 0.525,
+   "avg_move_pct": 0.01715679051287452,
+   "net_per_trade": -0.2828432094871255,
+   "mean_hold_h": 19.2559375,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21274220789852413,
+    -0.3529442110757268
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 812,
+   "per_week": 6.111827956989247,
+   "win_rate": 0.49507389162561577,
+   "avg_move_pct": 0.013796169327921019,
+   "net_per_trade": -0.286203830672079,
+   "mean_hold_h": 19.04310344827586,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.38154079564374166,
+    -0.19086686570041628
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 422,
+   "per_week": 3.1763440860215053,
+   "win_rate": 0.5165876777251185,
+   "avg_move_pct": 0.10611673484130774,
+   "net_per_trade": -0.19388326515869225,
+   "mean_hold_h": 20.0781990521327,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.07542052001819383,
+    -0.3123460102991907
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 400,
+   "per_week": 3.010752688172043,
+   "win_rate": 0.49,
+   "avg_move_pct": 0.11209561418686144,
+   "net_per_trade": -0.18790438581313856,
+   "mean_hold_h": 18.588125,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2248129828969713,
+    -0.1509957887293058
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 1022,
+   "per_week": 7.69247311827957,
+   "win_rate": 0.48238747553816047,
+   "avg_move_pct": 0.013292635239063192,
+   "net_per_trade": -0.2867073647609368,
+   "mean_hold_h": 17.764187866927593,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4143297008432826,
+    -0.15908502867859098
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 1033,
+   "per_week": 7.775268817204301,
+   "win_rate": 0.5198451113262342,
+   "avg_move_pct": 0.01020500857757533,
+   "net_per_trade": -0.28979499142242465,
+   "mean_hold_h": 17.948209099709583,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2006675703190281,
+    -0.3787500190614046
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 543,
+   "per_week": 4.087096774193548,
+   "win_rate": 0.5082872928176796,
+   "avg_move_pct": 0.1194279757547862,
+   "net_per_trade": -0.1805720242452138,
+   "mean_hold_h": 16.888121546961326,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27089200381721074,
+    -0.0905841034216433
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "15m",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 541,
+   "per_week": 4.072043010752688,
+   "win_rate": 0.5138632162661737,
+   "avg_move_pct": 0.05015055331503078,
+   "net_per_trade": -0.24984944668496922,
+   "mean_hold_h": 18.56977818853974,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.12552332160178442,
+    -0.37371680377891714
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 878,
+   "per_week": 6.331187226371363,
+   "win_rate": 0.4396355353075171,
+   "avg_move_pct": -0.06004072337962547,
+   "net_per_trade": -0.36004072337962545,
+   "mean_hold_h": 1.9555808656036446,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.38086560364464694,
+    -0.339215843114604
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 960,
+   "per_week": 6.922482616533609,
+   "win_rate": 0.45,
+   "avg_move_pct": -0.05060604696061268,
+   "net_per_trade": -0.35060604696061265,
+   "mean_hold_h": 2.267708333333333,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.35625,
+    -0.34496209392122534
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 477,
+   "per_week": 3.4396085500901368,
+   "win_rate": 0.44863731656184486,
+   "avg_move_pct": -0.051362683438155136,
+   "net_per_trade": -0.35136268343815513,
+   "mean_hold_h": 1.7085953878406708,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3840336134453781,
+    -0.3188284518828452
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 520,
+   "per_week": 3.749678083955705,
+   "win_rate": 0.45,
+   "avg_move_pct": -0.05,
+   "net_per_trade": -0.35,
+   "mean_hold_h": 2.1326923076923077,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.36538461538461536,
+    -0.3346153846153846
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 5052,
+   "per_week": 36.42956476950812,
+   "win_rate": 0.45387965162311955,
+   "avg_move_pct": -0.04617515866812494,
+   "net_per_trade": -0.3461751586681249,
+   "mean_hold_h": 2.1134204275534443,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3669431569425273,
+    -0.3254071603937225
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 5596,
+   "per_week": 40.35230491887716,
+   "win_rate": 0.46443888491779844,
+   "avg_move_pct": -0.0354134061817372,
+   "net_per_trade": -0.3354134061817372,
+   "mean_hold_h": 2.261972837741244,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3431830176516953,
+    -0.32764379471177907
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 5514,
+   "per_week": 39.761009528714915,
+   "win_rate": 0.4591947769314472,
+   "avg_move_pct": -0.04081402326720139,
+   "net_per_trade": -0.3408140232672014,
+   "mean_hold_h": 2.04715270221255,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3581382417459209,
+    -0.3234898047884819
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 5172,
+   "per_week": 37.29487509657481,
+   "win_rate": 0.4733178654292343,
+   "avg_move_pct": -0.026478160034219378,
+   "net_per_trade": -0.32647816003421937,
+   "mean_hold_h": 2.360982211910286,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3333566235571029,
+    -0.31959969651133585
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 851,
+   "per_week": 6.136492402781355,
+   "win_rate": 0.4688601645123384,
+   "avg_move_pct": -0.029818312130620975,
+   "net_per_trade": -0.32981831213062096,
+   "mean_hold_h": 3.0740305522914224,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3347949829574278,
+    -0.32485332362969865
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 1009,
+   "per_week": 7.275817666752512,
+   "win_rate": 0.45490584737363726,
+   "avg_move_pct": -0.04372432803728506,
+   "net_per_trade": -0.34372432803728503,
+   "mean_hold_h": 3.035678889990089,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3567823606980814,
+    -0.3306921528669061
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 454,
+   "per_week": 3.273757404069019,
+   "win_rate": 0.4779735682819383,
+   "avg_move_pct": -0.02122093845062592,
+   "net_per_trade": -0.32122093845062594,
+   "mean_hold_h": 3.2797356828193833,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.331428661042221,
+    -0.3110132158590308
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 435,
+   "per_week": 3.1367499356167916,
+   "win_rate": 0.4413793103448276,
+   "avg_move_pct": -0.05760298945037007,
+   "net_per_trade": -0.35760298945037006,
+   "mean_hold_h": 2.832183908045977,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3900190908595811,
+    -0.3253355857540453
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 3603,
+   "per_week": 25.9809425701777,
+   "win_rate": 0.4587843463780183,
+   "avg_move_pct": -0.04124488867293789,
+   "net_per_trade": -0.3412448886729379,
+   "mean_hold_h": 2.211767971135165,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3350831312970247,
+    -0.3474032266496413
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 3621,
+   "per_week": 26.110739119237707,
+   "win_rate": 0.463960231980116,
+   "avg_move_pct": -0.03609616955018568,
+   "net_per_trade": -0.3360961695501857,
+   "mean_hold_h": 2.468378900856117,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32893748798491207,
+    -0.34325089822668775
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 2024,
+   "per_week": 14.594900849858359,
+   "win_rate": 0.450098814229249,
+   "avg_move_pct": -0.04959201657343178,
+   "net_per_trade": -0.34959201657343175,
+   "mean_hold_h": 1.9614624505928853,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3587879758820185,
+    -0.34039605726484506
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 1920,
+   "per_week": 13.844965233067217,
+   "win_rate": 0.4708333333333333,
+   "avg_move_pct": -0.028532045856177836,
+   "net_per_trade": -0.32853204585617785,
+   "mean_hold_h": 2.581770833333333,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32344830810002245,
+    -0.3336157836123332
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 719,
+   "per_week": 5.184651043007984,
+   "win_rate": 0.4965229485396384,
+   "avg_move_pct": 0.0051467315603328165,
+   "net_per_trade": -0.2948532684396672,
+   "mean_hold_h": 5.495132127955494,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29672671937426354,
+    -0.2929850215354447
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 762,
+   "per_week": 5.494720576873552,
+   "win_rate": 0.4973753280839895,
+   "avg_move_pct": -0.0021056274115871586,
+   "net_per_trade": -0.30210562741158714,
+   "mean_hold_h": 6.335958005249344,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2888995073888308,
+    -0.3153117474343435
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 400,
+   "per_week": 2.8843677568890036,
+   "win_rate": 0.5225,
+   "avg_move_pct": 0.04448341117821553,
+   "net_per_trade": -0.25551658882178446,
+   "mean_hold_h": 4.2575,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2765393235869253,
+    -0.23449385405664358
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 414,
+   "per_week": 2.985320628380119,
+   "win_rate": 0.5,
+   "avg_move_pct": 0.006482541029321972,
+   "net_per_trade": -0.293517458970678,
+   "mean_hold_h": 6.3647342995169085,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3339335039471656,
+    -0.2531014139941904
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2135,
+   "per_week": 15.395312902395057,
+   "win_rate": 0.4885245901639344,
+   "avg_move_pct": -0.020761698023661984,
+   "net_per_trade": -0.32076169802366195,
+   "mean_hold_h": 5.024355971896956,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34756359741218534,
+    -0.29398489404655104
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2286,
+   "per_week": 16.484161730620656,
+   "win_rate": 0.489501312335958,
+   "avg_move_pct": -0.030346840799262715,
+   "net_per_trade": -0.3303468407992627,
+   "mean_hold_h": 5.563429571303587,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.35200732928878303,
+    -0.30868635230974234
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 2402,
+   "per_week": 17.320628380118468,
+   "win_rate": 0.49375520399666945,
+   "avg_move_pct": -0.006177884738638402,
+   "net_per_trade": -0.3061778847386384,
+   "mean_hold_h": 4.74646128226478,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.326261066146061,
+    -0.2860947033312158
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 2080,
+   "per_week": 14.99871233582282,
+   "win_rate": 0.49230769230769234,
+   "avg_move_pct": -0.020376787528953038,
+   "net_per_trade": -0.32037678752895304,
+   "mean_hold_h": 5.964903846153846,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3295230671621752,
+    -0.3112305078957308
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 471,
+   "per_week": 3.3963430337368017,
+   "win_rate": 0.4734607218683652,
+   "avg_move_pct": -0.045781417619337524,
+   "net_per_trade": -0.3457814176193375,
+   "mean_hold_h": 7.634819532908705,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3175928337274261,
+    -0.3738505583591646
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 514,
+   "per_week": 3.70641256760237,
+   "win_rate": 0.4669260700389105,
+   "avg_move_pct": -0.05608920406354013,
+   "net_per_trade": -0.3560892040635401,
+   "mean_hold_h": 7.772373540856031,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29931846193373723,
+    -0.412859946193343
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 257,
+   "per_week": 1.853206283801185,
+   "win_rate": 0.4980544747081712,
+   "avg_move_pct": 0.005779794154968992,
+   "net_per_trade": -0.294220205845031,
+   "mean_hold_h": 8.070038910505836,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.26298184416356296,
+    -0.32521640968400706
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 230,
+   "per_week": 1.658511460211177,
+   "win_rate": 0.4434782608695652,
+   "avg_move_pct": -0.09157748726184169,
+   "net_per_trade": -0.39157748726184166,
+   "mean_hold_h": 6.991304347826087,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3676970739562453,
+    -0.4154579005674381
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1812,
+   "per_week": 13.066185938707186,
+   "win_rate": 0.488962472406181,
+   "avg_move_pct": -0.013944324798863424,
+   "net_per_trade": -0.3139443247988634,
+   "mean_hold_h": 5.613686534216336,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29197137102950343,
+    -0.3359172785682234
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1704,
+   "per_week": 12.287406644347156,
+   "win_rate": 0.49471830985915494,
+   "avg_move_pct": -0.014123085500383842,
+   "net_per_trade": -0.3141230855003838,
+   "mean_hold_h": 6.459507042253521,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3087844922375457,
+    -0.31946167876322196
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1056,
+   "per_week": 7.614730878186969,
+   "win_rate": 0.4943181818181818,
+   "avg_move_pct": -0.005148003024588357,
+   "net_per_trade": -0.30514800302458833,
+   "mean_hold_h": 4.903409090909091,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3221768299386924,
+    -0.2881191761104843
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 904,
+   "per_week": 6.518671130569148,
+   "win_rate": 0.49557522123893805,
+   "avg_move_pct": -0.004720287144986876,
+   "net_per_trade": -0.3047202871449869,
+   "mean_hold_h": 6.8053097345132745,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2991604896733039,
+    -0.31028008461666984
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 604,
+   "per_week": 4.355395312902395,
+   "win_rate": 0.5099337748344371,
+   "avg_move_pct": 0.045471546394208195,
+   "net_per_trade": -0.2545284536057918,
+   "mean_hold_h": 9.607615894039736,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.16739030884802847,
+    -0.3416665983635551
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 622,
+   "per_week": 4.4851918619624005,
+   "win_rate": 0.4919614147909968,
+   "avg_move_pct": 0.014485823396069077,
+   "net_per_trade": -0.2855141766039309,
+   "mean_hold_h": 10.95176848874598,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27432994673569183,
+    -0.29669840647217
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 336,
+   "per_week": 2.422868915786763,
+   "win_rate": 0.5208333333333334,
+   "avg_move_pct": 0.05476429445918366,
+   "net_per_trade": -0.24523570554081633,
+   "mean_hold_h": 7.806547619047619,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.18510807470528862,
+    -0.30536333637634405
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 340,
+   "per_week": 2.451712593355653,
+   "win_rate": 0.5088235294117647,
+   "avg_move_pct": 0.05882258159330777,
+   "net_per_trade": -0.2411774184066922,
+   "mean_hold_h": 11.026470588235295,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.23344615458958445,
+    -0.24890868222379997
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1182,
+   "per_week": 8.523306721607005,
+   "win_rate": 0.47715736040609136,
+   "avg_move_pct": -0.061944515829227505,
+   "net_per_trade": -0.3619445158292275,
+   "mean_hold_h": 9.057529610829103,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4226610251583298,
+    -0.30122800650012516
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1303,
+   "per_week": 9.395827968065928,
+   "win_rate": 0.49731389102072143,
+   "avg_move_pct": -0.028594024774589073,
+   "net_per_trade": -0.32859402477458904,
+   "mean_hold_h": 9.766692248656945,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34394569104541645,
+    -0.31326590400417703
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1344,
+   "per_week": 9.691475663147052,
+   "win_rate": 0.4888392857142857,
+   "avg_move_pct": -0.015215870409105145,
+   "net_per_trade": -0.31521587040910515,
+   "mean_hold_h": 8.605654761904763,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32337746516992727,
+    -0.30705427564828297
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1197,
+   "per_week": 8.631470512490344,
+   "win_rate": 0.5029239766081871,
+   "avg_move_pct": -0.00029082278991158345,
+   "net_per_trade": -0.3002908227899116,
+   "mean_hold_h": 10.476190476190476,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2877997427590902,
+    -0.31276104959864476
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 333,
+   "per_week": 2.4012361576100956,
+   "win_rate": 0.4804804804804805,
+   "avg_move_pct": -0.06033859225174606,
+   "net_per_trade": -0.360338592251746,
+   "mean_hold_h": 13.543543543543544,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.23162096194825332,
+    -0.4882854583019245
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 388,
+   "per_week": 2.7978367241823334,
+   "win_rate": 0.47164948453608246,
+   "avg_move_pct": -0.05639184620532776,
+   "net_per_trade": -0.35639184620532777,
+   "mean_hold_h": 12.463917525773196,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.24930483569582604,
+    -0.46347885671482947
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 184,
+   "per_week": 1.3268091681689416,
+   "win_rate": 0.4945652173913043,
+   "avg_move_pct": 0.017462808236545082,
+   "net_per_trade": -0.28253719176345493,
+   "mean_hold_h": 14.070652173913043,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.20168729057666884,
+    -0.36338709295024096
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 169,
+   "per_week": 1.218645377285604,
+   "win_rate": 0.4437869822485207,
+   "avg_move_pct": -0.1225868843430559,
+   "net_per_trade": -0.4225868843430559,
+   "mean_hold_h": 11.928994082840237,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3711460431415901,
+    -0.4734225391774456
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1182,
+   "per_week": 8.523306721607005,
+   "win_rate": 0.4847715736040609,
+   "avg_move_pct": -0.0264694102843908,
+   "net_per_trade": -0.3264694102843908,
+   "mean_hold_h": 9.627749576988156,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2861002605260609,
+    -0.36683856004272064
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1101,
+   "per_week": 7.939222250836982,
+   "win_rate": 0.4940962761126249,
+   "avg_move_pct": -0.011540496554525213,
+   "net_per_trade": -0.3115404965545252,
+   "mean_hold_h": 11.20345140781108,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2635991555294793,
+    -0.35939482970112274
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 686,
+   "per_week": 4.946690703064641,
+   "win_rate": 0.4912536443148688,
+   "avg_move_pct": -0.007238379760362251,
+   "net_per_trade": -0.3072383797603622,
+   "mean_hold_h": 8.352769679300291,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3020152798702498,
+    -0.3124614796504747
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 593,
+   "per_week": 4.276075199587948,
+   "win_rate": 0.4873524451939292,
+   "avg_move_pct": 0.004608100264295623,
+   "net_per_trade": -0.29539189973570434,
+   "mean_hold_h": 11.839797639123104,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22492747196224666,
+    -0.3656190735435949
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 523,
+   "per_week": 3.771310842132372,
+   "win_rate": 0.5086042065009561,
+   "avg_move_pct": 0.055174612136813905,
+   "net_per_trade": -0.24482538786318608,
+   "mean_hold_h": 13.338432122370937,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.17842415298990225,
+    -0.3109731829087093
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 558,
+   "per_week": 4.0236930208601605,
+   "win_rate": 0.46953405017921146,
+   "avg_move_pct": -0.054741613525726526,
+   "net_per_trade": -0.35474161352572653,
+   "mean_hold_h": 14.774193548387096,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4103547515594235,
+    -0.2991284754920295
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 284,
+   "per_week": 2.0479011073911924,
+   "win_rate": 0.528169014084507,
+   "avg_move_pct": 0.11290615268885991,
+   "net_per_trade": -0.1870938473111401,
+   "mean_hold_h": 11.806338028169014,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.08335352903532847,
+    -0.2908341655869517
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 301,
+   "per_week": 2.170486737058975,
+   "win_rate": 0.47840531561461797,
+   "avg_move_pct": -0.014930745791905857,
+   "net_per_trade": -0.31493074579190583,
+   "mean_hold_h": 15.07641196013289,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3335735760116106,
+    -0.29641137802398726
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 809,
+   "per_week": 5.83363378830801,
+   "win_rate": 0.4796044499381953,
+   "avg_move_pct": -0.04368954981279317,
+   "net_per_trade": -0.34368954981279315,
+   "mean_hold_h": 13.294190358467244,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.48451302830225074,
+    -0.2032137836159021
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 941,
+   "per_week": 6.785475148081381,
+   "win_rate": 0.4867162592986185,
+   "avg_move_pct": -0.031046764330668414,
+   "net_per_trade": -0.3310467643306684,
+   "mean_hold_h": 13.53134962805526,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3362865187173449,
+    -0.3258181346879127
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 932,
+   "per_week": 6.720576873551378,
+   "win_rate": 0.4978540772532189,
+   "avg_move_pct": 0.015847511454166876,
+   "net_per_trade": -0.28415248854583314,
+   "mean_hold_h": 12.467811158798286,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34167450265490296,
+    -0.22663047443676326
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 884,
+   "per_week": 6.3744527427246975,
+   "win_rate": 0.49321266968325794,
+   "avg_move_pct": -0.003995742627309994,
+   "net_per_trade": -0.30399574262731,
+   "mean_hold_h": 14.35972850678733,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.28000501970728664,
+    -0.32798646554733335
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 293,
+   "per_week": 2.112799381921195,
+   "win_rate": 0.4880546075085324,
+   "avg_move_pct": -0.0726171892225044,
+   "net_per_trade": -0.3726171892225044,
+   "mean_hold_h": 16.85665529010239,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2962372256478023,
+    -0.44847756120826293
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 336,
+   "per_week": 2.422868915786763,
+   "win_rate": 0.47023809523809523,
+   "avg_move_pct": -0.047065487853607854,
+   "net_per_trade": -0.34706548785360786,
+   "mean_hold_h": 16.574404761904763,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22423661894278984,
+    -0.4698943567644258
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 168,
+   "per_week": 1.2114344578933816,
+   "win_rate": 0.5,
+   "avg_move_pct": -0.051099088849296107,
+   "net_per_trade": -0.3510990888492961,
+   "mean_hold_h": 17.130952380952376,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2862729777695253,
+    -0.41592519992906685
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 144,
+   "per_week": 1.0383723924800412,
+   "win_rate": 0.4375,
+   "avg_move_pct": -0.11156191263071132,
+   "net_per_trade": -0.4115619126307113,
+   "mean_hold_h": 15.694444444444445,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.437057701667119,
+    -0.3860661235943036
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 896,
+   "per_week": 6.460983775431368,
+   "win_rate": 0.4799107142857143,
+   "avg_move_pct": -0.02481842904582468,
+   "net_per_trade": -0.3248184290458247,
+   "mean_hold_h": 13.830357142857142,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3144813169851014,
+    -0.33515554110654794
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 884,
+   "per_week": 6.3744527427246975,
+   "win_rate": 0.49321266968325794,
+   "avg_move_pct": -0.028444605095175088,
+   "net_per_trade": -0.3284446050951751,
+   "mean_hold_h": 14.607466063348417,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2806914027099177,
+    -0.3761978074804324
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 496,
+   "per_week": 3.5766160185423646,
+   "win_rate": 0.4838709677419355,
+   "avg_move_pct": 0.0013678662474342078,
+   "net_per_trade": -0.29863213375256575,
+   "mean_hold_h": 12.389112903225806,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.37791473508899626,
+    -0.21934953241613528
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 484,
+   "per_week": 3.4900849858356944,
+   "win_rate": 0.48760330578512395,
+   "avg_move_pct": 0.016975681991351774,
+   "net_per_trade": -0.2830243180086482,
+   "mean_hold_h": 15.28305785123967,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22662743925586462,
+    -0.3394211967614318
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 459,
+   "per_week": 3.3098120010301315,
+   "win_rate": 0.5054466230936819,
+   "avg_move_pct": 0.05675613536680396,
+   "net_per_trade": -0.24324386463319603,
+   "mean_hold_h": 17.586056644880173,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33113416866872986,
+    -0.15573569235433846
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 481,
+   "per_week": 3.468452227659027,
+   "win_rate": 0.4677754677754678,
+   "avg_move_pct": -0.06984669319084615,
+   "net_per_trade": -0.3698466931908461,
+   "mean_hold_h": 18.444906444906444,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3897792032885048,
+    -0.3499968906039661
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 250,
+   "per_week": 1.8027298480556273,
+   "win_rate": 0.524,
+   "avg_move_pct": 0.11991806592560277,
+   "net_per_trade": -0.1800819340743972,
+   "mean_hold_h": 16.104,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3007141474339692,
+    -0.059449720714825266
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 260,
+   "per_week": 1.8748390419778524,
+   "win_rate": 0.46923076923076923,
+   "avg_move_pct": -0.017580985690587192,
+   "net_per_trade": -0.3175809856905872,
+   "mean_hold_h": 18.65,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3364821460362186,
+    -0.29867982534495574
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 611,
+   "per_week": 4.405871748647953,
+   "win_rate": 0.4779050736497545,
+   "avg_move_pct": -0.04325349289534258,
+   "net_per_trade": -0.34325349289534257,
+   "mean_hold_h": 17.646481178396073,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.5266949552282159,
+    -0.16041151246551788
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 721,
+   "per_week": 5.199072881792429,
+   "win_rate": 0.5034674063800277,
+   "avg_move_pct": -0.0201777901808687,
+   "net_per_trade": -0.32017779018086867,
+   "mean_hold_h": 17.668515950069345,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27381021220837376,
+    -0.36641692610911847
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 690,
+   "per_week": 4.9755343806335315,
+   "win_rate": 0.5,
+   "avg_move_pct": 0.02653324115718578,
+   "net_per_trade": -0.2734667588428142,
+   "mean_hold_h": 17.065217391304348,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3893233338401085,
+    -0.15761018384551992
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 691,
+   "per_week": 4.982745300025754,
+   "win_rate": 0.5151953690303908,
+   "avg_move_pct": 0.026508845914989164,
+   "net_per_trade": -0.27349115408501085,
+   "mean_hold_h": 18.50506512301013,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22221388084758298,
+    -0.3246202271107698
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 271,
+   "per_week": 1.9541591552922999,
+   "win_rate": 0.4870848708487085,
+   "avg_move_pct": -0.08495323439131554,
+   "net_per_trade": -0.3849532343913155,
+   "mean_hold_h": 20.107011070110698,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.27262916820375993,
+    -0.496451388327492
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 302,
+   "per_week": 2.1776976564511976,
+   "win_rate": 0.45364238410596025,
+   "avg_move_pct": -0.11377368103498176,
+   "net_per_trade": -0.41377368103498174,
+   "mean_hold_h": 20.155629139072847,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29207121726165963,
+    -0.5354761448083039
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 157,
+   "per_week": 1.132114344578934,
+   "win_rate": 0.5222929936305732,
+   "avg_move_pct": 0.0266979208404301,
+   "net_per_trade": -0.2733020791595699,
+   "mean_hold_h": 19.840764331210192,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.15185613805347303,
+    -0.3932107298719187
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 127,
+   "per_week": 0.9157867628122587,
+   "win_rate": 0.4094488188976378,
+   "avg_move_pct": -0.22639277913184644,
+   "net_per_trade": -0.5263927791318465,
+   "mean_hold_h": 19.543307086614174,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4751600517736777,
+    -0.5768249951250437
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 729,
+   "per_week": 5.256760236930209,
+   "win_rate": 0.4787379972565158,
+   "avg_move_pct": -0.013535523401823136,
+   "net_per_trade": -0.3135355234018231,
+   "mean_hold_h": 18.02469135802469,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.347907848855581,
+    -0.27925736870273304
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 719,
+   "per_week": 5.184651043007984,
+   "win_rate": 0.49791376912378305,
+   "avg_move_pct": -0.025782861367108292,
+   "net_per_trade": -0.32578286136710827,
+   "mean_hold_h": 18.968011126564672,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22364804700955399,
+    -0.4276339679070027
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 397,
+   "per_week": 2.862734998712336,
+   "win_rate": 0.49622166246851385,
+   "avg_move_pct": 0.07439421404146009,
+   "net_per_trade": -0.22560578595853992,
+   "mean_hold_h": 16.513853904282115,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3786255710246033,
+    -0.07335494453602454
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "1h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 402,
+   "per_week": 2.8987895956734486,
+   "win_rate": 0.48756218905472637,
+   "avg_move_pct": 0.043223828587138795,
+   "net_per_trade": -0.2567761714128612,
+   "mean_hold_h": 19.261194029850746,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.1772119045818462,
+    -0.33634043824387616
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 237,
+   "per_week": 1.7070828331332533,
+   "win_rate": 0.2869198312236287,
+   "avg_move_pct": -0.21123128409983738,
+   "net_per_trade": -0.5112312840998374,
+   "mean_hold_h": 4.523206751054852,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.6050847457627119,
+    -0.4181665069887517
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 296,
+   "per_week": 2.1320528211284513,
+   "win_rate": 0.3783783783783784,
+   "avg_move_pct": -0.12162162162162163,
+   "net_per_trade": -0.42162162162162165,
+   "mean_hold_h": 4.608108108108108,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.37432432432432433,
+    -0.4689189189189189
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 152,
+   "per_week": 1.0948379351740696,
+   "win_rate": 0.2631578947368421,
+   "avg_move_pct": -0.23679414284381206,
+   "net_per_trade": -0.5367941428438121,
+   "mean_hold_h": 4.447368421052632,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.6552631578947368,
+    -0.4183251277928873
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 218,
+   "per_week": 1.5702280912364945,
+   "win_rate": 0.4036697247706422,
+   "avg_move_pct": -0.0963302752293578,
+   "net_per_trade": -0.3963302752293578,
+   "mean_hold_h": 4.3119266055045875,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.35045871559633024,
+    -0.4422018348623853
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 2137,
+   "per_week": 15.392557022809122,
+   "win_rate": 0.3776321946654188,
+   "avg_move_pct": -0.1218291526692789,
+   "net_per_trade": -0.4218291526692789,
+   "mean_hold_h": 4.935891436593355,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4489685528434682,
+    -0.3947151401472637
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 2610,
+   "per_week": 18.79951980792317,
+   "win_rate": 0.39808429118773947,
+   "avg_move_pct": -0.10207351055921848,
+   "net_per_trade": -0.40207351055921847,
+   "mean_hold_h": 4.901149425287357,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4081547277550309,
+    -0.39599229336340597
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 2297,
+   "per_week": 16.54501800720288,
+   "win_rate": 0.3678711362646931,
+   "avg_move_pct": -0.1319999310210806,
+   "net_per_trade": -0.4319999310210806,
+   "mean_hold_h": 4.856769699608185,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.46132778878653213,
+    -0.40269759793601667
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 2469,
+   "per_week": 17.783913565426168,
+   "win_rate": 0.4038072093965168,
+   "avg_move_pct": -0.09670587479171054,
+   "net_per_trade": -0.39670587479171054,
+   "mean_hold_h": 4.9833940866747675,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.39907636022582504,
+    -0.39433730877900014
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 124,
+   "per_week": 0.893157262905162,
+   "win_rate": 0.4112903225806452,
+   "avg_move_pct": -0.09080829450538816,
+   "net_per_trade": -0.3908082945053881,
+   "mean_hold_h": 5.451612903225806,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3525843309462602,
+    -0.4290322580645161
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 137,
+   "per_week": 0.9867947178871548,
+   "win_rate": 0.45985401459854014,
+   "avg_move_pct": -0.04331385362332782,
+   "net_per_trade": -0.3433138536233278,
+   "mean_hold_h": 4.992700729927007,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2852941176470588,
+    -0.4004927238608103
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 81,
+   "per_week": 0.5834333733493396,
+   "win_rate": 0.41975308641975306,
+   "avg_move_pct": -0.08345961134158189,
+   "net_per_trade": -0.3834596113415819,
+   "mean_hold_h": 5.432098765432099,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3815057129667033,
+    -0.3853658536585366
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 49,
+   "per_week": 0.3529411764705882,
+   "win_rate": 0.40816326530612246,
+   "avg_move_pct": -0.09183673469387756,
+   "net_per_trade": -0.39183673469387753,
+   "mean_hold_h": 4.816326530612245,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3833333333333333,
+    -0.4
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 1509,
+   "per_week": 10.869147659063625,
+   "win_rate": 0.3658051689860835,
+   "avg_move_pct": -0.1324257045266886,
+   "net_per_trade": -0.4324257045266886,
+   "mean_hold_h": 4.9913850231941685,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4477779411296905,
+    -0.41709380201190255
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 1498,
+   "per_week": 10.789915966386554,
+   "win_rate": 0.39118825100133514,
+   "avg_move_pct": -0.10895875775619315,
+   "net_per_trade": -0.40895875775619317,
+   "mean_hold_h": 5.036048064085447,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.40581437328816683,
+    -0.41210314222421945
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 0.5,
+   "trades": 1065,
+   "per_week": 7.6710684273709475,
+   "win_rate": 0.3530516431924883,
+   "avg_move_pct": -0.14593063706731582,
+   "net_per_trade": -0.44593063706731584,
+   "mean_hold_h": 4.818779342723005,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4632226209150968,
+    -0.42867109596596586
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 0.5,
+   "trades": 1114,
+   "per_week": 8.024009603841536,
+   "win_rate": 0.40933572710951527,
+   "avg_move_pct": -0.09057084835110213,
+   "net_per_trade": -0.3905708483511021,
+   "mean_hold_h": 4.951526032315979,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3888689407540395,
+    -0.39227275594816474
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 224,
+   "per_week": 1.6134453781512603,
+   "win_rate": 0.45982142857142855,
+   "avg_move_pct": -0.07799394541006542,
+   "net_per_trade": -0.3779939454100654,
+   "mean_hold_h": 7.392857142857143,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.40271154278545956,
+    -0.3532763480346713
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 269,
+   "per_week": 1.9375750300120047,
+   "win_rate": 0.5055762081784386,
+   "avg_move_pct": 0.0095734351536374,
+   "net_per_trade": -0.2904265648463626,
+   "mean_hold_h": 8.490706319702602,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2145162574703599,
+    -0.36577457364920973
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 147,
+   "per_week": 1.0588235294117647,
+   "win_rate": 0.42857142857142855,
+   "avg_move_pct": -0.1450122253557429,
+   "net_per_trade": -0.4450122253557429,
+   "mean_hold_h": 6.91156462585034,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.5328767123287671,
+    -0.35833509631478655
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 197,
+   "per_week": 1.4189675870348137,
+   "win_rate": 0.5228426395939086,
+   "avg_move_pct": 0.055929994123998614,
+   "net_per_trade": -0.24407000587600136,
+   "mean_hold_h": 8.101522842639595,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.22393039286763497,
+    -0.26400618844993984
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1331,
+   "per_week": 9.58703481392557,
+   "win_rate": 0.4552967693463561,
+   "avg_move_pct": -0.0829429958492444,
+   "net_per_trade": -0.3829429958492444,
+   "mean_hold_h": 7.954921111945906,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4598800581175025,
+    -0.30612145469550317
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1543,
+   "per_week": 11.114045618247298,
+   "win_rate": 0.46856772521062867,
+   "avg_move_pct": -0.07007614477889777,
+   "net_per_trade": -0.3700761447788978,
+   "mean_hold_h": 8.334413480233312,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.37860184854390627,
+    -0.361561484671616
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1468,
+   "per_week": 10.573829531812724,
+   "win_rate": 0.4604904632152589,
+   "avg_move_pct": -0.07163492485074224,
+   "net_per_trade": -0.37163492485074223,
+   "mean_hold_h": 7.70299727520436,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4127532903690897,
+    -0.33051655933239477
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 1434,
+   "per_week": 10.32893157262905,
+   "win_rate": 0.4783821478382148,
+   "avg_move_pct": -0.048318895873806875,
+   "net_per_trade": -0.3483188958738069,
+   "mean_hold_h": 8.677824267782427,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34130777417811725,
+    -0.3553300175694965
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 79,
+   "per_week": 0.5690276110444177,
+   "win_rate": 0.45569620253164556,
+   "avg_move_pct": -0.10814989265110064,
+   "net_per_trade": -0.40814989265110063,
+   "mean_hold_h": 9.924050632911392,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33963397777058313,
+    -0.4749529096596051
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 93,
+   "per_week": 0.6698679471788715,
+   "win_rate": 0.5806451612903226,
+   "avg_move_pct": 0.16531065111386914,
+   "net_per_trade": -0.13468934888613085,
+   "mean_hold_h": 8.946236559139784,
+   "lev_for_target": null,
+   "halves_net": [
+    0.10213913694282883,
+    -0.3664789307612829
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 49,
+   "per_week": 0.3529411764705882,
+   "win_rate": 0.46938775510204084,
+   "avg_move_pct": -0.09741317866927024,
+   "net_per_trade": -0.39741317866927023,
+   "mean_hold_h": 10.285714285714286,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3333545313444627,
+    -0.45890948010108545
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 32,
+   "per_week": 0.2304921968787515,
+   "win_rate": 0.4375,
+   "avg_move_pct": -0.10516546318298377,
+   "net_per_trade": -0.40516546318298374,
+   "mean_hold_h": 9.25,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.425,
+    -0.38533092636596755
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 1005,
+   "per_week": 7.238895558223289,
+   "win_rate": 0.4597014925373134,
+   "avg_move_pct": -0.0725874561872628,
+   "net_per_trade": -0.3725874561872628,
+   "mean_hold_h": 7.972139303482587,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3931032621757135,
+    -0.3521124370894452
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 947,
+   "per_week": 6.8211284513805515,
+   "win_rate": 0.46673706441393875,
+   "avg_move_pct": -0.0631741333640525,
+   "net_per_trade": -0.36317413336405246,
+   "mean_hold_h": 8.70116156282999,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3613282127697926,
+    -0.3650161596110671
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.0,
+   "trades": 735,
+   "per_week": 5.294117647058823,
+   "win_rate": 0.4557823129251701,
+   "avg_move_pct": -0.0778019686543193,
+   "net_per_trade": -0.3778019686543193,
+   "mean_hold_h": 7.515646258503401,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4264646209112682,
+    -0.3292715518654599
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.0,
+   "trades": 695,
+   "per_week": 5.006002400960384,
+   "win_rate": 0.4906474820143885,
+   "avg_move_pct": -0.012605179960134067,
+   "net_per_trade": -0.31260517996013404,
+   "mean_hold_h": 8.62158273381295,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.33286069064315155,
+    -0.292407874767585
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 208,
+   "per_week": 1.4981992797118846,
+   "win_rate": 0.5048076923076923,
+   "avg_move_pct": 0.017395942227650583,
+   "net_per_trade": -0.2826040577723494,
+   "mean_hold_h": 10.884615384615385,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.1817963728144828,
+    -0.383411742730216
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 249,
+   "per_week": 1.793517406962785,
+   "win_rate": 0.4939759036144578,
+   "avg_move_pct": -0.0025909942418044546,
+   "net_per_trade": -0.30259099424180447,
+   "mean_hold_h": 12.610441767068274,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.14204419471478336,
+    -0.4618534193726094
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 134,
+   "per_week": 0.9651860744297719,
+   "win_rate": 0.47761194029850745,
+   "avg_move_pct": -0.08102765085634195,
+   "net_per_trade": -0.38102765085634194,
+   "mean_hold_h": 9.791044776119403,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.34782185287521095,
+    -0.41423344883747293
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 181,
+   "per_week": 1.303721488595438,
+   "win_rate": 0.5193370165745856,
+   "avg_move_pct": 0.09064159396493271,
+   "net_per_trade": -0.20935840603506728,
+   "mean_hold_h": 12.132596685082872,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.09593290910403765,
+    -0.3215374689338878
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 889,
+   "per_week": 6.403361344537815,
+   "win_rate": 0.46006749156355453,
+   "avg_move_pct": -0.0847072555621857,
+   "net_per_trade": -0.38470725556218566,
+   "mean_hold_h": 11.955005624296962,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.45811559503930477,
+    -0.31146387864568936
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 1054,
+   "per_week": 7.591836734693877,
+   "win_rate": 0.4990512333965844,
+   "avg_move_pct": -0.051124518845764265,
+   "net_per_trade": -0.35112451884576423,
+   "mean_hold_h": 12.204933586337761,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3528580512578993,
+    -0.3493909864336292
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 1004,
+   "per_week": 7.231692677070828,
+   "win_rate": 0.4770916334661355,
+   "avg_move_pct": -0.029731244571886504,
+   "net_per_trade": -0.3297312445718865,
+   "mean_hold_h": 11.358565737051793,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3389817431250597,
+    -0.3204807460187133
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 977,
+   "per_week": 7.0372148859543815,
+   "win_rate": 0.5076765609007164,
+   "avg_move_pct": -0.019534292901070158,
+   "net_per_trade": -0.31953429290107016,
+   "mean_hold_h": 12.904810644831116,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.29495573518863233,
+    -0.34406258771430054
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 60,
+   "per_week": 0.432172869147659,
+   "win_rate": 0.45,
+   "avg_move_pct": -0.20559768828709943,
+   "net_per_trade": -0.5055976882870994,
+   "mean_hold_h": 14.266666666666667,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.41591873550908276,
+    -0.595276641065116
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 59,
+   "per_week": 0.42496998799519803,
+   "win_rate": 0.559322033898305,
+   "avg_move_pct": 0.19417245635854888,
+   "net_per_trade": -0.10582754364145111,
+   "mean_hold_h": 14.440677966101696,
+   "lev_for_target": null,
+   "halves_net": [
+    0.43770983976903916,
+    -0.6312470142715917
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 39,
+   "per_week": 0.2809123649459784,
+   "win_rate": 0.41025641025641024,
+   "avg_move_pct": -0.28042063914789306,
+   "net_per_trade": -0.580420639147893,
+   "mean_hold_h": 14.153846153846153,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4273004243406333,
+    -0.7258848432147897
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 722,
+   "per_week": 5.200480192076831,
+   "win_rate": 0.4806094182825485,
+   "avg_move_pct": -0.025767564716730126,
+   "net_per_trade": -0.32576756471673013,
+   "mean_hold_h": 11.518005540166206,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32702078906588034,
+    -0.3245143403675799
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 636,
+   "per_week": 4.581032412965186,
+   "win_rate": 0.4889937106918239,
+   "avg_move_pct": -0.02818784408517863,
+   "net_per_trade": -0.32818784408517865,
+   "mean_hold_h": 13.125786163522013,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3303825874445291,
+    -0.32599310072582816
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 1.5,
+   "trades": 527,
+   "per_week": 3.7959183673469385,
+   "win_rate": 0.4667931688804554,
+   "avg_move_pct": -0.05246625610180362,
+   "net_per_trade": -0.3524662561018036,
+   "mean_hold_h": 10.96774193548387,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4140107450975322,
+    -0.2911548901704527
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 1.5,
+   "trades": 463,
+   "per_week": 3.3349339735894357,
+   "win_rate": 0.5053995680345572,
+   "avg_move_pct": 0.03041428542049799,
+   "net_per_trade": -0.269585714579502,
+   "mean_hold_h": 13.166306695464362,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2931880924766893,
+    -0.24608507106980254
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 195,
+   "per_week": 1.4045618247298919,
+   "win_rate": 0.5025641025641026,
+   "avg_move_pct": 0.0205282712432391,
+   "net_per_trade": -0.2794717287567609,
+   "mean_hold_h": 13.907692307692308,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.21938838386934117,
+    -0.3389419782881865
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 221,
+   "per_week": 1.5918367346938775,
+   "win_rate": 0.5113122171945701,
+   "avg_move_pct": 0.06216830898620582,
+   "net_per_trade": -0.23783169101379417,
+   "mean_hold_h": 15.746606334841628,
+   "lev_for_target": null,
+   "halves_net": [
+    0.03762186927457939,
+    -0.5108036876959662
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 124,
+   "per_week": 0.893157262905162,
+   "win_rate": 0.49193548387096775,
+   "avg_move_pct": -0.07946637922856527,
+   "net_per_trade": -0.37946637922856524,
+   "mean_hold_h": 12.548387096774194,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3509502446827224,
+    -0.40798251377440814
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 165,
+   "per_week": 1.1884753901560623,
+   "win_rate": 0.5393939393939394,
+   "avg_move_pct": 0.1663243573494812,
+   "net_per_trade": -0.1336756426505188,
+   "mean_hold_h": 15.103030303030303,
+   "lev_for_target": null,
+   "halves_net": [
+    0.16440163003726704,
+    -0.428161622896283
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 699,
+   "per_week": 5.034813925570227,
+   "win_rate": 0.4721030042918455,
+   "avg_move_pct": -0.04818727230820931,
+   "net_per_trade": -0.3481872723082093,
+   "mean_hold_h": 15.198855507868384,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.46680385028579363,
+    -0.22990959883913234
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 833,
+   "per_week": 6.0,
+   "win_rate": 0.5054021608643458,
+   "avg_move_pct": -0.02216190912354848,
+   "net_per_trade": -0.3221619091235485,
+   "mean_hold_h": 15.438175270108044,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.32040182574059306,
+    -0.3239177716830436
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 793,
+   "per_week": 5.71188475390156,
+   "win_rate": 0.4842370744010088,
+   "avg_move_pct": 0.017287276055727406,
+   "net_per_trade": -0.2827127239442726,
+   "mean_hold_h": 14.461538461538462,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2974750349755013,
+    -0.267987597575591
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 787,
+   "per_week": 5.668667466986794,
+   "win_rate": 0.5209656925031766,
+   "avg_move_pct": 0.03465168924653664,
+   "net_per_trade": -0.2653483107534633,
+   "mean_hold_h": 16.172808132147395,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2059364802139959,
+    -0.3246093498448611
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 49,
+   "per_week": 0.3529411764705882,
+   "win_rate": 0.46938775510204084,
+   "avg_move_pct": -0.2397663785241907,
+   "net_per_trade": -0.5397663785241906,
+   "mean_hold_h": 18.693877551020407,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.4915140000339431,
+    -0.5860886618748284
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 55,
+   "per_week": 0.3961584633853541,
+   "win_rate": 0.5636363636363636,
+   "avg_move_pct": 0.24217700735573658,
+   "net_per_trade": -0.05782299264426341,
+   "mean_hold_h": 16.654545454545456,
+   "lev_for_target": null,
+   "halves_net": [
+    0.6119674266349431,
+    -0.7036923255206411
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 34,
+   "per_week": 0.24489795918367346,
+   "win_rate": 0.4411764705882353,
+   "avg_move_pct": -0.33008907048081915,
+   "net_per_trade": -0.6300890704808191,
+   "mean_hold_h": 17.764705882352942,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.36187017523672366,
+    -0.8983079657249147
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 588,
+   "per_week": 4.235294117647059,
+   "win_rate": 0.4914965986394558,
+   "avg_move_pct": 0.02128124341369124,
+   "net_per_trade": -0.27871875658630874,
+   "mean_hold_h": 14.680272108843537,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.25032702978942145,
+    -0.307110483383196
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 517,
+   "per_week": 3.723889555822329,
+   "win_rate": 0.4951644100580271,
+   "avg_move_pct": 0.02126674591660444,
+   "net_per_trade": -0.27873325408339555,
+   "mean_hold_h": 16.5183752417795,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3015964133978349,
+    -0.255958369515344
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.0,
+   "trades": 428,
+   "per_week": 3.082833133253301,
+   "win_rate": 0.4742990654205608,
+   "avg_move_pct": -0.007740244296298598,
+   "net_per_trade": -0.3077402442962986,
+   "mean_hold_h": 13.85981308411215,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.3242288657931578,
+    -0.2912516227994394
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.0,
+   "trades": 379,
+   "per_week": 2.729891956782713,
+   "win_rate": 0.5277044854881267,
+   "avg_move_pct": 0.1337930054166787,
+   "net_per_trade": -0.16620699458332128,
+   "mean_hold_h": 16.45382585751979,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.1559248065036079,
+    -0.17643506588366775
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 175,
+   "per_week": 1.2605042016806722,
+   "win_rate": 0.5085714285714286,
+   "avg_move_pct": 0.0968600510572869,
+   "net_per_trade": -0.2031399489427131,
+   "mean_hold_h": 17.76,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.12274031782916736,
+    -0.28262594788451395
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 193,
+   "per_week": 1.3901560624249698,
+   "win_rate": 0.5181347150259067,
+   "avg_move_pct": 0.04634878401897236,
+   "net_per_trade": -0.25365121598102763,
+   "mean_hold_h": 19.751295336787564,
+   "lev_for_target": null,
+   "halves_net": [
+    0.03877460105575825,
+    -0.5430623338731044
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 113,
+   "per_week": 0.8139255702280912,
+   "win_rate": 0.46017699115044247,
+   "avg_move_pct": -0.1803781876675545,
+   "net_per_trade": -0.48037818766755447,
+   "mean_hold_h": 16.353982300884955,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.7512838289394124,
+    -0.2142252769443257
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "breakout+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 142,
+   "per_week": 1.0228091236494596,
+   "win_rate": 0.5422535211267606,
+   "avg_move_pct": 0.20641957083861173,
+   "net_per_trade": -0.09358042916138826,
+   "mean_hold_h": 19.43661971830986,
+   "lev_for_target": null,
+   "halves_net": [
+    0.16105029773096974,
+    -0.3482111560537462
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 565,
+   "per_week": 4.0696278511404556,
+   "win_rate": 0.4725663716814159,
+   "avg_move_pct": -0.08606241236977201,
+   "net_per_trade": -0.386062412369772,
+   "mean_hold_h": 18.831858407079647,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.5432811787551858,
+    -0.22939918932847633
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf1d",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 670,
+   "per_week": 4.825930372148859,
+   "win_rate": 0.5059701492537313,
+   "avg_move_pct": -0.039867505776281,
+   "net_per_trade": -0.339867505776281,
+   "mean_hold_h": 19.20597014925373,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.2865519016156681,
+    -0.3931831099368938
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 635,
+   "per_week": 4.5738295318127244,
+   "win_rate": 0.47716535433070867,
+   "avg_move_pct": -0.00921103540974011,
+   "net_per_trade": -0.3092110354097401,
+   "mean_hold_h": 18.274015748031495,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.36011047659103984,
+    -0.2584716553642306
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "htf4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 651,
+   "per_week": 4.6890756302521,
+   "win_rate": 0.5069124423963134,
+   "avg_move_pct": -0.007634807114638459,
+   "net_per_trade": -0.3076348071146384,
+   "mean_hold_h": 19.680491551459294,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.30134663677734835,
+    -0.31390368858586326
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 44,
+   "per_week": 0.3169267707082833,
+   "win_rate": 0.45454545454545453,
+   "avg_move_pct": -0.43400009827976693,
+   "net_per_trade": -0.734000098279767,
+   "mean_hold_h": 21.181818181818183,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.7234970342936028,
+    -0.744503162265931
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern",
+   "option": "double_top",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 46,
+   "per_week": 0.33133253301320525,
+   "win_rate": 0.5652173913043478,
+   "avg_move_pct": 0.24806811847839833,
+   "net_per_trade": -0.051931881521601664,
+   "mean_hold_h": 20.347826086956523,
+   "lev_for_target": null,
+   "halves_net": [
+    0.9036788615051301,
+    -1.0075426245483334
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "pattern+4h",
+   "option": "double_bottom",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 32,
+   "per_week": 0.2304921968787515,
+   "win_rate": 0.4375,
+   "avg_move_pct": -0.623883187044683,
+   "net_per_trade": -0.9238831870446831,
+   "mean_hold_h": 20.25,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.8164419758431429,
+    -1.0313243982462232
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 466,
+   "per_week": 3.3565426170468187,
+   "win_rate": 0.47854077253218885,
+   "avg_move_pct": 0.034128545726875056,
+   "net_per_trade": -0.2658714542731249,
+   "mean_hold_h": 18.4206008583691,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.18455829952297992,
+    -0.3471846090232699
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 437,
+   "per_week": 3.14765906362545,
+   "win_rate": 0.482837528604119,
+   "avg_move_pct": 0.028140110035087845,
+   "net_per_trade": -0.27185988996491217,
+   "mean_hold_h": 19.734553775743702,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.26791250458593935,
+    -0.2757892507531134
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "down",
+   "direction": "short",
+   "barrier_pct": 2.8302,
+   "trades": 333,
+   "per_week": 2.3985594237695076,
+   "win_rate": 0.45645645645645644,
+   "avg_move_pct": -0.050445740996825535,
+   "net_per_trade": -0.3504457409968255,
+   "mean_hold_h": 17.90990990990991,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.35507127277081446,
+    -0.3458479070178904
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  },
+  {
+   "timeframe": "4h",
+   "slot": "structure+4h",
+   "option": "up",
+   "direction": "long",
+   "barrier_pct": 2.8302,
+   "trades": 319,
+   "per_week": 2.2977190876350537,
+   "win_rate": 0.5078369905956113,
+   "avg_move_pct": 0.16027599628127365,
+   "net_per_trade": -0.13972400371872634,
+   "mean_hold_h": 19.811912225705328,
+   "lev_for_target": null,
+   "halves_net": [
+    -0.1385225046696107,
+    -0.140917993398785
+   ],
+   "dd_at_target": null,
+   "in_band": false
+  }
+ ],
+ "survivors": 0
+}
