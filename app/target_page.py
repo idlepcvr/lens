@@ -61,6 +61,104 @@ def _baseline() -> dict | None:
         return None
 
 
+def _entry_edge_section() -> str:
+    """His own entries, replayed to barrier resolution at each geometry.
+
+    The only section on the page made of his trades rather than of arithmetic,
+    and the only one that can say whether the target is reachable BY HIM. It
+    exists because the theoretical map above is silent on the one thing that
+    decides everything: whether he can supply the edge it prices.
+    """
+    try:
+        with open(RESULTS / "entry_edge.json") as fh:
+            d = json.load(fh)
+    except Exception:
+        return ("<h2>Your actual entries</h2><p class='lead'>Not measured yet — run "
+                "<span class='m'>python3 research/entry_edge.py</span>.</p>")
+
+    cells = d["cells"]
+    nv = sorted((c for c in cells if c["group"] == "NON-VETO"), key=lambda c: c["rr"])
+    best = max(nv, key=lambda c: c["net_pct"]) if nv else None
+    survivors = d.get("survivors", 0)
+
+    rows = []
+    for c in nv:
+        allc = next((x for x in cells if x["group"] == "ALL" and x["rr"] == c["rr"]), None)
+        vet = next((x for x in cells if x["group"] == "VETO" and x["rr"] == c["rr"]), None)
+        tone = "ok" if c["net_pct"] > 0 else "bad"
+        half = ("<span class='y'>both</span>" if c["both_halves"]
+                else "<span class='n'>H1 only</span>" if c["net_pct"] > 0
+                else "—")
+        vet_cell = f"<td class='m'>{vet['win_rate']:.1%}</td>" if vet else "<td>—</td>"
+        halves = (f"<td class='m'>{c['h1_net']:+.2f} / {c['h2_net']:+.2f}</td>"
+                  if c["h1_net"] is not None and c["h2_net"] is not None
+                  else "<td>—</td>")
+        rows.append(
+            f"<tr class='{tone}'><td class='m'>{c['rr']:.0f}</td>"
+            f"<td class='m'>{c['stop_pct']:.2f}%</td>"
+            f"<td class='m'>{c['target_pct']:.2f}%</td>"
+            f"<td class='m'>{c['win_rate']:.1%}</td>"
+            + vet_cell +
+            f"<td class='m'>{c['random_wr']:.1%}</td>"
+            f"<td class='m edge'>{c['edge_pp']:+.1f}pp</td>"
+            f"<td class='m'>{c['breakeven_wr']:.1%}</td>"
+            f"<td class='m {'pos' if c['net_pct'] > 0 else 'neg'}'>{c['net_pct']:+.3f}%</td>"
+            + halves +
+            f"<td class='m'>{half}</td></tr>")
+
+    warn = (
+        '<div class="warn-b"><b>Nothing here is a validated edge — '
+        f'{survivors} of {len(cells)} cells survive a split-half test.</b> '
+        "Every positive cell is positive in the first half of the book and negative "
+        "in the second. That is the exact failure mode that disarmed S1–S5: strong "
+        "in-sample, gone out of sample. Treat the numbers below as a map of where to "
+        "look, never as a system to size up.</div>"
+    )
+
+    body = (
+        "<h2>Your actual entries, replayed</h2>"
+        f"<p class='lead'>Every one of your <b>{d['n_entries']} entries</b> — same price, "
+        "same direction, same moment — walked forward through real bars to whichever "
+        "barrier hits first. <b>Holding is removed as a variable</b>, so what is left is "
+        "the entry alone. That matters because your median hold is 2.1 hours and your "
+        "exits, not your entries, have been doing most of the work.</p>"
+        + warn +
+        f"<p class='note' style='margin-bottom:10px'>Cadence: <b>{d['trades_per_week']:.1f} "
+        f"trades/week</b> lifetime, <b>{d['trades_per_week_90d']:.1f}/week</b> over the last "
+        f"90 days. Both are far above the 2–3/week the geometry work assumed — frequency "
+        f"is not your constraint. {d['n_non_veto']} of {d['n_entries']} entries are "
+        f"non-VETO.</p>"
+        "<table><tr><th>R:R</th><th>stop</th><th>target</th><th>your WR<br>(non-VETO)</th>"
+        "<th>VETO</th><th>random</th><th>edge</th><th>breakeven</th>"
+        "<th>net/trade</th><th>H1 / H2 net</th><th>halves</th></tr>"
+        + "".join(rows) + "</table>"
+        + (f"<p class='note'><b>The shape is the finding, and it inverts the map above.</b> "
+           f"Your entries do best at <b>low</b> R:R — {best['win_rate']:.1%} at R:R "
+           f"{best['rr']:.0f} against a {best['random_wr']:.1%} random floor, "
+           f"{best['edge_pp']:+.1f}pp — and at R:R 8 they land at or below random. But the "
+           "theoretical map says the <i>cheapest</i> target is high R:R. So the geometry "
+           "that needs the least skill is precisely the one where you have shown none, and "
+           "the geometry where you show something needs far more of it. That tension is "
+           "the real problem to solve, and no amount of position sizing touches it.</p>"
+           if best else "")
+        + "<p class='note'>Non-VETO beats VETO at nearly every R:R, which corroborates "
+        "the discipline rules by a completely independent route — these are replayed "
+        "barrier outcomes, not realised P&amp;L, so they share no arithmetic with the "
+        "bucket stats that produced the rules. It is the most robust finding on this "
+        "page, and it is a filter rather than an edge: it removes bad trades, it does "
+        "not manufacture good ones.</p>"
+        "<p class='note'><b>What would close the gap.</b> If the R:R 2 non-VETO cell were "
+        "real, then at 5% risk it pays +0.48%/trade and reaching 10%/week needs about "
+        "<b>20 trades/week</b> — roughly triple your current cadence, at a 34% drawdown "
+        "on eight consecutive losses. That is the honest shape of the target: not "
+        "impossible, but it requires an edge that has not yet survived its first "
+        "out-of-sample test. <b>Establishing that the R:R 2 non-VETO edge is real is the "
+        "single highest-value thing to do next</b>, and it is a matter of collecting "
+        "forward trades, not of more analysis.</p>"
+    )
+    return body
+
+
 def render() -> str:
     bl = _baseline()
     if not bl:
@@ -192,24 +290,8 @@ def render() -> str:
         "sample is large enough to tell edge from variance.</p>"
     )
 
-    # ── the one honest calibration point ─────────────────────────────────────
-    ledger = (
-        "<h2>Where the book actually sits</h2>"
-        "<p class='lead'>One number calibrates every table above. The realised "
-        "ledger is <b>39.4% at ~1.31R</b>. A random entry at 1.31R wins about "
-        "<b>43%</b>. So the book has been running roughly <b>4pp below random</b> — "
-        "the selection was not adding, and friction did the rest.</p>"
-        "<p class='note'>That is not a verdict on whether the edge can exist; those "
-        "trades were taken on a geometry where friction was half the stop, at a 2.1-hour "
-        "median hold, using setups later disarmed for failing out of sample. It is the "
-        "honest starting point: <b>the gap to 10%/week is not +9pp, it is +13pp from "
-        "where the book stands.</b> Any plan that does not name where those points come "
-        "from is a wish.</p>"
-        "<p class='note'>The cheapest cells all say the same thing — <b>high R:R, more "
-        "trades, small risk</b>. That is the search space. It is also exactly what "
-        "<a href='/edge'>/edge</a> and the breeder already scan, so the machinery to "
-        "hunt it exists; what has been missing is the number it has to beat.</p>"
-    )
+    # ── his actual entries, replayed ─────────────────────────────────────────
+    ledger = _entry_edge_section()
 
     body = head + floor + body_maps + prop + ledger + (
         '<p class="foot"><a href="/geometry">→ where the geometry comes from</a> · '
@@ -239,6 +321,12 @@ def render() -> str:
         "tr.ok td.edge{color:var(--long)} tr.warn td.edge{color:var(--amber)}"
         "tr.bad td.edge{color:var(--short)} tr.no td.edge{color:var(--short);opacity:.6}"
         "tr.no td{opacity:.55}"
+        "tr.ok td.edge{color:var(--long)} tr.bad td.edge{color:var(--short)}"
+        ".pos{color:var(--long)} .neg{color:var(--short)}"
+        ".y{color:var(--long)} .n{color:var(--short)}"
+        ".warn-b{background:var(--short-d);border:1px solid var(--short);"
+        "border-radius:9px;padding:12px 15px;margin:14px 0;font-size:13px;"
+        "line-height:1.6;max-width:76ch}"
         ".conf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;"
         "background:var(--line);border:1px solid var(--line);border-radius:10px;"
         "overflow:hidden;margin:6px 0}"
