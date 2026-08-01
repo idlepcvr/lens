@@ -45,15 +45,29 @@ ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 # −6.6%/mo is what losing that bet looks like.
 #
 # These come from the same identity run forwards instead: pick the hold, and the
-# stop follows. SL = σ·√(hold/R:R) at σ = 1.79%/day, hold 2.5 days, R:R 4 — the
-# shortest hold that clears friction with margin (the floor is ~43h at a 25% win
-# rate). Breakeven WR 24.2% against a 20% coin flip, so the edge required is
-# +4pp rather than +4 and a prayer.
+# stop follows. SL = σ·√(hold/R:R) at σ = 1.79%/day, hold 2.5 days.
+#
+# 2026-08-01, second pass: R:R 4 → R:R 1, so 1.42/5.66 → 2.83/2.83. The identity
+# and the hold are unchanged; only the R:R moved. The reason is that R:R 4 was
+# picked for the breakeven it implied (24.2% vs a 20% coin flip) and nothing in
+# the book was ever measured there. R:R 1 is where the one validated edge lives:
+# short non-VETO at exactly 2.8302/2.8302 — n=91, WR 68.1% vs 51.9% matched
+# random (+16.3pp), passes all four gates, net +0.726%/trade against a 55.3%
+# breakeven (results/short_edge.json). Trading a geometry nothing was validated
+# at, while holding the validation for a different one, was the defect.
+#
+# ⚠ Cost of the change: the validated cell fires 1.51×/week. This buys the only
+# edge that survived testing and gives up the cadence the goal model wants — a
+# real trade-off, made deliberately, not a free win.
+#
+# ⚠ Empirical median hold on those 91 is 21h, not the 60h the identity predicts.
+# Expected barrier-hit time exceeds the median (the mean is dragged by the long
+# tail), so this is the expected divergence, not a broken model.
 #
 # ⚠ σ drifts, and these do not. /geometry compares them against live σ and shows
 # a STALE banner past 15% divergence — deliberately a manual edit, because the
 # scanner must not silently move its own stop. Re-derive there, don't guess here.
-SL_PCT, TP_PCT = 1.42, 5.66
+SL_PCT, TP_PCT = 2.83, 2.83
 
 # ── alert ticket sizing (tunable in .env; falls back to these defaults) ──
 MM_RATE = 0.005                      # maintenance margin, Kraken BTC perp ~0.5%

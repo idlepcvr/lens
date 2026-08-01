@@ -26,13 +26,18 @@ from .theme import shell
 # measurements. Keeping them adjacent makes clear which is which.
 HOLD_DAYS = 2.5           # ~2 trades/week — the original instinct, and the
                           # shortest hold that clears friction with margin
-RR = 4.0
-WIN_RATE = 0.25           # coin-flip at R:R 4 is 20%; this assumes +5pp of edge
+RR = 1.0                  # 2026-08-01: was 4.0. R:R 1 is the only R:R anything
+                          # in this book was validated at — see setups.SL_PCT.
+WIN_RATE = 0.681          # MEASURED, not assumed: short non-VETO at 2.83/2.83,
+                          # n=91, vs a 50% coin flip at R:R 1 (short_edge.json)
 MAX_DD = 0.25
 STREAK = 15
 
 # Hold-time ladder — the centrepiece. Short holds are the ones that fail.
-# 60h is the chosen 2.5d operating point; the 43h row is the breakeven floor.
+# 60h is the chosen 2.5d operating point. The floor moved with the R:R: at R:R 4
+# / 25% WR it was ~43h, at R:R 1 / 68.1% WR it is ~5h — a measured win rate that
+# high buys back most of the short-hold penalty. 60h is now a choice, not a
+# constraint; it is where the edge was measured, which is the reason to keep it.
 LADDER_HOURS = [4, 8, 16, 24, 43, 60, 5 * 24, 10 * 24]
 
 # The geometry this replaced, kept so the change stays legible on the page that
@@ -259,7 +264,7 @@ def render() -> str:
     # ── 7. does the market even offer this? ──────────────────────────────────
     #
     # ⚠ The supply check counts DAYS whose range clears the target, but this
-    # geometry is held for HOLD_DAYS. A 5.66% move accumulated over 2.5 days
+    # geometry is held for HOLD_DAYS. A 2.83% move accumulated over 2.5 days
     # never shows up in any single day's range, so the badge is measuring the
     # wrong window and reads far more pessimistic than the trade actually is.
     # Scale the threshold to a single day (σ√t scaling: move ÷ √hold) so the
@@ -372,7 +377,7 @@ def render() -> str:
     # The reachability verdict on this book is STARVED at every cell, and it is
     # tempting to read that as "the geometry is wrong". It isn't — reach is
     # measured over the trades he TOOK, at the holds he CHOSE, and those holds
-    # are hours. A 5.66% move takes ~2.5 days to arrive; a 2-hour trade cannot
+    # are hours. A 2.83% move takes ~2.5 days to arrive; a 2-hour trade cannot
     # reach it, so 0/512 is what the barrier math predicts rather than evidence
     # against it. What the ledger genuinely establishes is the harder point:
     # the config needs a holding period with essentially no precedent here.
