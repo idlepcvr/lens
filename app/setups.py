@@ -27,6 +27,7 @@ import uuid
 from typing import Optional
 
 from .database import DB_PATH
+from .geometry import FRICTION_PCT
 
 OHLCV_SYMBOL = "binance:BTC/USDT"
 
@@ -896,7 +897,10 @@ def _trade_shape(sig: dict) -> dict:
         if acct is None:
             acct = 1000.0
     lev = float(_envcfg("LENS_LEVERAGE", "10"))
-    fee_rt = float(_envcfg("LENS_FEE_RT_PCT", "0.30")) / 100.0   # round-trip fraction
+    # default = geometry's measured round-trip friction; 0.30 was the pre-measurement
+    # guess (FRICTION_PCT commit bbbeb2d fixed geometry but this default was missed)
+    fee_rt = float(_envcfg("LENS_FEE_RT_PCT", str(FRICTION_PCT))) / 100.0
+
 
     win_move = abs(tgt - entry) / entry          # underlying move, fraction
     loss_move = abs(entry - stop) / entry

@@ -32,6 +32,7 @@ BODY = r"""
       <button class="btn take"  id="b-take"  onclick="decide('approved',3)">TAKE<span class="cap">conv 3</span></button>
       <button class="btn aplus" id="b-aplus" onclick="decide('approved',5)">TAKE A+<span class="cap">conv 5</span></button>
     </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--dim);text-align:center">signals you skipped went on to win 83% (n=30, one_at_a_time) — SKIP only on a veto you can name, not a feeling</div>
   </div>
 </div>
 
@@ -91,12 +92,15 @@ function wireSizer(dir,d){
   const p = STATE.verdicts[dir].plan;
   const upd = ()=>{
     const risk = parseFloat(inp.value)||0; RISK[dir]=risk;
-    const notional = risk/(p.sl_pct/100), btc = notional/d.close, fee = notional*0.0004;
+    // outcomes priced at MEASURED friction (taker entries — what the book pays),
+    // then the € recovered by resting post-only limits instead of crossing.
+    const fee = notional*GEO.fee_t, feeM = notional*GEO.fee_m, save = fee-feeM;
     const win = notional*(p.tp_pct/100)-fee, early = notional*0.007-fee, loss = risk+fee;
     $('size-'+dir).innerHTML = `→ €${money(notional)} <span style="color:var(--dim)">(${btc.toFixed(4)} BTC · €${money(notional/10)} margin @10x)</span>`;
     $('out-'+dir).innerHTML =
       `target <b class="g">+€${win.toFixed(2)}</b> · +0.7% early <b class="g">+€${early.toFixed(2)}</b> · stop <b class="r">−€${loss.toFixed(2)}</b>`
-      + (d.balance?` · <span style="color:var(--dim)">stop = ${(loss/d.balance*100).toFixed(1)}% of acct</span>`:'');
+      + (d.balance?` · <span style="color:var(--dim)">stop = ${(loss/d.balance*100).toFixed(1)}% of acct</span>`:'')
+      + `<br><span style="color:var(--dim)">fees €${fee.toFixed(2)} market → €${feeM.toFixed(2)} post-only limit · </span><b class="g">save €${save.toFixed(2)}</b><span style="color:var(--dim)"> — rest the entry, don't cross</span>`;
   };
   inp.addEventListener('input',upd); upd();
 }
@@ -262,11 +266,18 @@ setInterval(load, 60000);
 # Geometry into the help prose from the one source, so the explainer can never
 # quote a stop the desk no longer uses. SCRIPT is a raw literal full of JS
 # template braces, so it's prepended rather than .format()ed.
+from .geometry import FRICTION_LADDER, FRICTION_PCT     # noqa: E402
 from .geometry_page import HOLD_DAYS as _HOLD           # noqa: E402
 from .setups import SL_PCT as _SL, TP_PCT as _TP        # noqa: E402
 
+# fee_t = measured round-trip friction (the taker entries the book actually
+# pays); fee_m = the ladder's "maker both sides". Both as fractions for JS.
+# 346/512 realized trades were pure-taker IOC — the ticket's old hardcoded
+# 0.0004 was quoting the maker world while the book lived in the taker one.
 _GEO_JS = (f"const GEO={{sl:{_SL},tp:{_TP},"
-           f"rr:'{_TP / _SL:.2f}',hold:{_HOLD:g}}};\n")
+           f"rr:'{_TP / _SL:.2f}',hold:{_HOLD:g},"
+           f"fee_t:{FRICTION_PCT / 100:g},"
+           f"fee_m:{FRICTION_LADDER['maker both sides'] / 100:g}}};\n")
 
 DESK_HTML = shell("/desk", "Desk", BODY, script=_GEO_JS + SCRIPT, right=RIGHT,
                   meta="can I enter?")
