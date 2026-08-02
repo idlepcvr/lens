@@ -20,6 +20,7 @@ Routes:
   POST   /api/signals/{signal_id}/decide → approve / reject (week 4 wire-up)
 """
 
+import re
 import threading
 import time
 from datetime import date, datetime
@@ -28,7 +29,9 @@ from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+
+from .paths import RESULTS
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 
 from .calculator import CalcError, compute_goal, compute_position, compute_projection
@@ -944,6 +947,23 @@ class ConfigUpdate(BaseModel):
 @app.get("/goal", response_class=HTMLResponse)
 def goal_page():
     from .goal_page import render
+    return render()
+
+
+@app.get("/api/research/{name}.json")
+def api_research_json(name: str):
+    """Raw results/<name>.json — the evidence file behind a /research card."""
+    if not re.fullmatch(r"[A-Za-z0-9_]+", name):
+        raise HTTPException(404)
+    fp = RESULTS / f"{name}.json"
+    if not fp.exists():
+        raise HTTPException(404)
+    return FileResponse(fp, media_type="application/json")
+
+
+@app.get("/research", response_class=HTMLResponse)
+def research_page():
+    from .research_page import render
     return render()
 
 
