@@ -382,7 +382,10 @@ if __name__ == "__main__":   # ponytail: one runnable check
     lv = leverage_for(1.9, g["stop_pct"])
     assert abs((g["stop_pct"] + FRICTION_PCT) * lv - 1.9) < 1e-9
 
-    # ── the recommendation, and the friction lever ───────────────────────────
+    # ── a fixed math case, and the friction lever ────────────────────────────
+    # NOT the live operating point — that moved to R:R 1 / 2.83-2.83 on
+    # 2026-08-01 (see setups.SL_PCT). These stay at R:R 4 deliberately: they are
+    # regression cases for the identity itself, which the move did not change.
     c = config(SIGMA, 2.5, 4.0, 0.25)
     assert c["positive"] and c["monthly_pct"] > 0
     # Half the live friction, whatever the live friction happens to be — the old
@@ -397,7 +400,7 @@ if __name__ == "__main__":   # ponytail: one runnable check
     assert not config(SIGMA, 2.5, 4.0, edge - 0.005)["positive"]
     assert config(SIGMA, 2.5, 4.0, edge + 0.005)["positive"]
 
-    print(f"σ {SIGMA}%/d · hold 2.5d · R:R 4")
+    print(f"σ {SIGMA}%/d · hold 2.5d · R:R 4 (math case, not the live geometry)")
     print(f"  stop {c['stop_pct']:.2f}%  target {c['target_pct']:.2f}%  "
           f"BE {c['breakeven_wr']:.1%} vs coin {c['coinflip_wr']:.0%}")
     print(f"  risk {c['risk_pct']:.2f}%  lev {c['leverage']:.2f}x  "
