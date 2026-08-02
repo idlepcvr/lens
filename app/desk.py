@@ -92,6 +92,8 @@ function wireSizer(dir,d){
   const p = STATE.verdicts[dir].plan;
   const upd = ()=>{
     const risk = parseFloat(inp.value)||0; RISK[dir]=risk;
+    // position that puts exactly `risk` € at the stop, and its BTC size
+    const notional = risk/(p.sl_pct/100), btc = notional/d.close;
     // outcomes priced at MEASURED friction (taker entries — what the book pays),
     // then the € recovered by resting post-only limits instead of crossing.
     const fee = notional*GEO.fee_t, feeM = notional*GEO.fee_m, save = fee-feeM;
