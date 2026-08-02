@@ -111,6 +111,12 @@ def _months_of(df) -> float:
     return (df.index[-1] - df.index[0]).days / 30.44
 
 
+def _write(payload: dict) -> None:
+    """Write results, creating the directory if the tree is missing one."""
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    (RESULTS / "cadence_search.json").write_text(json.dumps(payload, indent=1))
+
+
 def _bar_outcomes(df, k, r, direction, cap=CAP_BARS):
     """Per-bar trade outcome in R, for EVERY bar — computed once, sampled many.
 
@@ -232,6 +238,27 @@ def run(timeframes=TIMEFRAMES, min_per_month=MIN_PER_MONTH, n_perm=N_PERM):
     print(f"\nstage 1: {tests:,} tests · {len(rows)} cleared cadence + split-half"
           f"\nBonferroni threshold: {ALPHA}/{tests:,} = {bonf:.3g}", flush=True)
 
+    # ── CHECKPOINT ────────────────────────────────────────────────────────────
+    # Stage 1 is hours; stage 2 is seconds. Learned the hard way on 2026-08-02:
+    # an 8-hour run reached here having found a survivor, then died loading data
+    # for stage 2, and the survivor's identity existed only in this list — never
+    # printed, never written. Eight hours of compute, one interesting result, gone.
+    # So stage 1 lands on disk BEFORE anything else can fail. Expensive work is
+    # never allowed to depend on cheap work succeeding.
+    _write({"generated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "stage": "1-only (permutation not yet run)",
+            "min_per_month": min_per_month, "months": MONTHS,
+            "timeframes": list(timeframes), "stage1_tests": tests,
+            "bonferroni": bonf, "cadence_split_half_survivors": len(rows),
+            "rows": rows[:TOP_REPORT]})
+    print(f"checkpoint: stage 1 written to {RESULTS / 'cadence_search.json'}",
+          flush=True)
+    # And print every survivor NOW, so the log alone is a sufficient record even
+    # if the file is lost with the working tree.
+    for r_ in rows[:TOP_REPORT]:
+        print(f"  STAGE1 [{r_['tf']}] {r_['per_month']}/mo exp {r_['exp_r']}R "
+              f"n={r_['n']} wr={r_['wr']}% · {r_['desc']}", flush=True)
+
     # ── stage 2: permutation, survivors only (expensive, so top-N) ────────────
     rng = np.random.default_rng(42)
     dfs = {tf: _load(tf, MONTHS) for tf in {r_["tf"] for r_ in rows[:TOP_REPORT]}}
@@ -258,7 +285,7 @@ def run(timeframes=TIMEFRAMES, min_per_month=MIN_PER_MONTH, n_perm=N_PERM):
         "rows": rows[:TOP_REPORT],
     }
     path = RESULTS / "cadence_search.json"
-    path.write_text(json.dumps(out, indent=1))
+    _write(out)                      # overwrites the stage-1 checkpoint
 
     print(f"\n{'='*72}")
     if survivors:
