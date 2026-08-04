@@ -167,24 +167,36 @@ CSS = """
 
 
 def render(doc: str = "readme") -> str:
-    if doc not in BY_KEY:
+    if doc not in BY_KEY and doc != "glossary":
         doc = "readme"
-    label, filename, _ = BY_KEY[doc]
-    path = ROOT / filename
-    try:
-        body = render_md(path.read_text())
-        meta = f"{filename} · {len(path.read_text().splitlines())} lines"
-    except OSError as e:
-        body = f"<p class='r'>Could not read {html.escape(filename)}: {html.escape(str(e))}</p>"
-        meta = filename
 
+    if doc == "glossary":
+        # The glossary was its own route until the 2026-08-03 merge. It is the
+        # one tab whose source isn't a file on disk — it's static HTML that
+        # mirrors calculator.py — so it can't go through render_md().
+        from .glossary_page import BODY
+        body, meta = BODY, "plain-English reference · every metric in the model"
+    else:
+        label, filename, _ = BY_KEY[doc]
+        path = ROOT / filename
+        try:
+            body = render_md(path.read_text())
+            meta = f"{filename} · {len(path.read_text().splitlines())} lines"
+        except OSError as e:
+            body = f"<p class='r'>Could not read {html.escape(filename)}: {html.escape(str(e))}</p>"
+            meta = filename
+
+    tabs = [(k, lbl, b) for k, lbl, _fn, b in DOCS]
+    tabs.append(("glossary", "Glossary", "what every metric means, in English"))
     nav = "".join(
         f'<a href="/manual?doc={k}" class="{"on" if k == doc else ""}" title="{b}">{lbl}</a>'
-        for k, lbl, _fn, b in DOCS)
+        for k, lbl, b in tabs)
 
     return shell("/manual", "Manual",
                  CSS + f'<div class="docnav">{nav}</div>'
-                 f'<div class="docmeta">{meta} — rendered live from the repo, '
-                 f'so it cannot go stale</div>'
+                 f'<div class="docmeta">{meta}'
+                 + ('' if doc == "glossary" else
+                    ' — rendered live from the repo, so it cannot go stale')
+                 + '</div>'
                  f'<div class="docwrap">{body}</div>',
                  meta="the written record")

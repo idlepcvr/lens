@@ -212,7 +212,7 @@ async function loadOpenPositions(){
           ${plan}
         </div></div>`;
     }).join('');
-    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
+    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/hedge-position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
   }catch(e){ el.innerHTML=''; }
 }
 async function load(){
@@ -453,7 +453,7 @@ function openTrade(id){
     <textarea id="bm-notes" placeholder="notes…">${t.notes||''}</textarea>
     <div><button class="bm-save" id="msave">💾 Save review</button></div>
   </div></div>`;
-  const close=()=>{if(bmChart){try{bmChart.remove();}catch(e){}bmChart=null;}$('modal').innerHTML='';document.onkeydown=null;if(location.search.includes('trade='))history.replaceState(null,'','/journal');};
+  const close=()=>{if(bmChart){try{bmChart.remove();}catch(e){}bmChart=null;}$('modal').innerHTML='';document.onkeydown=null;if(location.search.includes('trade='))history.replaceState(null,'','/hedge-journal');};
   $('mbg').onclick=e=>{if(e.target.id==='mbg')close();}; $('mx').onclick=close;
   document.onkeydown=e=>{if(e.key==='Escape')close();};
   // chart
@@ -524,10 +524,10 @@ def render(book: str = "hedge") -> str:
     eval currently running lives on /prop-ledger, which also enforces the walls."""
     book = "prop" if book == "prop" else "hedge"
     other = "prop" if book == "hedge" else "hedge"
-    path = "/prop-journal" if book == "prop" else "/journal"
+    path = "/prop-journal" if book == "prop" else "/hedge-journal"
     sub = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
            f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
-           f'<a href="{"/journal" if book == "prop" else "/prop-journal"}" class="ac">'
+           f'<a href="{"/hedge-journal" if book == "prop" else "/prop-journal"}" class="ac">'
            f'switch to {other}</a></div>')
     return shell(path, "Journal", sub + BODY,
                  script=f'const BOOK="{book}";\n' + SCRIPT,

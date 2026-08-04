@@ -102,10 +102,11 @@ CSS = """
 """
 
 
-def render() -> str:
+def parts() -> dict:
+    """Body + CSS. CSS is returned separately rather than inlined in the body
+    so the merge can scope it to its own section."""
     cards, pending = _experiments()
-    body = ['<style>', CSS, '</style>',
-            '<div class="rs-intro">Every experiment run against the book or the candle history, '
+    body = ['<div class="rs-intro">Every experiment run against the book or the candle history, '
             'newest first — the question it asked in its own words, and the raw numbers it produced. '
             'Rendered live from <code>research/</code> and <code>results/</code> on every load; '
             'nothing here is summarised by hand.</div>']
@@ -117,4 +118,10 @@ def render() -> str:
                         f'{html.escape(p["summary"])}</div>')
     body.append(f'<div class="foot">{len(cards)} experiments with artifacts · '
                 f'{len(pending)} scripts without · CLI twins live in research/</div>')
-    return shell("/research", "Research", "\n".join(body), meta="the lab notebook")
+    return {"body": "\n".join(body), "css": "<style>" + CSS + "</style>"}
+
+
+def render() -> str:
+    p = parts()
+    return shell("/research", "Research", p["body"], head_extra=p["css"],
+                 meta="the lab notebook")

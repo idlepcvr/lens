@@ -30,7 +30,16 @@ def render(paths: list[str]) -> str:
     hedge = {h for h, _ in NAV_HEDGE}
     prop = {h for h, _ in NAV_PROP}
 
-    groups: dict[str, list[str]] = {"Shared": [], "Hedge": [], "Prop": [], "Other": []}
+    # Pages with no nav chip on purpose: they're engine cards on /prop-plan
+    # (see NAV_PROP in theme.py — they lost a chip, not a home). Listing them
+    # under "Other" made deliberate design look like clutter.
+    ENGINES = {
+        "/prop-survival", "/regime", "/prop-ledger", "/prop-income", "/prop",
+    }
+
+    groups: dict[str, list[str]] = {
+        "Shared": [], "Hedge": [], "Prop": [], "Engines": [], "Reference": []
+    }
     for p in paths:
         if p in hedge and p in prop:
             groups["Shared"].append(p)
@@ -38,11 +47,13 @@ def render(paths: list[str]) -> str:
             groups["Hedge"].append(p)
         elif p in prop:
             groups["Prop"].append(p)
+        elif p in ENGINES:
+            groups["Engines"].append(p)
         else:
-            groups["Other"].append(p)
+            groups["Reference"].append(p)
 
     cards = []
-    for title in ("Hedge", "Prop", "Shared", "Other"):
+    for title in ("Hedge", "Prop", "Shared", "Engines", "Reference"):
         items = sorted(groups[title], key=lambda p: _label(p, labels).lower())
         if not items:
             continue

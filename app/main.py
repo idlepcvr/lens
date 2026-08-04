@@ -27,7 +27,7 @@ from datetime import date, datetime
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .paths import RESULTS
@@ -128,7 +128,7 @@ def home():
     return render()
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/hedge-plan", response_class=HTMLResponse)
 def landing():
     # Scoped to the hedge book. This counted EVERY book, so its trade count was
     # hedge + every prop attempt, and prop signals landed in the hedge queue —
@@ -235,9 +235,9 @@ def landing():
 
     body = f"""
 <div class="strip">
-  <a class="sc" href="/journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
-  <a class="sc" href="/signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
-  <a class="sc {'pend' if pending else ''}" href="/desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
+  <a class="sc" href="/hedge-journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
+  <a class="sc" href="/hedge-signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
+  <a class="sc {'pend' if pending else ''}" href="/hedge-desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
 </div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this dashboard</span><span class="line"></span></div>
@@ -246,7 +246,7 @@ def landing():
 <h4>the only inputs are the parameters</h4>Start €, target €, target date, win rate, R:R, leverage, trades/week, drawdown limits. Every field is a calculator — type <code>300*0.1</code> and hit <b>↵</b> to get <code>30</code>. <b>Apply</b> saves them as your defaults; <b>Reload</b> pulls the last saved set.
 <h4>the four hero cards</h4>Each answers one goal question and passes or fails: <b>On time?</b> = does your edge reach the target inside the window (projected arrival vs deadline). <b>Edge / trade</b> = is per-trade EV at least what the goal needs (green only when it clears the bar). <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Risk sizing</b> = used risk vs the Kelly/DD optimal. Detail (Actual R, geometric drift) is in the cards below.
 <h4>the metric cards</h4>Break the model down: time-to-goal, required growth rates, the per-trade EV model, Kelly sizing, account impact per win/loss, risk analytics (Sharpe, profit factor, ruin), €-growth projections, and a BTC / Monte-Carlo band (P05 / P50 / P95 outcomes).
-<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/goal">Goal</a> (equity curve + projection over time).
+<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/hedge-desk">Desk</a> (can I enter now?) and <a href="/hedge-goal">Goal</a> (equity curve + projection over time).
 </div></div>
 
 <div class="main">
@@ -624,7 +624,7 @@ ATR_MULT.addEventListener("input", () => {{ clearTimeout(volDeb); volDeb = setTi
 refreshVol();
 """ + HERO_JS
 
-    return shell("/dashboard", "Plan", body, script=script, head_extra=css, meta="goal model")
+    return shell("/hedge-plan", "Plan", body, script=script, head_extra=css, meta="goal model")
 
 
 @app.get("/health")
@@ -944,7 +944,7 @@ class ConfigUpdate(BaseModel):
     btc_growth_monthly:      Optional[float] = None
 
 
-@app.get("/goal", response_class=HTMLResponse)
+@app.get("/hedge-goal", response_class=HTMLResponse)
 def goal_page():
     from .goal_page import render
     return render()
@@ -961,40 +961,75 @@ def api_research_json(name: str):
     return FileResponse(fp, media_type="application/json")
 
 
-@app.get("/research", response_class=HTMLResponse)
-def research_page():
-    from .research_page import render
-    return render()
+@app.get("/evidence", response_class=HTMLResponse)
+def evidence_page():
+    """What has actually been tested, and what survived.
 
-
-@app.get("/glossary", response_class=HTMLResponse)
-def glossary_page():
-    from .glossary_page import render
-    return render()
-
-
-@app.get("/robustness", response_class=HTMLResponse)
-def robustness_page():
-    from .robustness_page import render
-    return render()
-
-
-@app.get("/short", response_class=HTMLResponse)
-def short_page():
-    from .short_page import render
-    return render()
-
-
-@app.get("/target", response_class=HTMLResponse)
-def target_page():
-    from .target_page import render
-    return render()
+    Was three routes — /short, /robustness, /research — which is one argument
+    split into three pages with no stated relationship, so none of them said
+    what it was for. Ordered here as the argument actually runs: the claim
+    that survived, then the test that it isn't luck, then every experiment
+    including the ones that failed.
+    """
+    from .research_page import parts as notebook
+    from .robustness_page import parts as luck
+    from .short_page import parts as verdict
+    from .theme import merged
+    from .tldr import opener
+    intro = opener(
+        "What this page is",
+        "Every trading idea you've had was tested against the price history to "
+        "see whether it makes money for a real reason, or only made money by "
+        "coincidence in the sample it was found in. Twelve ideas were tested. "
+        "One survived. That is all the word “evidence” means here.",
+        ["<b>The verdict</b> — the one idea that still made money when tested on "
+         "data it had never seen, and beat a coin-flip entry in the same market. "
+         "Everything else died.",
+         "<b>Is it luck?</b> — the same trades, shuffled into random order a few "
+         "thousand times, to measure how often pure chance produces a result this "
+         "good. Low number = the pattern is probably real.",
+         "<b>The notebook</b> — every test ever run, including the failures. The "
+         "failures are the point: they are why the verdict is only one line long."],
+        "whether that one surviving edge is <b>big enough</b>. It is real, and it "
+        "is still far too small — the scoreboard above is the answer to that, and "
+        "nothing on this page changes it.")
+    return merged("/evidence", "Evidence", [
+        {"id": "verdict", "label": "The verdict · what survived", **verdict()},
+        {"id": "luck", "label": "Is it luck? · permutation test", **luck()},
+        {"id": "notebook", "label": "The notebook · every experiment", **notebook()},
+    ], meta="what survived testing", intro=intro)
 
 
 @app.get("/geometry", response_class=HTMLResponse)
 def geometry_page():
-    from .geometry_page import render
-    return render()
+    """One calculation, both directions. /geometry derived what a configuration
+    earns; /target inverted it — name a weekly return, see the edge it demands.
+    target_page.py said so in its own docstring, so they merged 2026-08-03."""
+    from .geometry_page import parts as geo
+    from .target_page import parts as tgt
+    from .theme import merged
+    from .tldr import opener
+    intro = opener(
+        "What this page is",
+        "Where the stop-loss and the take-profit go, and what that choice earns. "
+        "Put the stop too close and normal noise knocks you out; too far and one "
+        "loss costs more than several wins. This page picks the distance from how "
+        "much Bitcoin actually moves in a day, rather than from a round number.",
+        ["<b>What this configuration earns</b> — given the stop and target you're "
+         "using now, the win rate you'd need and the return it produces.",
+         "<b>What a named target demands</b> — the same maths backwards: name a "
+         "weekly return, and see the win rate it would take to get there. This is "
+         "where a target stops being a wish.",
+         "The honest bit: each requirement is priced against a <b>random entry</b>, "
+         "not against zero. Beating a coin flip is the real bar, and it is higher "
+         "than it looks."],
+        "whether the target is reachable. Naming 10%/week does not make it "
+        "available — the win rate the table demands for it is the price, and the "
+        "scoreboard above is what you're actually achieving.")
+    return merged("/geometry", "Geometry", [
+        {"id": "geometry", "label": "What this configuration earns", **geo()},
+        {"id": "target", "label": "What a named target demands", **tgt()},
+    ], meta="where the stop comes from", intro=intro)
 
 
 @app.get("/audit", response_class=HTMLResponse)
@@ -1085,7 +1120,7 @@ def audit_page():
         "<th>Why (plain English)</th></tr>" + "".join(rows) + "</table>"
         '<p style="margin-top:18px"><a href="/geometry" style="color:var(--accent)">'
         "→ Where the geometry now comes from</a> · "
-        '<a href="/audit-report" style="color:var(--accent)">'
+        '<a href="/audit#report" style="color:var(--accent)">'
         "→ Full audit report (visual, historical)</a> · "
         '<a href="/strategy" style="color:var(--accent)">→ live strategy re-ranks (H12/H13 watch)</a></p>'
     )
@@ -1095,11 +1130,52 @@ def audit_page():
            "td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top}"
            "td.m{font-family:var(--mono);font-size:12.5px;white-space:nowrap}"
            "td.why{color:var(--dim);font-size:12.5px;line-height:1.55}</style>")
-    return shell("/audit", "Audit", body, head_extra=css, meta="what to change and why")
+    from .theme import merged
+    # The original report is a standalone document with its own :root and body
+    # rules — inlining it would overwrite the cockpit's. An iframe keeps the
+    # July artifact exactly as written and costs one line.
+    report = (
+        '<div style="max-width:1000px;margin:0 auto;padding:0 14px">'
+        '<p style="color:var(--dim);font-size:13px;margin:0 0 10px">'
+        'The original 2026-07-02 report, unedited. Its geometry findings are '
+        'superseded by <a href="/geometry" class="ac">/geometry</a>; it is kept '
+        'as the record of what was believed at the time. '
+        '<a href="/audit-report-raw" class="ac" target="_blank">open standalone →</a></p>'
+        '<iframe src="/audit-report-raw" title="Strategy Audit 2026-07-02" '
+        'style="width:100%;height:78vh;border:1px solid var(--line);'
+        'border-radius:10px;background:var(--bg)"></iframe></div>'
+    )
+    from .tldr import opener
+    intro = opener(
+        "What this page is",
+        "On 2 July 2026 the strategy was reviewed end to end and a list of changes "
+        "was written down. This page is that list, checked automatically against "
+        "what the system is set to today — so you can see which recommendations "
+        "were actually applied and which were quietly ignored. It is a to-do list "
+        "with a memory, not an analysis.",
+        ["<b>Recommendations vs live config</b> — each July recommendation beside "
+         "the value in use right now, so a drift between what was decided and what "
+         "is running shows up as a mismatched row.",
+         "<b>The original report</b> — the July document itself, unedited, kept as "
+         "the record of what was believed at the time.",
+         "Its stop-and-target findings are <b>out of date on purpose</b>: they were "
+         "fitted to past winning trades, which is circular. "
+         "<a href='/geometry' class='ac'>Geometry</a> replaced that method."],
+        "anything about today. It is a snapshot from July. If a row disagrees with "
+        "the live config, the live config is not automatically wrong — the July "
+        "recommendation may be the stale one.")
+    return merged("/audit", "Audit", [
+        {"id": "recommendations", "label": "Recommendations vs live config",
+         "body": body, "css": css},
+        {"id": "report", "label": "The original report · 2026-07-02",
+         "body": report},
+    ], meta="what to change and why", intro=intro)
 
 
-@app.get("/audit-report", response_class=HTMLResponse)
-def audit_report():
+@app.get("/audit-report-raw", include_in_schema=False)
+def audit_report_raw():
+    """The frozen July report, served as its own document so /audit#report can
+    frame it. Not in the sitemap — it is a section, not a page."""
     import os
     from fastapi.responses import FileResponse
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
@@ -1532,7 +1608,7 @@ def expire_stale(older_than_minutes: int = Query(30, ge=1, le=10080)):
 
 # ─── Signals / Conviction page ───────────────────────────────────────────────
 
-@app.get("/signals", response_class=HTMLResponse)
+@app.get("/hedge-signals", response_class=HTMLResponse)
 def signals_page_new():
     """Responsive signals queue built on the shared design system."""
     from .signals_page import render
@@ -1625,7 +1701,7 @@ canvas{width:100%;height:200px;display:block}
 <h4>the metrics that matter</h4><b class="g">Win rate</b> ≥48% = goal-grade. <b>Profit factor</b> ≥1.5 (gross win ÷ gross loss). <b class="a">Avg R</b> ≥3.5 — the real lever. <b class="r">Max DD</b> &lt;40% survivable, and <b>max consecutive losses</b> = your risk-of-ruin reality check.
 <h4>the risk-adjusted trio (plain English)</h4><b>Sharpe</b> = return per unit of <i>bumpiness</i> — how much reward you got for how wildly the equity swung. ≥1 is solid, higher is smoother. <b>Sortino</b> = the same idea but only counts the <i>downside</i> swings (it doesn't punish you for big <i>up</i> moves — fairer for high-R strategies). <b>Calmar</b> = annual return ÷ worst drawdown — "how much did I make for the deepest hole I sat in." Use them to compare two strategies with similar returns: the higher trio = the same money with less pain.
 <h4>equity curve + trade log</h4>The curve is account €over the window; the log lists every entry/exit with PnL% and hold time. Look for <b>smooth-ish</b> growth, not one lucky spike.
-<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/journal">Journal</a>.
+<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/hedge-journal">Journal</a>.
 </div></div>
 
 <div class="row">
@@ -1981,7 +2057,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 
 function toGoal(wrPct, rr, freq) {{
   var q = 'win_rate=' + (wrPct/100).toFixed(4) + '&rr_ratio=' + rr + '&trades_per_week=' + freq;
-  window.open('/goal?' + q, '_blank');
+  window.open('/hedge-goal?' + q, '_blank');
 }}
 
 function runCustomSweep() {{
@@ -2109,7 +2185,7 @@ function renderResults(d) {{
   var gR = gp.rr || (gp.stop_pct ? (gp.tp_pct / gp.stop_pct) : m.avg_r) || 3;
   var gLink = document.getElementById('result-goal');
   if (m.win_rate != null) {{
-    gLink.href = '/goal?win_rate=' + (m.win_rate/100).toFixed(4) + '&rr_ratio=' +
+    gLink.href = '/hedge-goal?win_rate=' + (m.win_rate/100).toFixed(4) + '&rr_ratio=' +
                  (+gR).toFixed(2) + '&trades_per_week=' + (m.trades_per_week||1);
     gLink.target = '_blank'; gLink.style.display = '';
   }} else {{ gLink.style.display = 'none'; }}
@@ -2209,11 +2285,6 @@ function drawChart(curve) {{
 """
 
     return css, body, script
-
-
-@app.get("/backtest")
-def backtest_redirect():
-    return RedirectResponse("/edge#backtest", status_code=301)
 
 
 class BtRunRequest(BaseModel):
@@ -2459,21 +2530,75 @@ def api_backtest_strategies():
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
 
-@app.get("/overview", response_class=HTMLResponse)
+@app.get("/prop-overview", response_class=HTMLResponse)
 def overview_page():
     """Prop-book snapshot — eval ledger, performance, market."""
     from .overview_page import render
     return render("prop")
 
 
-@app.get("/overview-hedge", response_class=HTMLResponse)
+# Hedge pages were renamed to a /hedge-* namespace on 2026-08-03 so the URL matches
+# the nav chip and mirrors /prop-*. Old bare paths 301 to the new ones — bookmarks,
+# the phone's home-screen shortcuts and any stale href keep working.
+LEGACY_ROUTES = {
+    "/overview-hedge": "/hedge-overview", "/dashboard": "/hedge-plan",
+    "/goal": "/hedge-goal", "/desk": "/hedge-desk", "/signals": "/hedge-signals",
+    "/journal": "/hedge-journal", "/calendar": "/hedge-calendar",
+    "/analytics": "/hedge-analytics", "/position": "/hedge-position",
+    "/edge": "/hedge-edge",
+    # prop, renamed the same day so both books read alike
+    "/overview": "/prop-overview", "/prop-dashboard": "/prop-plan",
+    # Older shims, folded in here from four hand-written handlers. They were
+    # identical 301s that each forgot include_in_schema=False, so /sitemap
+    # listed them as if they were pages — two of them under "Engines".
+    "/backtest": "/hedge-edge#backtest",
+    "/strategy": "/hedge-edge#board", "/strategy-hedge": "/hedge-edge#board",
+    # The survival group: five pages that shared prop_metrics() and one question.
+    "/rules": "/prop-survival#rules", "/risk": "/prop-survival#risk",
+    "/survival": "/prop-survival#survival", "/equity": "/prop-survival#equity",
+    "/prop-cone": "/prop-survival#projection",
+    "/prop-goal-old": "/prop-survival#projection",
+    # 2026-08-03 merges. Reading material is one page with tabs; the audit is
+    # one July artifact, not two; geometry/target are one calculation run in
+    # both directions; short/robustness/research are conclusion, evidence and
+    # appendix of a single argument.
+    "/glossary": "/manual?doc=glossary",
+    "/audit-report": "/audit#report",
+    "/target": "/geometry#target",
+    "/short": "/evidence#verdict",
+    "/robustness": "/evidence#luck",
+    "/research": "/evidence#notebook",
+}
+def _legacy_redirect(new: str):
+    # A factory, not a loop closure: closing over the loop variable would send
+    # every legacy path to /hedge-edge. `request` must be annotated or FastAPI
+    # reads it as a query param and 422s.
+    def go(request: Request):
+        q = request.url.query
+        # Some targets carry a #fragment; the query has to go before it or the
+        # browser reads "?book=prop" as part of the anchor name.
+        base, _, frag = new.partition("#")
+        # A target may already carry its own query (?doc=glossary), so the
+        # incoming one joins with & rather than a second ?.
+        sep = "&" if "?" in base else "?"
+        return RedirectResponse(
+            base + (f"{sep}{q}" if q else "") + (f"#{frag}" if frag else ""),
+            status_code=301)
+    return go
+
+
+for _old, _new in LEGACY_ROUTES.items():
+    app.get(_old, include_in_schema=False)(_legacy_redirect(_new))
+
+
+@app.get("/hedge-overview", response_class=HTMLResponse)
 def overview_page_hedge():
     """Hedge-book snapshot — live Kraken account, performance, market."""
     from .overview_page import render
     return render("hedge")
 
 
-@app.get("/position", response_class=HTMLResponse)
+@app.get("/hedge-position", response_class=HTMLResponse)
 def position_page_route(book: str = "hedge"):
     """Entry + direction → SL/TP/liq levels and size in ₿/€ (uses /api/position).
     Shared page: `book` preselects its Hedge|Prop tab and keeps that mode's nav."""
@@ -2491,17 +2616,20 @@ def sitemap_route():
         if "GET" in getattr(r, "methods", set())
         and not r.path.startswith(("/api", "/assets"))
         and "{" not in r.path and r.path not in skip
+        # Legacy 301s and FastAPI's own plumbing are registered with
+        # include_in_schema=False. They're not pages; don't map them.
+        and getattr(r, "include_in_schema", True)
     })
     return render(paths)
 
 
-@app.get("/journal", response_class=HTMLResponse)
+@app.get("/hedge-journal", response_class=HTMLResponse)
 def journal_page(book: str = "hedge"):
     from .journal_page import render
     return render(book)
 
 
-@app.get("/analytics", response_class=HTMLResponse)
+@app.get("/hedge-analytics", response_class=HTMLResponse)
 def analytics_page(book: str = "hedge"):
     from .analytics_page import render
     return render(book)
@@ -2519,7 +2647,7 @@ def api_money(refresh: bool = Query(False)):
     return money_data(refresh=refresh)
 
 
-@app.get("/edge", response_class=HTMLResponse)
+@app.get("/hedge-edge", response_class=HTMLResponse)
 def edge_page(book: str = "hedge"):
     from .edge_page import render_page
     css, body, script = _backtest_fragment()
@@ -2529,7 +2657,7 @@ def edge_page(book: str = "hedge"):
 # /review + /recap deleted — the Journal is the single trade-history surface.
 
 
-@app.get("/calendar", response_class=HTMLResponse)
+@app.get("/hedge-calendar", response_class=HTMLResponse)
 def calendar_page(book: str = "hedge"):
     from .calendar_page import render
     return render(book)
@@ -2575,38 +2703,51 @@ def prop_page():
 
 
 # Both boards + the backtest runner live on /edge now (one page, three tenses).
-@app.get("/strategy")
-def strategy_engine():
-    return RedirectResponse("/edge#board", status_code=301)
+@app.get("/prop-survival", response_class=HTMLResponse)
+def prop_survival_page():
+    """How big do I bet, and will I survive the walls — one page.
 
+    Was five routes: /rules, /risk, /survival, /equity and /prop-cone. They
+    read the same prop_metrics() and answered one question between them, so
+    reading any one of them alone told you a fifth of the answer. Ordered as
+    the question is actually asked: the walls, then the bet size, then what a
+    losing streak does to it, then the same thing simulated two ways.
 
-@app.get("/strategy-hedge")
-def strategy_engine_hedge():
-    return RedirectResponse("/edge#board", status_code=301)
-
-
-@app.get("/risk", response_class=HTMLResponse)
-def risk_engine():
-    from .prop_views import risk_page
-    return risk_page()
-
-
-@app.get("/survival", response_class=HTMLResponse)
-def survival_engine():
-    from .prop_views import survival_page
-    return survival_page()
-
-
-@app.get("/rules", response_class=HTMLResponse)
-def rules_engine():
-    from .prop_views import rules_page
-    return rules_page()
-
-
-@app.get("/equity", response_class=HTMLResponse)
-def equity_engine():
-    from .prop_views import equity_page
-    return equity_page()
+    The two simulations are deliberately both here. /equity draws paths from
+    the typed WR and R:R — "what if"; the cone bootstraps your ACTUAL realised
+    P&L — "what the book says". Side by side the gap between them is legible,
+    which on separate pages it never was.
+    """
+    from .prop_goal import parts as cone
+    from .prop_views import (equity_page_parts, risk_page_parts,
+                             rules_page_parts, survival_page_parts)
+    from .theme import merged
+    from .tldr import opener
+    intro = opener(
+        "What this page is",
+        "The prop firm gives you a funded account with two tripwires: lose 3% in "
+        "one day, or drop 3% below the starting balance at any point, and the "
+        "account is gone. This page answers one question — how big can each bet "
+        "be so that a normal run of losses doesn't hit those tripwires before the "
+        "strategy has a chance to work.",
+        ["<b>The walls</b> — the exact rules that end the account, and the ones "
+         "that turn out not to matter.",
+         "<b>Bet size</b> — how much per trade, and why it's that number.",
+         "<b>Loss streaks</b> — how many losses in a row you can take before "
+         "you're out, and how likely that streak is.",
+         "<b>Both simulations</b> — the same account run thousands of times. One "
+         "uses your typed win rate, the other uses your <b>real past trades</b>. "
+         "When they disagree, the second one is the honest one."],
+        "whether passing the eval gets you to 50 ₿. Passing pays a share of "
+        "profits on a €10,000 account — the scoreboard above is what that has to "
+        "produce monthly just to cover the burn.")
+    return merged("/prop-survival", "Survival", [
+        {"id": "rules", "label": "The walls", "heading": False, **rules_page_parts()},
+        {"id": "risk", "label": "Bet size", "heading": False, **risk_page_parts()},
+        {"id": "survival", "label": "Loss streaks", "heading": False, **survival_page_parts()},
+        {"id": "equity", "label": "Simulated · from typed WR", "heading": False, **equity_page_parts()},
+        {"id": "projection", "label": "Simulated · from real trades", "heading": False, **cone()},
+    ], meta="will I survive the walls?", intro=intro)
 
 
 @app.get("/regime", response_class=HTMLResponse)
@@ -2710,7 +2851,7 @@ class PropBasket(BaseModel):
     basket: list[str]
 
 
-@app.get("/prop-dashboard", response_class=HTMLResponse)
+@app.get("/prop-plan", response_class=HTMLResponse)
 def prop_dashboard_page():
     from .prop_dashboard import dashboard_page
     return dashboard_page()
@@ -2724,17 +2865,6 @@ def prop_goal_page():
     return render("prop")
 
 
-@app.get("/prop-cone", response_class=HTMLResponse)
-def prop_cone_page():
-    """The eval Monte-Carlo cone: pass odds, milestone ladder, basket picker.
-    Was /prop-goal-old — renamed once /prop-goal became the /goal clone."""
-    from .prop_goal import goal_page
-    return goal_page()
-
-
-@app.get("/prop-goal-old")
-def prop_goal_old_redirect():
-    return RedirectResponse("/prop-cone", status_code=301)
 
 
 @app.get("/api/prop/goal")
@@ -2930,7 +3060,7 @@ def api_stats_trades():
 
 # ─── LENS_EDGE_v3 setup engine (see strategies/LENS_EDGE_v3_ICT/FINDINGS.md) ──
 
-@app.get("/desk", response_class=HTMLResponse)
+@app.get("/hedge-desk", response_class=HTMLResponse)
 def desk_page():
     from .desk import DESK_HTML
     return DESK_HTML

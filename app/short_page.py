@@ -42,13 +42,13 @@ def _data() -> dict | None:
         return None
 
 
-def render() -> str:
+def parts() -> dict:
+    """Body + CSS, so this renders standalone or as a section of /evidence."""
     d = _data()
     if not d or not d.get("best"):
-        return shell("/short", "Short",
-                     "<p class='lead'>No validated cell — run "
-                     "<span class='m'>python3 research/short_edge.py</span>.</p>",
-                     meta="the one validated edge")
+        return {"body": "<p class='lead'>No validated cell — run "
+                        "<span class='m'>python3 research/short_edge.py</span>.</p>",
+                "css": ""}
 
     b = d["best"]
     gap = d.get("gap", {})
@@ -292,7 +292,7 @@ def render() -> str:
     )
 
     body = (head + spec + evidence + long_sec + gap_sec + rob + mech + limits +
-            '<p class="foot"><a href="/target">→ what the target costs</a> · '
+            '<p class="foot"><a href="/geometry#target">→ what the target costs</a> · '
             '<a href="/geometry">→ where the geometry comes from</a><br>'
             '<span class="m">python3 research/short_edge.py</span> reruns all four '
             'gates.</p>')
@@ -329,5 +329,10 @@ def render() -> str:
         "ul.gates li.n::first-letter{color:var(--short)}"
         "@media(max-width:720px){.conf{grid-template-columns:1fr}}"
         "</style>")
-    return shell("/short", "Short", body, head_extra=css,
+    return {"body": body, "css": css}
+
+
+def render() -> str:
+    p = parts()
+    return shell("/short", "Short", p["body"], head_extra=p["css"],
                  meta="the one validated edge")

@@ -88,7 +88,8 @@ def _holds() -> list[float]:
     return sorted(out)
 
 
-def render() -> str:
+def parts() -> dict:
+    """Body + CSS, so /geometry can render it standalone or as a merged section."""
     sigma, live = _sigma()
     cfg = G.config(sigma, HOLD_DAYS, RR, WIN_RATE, max_drawdown=MAX_DD, streak=STREAK)
     min_hold = G.min_viable_hold(RR, WIN_RATE, sigma)
@@ -440,8 +441,8 @@ def render() -> str:
         f'Nothing on this page is fitted to past winners.</p>'
         + stale + verdict + law + ladder + conf + base + fric + frag + avail + ledger +
         '<p class="foot"><a href="/audit">→ what this supersedes</a> · '
-        '<a href="/glossary">→ the terms</a> · '
-        '<a href="/edge">→ live strategy ranks</a><br>'
+        '<a href="/manual?doc=glossary">→ the terms</a> · '
+        '<a href="/hedge-edge">→ live strategy ranks</a><br>'
         '<span class="m">python3 -m app.geometry</span> runs the same math with its '
         'assertions, if you want the identities checked rather than asserted.</p>'
     )
@@ -512,5 +513,10 @@ def render() -> str:
         ".conf{grid-template-columns:1fr}}"
         "</style>"
     )
-    return shell("/geometry", "Geometry", body, head_extra=css,
+    return {"body": body, "css": css}
+
+
+def render() -> str:
+    p = parts()
+    return shell("/geometry", "Geometry", p["body"], head_extra=p["css"],
                  meta="where the stop comes from")

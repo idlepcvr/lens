@@ -298,7 +298,7 @@ function render(d){
       <input type="number" id="mmpct" value="${MMPCT ?? d.assumptions.mm_rate_pct}" step="0.1" inputmode="decimal" style="width:60px">
       <span class="size-out" id="size-out"></span></div>
     <div class="outcome" id="out"></div>
-    <div class="exit-note">Locked prop sizing. Full stop ≈ <b>−$${money(s.loss_usd)}</b> (${d.risk_pct}% of wallet). Target ≈ <b>+$${money(s.win_usd)}</b>. Walls: 3% static DD / 3% daily — see <a href="/survival">Survival</a>.</div>
+    <div class="exit-note">Locked prop sizing. Full stop ≈ <b>−$${money(s.loss_usd)}</b> (${d.risk_pct}% of wallet). Target ≈ <b>+$${money(s.win_usd)}</b>. Walls: 3% static DD / 3% daily — see <a href="/prop-survival#survival">Survival</a>.</div>
   </div></div>`;
 
   // context chips

@@ -25,7 +25,6 @@ import numpy as np
 from .prop_eval import EVALS, _portfolio_daily_trades, _walk_eval
 from .prop_scan import prop_tradeable
 from .prop_views import prop_config
-from .theme import shell
 
 MONTHS = 30          # backtest window the trades are resampled from
 PATHS = 2000
@@ -419,7 +418,7 @@ _CSS = r"""<style>
 BODY = r"""
 <div class="pg">
   <h1>Prop Goal</h1>
-  <div class="sub">Time-to-target for the live eval, resampled from the basket's real backtested trades against the same walls as <a href="/survival" class="ac">Survival</a>. <span class="dim">Hedge twin: <a href="/goal" class="ac">/goal</a>.</span></div>
+  <div class="sub">Time-to-target for the live eval, resampled from the basket's real backtested trades against the same walls as <a href="/prop-survival#survival" class="ac">Survival</a>. <span class="dim">Hedge twin: <a href="/hedge-goal" class="ac">/goal</a>.</span></div>
   <div class="pg-main">
     <aside class="pg-side">
       <div class="side-card"><div class="side-h">The plan · locked eval rules</div><div id="plan"><div class="skeleton">…</div></div></div>
@@ -700,6 +699,8 @@ load(); loadModel(); loadBaskets();
 """
 
 
-def goal_page() -> str:
-    return shell("/prop-cone", "Eval Cone", BODY, script=SCRIPT, head_extra=_CSS,
-                 meta="when do I hit target?")
+def parts() -> dict:
+    """Body + CSS + script, so the cone renders standalone or as a section."""
+    return {"body": BODY, "css": _CSS, "script": SCRIPT}
+
+

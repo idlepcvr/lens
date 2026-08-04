@@ -159,7 +159,8 @@ def _eur(x: float) -> str:
     return f'<td class="{cls}">€{x:+,.0f}</td>'
 
 
-def render() -> str:
+def parts() -> dict:
+    """Body only — this page carries no CSS of its own."""
     r = results()
     cf = r["cf"]
     conv, tagged, total = conviction_rows()
@@ -260,4 +261,8 @@ out-of-sample evidence accumulates on its own — check back every ~50 trades.</
 <div class="foot">engine: research/perm_test.py · {N_SHUFFLES:,} shuffles · buckets by opened_at,
 Bangkok clock · pnl only, never balance_after</div>
 """
-    return shell("/robustness", "Robustness", body, meta="is it luck?")
+    return {"body": body, "css": ""}
+
+
+def render() -> str:
+    return shell("/robustness", "Robustness", parts()["body"], meta="is it luck?")

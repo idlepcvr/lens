@@ -294,7 +294,7 @@ function openModal(id){
 
     <div class="cal-acts">
       <button class="save" id="msave">💾 Save review</button>
-      <a class="full" href="/journal">Journal →</a>
+      <a class="full" href="/hedge-journal">Journal →</a>
     </div>
   </div></div>`;
 
@@ -398,10 +398,10 @@ def render(book: str = "hedge") -> str:
     other = "prop" if book == "hedge" else "hedge"
     body = BODY.replace(
         "Monthly hedge-book heatmap",
-        f'{sub} · <a href="{"/prop-calendar" if book == "hedge" else "/calendar"}" class="ac">'
+        f'{sub} · <a href="{"/prop-calendar" if book == "hedge" else "/hedge-calendar"}" class="ac">'
         f'switch to {other}</a> ·')
     return shell(
-        "/prop-calendar" if book == "prop" else "/calendar", "Calendar", body,
+        "/prop-calendar" if book == "prop" else "/hedge-calendar", "Calendar", body,
         script=(SCRIPT
                 .replace("__MISTAKES__", _json.dumps(MISTAKES))
                 .replace("__EMOTIONS__", _json.dumps(EMOTIONS))

@@ -15,8 +15,8 @@ from app.theme import (HEDGE_MAIN, NAV_HEDGE, NAV_NEUTRAL, NAV_PROP, PROP_MAIN,
 
 # hedge label → the prop entry that fulfils it
 EXPECTED = {
-    "Overview": "/overview",
-    "Plan": "/prop-dashboard",
+    "Overview": "/prop-overview",
+    "Plan": "/prop-plan",
     "Goal": "/prop-goal",
     "Position": "/prop-position",
     "Desk": "/prop-desk",
@@ -41,6 +41,12 @@ def main():
         assert lbl in hedge, f"{lbl} vanished from NAV_HEDGE"
         assert prop[lbl] == href, f"{lbl}: prop nav points at {prop[lbl]}, want {href}"
 
+    # 2b) the mirror is exact — same chips, same count. Cone/Engines/Ledger/Income
+    #     used to hang off the end of NAV_PROP and made the two bars different
+    #     lengths; they're engine cards on /prop-plan now.
+    assert [lbl for _, lbl in NAV_PROP] == [lbl for _, lbl in NAV_HEDGE], \
+        "the two nav bars must be the same ten chips in the same order"
+
     # 3) labels appear in the SAME order in both navs, so the layout is learnable
     shared = [lbl for _, lbl in NAV_HEDGE]
     prop_order = [lbl for _, lbl in NAV_PROP if lbl in set(shared)]
@@ -56,14 +62,14 @@ def main():
 
     # 5) page_mode: each prop URL is prop, each hedge URL is hedge
     assert page_mode("/prop-position") == "prop"
-    assert page_mode("/position") == "hedge"
+    assert page_mode("/hedge-position") == "hedge"
     assert page_mode("/prop-journal") == "prop"
-    assert page_mode("/journal") == "hedge"
+    assert page_mode("/hedge-journal") == "hedge"
     assert page_mode("/prop-analytics") == "prop"
     assert page_mode("/prop-calendar") == "prop"
     assert page_mode("/prop-edge") == "prop"
     assert page_mode("/prop-desk") == "prop"
-    assert page_mode("/dashboard") == "hedge"
+    assert page_mode("/hedge-plan") == "hedge"
 
     # 6) neutral pages are owned by neither nav
     neutral = {h for h, _ in NAV_NEUTRAL}

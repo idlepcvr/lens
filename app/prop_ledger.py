@@ -299,7 +299,7 @@ def ledger_page() -> str:
     body = r"""
 <div class="pl">
   <h1>Prop Ledger</h1>
-  <div class="sub">Realised <b>ASIAN_RSI_DIP_v1</b> trades on the Breakout eval book — equity vs the walls. Simulated streak risk lives on <a href="/survival" class="ac">Survival</a>.
+  <div class="sub">Realised <b>ASIAN_RSI_DIP_v1</b> trades on the Breakout eval book — equity vs the walls. Simulated streak risk lives on <a href="/prop-survival#survival" class="ac">Survival</a>.
     <button type="button" class="neweval" onclick="newEval()">↻ start new eval</button></div>
 
   <div id="verdict"></div>

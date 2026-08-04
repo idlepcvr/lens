@@ -344,7 +344,7 @@ def render() -> str:
       everything right and still lose that day. <b>LENS doesn't remove that. It makes sure
       that when I lose, I lost for a reason I can point at.</b></p>
     <div class="out">
-      <a href="/dashboard">go to the desk <span>&rarr;</span></a>
+      <a href="/hedge-plan">go to the desk <span>&rarr;</span></a>
     </div>
   </section>
 </div>

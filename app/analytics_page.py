@@ -247,7 +247,7 @@ function renderRead(E,A){
   if(E.prop_cash && A.n<30){
     move=`n=${A.n} closed prop trades is too small to read a timing edge from — any best-hour/worst-day split here is noise. `+
       `Execute the basket as designed and revisit once the ledger has 30+; the numbers that matter now are on `+
-      `<a href="/prop-cone" class="ac">the cone</a> (pass odds) and <a href="/prop-ledger" class="ac">the ledger</a> (distance to the walls).`;
+      `<a href="/prop-survival#projection" class="ac">the cone</a> (pass odds) and <a href="/prop-ledger" class="ac">the ledger</a> (distance to the walls).`;
   } else if(bleedSum<-200 && greenHrs.length){
     move=`For the next 2 weeks, run a <b>subtraction test</b>: only take entries in your green windows `+
       `(<b>${greenHrs.join(', ')}</b>)`+
@@ -429,12 +429,12 @@ def render(book: str = "hedge") -> str:
     — the current eval alone is /prop-ledger."""
     book = "prop" if book == "prop" else "hedge"
     other = "prop" if book == "hedge" else "hedge"
-    path = "/prop-analytics" if book == "prop" else "/analytics"
+    path = "/prop-analytics" if book == "prop" else "/hedge-analytics"
     eval_cone = ('' if book != "prop"
-                 else ' · <a href="/prop-cone" class="ac">eval projection cone → /prop-cone</a>')
+                 else ' · <a href="/prop-survival#projection" class="ac">eval projection cone →</a>')
     body = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
             f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
-            f'<a href="{"/analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
+            f'<a href="{"/hedge-analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
             f'switch to {other}</a>{eval_cone}</div>') + BODY
     return shell(path, "Analytics", body,
                  script=f"const BOOK={book!r};\n".replace("'", '"') + SCRIPT,

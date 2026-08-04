@@ -39,7 +39,10 @@ def test_no_jargon_and_no_hold_time_claim():
     html = _html().lower()
     for term in ("swing", "day trader", "days or weeks",
                  "drawdown", "backtest", "veto", "edge"):
-        assert term not in html, f"banned term on the front door: {term!r}"
+        # whole words only: the ban is on the vocabulary a reader sees, and
+        # "edge" lives inside the /hedge-* URLs, which nobody reads as jargon.
+        assert not re.search(rf"\b{term}\b", html), \
+            f"banned term on the front door: {term!r}"
 
 
 def test_no_solicitation():
@@ -74,7 +77,7 @@ def test_one_way_out():
     assert "/system" not in html, "the deleted instrument plate is linked again"
     out = re.search(r'<div class="out">(.*?)</div>', html, re.S).group(1)
     assert out.count("<a ") == 1, "the front door should offer one way out"
-    assert "/dashboard" in out
+    assert "/hedge-plan" in out
 
 
 def test_both_outcomes_are_shown():

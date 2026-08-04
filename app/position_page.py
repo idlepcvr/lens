@@ -51,13 +51,13 @@ _CSS = r"""<style>
 
 def position_page(book: str = "hedge") -> str:
     sub = ('Entry → full trade: levels, sizing, risk — long &amp; short. Sized off <b>live eval equity</b> '
-           'at the plan\'s risk — see <a href="/rules" style="color:var(--accent)">Rules</a>. '
+           'at the plan\'s risk — see <a href="/prop-survival#rules" style="color:var(--accent)">Rules</a>. '
            'Risk sets the <b>size</b>; leverage only sets the <b>margin</b> and the liq price — '
            'move it freely, the stop, target and € at risk don\'t budge. '
            'Override risk %, R:R or leverage below for a per-trade what-if; the saved plan is untouched.'
            if book == "prop" else
            'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
-           '<a href="/dashboard" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
+           '<a href="/hedge-plan" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
     body = r"""
 <div class="pz">
   <h1>Position</h1>
@@ -325,7 +325,7 @@ async function logTrade(){
         size:Number(LAST.size.toFixed(6)),leverage:LAST.leverage,book:LAST.book})});
     if(!r.ok){ throw new Error((await r.json()).detail||'log failed'); }
     const t=await r.json();
-    $('logmsg').innerHTML='✓ logged open '+LAST.direction+' #'+t.id+' · <a href="/journal?trade='+t.id+'" style="color:var(--accent)">journal</a>';
+    $('logmsg').innerHTML='✓ logged open '+LAST.direction+' #'+t.id+' · <a href="/hedge-journal?trade='+t.id+'" style="color:var(--accent)">journal</a>';
   }catch(e){ $('logmsg').textContent='✗ '+(e.message||e); }
   $('logbtn').disabled=false;
 }
@@ -368,7 +368,7 @@ if(START_BOOK==='prop') setBook('prop');
     # On the prop page there's no hedge sizing — lock the book and hide the
     # hedge-only inputs (BTC € price, win-rate override). Balance (eval $) and the
     # risk/R:R/leverage-cap overrides stay: per-trade what-ifs against the plan.
-    path = "/prop-position" if book == "prop" else "/position"
+    path = "/prop-position" if book == "prop" else "/hedge-position"
     head = _CSS + ("<style>#book-preset-row,#f-btc,#f-wr{display:none!important}</style>"
                    if book == "prop" else "")
     return shell(path, "Position", body, script=script, head_extra=head, meta="size the trade")

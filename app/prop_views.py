@@ -1,15 +1,16 @@
 """LENS — PROP engine pages.
 
-The cockpit split into focused, single-purpose pages (the user's spec):
-  /prop      Goals hub — visual target + the 3 upgrades, links to engines
-  /strategy  Strategy Engine — WR, R, expectancy, frequency
-  /risk      Risk Engine — account, risk, stop, position size, leverage
-  /survival  Survival Engine — DD limit, max hist DD, loss-streak stress
-  /rules     Prop Rules Engine — the live Kraken Prop constraint layer
-  /equity    Equity Curve Simulator — Monte Carlo paths (client canvas)
+  /prop  Goals hub — visual target + the 3 upgrades, and the index of every
+         prop page that isn't a nav chip.
+
+The rest of this module is no longer routes. Risk, Survival, Rules and Equity
+were four pages until 2026-08-03; they are now *_parts() sections of
+/prop-survival, because they read the same prop_metrics() and answered one
+question between them — how big do I bet, and will I survive the walls. Each
+still returns its own body and CSS, so nothing about their markup changed.
 
 All numbers come from one place: prop_metrics() (built on prop_eval), so no
-view can drift from another. Server-rendered except /equity (needs a canvas).
+view can drift from another. Server-rendered except the equity canvas.
 """
 
 from .theme import shell
@@ -92,6 +93,7 @@ def prop_metrics(strategy=HERO, eval_name=None, account=None, risk=None, months=
 _CSS = r"""<style>
 .pv h1{font-family:var(--mono);font-size:13px;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:3px}
 .pv .sub{color:var(--dim);font-size:13px;margin-bottom:22px}
+.pv .sub2{color:var(--dim);font-size:12px;margin:-4px 0 14px;max-width:62ch}
 .pv .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
 .pv .panel h2{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:14px}
 .pv .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -176,22 +178,26 @@ def goals_page():
   <div class="panel">
     <h2>The 3 structural upgrades — and where each lives</h2>
     <div class="up"><div class="num">1</div><div class="txt"><strong>Equity curve + max-drawdown tracking</strong>
-      <span class="arrow">→ replaces risk-of-ruin.</span> See it on <a href="/equity" class="ac">Equity Simulator</a> &amp; <a href="/survival" class="ac">Survival</a>.</div></div>
+      <span class="arrow">→ replaces risk-of-ruin.</span> See it on <a href="/prop-survival#equity" class="ac">Equity Simulator</a> &amp; <a href="/prop-survival#survival" class="ac">Survival</a>.</div></div>
     <div class="up"><div class="num">2</div><div class="txt"><strong>Loss-streak stress testing</strong>
-      <span class="arrow">→ replaces theoretical probability models.</span> See it on <a href="/survival" class="ac">Survival</a>.</div></div>
+      <span class="arrow">→ replaces theoretical probability models.</span> See it on <a href="/prop-survival#survival" class="ac">Survival</a>.</div></div>
     <div class="up"><div class="num">3</div><div class="txt"><strong>Rule-based constraint layer</strong>
-      <span class="arrow">→ makes it prop-firm realistic.</span> See it on <a href="/rules" class="ac">Prop Rules</a>.</div></div>
+      <span class="arrow">→ makes it prop-firm realistic.</span> See it on <a href="/prop-survival#rules" class="ac">Prop Rules</a>.</div></div>
   </div>
 
   <div class="panel">
     <h2>The engines</h2>
+    <div class="sub2">Every prop page that isn't a nav chip. The top bar is the daily
+      loop — overview, signals, desk, plan, goal, position, calendar, journal,
+      analytics, edge. Everything else lives here.</div>
     <div class="engines">
-      <a class="eng" href="/strategy"><div class="t">Strategy</div><div class="d">WR {m['win_rate_pct']:.0f}% · {m['r_multiple']}R · expectancy {m['expectancy_r']}R</div><div class="u">open →</div></a>
-      <a class="eng" href="/risk"><div class="t">Risk</div><div class="d">{m['risk_pct']}% / trade · {m['leverage']}x · sizing</div><div class="u">open →</div></a>
-      <a class="eng" href="/survival"><div class="t">Survival</div><div class="d">floor {m['dd_pct']:.0f}% · bust at {m['bust_k']} losses · hist DD {m['max_hist_dd_pct']:.0f}%</div><div class="u">open →</div></a>
-      <a class="eng" href="/rules"><div class="t">Prop Rules</div><div class="d">no time limit · no consistency · 3% daily</div><div class="u">open →</div></a>
-      <a class="eng" href="/equity"><div class="t">Equity Simulator</div><div class="d">Monte Carlo paths vs the walls</div><div class="u">open →</div></a>
+      <a class="eng" href="/prop-survival"><div class="t">Survival</div><div class="d">the walls · bet size · loss streaks · both simulations — floor {m['dd_pct']:.0f}%, bust at {m['bust_k']} losses</div><div class="u">open →</div></a>
+      <a class="eng" href="/prop-ledger"><div class="t">Ledger</div><div class="d">equity vs the walls · every past attempt</div><div class="u">open →</div></a>
+      <a class="eng" href="/prop-income"><div class="t">Income</div><div class="d">what a pass is actually worth</div><div class="u">open →</div></a>
       <a class="eng" href="/regime"><div class="t">Regime</div><div class="d">is now a regime where the hero wins?</div><div class="u">open →</div></a>
+      <a class="eng" href="/evidence"><div class="t">Evidence</div><div class="d">what survived testing, and what didn't</div><div class="u">open →</div></a>
+      <a class="eng" href="/geometry"><div class="t">Geometry</div><div class="d">where the stop and target come from</div><div class="u">open →</div></a>
+      <a class="eng" href="/hedge-edge#board"><div class="t">Strategy</div><div class="d">WR {m['win_rate_pct']:.0f}% · {m['r_multiple']}R · expectancy {m['expectancy_r']}R</div><div class="u">on hedge edge →</div></a>
     </div>
   </div>
 </div>"""
@@ -255,10 +261,10 @@ def _board(results, mode, r_levels):
 
 
 # ── /risk — Risk Engine ───────────────────────────────────────────────────────
-def risk_page():
+def risk_page_parts() -> dict:
     m = prop_metrics()
     if "error" in m:
-        return _err("/risk", "Risk", m)
+        return {"body": f'<div class="pv"><div class="panel">error: {m.get("error")}</div></div>', "css": _CSS}
     a = m["account"]
     risk_usd = a * m["risk_pct"] / 100.0
     price = m.get("last_price")
@@ -286,16 +292,16 @@ def risk_page():
     </div>
     <div class="prose">A full stop-out loses exactly <code>${risk_usd:,.0f}</code> ({m['risk_pct']}%). The stop is a <strong>fixed {m['stop_pct']}%</strong>,
       not ATR-scaled — the edge is tuned to it (tighter stops got noise-hit in testing). On a {m['dd_pct']:.0f}% wall this {m['risk_pct']}% sizing
-      is what buys the cushion: see <a href="/survival" class="ac">Survival</a>.</div></div>
+      is what buys the cushion: see <a href="/prop-survival#survival" class="ac">Survival</a>.</div></div>
 </div>"""
-    return shell("/risk", "Risk", body, head_extra=_CSS, meta="risk engine")
+    return {"body": body, "css": _CSS}
 
 
 # ── /survival — Survival Engine ───────────────────────────────────────────────
-def survival_page():
+def survival_page_parts() -> dict:
     m = prop_metrics()
     if "error" in m:
-        return _err("/survival", "Survival", m)
+        return {"body": f'<div class="pv"><div class="panel">error: {m.get("error")}</div></div>', "css": _CSS}
     a = m["account"]
     rows = ""
     for r in m["loss_streak"]:
@@ -323,16 +329,16 @@ def survival_page():
     <table><tr><th>Losses in a row</th><th>Account left</th><th>Drawdown</th><th>Odds of this streak</th><th>Status</th></tr>{rows}</table>
     <div class="prose" style="margin-top:12px">One loss ≈ <code>{m['avg_loss_pct']:.2f}%</code>; the floor is <code>−{m['dd_pct']:.0f}%</code>.
       So it takes <strong>{m['bust_k']} straight losses</strong> to bust (≈{m['bust_odds_pct']:.1f}% on a cold run){(' ≈ <strong>'+str(m['days_to_breach'])+' days</strong> back-to-back' if m['days_to_breach'] else '')}.
-      Your worst historical drawdown was <strong>{m['max_hist_dd_pct']:.0f}%</strong> — comfortably inside the {m['dd_pct']:.0f}% wall at this sizing. Watch the live curve on <a href="/equity" class="ac">Equity Simulator</a>.</div></div>
+      Your worst historical drawdown was <strong>{m['max_hist_dd_pct']:.0f}%</strong> — comfortably inside the {m['dd_pct']:.0f}% wall at this sizing. Watch the live curve on <a href="/prop-survival#equity" class="ac">Equity Simulator</a>.</div></div>
 </div>"""
-    return shell("/survival", "Survival", body, head_extra=_CSS, meta="survival engine")
+    return {"body": body, "css": _CSS}
 
 
 # ── /rules — Prop Rules Engine ────────────────────────────────────────────────
-def rules_page():
+def rules_page_parts() -> dict:
     m = prop_metrics()
     if "error" in m:
-        return _err("/rules", "Rules", m)
+        return {"body": f'<div class="pv"><div class="panel">error: {m.get("error")}</div></div>', "css": _CSS}
     a = m["account"]
     floor = round(a * (1 - m["dd_pct"] / 100))
     tgt = round(a * (1 + m["target_pct"] / 100))
@@ -358,7 +364,7 @@ def rules_page():
     no consistency rule (the dangerous one) means a single big winner can't void the eval. This is the layer that makes
     the sim <strong>prop-firm realistic</strong> rather than a generic backtest.</div></div>
 </div>"""
-    return shell("/rules", "Rules", body, head_extra=_CSS, meta="prop rules")
+    return {"body": body, "css": _CSS}
 
 
 # ── /equity — Equity Curve Simulator (client canvas) ──────────────────────────
@@ -374,10 +380,10 @@ _EQ_CSS = _CSS.replace("</style>", r"""
 </style>""")
 
 
-def equity_page():
+def equity_page_parts() -> dict:
     m = prop_metrics()
     if "error" in m:
-        return _err("/equity", "Equity", m)
+        return {"body": f'<div class="pv"><div class="panel">error: {m.get("error")}</div></div>', "css": _EQ_CSS}
     # defaults seeded from the live hero metrics
     body = f"""
 <div class="pv">
@@ -454,4 +460,4 @@ draw();
                     .replace("_FLR_", f"{m['dd_pct']:.0f}")
                     .replace("_TGT_", f"{m['target_pct']:.0f}")
                     .replace("_ACCT_", f"{m['account']:.0f}"))
-    return shell("/equity", "Equity", body, head_extra=_EQ_CSS, script=script, meta="equity simulator")
+    return {"body": body, "css": _EQ_CSS, "script": script}

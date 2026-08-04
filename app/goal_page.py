@@ -730,7 +730,7 @@ def render(book: str = "hedge") -> str:
     """One page, two books — an exact clone. `book` only changes which config row
     and measured book feed the form (BQ suffix); every panel and computation is
     identical. Prop values are seeded on first load (see _seed_prop_goal_config)."""
-    path = "/prop-goal" if book == "prop" else "/goal"
+    path = "/prop-goal" if book == "prop" else "/hedge-goal"
     bq = "?book=prop" if book == "prop" else ""
     script = f'const BQ="{bq}";\n' + SCRIPT
     return shell(path, "Goal", BODY, script=script, head_extra=CSS, meta="re-solved goal model")

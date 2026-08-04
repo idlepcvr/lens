@@ -13,43 +13,49 @@ Components available to any page (class names): .tape .gauge .ticket .tg .sizer
 plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080px.
 """
 
+import re
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
 # PROP mirrors HEDGE one-for-one, in the same order, so the two modes are learnable
 # as one layout. Every prop page has its OWN URL (a /prop-* twin) — no ?book= toggle.
 # The twin routes call the same render() with book="prop" hard-locked, so hedge and
 # prop share one codebase and can never drift, but read as fully separate pages.
-#   hedge          prop                    render
-#   /dashboard  →  /prop-dashboard         own page
-#   /goal       →  /prop-goal              own page
-#   /desk       →  /prop-desk              own page
-#   /signals    →  /prop-signals           own page
-#   /journal    →  /prop-journal           shared render, book="prop" locked
-#   /calendar   →  /prop-calendar          shared render, book="prop" locked
-#   /analytics  →  /prop-analytics         shared render, book="prop" locked
-#   /position   →  /prop-position          shared render, book="prop" locked
-#   /edge       →  /prop-edge              shared render, book="prop" locked
+# Every URL says which book it belongs to and what the chip is called — the route
+# and the label match, so you can read the address bar instead of decoding it
+# (Lucky, 2026-08-03: "I can barely understand what's built half the time").
+#   hedge                 prop                    render
+#   /hedge-overview   →   /prop-overview          own page
+#   /hedge-plan       →   /prop-plan              own page
+#   /hedge-goal       →   /prop-goal              own page
+#   /hedge-desk       →   /prop-desk              own page
+#   /hedge-signals    →   /prop-signals           own page
+#   /hedge-journal    →   /prop-journal           shared render, book="prop" locked
+#   /hedge-calendar   →   /prop-calendar          shared render, book="prop" locked
+#   /hedge-analytics  →   /prop-analytics         shared render, book="prop" locked
+#   /hedge-position   →   /prop-position          shared render, book="prop" locked
+#   /hedge-edge       →   /prop-edge              shared render, book="prop" locked
+# LEGACY_ROUTES in main.py 301s the old bare paths (/goal, /dashboard…) here, so
+# old bookmarks and any href missed by the rename keep working.
 # Same order as NAV_HEDGE — test_nav_parity enforces it, so the two modes stay
-# muscle-memory compatible. Prop-only pages (Cone, Engines, Ledger, Income) are
-# appended after the shared spine rather than interleaved.
+# muscle-memory compatible. Both bars are now the same ten chips, nothing else.
 NAV_PROP = [
-    ("/overview", "Overview"),
+    ("/prop-overview", "Overview"),
     ("/prop-signals", "Signals"),
     ("/prop-desk", "Desk"),
-    ("/prop-dashboard", "Plan"),
+    ("/prop-plan", "Plan"),
     ("/prop-goal", "Goal"),
     ("/prop-position", "Position"),
     ("/prop-calendar", "Calendar"),
     ("/prop-journal", "Journal"),
     ("/prop-analytics", "Analytics"),
     ("/prop-edge", "Edge"),
-    ("/prop-cone", "Cone"),
-    ("/prop", "Engines"),
-    ("/prop-ledger", "Ledger"),
-    ("/prop-income", "Income"),
-    # Strategy / Risk / Survival / Rules / Equity / Regime deliberately have no
-    # nav entry — they're the engine cards on /prop. Their pages still render
-    # with the prop nav (page_mode defaults to prop).
+    # Cone / Engines / Ledger / Income used to hang off the end of this list,
+    # which made the prop bar four chips longer than hedge and broke the mirror.
+    # They're now engine cards in the "engines" block on /prop-plan, alongside
+    # Strategy / Risk / Survival / Rules / Equity / Regime, which never had a
+    # nav entry either. Every one of those pages still renders with the prop nav
+    # (page_mode defaults to prop) — they lost a chip, not a home.
 ]
 # Order specified by Lucky, 2026-07-25 — his flow, not a derived one:
 # overview → signals → desk → plan → goal → position → calendar → journal →
@@ -57,16 +63,16 @@ NAV_PROP = [
 # set), because the previous 5-chip bar pushed half the book into a "more"
 # footer: "the nav bar here is too small, it's too little".
 NAV_HEDGE = [
-    ("/overview-hedge", "Overview"),
-    ("/signals", "Signals"),
-    ("/desk", "Desk"),
-    ("/dashboard", "Plan"),
-    ("/goal", "Goal"),
-    ("/position", "Position"),
-    ("/calendar", "Calendar"),
-    ("/journal", "Journal"),
-    ("/analytics", "Analytics"),
-    ("/edge", "Edge"),
+    ("/hedge-overview", "Overview"),
+    ("/hedge-signals", "Signals"),
+    ("/hedge-desk", "Desk"),
+    ("/hedge-plan", "Plan"),
+    ("/hedge-goal", "Goal"),
+    ("/hedge-position", "Position"),
+    ("/hedge-calendar", "Calendar"),
+    ("/hedge-journal", "Journal"),
+    ("/hedge-analytics", "Analytics"),
+    ("/hedge-edge", "Edge"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.
@@ -79,7 +85,10 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
-NAV_NEUTRAL = [("/glossary", "Learn"), ("/robustness", "Robustness"), ("/research", "Research"), ("/money", "Money"), ("/geometry", "Geometry"), ("/target", "Target"), ("/short", "Short"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+# Twelve entries became seven on 2026-08-03: Robustness/Research/Short are one
+# argument (/evidence), Target is the other half of /geometry, and Learn was the
+# glossary, now a tab of /manual.
+NAV_NEUTRAL = [("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
@@ -424,16 +433,12 @@ def nav_html(current_path: str) -> str:
             continue
         cur = " cur" if href == current_path else ""
         out.append('<a href="%s" class="%s">%s</a>' % (href, cur.strip(), label))
-    # Sitemap rides at the end of the chips rather than inside NAV_HEDGE/NAV_PROP:
-    # it is mode-neutral, and test_nav_parity (rightly) refuses to let a neutral
-    # page be owned by one book's nav. This gives it the chip he asked for
-    # without pretending it belongs to hedge.
-    out.append('<a href="/sitemap" class="%s ntl">Sitemap</a>'
-               % ("cur" if current_path == "/sitemap" else ""))
+    # No Sitemap chip: the ☰ in the mode switch below is already the sitemap
+    # button, on every page. Two entries to one page on the same screen.
     sw = (
         '<div class="modesw">'
-        '<a href="/overview" class="%s">◎ PROP</a>'
-        '<a href="/overview-hedge" class="%s">▤ HEDGE</a>'
+        '<a href="/prop-overview" class="%s">◎ PROP</a>'
+        '<a href="/hedge-overview" class="%s">▤ HEDGE</a>'
         '<a href="/sitemap" class="home">☰</a>'
         '<a href="/" class="home">⌂</a>'
         '</div>'
@@ -480,6 +485,110 @@ def _booked(path: str, label: str) -> str:
     if not book or label.upper().startswith(book.upper()):
         return label
     return f"{book.upper()} — {label}"
+
+
+_MERGE_CSS = """<style>
+.mgsub{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;gap:4px 6px;
+  background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px;margin-bottom:4px}
+.mgsub a{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.mgsub a:hover{color:var(--accent);border-color:var(--accent)}
+.mgsec{scroll-margin-top:52px;padding-top:6px}
+.mgsec + .mgsec{border-top:1px solid var(--line);margin-top:34px;padding-top:26px}
+.mgsec > .mgh{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);max-width:1000px;margin:0 auto 10px;padding:0 14px}
+</style>"""
+
+
+_AT_UNSCOPED = ("@keyframes", "@-webkit-keyframes", "@font-face", "@import", "@charset")
+_AT_NESTED = ("@media", "@supports", "@container", "@layer")
+
+
+def scope_css(css: str, sel: str) -> str:
+    """Prefix every rule in `css` with `sel`, so two merged pages can each keep
+    their own `.conf` without one silently restyling the other.
+
+    Geometry and Target collided on sixteen class names — `.conf`, `.kv`, `.m`,
+    `.lead`… — which is why this exists rather than hand-renaming. `:root` and
+    `body` map to the scope itself: a section can't restyle the document.
+    """
+    css = re.sub(r"</?style[^>]*>", "", css)
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    out, i, n = [], 0, len(css)
+    while i < n:
+        brace = css.find("{", i)
+        if brace == -1:
+            break
+        head = css[i:brace].strip()
+        # walk to the matching close brace, so nested @media blocks stay whole
+        depth, j = 1, brace + 1
+        while j < n and depth:
+            if css[j] == "{":
+                depth += 1
+            elif css[j] == "}":
+                depth -= 1
+            j += 1
+        block = css[brace + 1:j - 1]
+        if head.startswith(_AT_UNSCOPED):
+            out.append(f"{head}{{{block}}}")
+        elif head.startswith(_AT_NESTED):
+            out.append(f"{head}{{{scope_css(block, sel)}}}")
+        elif head:
+            parts = []
+            for one in head.split(","):
+                one = one.strip()
+                if not one:
+                    continue
+                parts.append(sel if one in (":root", "html", "body") else f"{sel} {one}")
+            out.append(f"{','.join(parts)}{{{block}}}")
+        i = j
+    return "".join(out)
+
+
+def merged(current_path: str, page_label: str, sections: list[dict], *,
+           meta: str = "can I trade?", intro: str = "") -> str:
+    """One page built from several former pages, stacked as anchored sections.
+
+    Each section is {"id","label","body"} plus optional "css"/"script". These
+    used to be separate routes; nothing about their markup changed, so the
+    merge can't silently drop content — it only re-wraps it.
+
+    Scripts are wrapped in an IIFE apiece. Merging two pages that each declare
+    a top-level `const c = canvas` is otherwise an instant SyntaxError, and the
+    pages being merged here have no inline on* handlers that would need the
+    old global scope back.
+    """
+    # A section id that already exists inside one of the bodies silently wins
+    # getElementById, because the <section> comes first in document order. That
+    # is how id="cone" handed the cone's drawCone() a <section> instead of its
+    # <canvas> — no console error until the first paint. Fail loudly instead.
+    ids = set()
+    for s in sections:
+        ids |= set(re.findall(r'id="([^"]+)"', s["body"]))
+    clash = ids & {s["id"] for s in sections}
+    if clash:
+        raise ValueError(
+            "merged(%s): section id(s) %s already used by an element inside a "
+            "section body — rename the section." % (current_path, sorted(clash)))
+
+    nav = "".join('<a href="#%s">%s</a>' % (s["id"], s["label"]) for s in sections)
+    css = _MERGE_CSS + "<style>" + "".join(
+        scope_css(s["css"], "#" + s["id"]) for s in sections if s.get("css")
+    ) + "</style>"
+    script = "".join(
+        "\n;(function(){\n%s\n})();\n" % s["script"] for s in sections if s.get("script")
+    )
+    # Sections whose body already opens with its own <h1> pass heading=False,
+    # or the eyebrow just says the same thing twice.
+    body = (intro or "") + '<div class="mgsub">' + nav + "</div>" + "".join(
+        '<section id="%s" class="mgsec">%s%s</section>'
+        % (s["id"],
+           ('<div class="mgh">%s</div>' % s["label"]) if s.get("heading", True) else "",
+           s["body"])
+        for s in sections
+    )
+    return shell(current_path, page_label, body,
+                 head_extra=css, script=script, meta=meta)
 
 
 def shell(current_path: str, page_label: str, body: str, *,

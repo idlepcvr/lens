@@ -154,14 +154,14 @@ def dashboard_page() -> str:
   <h1>Prop Dashboard</h1>
   <div class="sub">Scoped to the prop book — <b>${acct:,.0f}</b> {cfg['eval_name']} at {cfg['risk']}% risk.
     Counters are the <b>current eval</b>; performance spans <b>every attempt</b>.
-    The hedge twin is <a href="/dashboard" class="ac">/dashboard</a>.</div>
+    The hedge twin is <a href="/hedge-plan" class="ac">/dashboard</a>.</div>
 
   {scores}
 
   <div class="sect2">performance · all prop attempts</div>
   {perf}
 
-  <div class="sect2">goal model · will this basket pass? · <a href="/prop-cone" class="ac">full cone →</a></div>
+  <div class="sect2">goal model · will this basket pass? · <a href="/prop-survival#projection" class="ac">full cone →</a></div>
   {_goal_section(d['goal'])}
 
   <div class="sect2">signals by strategy</div>
@@ -169,15 +169,11 @@ def dashboard_page() -> str:
 
   <div class="sect2">engines</div>
   <div class="links">
-    <a class="lk" href="/prop-goal"><b>Goal →</b><span>goal model · risk &amp; Kelly</span></a>
-    <a class="lk" href="/prop-cone"><b>Cone →</b><span>pass odds · basket picker</span></a>
+    <a class="lk" href="/prop-survival"><b>Survival →</b><span>walls · bet size · streaks · both cones</span></a>
     <a class="lk" href="/prop-ledger"><b>Ledger →</b><span>equity vs the walls · past attempts</span></a>
-    <a class="lk" href="/prop-desk"><b>Desk →</b><span>can I enter now?</span></a>
-    <a class="lk" href="/prop-signals"><b>Queue →</b><span>pending signals</span></a>
-    <a class="lk" href="/prop-calendar"><b>Calendar →</b><span>monthly heatmap</span></a>
-    <a class="lk" href="/survival"><b>Survival →</b><span>streak + floor stress</span></a>
-    <a class="lk" href="/rules"><b>Rules →</b><span>the live constraint layer</span></a>
     <a class="lk" href="/prop-income"><b>Income →</b><span>what a pass is worth</span></a>
+    <a class="lk" href="/regime"><b>Regime →</b><span>does the hero win in this market?</span></a>
+    <a class="lk" href="/prop"><b>All engines →</b><span>every prop page in one index</span></a>
   </div>
 </div>"""
-    return shell("/prop-dashboard", "Dashboard", body, head_extra=_CSS, meta="prop front door")
+    return shell("/prop-plan", "Dashboard", body, head_extra=_CSS, meta="prop front door")

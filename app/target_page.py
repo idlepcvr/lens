@@ -159,13 +159,13 @@ def _entry_edge_section() -> str:
     return body
 
 
-def render() -> str:
+def parts() -> dict:
+    """Body + CSS, so /target can render standalone or as a merged section."""
     bl = _baseline()
     if not bl:
-        return shell("/target", "Target",
-                     "<p class='lead'>No measured baseline yet — run "
-                     "<span class='m'>python3 research/barrier_test.py</span>.</p>",
-                     meta="what the target costs")
+        return {"body": "<p class='lead'>No measured baseline yet — run "
+                        "<span class='m'>python3 research/barrier_test.py</span>.</p>",
+                "css": ""}
 
     sigma = bl["sigma"]
     rr_base = {float(k): v["win_rate"] for k, v in bl["rr_baseline"].items()}
@@ -295,7 +295,7 @@ def render() -> str:
 
     body = head + floor + body_maps + prop + ledger + (
         '<p class="foot"><a href="/geometry">→ where the geometry comes from</a> · '
-        '<a href="/edge">→ live strategy search</a><br>'
+        '<a href="/hedge-edge">→ live strategy search</a><br>'
         '<span class="m">python3 research/barrier_test.py</span> regenerates the '
         'measured floor.</p>')
 
@@ -337,5 +337,10 @@ def render() -> str:
         ".kv .s{display:block;font-size:11.5px;color:var(--dim);line-height:1.45}"
         "@media(max-width:720px){.conf{grid-template-columns:1fr}}"
         "</style>")
-    return shell("/target", "Target", body, head_extra=css,
+    return {"body": body, "css": css}
+
+
+def render() -> str:
+    p = parts()
+    return shell("/target", "Target", p["body"], head_extra=p["css"],
                  meta="what the target costs")
