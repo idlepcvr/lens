@@ -104,6 +104,64 @@ system's criteria were profitable, and the ones taken against its explicit warni
 were not. The gap between those two groups is larger than any indicator ever found.
 Discipline outperformed cleverness by a wide margin, and it wasn't close.</p>
 
+<h4 id="philosophy">Where this sits — the wider picture</h4>
+
+<p>Trading is one drawer, not the whole cabinet. The underlying view is ordinary and
+deliberately boring: hold a spread of assets, keep costs low, let time compound, and
+withdraw a small fraction each year once the pile is large enough to live on. None of
+that is original — the safe-withdrawal-rate research it rests on is public and
+decades old, and the calculators are free.</p>
+
+<p>The one part that isn't standard is treating <b>crypto as two asset classes rather
+than one</b>, because the two halves behave nothing alike:</p>
+
+<p><b>Cold storage — the patient half.</b> Bitcoin held long-term in self-custody,
+never traded, sized to survive being wrong for years. It isn't income and isn't meant
+to be. It only works if it is never touched, so the discipline it asks for is
+inaction.</p>
+
+<p><b>Hot wallet — the active half.</b> A funded exchange account running one
+specific short-side strategy on a defined risk budget. <b>This is the part LENS
+governs, and the only part attempting to produce income.</b> It is also the only part
+that can be lost quickly, which is why it gets all of the measurement and all of the
+rules.</p>
+
+<p>Keeping those two separated is most of the discipline. Money meant to sit still
+and money meant to work are different money, and the failure mode is letting the
+second borrow from the first after a bad week.</p>
+
+<h4 id="history">What changed my mind</h4>
+
+<p>The starting position, in 2019, was the <b>stock-to-flow model</b> — the argument
+that Bitcoin's price could be predicted from its programmed scarcity and halving
+schedule. It was compelling, it was quantitative, and for a while it looked
+extraordinarily accurate.</p>
+
+<p><b>It then failed badly, and that failure is the most useful thing that has
+happened to my thinking.</b> Its projections diverged from reality by orders of
+magnitude after 2021. In hindsight it had a suspiciously perfect backtest, a story
+that explained everything, and no mechanism that survived contact with the future —
+which is a precise description of every over-fitted model I have since learned to
+throw away.</p>
+
+<p>That is why this site is built the way it is: why the search publishes its
+failures, why a result has to survive permutation testing and out-of-sample data
+before it counts, and why the claim at the top of this page is one sentence rather
+than a narrative. Having believed a beautiful model that turned out to be curve-fitted
+is a better teacher than never having been wrong.</p>
+
+<p style="color:var(--faint);font-size:12px">Primary sources, rather than my summary
+of them: <a href="https://bitcoin.org/bitcoin.pdf">the Bitcoin whitepaper</a> ·
+<a href="https://medium.com/@100trillionUSD/modeling-bitcoins-value-with-scarcity-91fa0fc03e25">the
+original 2019 stock-to-flow thesis</a> ·
+<a href="https://medium.com/@100trillionUSD/bitcoin-stock-to-flow-cross-asset-model-50d260feed12">its
+cross-asset extension</a> ·
+<a href="https://www.bitcoinmagazinepro.com/charts/stock-to-flow-model/">the model
+charted against what actually happened</a> ·
+<a href="https://bitbo.io/calendar/2020-halving/">the 2020 halving</a>.
+The fourth link is the one that matters — it is the model next to reality rather than
+the model on its own.</p>
+
 <h4 id="notspecial">Why this isn't special</h4>
 
 <p>There is no secret. The mechanism is boring and entirely public:</p>
