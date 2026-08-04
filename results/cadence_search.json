@@ -1,0 +1,14 @@
+{
+ "generated": "2026-08-02",
+ "min_per_month": 6.0,
+ "months": 30,
+ "timeframes": [
+  "1h"
+ ],
+ "stage1_tests": 51966,
+ "bonferroni": 9.621675711041836e-07,
+ "permutations": 25000,
+ "cadence_split_half_survivors": 0,
+ "permutation_survivors": 0,
+ "rows": []
+}

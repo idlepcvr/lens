@@ -87,8 +87,10 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
 # Twelve entries became seven on 2026-08-03: Robustness/Research/Short are one
 # argument (/evidence), Target is the other half of /geometry, and Learn was the
-# glossary, now a tab of /manual.
-NAV_NEUTRAL = [("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+# glossary, now a tab of /manual. /about joined 2026-08-04 — the page for a
+# reader who can judge the work, as distinct from "/" which is for someone who
+# just wants to know he's okay.
+NAV_NEUTRAL = [("/about", "About"), ("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}

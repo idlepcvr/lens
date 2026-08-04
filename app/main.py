@@ -1000,6 +1000,20 @@ def evidence_page():
     ], meta="what survived testing", intro=intro)
 
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page():
+    """The page for a reader who can judge the work — a friend, not a partner.
+
+    "/" is for someone who already cares about him and wants to know he's okay.
+    /evidence is the argument. This is the introduction: what this is, where it
+    sits in his wider thesis, and what has failed. Deliberately keeps the
+    glossary/robustness/short/target routes DEAD — they were consolidated on
+    2026-08-03 and resurrecting them here would undo that on merge.
+    """
+    from .about_page import render
+    return render()
+
+
 @app.get("/geometry", response_class=HTMLResponse)
 def geometry_page():
     """One calculation, both directions. /geometry derived what a configuration
@@ -2336,6 +2350,7 @@ class BtCustomRequest(BaseModel):
     ma_align: str | None = None     # bull | bear (EMA 50/100/200 stack)
     vol_spike: bool = False         # volume > 2× its 20-bar SMA
     atr_regime: str | None = None   # low | high (vs rolling median ATR%)
+    funding: str | None = None      # hot | extreme | cold | neg (app/orderflow.py)
     mayer_max: float | None = None  # 2y-MA multiple cycle gates
     mayer_min: float | None = None
     hour_from: int | None = None    # Bangkok hours, window may wrap midnight

@@ -373,8 +373,12 @@ function render(g){
 // Cell EV is in R units: WR×(1+R) − 1 − feeR. Monthly % = (1 + risk×EV)^tpm − 1.
 // Breakeven WR = (1+feeR)/(1+R) — drawn as the boundary between red and green.
 let LAST_G=null;
-const SL_WRS=[0.25,0.30,0.35,0.40,0.45,0.50,0.55];
-const SL_RS=[1,1.5,2,2.5,3,3.5,4];
+// Axes run past what has been achieved on purpose. The old grid stopped at 55%
+// WR and 4R, which put the plan's own pin (55% · 5R) OFF-GRID in the R
+// direction — the ladder could not show the cell the whole plan depends on.
+// Matches the prop ladder's R axis so the two boards can be read side by side.
+const SL_WRS=[0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70];
+const SL_RS=[1,1.5,2,2.5,3,3.5,4,5,6];
 function nearestIdx(arr,v){ if(v==null||!isFinite(v))return -1;
   if(v<arr[0]-1e-9||v>arr[arr.length-1]+1e-9) return -1;   // off-grid: don't pretend
   let bi=0; arr.forEach((x,i)=>{ if(Math.abs(x-v)<Math.abs(arr[bi]-v)) bi=i; }); return bi; }

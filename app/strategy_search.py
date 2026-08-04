@@ -71,6 +71,10 @@ SLOTS = {
     "ma_align": ["bull", "bear"],
     "vol":      [True],
     "atr":      ["low", "high"],
+    # Crowd positioning (app/orderflow.py) — the first slot that is NOT derived
+    # from the same OHLC as everything above it. hot/extreme = crowded long,
+    # which is the fade condition for the validated SHORT side.
+    "funding":  ["hot", "extreme", "cold", "neg"],
 }
 
 # Chart structure + higher-timeframe trend (see app/patterns.py). Merged rather
@@ -105,6 +109,16 @@ def _masks(df) -> dict:
         ("atr", "low"):           (c["atr_pctv"] < c["atr_medv"]).to_numpy(),
         ("atr", "high"):          (c["atr_pctv"] >= c["atr_medv"]).to_numpy(),
     }
+    # Funding: NaN-safe by construction — a comparison against NaN is False, so
+    # unwarmed/missing settlements simply never satisfy the condition, matching
+    # _signal_custom's "missing data fails the entry" rule.
+    fr = c["fund_rate"].to_numpy() if "fund_rate" in c else np.full(len(c), np.nan)
+    fp = c["fund_pct"].to_numpy() if "fund_pct" in c else np.full(len(c), np.nan)
+    m[("funding", "hot")]     = fp >= 0.80
+    m[("funding", "extreme")] = fp >= 0.95
+    m[("funding", "cold")]    = fp <= 0.20
+    m[("funding", "neg")]     = fr < 0
+
     for hf, ht in SLOTS["hours"]:
         m[("hours", (hf, ht))] = ((hour_bkk >= hf) & (hour_bkk <= ht))
     m.update(pattern_masks(df))
@@ -163,6 +177,10 @@ def _describe(direction, active, tf):
            "bb": lambda o: "BB " + ("<lower" if o == "below_lower" else ">upper"),
            "td": lambda o: f"TD {o}", "ma_align": lambda o: f"MA-stack {o}",
            "vol": lambda o: "vol spike", "atr": lambda o: f"{o}-vol",
+           "funding": lambda o: {"hot": "funding hot (crowded long)",
+                                 "extreme": "funding extreme (very crowded long)",
+                                 "cold": "funding cold",
+                                 "neg": "funding negative (crowded short)"}[o],
            "pattern": lambda o: o.replace("_", " "),
            "structure": lambda o: f"structure {o}",
            "breakout": lambda o: f"breakout {o}",

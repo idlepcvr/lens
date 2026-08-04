@@ -30,7 +30,8 @@ from app.strategy_search import SLOTS, _masks, _combo_mask, combo_params
 # ── the vocabulary actually grew ──────────────────────────────────────────
 for slot in PATTERN_SLOTS:
     assert slot in SLOTS, f"{slot} never reached strategy_search.SLOTS"
-assert len(SLOTS) == 15, f"expected 15 slots, got {len(SLOTS)}"
+# 15 → 16 on 2026-08-04: the 'funding' positioning slot (app/orderflow.py).
+assert len(SLOTS) == 16, f"expected 16 slots, got {len(SLOTS)}"
 
 # ── a synthetic series with genuine structure (no network) ────────────────
 rng = np.random.default_rng(11)

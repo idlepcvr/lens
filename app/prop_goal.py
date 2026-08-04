@@ -251,7 +251,9 @@ def model(basket: list = None) -> dict:
     r_scen.sort(key=lambda x: x["rr"])
 
     # WR × R ladder — the same shape as the hedge page's, in prop terms
-    wr_axis = [.20, .25, .30, .35, .40, .45, .50]
+    # Extended to 70% so the plan's typed win rate sits inside the grid rather
+    # than above it — a pin you cannot see is a pin you cannot argue with.
+    wr_axis = [.20, .25, .30, .35, .40, .45, .50, .55, .60, .65, .70]
     r_axis = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0]
     ladder = []
     for w in wr_axis:
