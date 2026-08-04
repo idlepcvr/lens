@@ -967,6 +967,12 @@ def research_page():
     return render()
 
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page():
+    from .about_page import render
+    return render()
+
+
 @app.get("/glossary", response_class=HTMLResponse)
 def glossary_page():
     from .glossary_page import render
