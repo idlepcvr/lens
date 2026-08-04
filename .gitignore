@@ -50,3 +50,6 @@ data/backups/
 
 # stray 0-byte artifact from connecting to a bare relative "lens.db"
 /lens.db
+
+# git worktrees live here — never part of the repo itself
+.claude/worktrees/
