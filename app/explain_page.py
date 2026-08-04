@@ -64,6 +64,7 @@ want it back it is in git, at 43468ca and earlier.
 import sqlite3
 
 from .database import DB_PATH
+from .site import NAV_CSS, footer_html, nav_html
 from .theme import shell
 
 _FONT = (
@@ -349,4 +350,9 @@ def render() -> str:
   </section>
 </div>
 """
-    return shell("/", "What this is", body, head_extra=_FONT + _CSS, bare=True)
+    # The public nav is injected rather than baked into this page's own CSS:
+    # "/" was designed as a single uninterrupted scroll and its layout is the
+    # thing /about and /philosophy were built to match, so it gets the shared
+    # chrome without any of its existing styling being touched.
+    return shell("/", "What this is", nav_html("/") + body + footer_html(),
+                 head_extra=_FONT + NAV_CSS + _CSS, bare=True)

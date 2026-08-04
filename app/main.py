@@ -1000,6 +1000,14 @@ def evidence_page():
     ], meta="what survived testing", intro=intro)
 
 
+@app.get("/philosophy", response_class=HTMLResponse)
+def philosophy_page():
+    """The public site's third page — worldview and the model he was wrong about.
+    Split from /about so that page stays short enough to read in one sitting."""
+    from .philosophy_page import render
+    return render()
+
+
 @app.get("/about", response_class=HTMLResponse)
 def about_page():
     """The page for a reader who can judge the work — a friend, not a partner.
