@@ -227,6 +227,14 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     for (slot, opt), arr in pattern_masks(df).items():
         df[f"pat_{slot}_{opt}"] = arr
 
+    # Positioning feed — the only input here that isn't a rearrangement of the
+    # same OHLC. Cached in SQLite and fetched incrementally, so this is a local
+    # read after the first call; fail-soft to NaN if the feed is unreachable,
+    # and a NaN funding condition FAILS the entry (see _signal_custom) rather
+    # than silently passing.
+    from .orderflow import funding_columns
+    df = funding_columns(df)
+
     return df
 
 
@@ -1622,6 +1630,22 @@ def _signal_custom(df, i, params):
         if col not in df.columns or not bool(row[col]):
             return None
 
+    fund = params.get("funding")   # crowd positioning — see app/orderflow.py
+    if fund is not None:
+        fr, fp = row.get("fund_rate"), row.get("fund_pct")
+        if fund == "neg":
+            if fr != fr or not (fr < 0):        # NaN guard, then the test
+                return None
+        else:
+            if fp != fp:                        # no percentile = no entry
+                return None
+            if fund == "hot" and not (fp >= 0.80):
+                return None
+            if fund == "extreme" and not (fp >= 0.95):
+                return None
+            if fund == "cold" and not (fp <= 0.20):
+                return None
+
     hf, ht = params.get("hour_from"), params.get("hour_to")
     if hf is not None and ht is not None:
         h = (df.index[i].hour + 7) % 24     # Bangkok hour (UTC+7, no DST)
@@ -1673,8 +1697,12 @@ def to_pinescript(params: dict) -> str:
     # a charting discrepancy rather than a missing condition. Say so in the
     # script instead. Upgrade path: port app/patterns.py to Pine (ta.pivothigh /
     # ta.pivotlow and request.security for the HTF trend).
+    # 'funding' joins this list permanently, not pending an upgrade: TradingView
+    # has no perp funding-rate history to gate on, which is exactly why the feed
+    # is worth having in LENS and not there.
     untranslated = [f"{s}={p[s]}" for s in
-                    ("pattern", "structure", "breakout", "htf4h", "htf1d")
+                    ("pattern", "structure", "breakout", "htf4h", "htf1d",
+                     "funding")
                     if p.get(s) is not None]
     cond_str = " and ".join(conds) if conds else "true"
 

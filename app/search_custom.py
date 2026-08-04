@@ -30,7 +30,7 @@ _lock = threading.Lock()
 def _pinned_std(req: dict) -> dict:
     """Standard-slot pins (fixed values with prebuilt masks) → {slot: option}."""
     a = {}
-    for k in ("trend", "candle", "macd", "bb", "td", "ma_align"):
+    for k in ("trend", "candle", "macd", "bb", "td", "ma_align", "funding"):
         if req.get(k):
             a[k] = req[k]
     if req.get("atr_regime"):
@@ -84,6 +84,12 @@ def _blank_slots(req, pins):
         free.add("hours")
     if not req.get("patterns"):
         free |= set(PATTERN_SLOTS)
+    # Same invisible-condition rule as the pattern slots: /edge has no funding
+    # select, so an unpinned funding slot would let every interactive search
+    # explore a condition the user cannot see or switch off. Pinning it works
+    # (via _pinned_std), and the research pipeline reads SLOTS directly, which
+    # is where the funding sweep is actually wanted.
+    free.add("funding")
     return [s for s in SLOTS if s not in free]
 
 

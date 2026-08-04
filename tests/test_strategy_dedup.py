@@ -25,10 +25,11 @@ for r in (1, 2, 3):
             assert back == active, f"roundtrip lost {active} → {back}"
             checked += 1
 # 1467 → 4847 on 2026-07-25, when the five pattern/HTF slots joined SLOTS.
+# 4847 → 6879 on 2026-08-04, when the 'funding' slot joined (app/orderflow.py).
 # The roundtrip above passed on every one of them unchanged, which is the part
 # that matters: combo_params/_active handle the new slots generically. This
 # number is a canary for "the vocabulary moved" — update it deliberately.
-assert checked == 4847, f"slot space changed: {checked} combos, expected 4847"
+assert checked == 6879, f"slot space changed: {checked} combos, expected 6879"
 
 # an rsi_min combo must not come back as rsi_max, and vice versa
 assert _active({"rsi_min": 70}) == {"rsi": ("rsi_min", 70)}

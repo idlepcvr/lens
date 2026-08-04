@@ -2265,6 +2265,7 @@ class BtCustomRequest(BaseModel):
     ma_align: str | None = None     # bull | bear (EMA 50/100/200 stack)
     vol_spike: bool = False         # volume > 2× its 20-bar SMA
     atr_regime: str | None = None   # low | high (vs rolling median ATR%)
+    funding: str | None = None      # hot | extreme | cold | neg (app/orderflow.py)
     mayer_max: float | None = None  # 2y-MA multiple cycle gates
     mayer_min: float | None = None
     hour_from: int | None = None    # Bangkok hours, window may wrap midnight
