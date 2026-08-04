@@ -47,3 +47,6 @@ results/strategy_scores.json
 # local DB backups
 data/backups/
 .playwright-cli/
+
+# stray 0-byte artifact from connecting to a bare relative "lens.db"
+/lens.db
