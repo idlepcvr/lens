@@ -187,7 +187,7 @@ BODY = r"""
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
           <div class="frow"><label>Losses allowed</label><input type="text" inputmode="decimal" name="losses_allowed"></div>
           <div class="frow"><label>Frac. Kelly</label><input type="text" inputmode="decimal" name="fractional_kelly"></div>
-          <div class="frow"><label>ATR floor <input type="checkbox" id="atr-auto" checked style="vertical-align:-1px"> <span class="hint">auto, decimal</span></label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
+          <div class="frow"><label>ATR floor <input type="checkbox" id="atr-auto" style="vertical-align:-1px"> <span class="hint">auto, decimal</span></label><input type="text" inputmode="decimal" name="min_underlying_stop_pct" placeholder="—"></div>
           <div class="frow"><label>Noise × <span class="hint">ATR mult</span></label><input type="text" inputmode="decimal" id="atr-mult" value="0.5"></div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Execution</div>
@@ -492,6 +492,15 @@ RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config"+BQ)
   ["win_rate","rr_ratio","trades_per_week","leverage","start_balance","target_balance","target_date"].forEach(function(k){
     if(qs.has(k)){ const el=FORM.elements.namedItem(k); if(el) el.value=qs.get(k); }
   });
+  // The ATR floor checkbox drives whether the stop is derived from live ATR or
+  // taken from the saved config. It used to be hard-coded checked, so auto ran
+  // on every load and overwrote a deliberately-saved floor with ATR × mult — a
+  // stop you chose and stored could never survive a refresh, silently, because
+  // the field just showed the auto value as though it were yours. Default it to
+  // whatever the config implies: a stored floor means you picked one, so respect
+  // it; no stored floor means fall back to deriving it.
+  document.getElementById("atr-auto").checked =
+    !(FORM.elements.namedItem("min_underlying_stop_pct").value||"").trim();
   recompute();
   // auto-fills read the populated form, so they run strictly after populate()
   loadLadder(); loadMeasured(); loadValidated(); loadGeometry(); refreshVol();
