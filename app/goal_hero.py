@@ -81,10 +81,56 @@ function renderPillars(g){
   const arrival=projD?("around "+fmtMY(projD)):"never at this edge (drift ≤ 0)";
   const insufficient=g.trades_needed>g.total_trades;   // ⟺ arrival past the deadline (same drift)
 
-  // 1 · On time? — reach the target inside the window
+  // 1 · On time? — reach the target inside the window.
+  //
+  // Gated against the ledger. The arrival date is computed from whatever win
+  // rate is in the form, and win rate is the one input nothing on this page can
+  // check — so a typed 55% at a geometry that has only ever produced 35% used
+  // to light this card green and call the plan reachable. It is not a plan, it
+  // is a wish with a date on it. When the typed rate is materially above what
+  // the entries have actually done AT THIS GEOMETRY, the card degrades to
+  // "Unproven": the arithmetic closes, the evidence does not.
+  //
+  // Loading a measured source (validated cell, or a swept geometry cell) is not
+  // typing, so those are exempt — the gate compares against them, it does not
+  // fire on them.
+  const wrGate=(function(){
+    try{
+      const f=document.getElementById("goal-form")||document.forms[0];
+      if(!f) return null;
+      const wr=parseFloat(f.elements.win_rate?.value),
+            rr=parseFloat(f.elements.rr_ratio?.value);
+      if(!isFinite(wr)||!isFinite(rr)) return null;
+      const V=window.VALIDATED, GM=window.GEOM, M=window.MEAS;
+      const near=(a,b)=>Math.abs(a-b)<1e-6;
+      // exempt: this IS a measured cell, not a typed one
+      if(V&&V.n&&near(wr,V.win_rate)&&near(rr,V.rr_ratio)) return null;
+      const cells=(GM&&GM.cells)||[];
+      if(cells.some(c=>near(wr,c.win_rate)&&near(rr,c.rr))) return null;
+      // Closest measured evidence to the geometry actually typed. Compare on the
+      // stop as well as the R:R — a win rate belongs to both barriers, so the
+      // nearest R:R at a wildly different stop is not the right yardstick. Falls
+      // back to the whole book only when the sweep has produced nothing.
+      const stopTyped=parseFloat(f.elements.min_underlying_stop_pct?.value)*100;
+      let ref=null, best=Infinity;
+      for(const c of (GM&&GM.reference)||[]){
+        const d=Math.abs(c.rr-rr)+(isFinite(stopTyped)?Math.abs(c.stop_pct-stopTyped)/2:0);
+        if(d<best){ best=d; ref={wr:c.win_rate,lbl:`${c.group} ${c.stop_pct}/${c.target_pct} @ ${c.hold_h}h`,n:c.n}; }
+      }
+      if(!ref&&M&&M.n&&M.win_rate!=null) ref={wr:M.win_rate,lbl:"the whole book",n:M.n};
+      if(!ref) return null;
+      const gap=(wr-ref.wr)*100;
+      return gap>5 ? {gap:gap, ref:ref, typed:wr} : null;
+    }catch(e){ return null; }
+  })();
   setTxt("h-arr", projD?fmtMY(projD):"never");
   setTxt("h-arr-sub",(tgtDate?"target "+fmtMY(tgtDate):"—")+(g.days_remaining!=null?" · "+fmtInt(g.days_remaining)+"d left":""));
-  setHero("hc-time","st-time", !insufficient, insufficient?"Behind":"On time");
+  if(insufficient)      setHero("hc-time","st-time", false, "Behind");
+  else if(wrGate)       setHero("hc-time","st-time", "warn", "Unproven");
+  else                  setHero("hc-time","st-time", true,  "On time");
+  if(wrGate) setTxt("h-arr-sub",
+    `typed WR ${(wrGate.typed*100).toFixed(1)}% vs ${(wrGate.ref.wr*100).toFixed(1)}% measured `
+    +`(${wrGate.ref.lbl}, n=${wrGate.ref.n}) — +${wrGate.gap.toFixed(1)}pp unproven`);
   // 2 · Edge / trade — per-trade EV vs what the goal needs (colour matches the two numbers)
   const evOk=g.per_trade_ev!=null&&g.per_trade_ev_required!=null&&g.per_trade_ev>=g.per_trade_ev_required;
   setTxt("h-ev", sgnp(g.per_trade_ev));

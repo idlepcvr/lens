@@ -450,7 +450,15 @@ def geometry(limit: int = 12) -> dict:
     except Exception:
         return {"cells": [], "candidates": 0}
 
-    cells = [c for c in d.get("cells", []) if c.get("candidate")][:limit]
+    every = d.get("cells", [])
+    cells = [c for c in every if c.get("candidate")][:limit]
+    # Every judged cell, slimmed — the picker offers only candidates, but the
+    # "On time" gate needs the nearest measured geometry to the one TYPED, which
+    # is usually not a candidate. Comparing a typed R:R 2 against the nearest
+    # candidate at R:R 1.5 would gate against the wrong payoff.
+    ref = [{"stop_pct": c["stop_pct"], "target_pct": c["target_pct"], "rr": c["rr"],
+            "hold_h": c["hold_h"], "win_rate": c["win_rate"], "n": c["n"],
+            "group": c["group"]} for c in every]
     return {
         "generated": d.get("generated"),
         "cells_tried": d.get("cells_tried"),
@@ -459,4 +467,5 @@ def geometry(limit: int = 12) -> dict:
         "bonferroni_p": d.get("bonferroni_p"),
         "friction_pct": d.get("friction_pct"),
         "cells": cells,
+        "reference": ref,
     }

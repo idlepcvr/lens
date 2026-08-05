@@ -722,6 +722,7 @@ document.getElementById("validated-btn").addEventListener("click",()=>{
 let GEO=null;
 async function loadGeometry(){
   try{ GEO=await fetch("/api/goal/geometry").then(r=>r.json()); }catch(e){ return; }
+  window.GEOM=GEO;   // the hero gates "On time" against these (goal_hero.py)
   const sel=document.getElementById("geo-pick"), btn=document.getElementById("geo-btn"),
         note=document.getElementById("geo-note");
   if(!sel||!btn||!note) return;
