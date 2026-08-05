@@ -108,6 +108,35 @@ PAGE_CSS = r"""<style>
 .pg .stat .v{font-family:var(--hud);font-weight:700;font-size:15px;
   line-height:1.35;color:var(--ink)}
 .pg .stat .v.q{color:var(--dim);font-weight:400;font-size:14px}
+
+/* ── the two-layer fold, added 2026-08-05 ──────────────────────────────────
+   His read of the prose version: "nobody's reading all of that information".
+   So every section is now picture → ONE sentence → the paragraph, quietly.
+   A skimmer takes the pictures and the hooks and leaves with the whole story;
+   the detail is there for the minority who scroll, and nothing he dictated
+   had to be thrown away to achieve it. */
+.pg figure{margin:0 0 4px}
+.pg figure svg{width:100%;height:auto;display:block;overflow:visible}
+.pg .lb{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;fill:var(--faint)}
+.pg .lb.on{fill:var(--dim)}
+/* SVG text scales with its viewBox, so on a phone these 480-unit plates render
+   at ~0.75x and 9.5px labels land near 7px — illegible, and the labels are
+   half the point of a diagram. Bump in USER UNITS to compensate; explain_page
+   does the same for its own plate. Any label added below must be checked for
+   collision at this size, not just at desktop. */
+@media(max-width:560px){.pg .lb{font-size:12.5px;letter-spacing:.06em}}
+/* the hook: the one sentence that has to survive being the ONLY thing read */
+.pg .hook{font-size:clamp(17px,2.5vw,22px);line-height:1.45;color:var(--ink);
+  max-width:30ch;margin:22px 0 0;font-weight:600;letter-spacing:-.01em}
+.pg .hook em{font-style:normal;color:var(--accent)}
+/* the detail layer. --dim, never --faint: --faint is ~3.2:1 on this bg and
+   this text is meant to be readable by whoever bothers, not decorative. */
+.pg .detail{font-size:13.5px;line-height:1.65;color:var(--dim);max-width:58ch;
+  margin:14px 0 0}
+.pg .detail + .detail{margin-top:10px}
+.pg .detail b{color:var(--ink);font-weight:600}
+.pg .detail a{color:var(--accent);text-decoration:none;
+  border-bottom:1px solid var(--accent-d)}
 </style>"""
 
 
