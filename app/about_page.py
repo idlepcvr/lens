@@ -1,164 +1,158 @@
-"""LENS /about — for a reader who can judge the work.
+"""LENS /about — who he is, when he started, and what it cost him.
 
-Three public pages, three readers:
+Rewritten 2026-08-05 from dictation. The previous version was the evidence
+page in prose: the edge stated once, then four sections of null results. It
+was accurate and it was not his voice — his words, "the public website is not
+an accurate representation of my voice". Read back, the old page argued like a
+paper and he talks like a person who lost a lot of money and learned from it.
+
+So the public site now splits the way the dictation did, cleanly:
 
   "/"          somebody who already cares about him and wants to know he's okay.
-               Never argues, shows. No numbers at all.
-  /about       a friend or peer capable of evaluating this, who would be
-               insulted by reassurance and will discount anything that reads
-               as a pitch. Numbers allowed, and required.
-  /philosophy  the same reader, one level down: what he believes about money,
+  /about       the story — who, when, what happened, where. THIS page.
+  /philosophy  the system — why and how. FIRE arithmetic, the allocation map,
                and the model he was wrong about.
+  /evidence    the numbers. Recomputed from the ledger and the research runs,
+               including every experiment that failed.
 
-The structural decision, and the whole reason this page works: the claim is
-stated ONCE, in its narrowest true form, and then most of the page is what has
-NOT worked. A 75,000-combination search that returned nothing is better evidence
-of honest method than any equity curve, because nobody fabricates their own null
-results. Leading with the best number is what makes a page read as a pitch, and
-a sharp reader discounts everything after it.
+⚠️ No statistics on this page, deliberately, and this is a change of rule
+rather than an oversight. The old version restated a win rate, a sample size
+and a p-value inline. Those are computed by research runs, and a figure typed
+into a prose file goes stale silently the next time one is re-run — a public
+page quoting a win rate that the evidence page no longer agrees with is worse
+than a page with no number on it. The claim here is one sentence and a link.
+If you want a number on this page, read it out of the run, don't retype it.
 
-Rules, inherited from "/" and tightened:
+Rules, inherited and one of them tightened:
 
-  · No P&L, no account size, no returns. The claim is about a WIN RATE against
-    a matched-random baseline — a statement about method, not about money. The
-    moment a euro figure appears the page is answering "how rich are you", which
-    is a different and much worse conversation.
-  · No solicitation of any kind. AKA is in wind-down with a live case and ~179
-    creditors; see memory `securities-law-flag`. An open invitation to send
-    money is the most quotable artefact a creditor's solicitor could find.
-  · No AKA Blockchains, by name or link. Its history belongs to a wound-down
-    entity in live litigation, and a personal credibility page is the wrong
-    surface for it.
-  · Every number here is from the ledger or a research run, and the losing ones
-    are on the page next to the winning ones.
+  · No creditors, no obligations, no amounts owed. His decision, 2026-08-05:
+    the 50 BTC he lost may be named, because it is his own loss and the size
+    of the hole is the point of the story. What he owes and to whom may NOT
+    appear, in any phrasing, including the dictated "getting back not only
+    what is owed". AKA is in wind-down with a live case (HP2025/6818, damages
+    hearing ~late 2026); see memory `securities-law-flag`. The sentence "I
+    intend to recover more than what is owed" is the single most quotable
+    thing this site could publish, and it is not here.
+  · No AKA Blockchains, by name or link.
+  · No solicitation. The longer written breakdown is mentioned once, at the
+    very end, with no link, no price and no signup — his call, 2026-08-05. The
+    moment it becomes a link with a price, the "nothing to buy here" guarantee
+    that is currently doing legal work for him is gone. Get that wording
+    checked before you add it.
 """
 
 from .site import site_shell
 
 BODY = r"""
-<h1>I found <em>one</em> edge, and most of this page is the things that
-didn't work.</h1>
+<h1>I lost more than fifty bitcoin. Getting them back is the
+<em>slow</em> part.</h1>
 
-<p class="lede">I trade bitcoin with my own money, using a system I built to stop
-myself from lying to myself about it. <b>Nothing here is a secret method.</b> The
-mechanism is a small statistical edge, applied the same way every time, and the
-honest status is that it works and is not yet running on enough money to matter.</p>
+<p class="lede">I'm twenty-five, born and raised in Ireland, and I have a
+bachelor's degree in microbiology that I worked out fairly early was never going
+to pay for the life I wanted. So I started investing instead, and I've been doing
+the same thing for a long time now. <b>It isn't about being smart. It's about
+being consistent.</b></p>
 
 <section>
-  <div class="lbl">the claim, stated once</div>
-  <h2>One setup. One side of the market. Ninety-one occurrences.</h2>
+  <div class="lbl">when it started</div>
+  <h2>2016, with bitcoin somewhere around three thousand dollars.</h2>
 
-  <blockquote>Over <b>n=91</b> occurrences, one short-side setup won <b>68.1%</b>
-  of the time against a matched-random baseline of <b>51.9%</b> — a <b>+16.3 point</b>
-  difference, significant at <b>p&lt;0.01</b>. Positive in both halves of the sample.
-  Survives label permutation and leave-one-month-out testing.</blockquote>
+  <p>I bought some, I sold some, and I didn't really know what I was doing. It
+  properly started for me in <b>2019</b>, just before COVID — that's when I became
+  the bitcoin guy, the one people asked about it. From 2019 to 2021 we saw an
+  enormous rise, and I was right about it.</p>
 
-  <p>That is the entire edge. Not a philosophy, not a read on where bitcoin is
-  going — one specific, repeatable situation that resolves in my favour more often
-  than chance, and which I can describe precisely enough that a computer spots it
-  without me.</p>
-
-  <div class="stat three">
-    <div><div class="k">how often it fires</div>
-      <div class="v">~1.5 times a week</div></div>
-    <div><div class="k">how long it's held</div>
-      <div class="v">about 21 hours</div></div>
-    <div><div class="k">risked vs targeted</div>
-      <div class="v">2.83% against 2.83%</div></div>
-  </div>
-
-  <p>Everything else on this site is either the machinery that finds situations
-  like that, or the record of the ones that turned out not to be real.</p>
+  <p>Being right about the rise is the easy half, and nobody tells you that until
+  afterwards.</p>
 </section>
 
 <section>
-  <div class="lbl">what didn't work</div>
-  <h2>Anyone can show you a winner. The useful question is what happened to
-  everything else.</h2>
+  <div class="lbl">and then the part I don't skip</div>
+  <h2>The fall came, I made a lot of mistakes, and almost all of it went.</h2>
 
-  <p><b>A 75,000-combination search returned nothing.</b> Every arrangement of
-  RSI, moving averages, MACD, Bollinger bands, TD Sequential, chart patterns and
-  higher-timeframe trend, across three timeframes and a full matrix of stop and
-  target geometries, each one filtered through split-half testing and out-of-sample
-  confirmation. Nothing survived that wasn't already known. That result is
-  published here rather than quietly dropped.</p>
+  <p><b>More than fifty bitcoin.</b> I'm not going to dress that up as a market
+  event or bad luck or a lesson the universe had in store for me. The market did
+  what markets do. The mistakes were mine, they were avoidable, and I made them
+  because I was naive and because I was in a hurry.</p>
 
-  <p><b>The positioning research failed too, in August 2026.</b> The reasoning was
-  sound: everything above is a rearrangement of the same price candles, so a search
-  over them can only recombine what price already said. The funding rate — what
-  the crowd pays to hold its position — is genuinely different data, and seven
-  years of it exists. It was wired in and tested properly. No funding condition
-  beat its baseline once corrected for the number of conditions tested, and the one
-  near-miss pointed at the <em>opposite</em> side of the market from the edge above.</p>
-
-  <p><b>A related idea turned out to be untestable at all.</b> Open interest — how
-  much money is committed to the market — is retained by exchanges for only about
-  thirty days. That is roughly 180 bars, far too few to conclude anything from. It
-  is now being collected daily, so the question becomes answerable in about a year
-  and a half. It is not answerable today, and saying so is cheaper than pretending
-  otherwise.</p>
-
-  <p><b>And the most intuitive idea in trading is backwards.</b> The belief that a
-  crowded market can be faded — everyone is buying, so sell — predicted <em>nothing</em>
-  (p=0.91). What the data shows instead is that by the time a crowd visibly gets
-  punished, the move has already happened. Being contrarian at the top works. Being
-  contrarian after the crash is just being late.</p>
+  <p>That's the whole reason any of this exists. Not the winning — the losing. I
+  don't think you build a system like this off the back of a good year. You build
+  it after a bad one, because a bad one is the only thing that makes you
+  suspicious enough of yourself to bother.</p>
 </section>
 
 <section>
-  <div class="lbl">the real constraint</div>
-  <h2>The bottleneck isn't cleverness. It's arithmetic.</h2>
+  <div class="lbl">what it actually taught me</div>
+  <h2>Most of the time the answer isn't a trade. It's not taking one.</h2>
 
-  <p><b>Frequency.</b> A setup that fires 1.5 times a week offers about 78 chances a
-  year. That is not many opportunities to compound, no matter how good each one is.
-  Most of the research effort goes into finding <em>more valid signals</em>, not
-  better ones.</p>
+  <p>The way it works now: the computer spots something. It hands me a signal and
+  I take it or I leave it. It writes down what I did, and later we both go back
+  and check — so I can improve what it looks for, and it can show me where I was
+  wrong about myself.</p>
 
-  <p><b>Capital.</b> The part people skip. The same edge on a small account and on a
-  large one is the identical system and a completely different life. At a working
-  size, one or two good trades a week is a living. At a small size the same trades
-  are rounding errors — and the temptation to trade more to compensate is the single
-  most expensive mistake available, because fees are charged per trade whether or not
-  the trade should have been taken.</p>
+  <p><b>There's no large language model in any of this</b>, and there doesn't need
+  to be. I'm the one who has to get better. The system's job is to make that
+  measurable, not to do it for me.</p>
 
-  <p><b>Discipline, measured.</b> Across 520 closed trades, the ones that matched the
-  system's criteria were profitable and the ones taken against its explicit warnings
-  were not. The gap between those two groups is larger than any indicator I have ever
-  found. That is not a motivational point, it is the largest measured effect in the
-  entire dataset.</p>
+  <p>And the thing it can't ever do for me is tell me when there is no edge. A
+  computer will always find you something; that's what they're for. Knowing when
+  the honest answer is <em>nothing today</em> takes discernment and it takes
+  history, and both of those are mine to carry.</p>
 </section>
 
 <section>
-  <div class="lbl">why this isn't special</div>
-  <h2>A small edge, repeated, with enough behind it. That's the whole mechanism.</h2>
+  <div class="lbl">where</div>
+  <h2>West to east — and it was arithmetic, not wanderlust.</h2>
 
-  <p>There is no secret and there is no prediction. A strategy that wins slightly
-  more than it loses, executed identically every time, on an account large enough for
-  the result to matter. No insight into where the market is going, no signal nobody
-  else has, nothing that stops working if I describe it out loud.</p>
+  <p>I left Ireland and went to the US first, New York and Arizona, and thought
+  for a while I'd live there. With everything going on I decided to look globally
+  instead: Germany, France, and eventually Southeast Asia, where I am now.</p>
 
-  <p>The hard parts aren't intellectual. They are: proving an edge is real rather
-  than a pattern found by looking too hard; taking every valid signal and no invalid
-  ones for months at a time; and surviving the losing streaks a 68% win rate
-  guarantees. <b>The research is the easy half.</b></p>
+  <p><b>The reason is boring and it's the entire point.</b> Every target on the
+  next page is a multiple of what I spend, not a fixed sum. Cut the spend and the
+  pile you need shrinks with it. The same freedom that costs a fortune in New York
+  is affordable here, and moving was the cheapest way I know to buy years.</p>
 </section>
 
 <section>
-  <div class="lbl">what would prove me wrong</div>
-  <h2>A claim you can't kill isn't worth much.</h2>
+  <div class="lbl">the goal</div>
+  <h2>Fifty back. A hundred and fifty is the north star.</h2>
 
-  <p>The edge should be considered dead if its win rate falls to the random baseline
-  over the next fifty occurrences, or if it comes out positive in one half of a future
-  sample and negative in the other. Both are checked continuously, and both appear
-  here whichever way they land.</p>
+  <p>Getting back to <b>50 BTC</b> is the real goal — that's the hole, and filling
+  it is what I'm actually doing. <b>150 BTC</b> is the north star, and I hold it
+  loosely: it's a direction, not a plan.</p>
 
-  <p>The honest current status: <b>validated but under-deployed.</b> Correct, rare,
-  and not yet running on enough capital to be a living. That is the actual problem
-  being worked on, and stating it plainly is the point of this page.</p>
+  <p>There are two phases and they ask for different people. <b>Phase one</b> uses
+  bitcoin's asymmetry to accumulate — a large upside against a downside I've
+  chosen and sized in advance. <b>Phase two</b> is de-risking out of it into
+  everything else, which is what the allocation on
+  <a href="/philosophy">the next page</a> is for.</p>
 
-  <p class="small">Every figure above comes from the trade ledger or a research run,
-  and can be traced on <a href="/evidence">the evidence page</a>, which includes the
-  experiments that failed. There is nothing to buy here and nothing to sign up for.</p>
+  <p>I'm not trying to be a billionaire. I want to be able to afford my life,
+  wherever I decide to live it, without having to ask anyone. That's the ceiling
+  on the ambition and I'm comfortable with it.</p>
+</section>
+
+<section>
+  <div class="lbl">is any of this real</div>
+  <h2>One idea survived testing. Everything else died, and the corpses are
+  published.</h2>
+
+  <p>I'm not restating the statistics here, because numbers typed into a page go
+  stale and the page keeps saying them anyway. Twelve ideas were tested properly.
+  One survived. The rest — including a search over tens of thousands of
+  combinations that returned nothing at all, and a funding-rate study that failed
+  in August 2026 — are written up next to it, whichever way they landed.</p>
+
+  <p><a href="/evidence">The evidence page</a> recomputes all of it from the
+  ledger and the research runs. <b>If it disagrees with anything I've said here,
+  believe it and not me.</b></p>
+
+  <p class="small">Slow and steady wins the race isn't a slogan I picked because
+  it sounds humble. It's the only thing that has ever worked for me, and I have an
+  expensive counter-example to prove it. I'm writing up the longer version of how
+  this was actually done — the mistakes in detail, not the highlights — and it
+  isn't ready yet. <b>There's nothing to buy here and nothing to sign up for.</b></p>
 </section>
 """
 
