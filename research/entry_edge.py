@@ -73,8 +73,16 @@ def load_trades():
     return out
 
 
-def replay(bars, ts_index, trades, stop_pct: float, target_pct: float) -> dict:
-    """Every entry walked forward to a barrier. Returns win rate + holds."""
+def replay(bars, ts_index, trades, stop_pct: float, target_pct: float,
+           max_hours: int = MAX_HOURS) -> dict:
+    """Every entry walked forward to a barrier. Returns win rate + holds.
+
+    `max_hours` is the walk-away horizon: an entry that touches neither barrier
+    within it counts as unresolved, not as a win or a loss. It defaults to the
+    module constant so existing callers are unchanged; entry_geometry.py varies
+    it, because hold time is part of a geometry and a 1% stop resolves on a very
+    different clock from a 5% one.
+    """
     wins = losses = skipped = 0
     holds = []
     for ts, d, entry, _tag in trades:
@@ -87,7 +95,7 @@ def replay(bars, ts_index, trades, stop_pct: float, target_pct: float) -> dict:
             tp, sl = entry * (1 + target_pct / 100), entry * (1 - stop_pct / 100)
         else:
             tp, sl = entry * (1 - target_pct / 100), entry * (1 + stop_pct / 100)
-        end = min(i + MAX_HOURS, len(bars))
+        end = min(i + max_hours, len(bars))
         for j in range(i, end):
             _, hi, lo, _c = bars[j]
             hit_sl = lo <= sl if long_ else hi >= sl

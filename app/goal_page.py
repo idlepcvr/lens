@@ -175,6 +175,13 @@ BODY = r"""
           </div>
           <div class="calc-tip" id="measured-note" style="margin-top:5px">—</div>
           <div class="calc-tip" id="validated-note" style="margin-top:4px">—</div>
+          <label style="display:block;font-size:11px;color:var(--t2);margin-top:8px">Your entries @ geometry</label>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+            <select id="geo-pick" style="flex:1;min-width:0;background:var(--s2);border:1px solid var(--b2);color:var(--t1);padding:4px 6px;border-radius:5px;font-family:var(--mono);font-size:10.5px"><option>—</option></select>
+            <button type="button" class="btn" id="geo-btn" disabled
+              title="your real entries replayed at a geometry you have not traded">Use</button>
+          </div>
+          <div class="calc-tip" id="geo-note" style="margin-top:4px">—</div>
         </div>
         <div class="fsec"><div class="fsec-lbl">Risk</div>
           <div class="frow"><label>Max drawdown</label><input type="text" inputmode="decimal" name="max_drawdown_allowed"></div>
@@ -487,7 +494,7 @@ RESET.addEventListener("click",async()=>{ populate(await fetch("/api/config"+BQ)
   });
   recompute();
   // auto-fills read the populated form, so they run strictly after populate()
-  loadLadder(); loadMeasured(); loadValidated(); refreshVol();
+  loadLadder(); loadMeasured(); loadValidated(); loadGeometry(); refreshVol();
 })();
 
 // ── ATR noise floor + live-price auto-fill (same behaviour as /dashboard) ────
@@ -706,6 +713,53 @@ document.getElementById("validated-btn").addEventListener("click",()=>{
     const el=document.getElementById("src-"+k);
     if(el){ el.textContent="validated"; el.className="msrc measured"; }});
   window.GOAL_SRC="validated"; recompute();
+});
+// ── "Use geometry": the same entries, re-measured at barriers he has not run.
+// measured() and validated() each report ONE geometry's win rate; neither can
+// say what a 1% stop would have done, because a win rate is a property of the
+// (trader, geometry) pair. This loads a swept cell — and shows the chance count
+// beside the candidate count, because a grid always returns something.
+let GEO=null;
+async function loadGeometry(){
+  try{ GEO=await fetch("/api/goal/geometry").then(r=>r.json()); }catch(e){ return; }
+  const sel=document.getElementById("geo-pick"), btn=document.getElementById("geo-btn"),
+        note=document.getElementById("geo-note");
+  if(!sel||!btn||!note) return;
+  const cells=(GEO&&GEO.cells)||[];
+  if(!cells.length){
+    note.textContent="no candidate cells — run research/entry_geometry.py";
+    sel.innerHTML="<option>—</option>"; btn.disabled=true; return;
+  }
+  sel.innerHTML=cells.map((c,i)=>
+    `<option value="${i}">${c.group} · ${c.stop_pct}/${c.target_pct} · R ${c.rr} · `
+    +`${c.hold_h}h · WR ${(c.win_rate*100).toFixed(1)}% · net ${c.net_pct>0?"+":""}`
+    +`${c.net_pct.toFixed(3)}%</option>`).join("");
+  btn.disabled=false;
+  const paint=()=>{
+    const c=cells[Number(sel.value)||0]; if(!c) return;
+    note.innerHTML=`n=${c.n} · WR <b>${(c.win_rate*100).toFixed(1)}%</b> vs breakeven `
+      +`${(c.breakeven_wr*100).toFixed(1)}% (${c.edge_pp>0?"+":""}${c.edge_pp}pp) · `
+      +`coin-flip at these barriers ${(c.random_wr*100).toFixed(1)}% · z ${c.z} · `
+      +`${c.both_halves?"holds in both halves":"<span style='color:var(--amber)'>fails split-half</span>"}`
+      +` · fires ${c.trades_per_week}/wk`
+      +`<br><span style="color:var(--amber)">⚠ ${GEO.candidates} candidates from `
+      +`${GEO.cells_tried} cells tried — a null grid returns ~${GEO.expected_by_chance}. `
+      +`Uncorrected; Bonferroni here is p&lt;${GEO.bonferroni_p}. Candidate, not finding.</span>`;
+  };
+  sel.addEventListener("change",paint); paint();
+}
+document.getElementById("geo-btn").addEventListener("click",()=>{
+  const sel=document.getElementById("geo-pick");
+  const c=((GEO&&GEO.cells)||[])[Number(sel.value)||0];
+  if(!c) return;
+  FORM.elements.win_rate.value=c.win_rate;
+  FORM.elements.rr_ratio.value=c.rr;
+  FORM.elements.trades_per_week.value=c.trades_per_week;
+  FORM.elements.min_underlying_stop_pct.value=(c.stop_pct/100).toFixed(6);
+  ["win_rate","rr_ratio","trades_per_week"].forEach(k=>{
+    const el=document.getElementById("src-"+k);
+    if(el){ el.textContent="geometry"; el.className="msrc measured"; }});
+  window.GOAL_SRC="geometry"; recompute();
 });
 document.getElementById("measured-btn").addEventListener("click",()=>{
   if(!MEAS||!MEAS.enough) return;

@@ -1262,6 +1262,14 @@ def api_goal_validated():
     return plan.validated()
 
 
+@app.get("/api/goal/geometry")
+def api_goal_geometry():
+    """Your entries replayed across a (stop × R:R × hold) grid — the win rate at
+    geometries you have never traded. research/entry_geometry.py generates it."""
+    from . import plan
+    return plan.geometry()
+
+
 @app.get("/api/goal/hero")
 def api_goal_hero():
     """C6 — stage, next rung, progress, the C3 status word, and coverage."""

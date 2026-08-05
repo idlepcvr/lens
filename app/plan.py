@@ -426,3 +426,37 @@ def validated() -> dict:
         "enough": b["n"] >= MEASURED_MIN_N,
         "min_n": MEASURED_MIN_N,
     }
+
+
+def geometry(limit: int = 12) -> dict:
+    """Your entries re-measured at geometries you have not traded.
+
+    `measured()` and `validated()` both report a win rate at ONE geometry — the
+    book's blended one, and the surviving cell's. Neither can answer "what would
+    my win rate be at a 1% stop", because a win rate belongs to a (trader,
+    geometry) pair, not to the trader. research/entry_geometry.py sweeps the
+    grid; this serves the ranked cells so /hedge-goal can load one on evidence
+    instead of a typed guess.
+
+    `expected_by_chance` travels with them deliberately. The grid is a search,
+    so it always returns SOMETHING; the count of candidates is meaningless
+    unless read against how many a null grid hands back. The UI shows both.
+    """
+    import json
+    from .paths import RESULTS
+    try:
+        with open(RESULTS / "entry_geometry.json") as fh:
+            d = json.load(fh)
+    except Exception:
+        return {"cells": [], "candidates": 0}
+
+    cells = [c for c in d.get("cells", []) if c.get("candidate")][:limit]
+    return {
+        "generated": d.get("generated"),
+        "cells_tried": d.get("cells_tried"),
+        "candidates": d.get("candidates", 0),
+        "expected_by_chance": d.get("expected_by_chance"),
+        "bonferroni_p": d.get("bonferroni_p"),
+        "friction_pct": d.get("friction_pct"),
+        "cells": cells,
+    }
