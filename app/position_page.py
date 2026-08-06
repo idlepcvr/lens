@@ -214,7 +214,13 @@ function render(g, p, pl, bal, btcE){
       ['Trade volatility σ', g.trade_volatility.toFixed(4)+'%', ''],
     ]);
   $('out').innerHTML='<div class="grid">'+out+'</div>';
-  LAST={book:'hedge',direction:dir,entry:e,size:p.current_trade_size_btc,leverage:lev};
+  // Carry the PLAN, not just the ticket. Logging used to send entry/size/
+  // leverage only, so trades.tp and trades.sl were NULL on every row ever
+  // written — which meant a review could never ask "did it reach the target you
+  // set", only "did it make money". The levels are already computed right here
+  // for display; they just were not being kept.
+  LAST={book:'hedge',direction:dir,entry:e,size:p.current_trade_size_btc,leverage:lev,
+        tp:(dir==='long'?tpL:tpS), sl:(dir==='long'?slL:slS)};
   $('logbar').style.display='flex'; $('logmsg').textContent='';
 }
 
@@ -311,7 +317,11 @@ function renderProp(t, o){
   $('out').innerHTML='<div class="grid">'+out+'</div>';
   // log the ticket you'd actually place — the override when there is one
   const k = o || t;
-  LAST={book:'prop',direction:dir,entry:k.entry,size:k.size_btc,leverage:k.leverage};
+  // levels() already resolves the override's own stop/target, so `k` carries the
+  // plan actually being placed rather than the strategy default it replaced
+  const kl = levels(k);
+  LAST={book:'prop',direction:dir,entry:k.entry,size:k.size_btc,leverage:k.leverage,
+        tp:(dir==='long'?kl.tpL:kl.tpS), sl:(dir==='long'?kl.slL:kl.slS)};
   $('logbar').style.display='flex';
   $('logmsg').textContent = o ? 'logs the OVERRIDE ticket ('+pc(o.stop_pct)+' stop)' : '';
 }
@@ -322,7 +332,11 @@ async function logTrade(){
   try{
     const r=await fetch('/api/trades',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({symbol:'BTC/USD',direction:LAST.direction,entry:LAST.entry,
-        size:Number(LAST.size.toFixed(6)),leverage:LAST.leverage,book:LAST.book})});
+        size:Number(LAST.size.toFixed(6)),leverage:LAST.leverage,book:LAST.book,
+        // the plan as it stood at entry, overrides included — this is what the
+        // review later compares reality against
+        tp:LAST.tp!=null?Number(LAST.tp.toFixed(2)):null,
+        sl:LAST.sl!=null?Number(LAST.sl.toFixed(2)):null})});
     if(!r.ok){ throw new Error((await r.json()).detail||'log failed'); }
     const t=await r.json();
     $('logmsg').innerHTML='✓ logged open '+LAST.direction+' #'+t.id+' · <a href="/hedge-journal?trade='+t.id+'" style="color:var(--accent)">journal</a>';

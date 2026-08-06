@@ -119,7 +119,7 @@ def _load_trades(book: str = None):
                market_type, order_type, fill_count,
                grade, conviction, emotion, mistakes, went_right, went_wrong, lesson,
                book, venue, symbol, manually_edited
-        FROM trades WHERE closed_at IS NOT NULL {bsql} ORDER BY opened_at
+        FROM trades WHERE (closed_at IS NOT NULL OR exit IS NULL) {bsql} ORDER BY opened_at
     """, list(bparams))
     rows = cur.fetchall()
     conn.close()
@@ -152,7 +152,7 @@ def get_enriched_trades(book: str = None) -> list:
          book, venue, symbol, manually_edited) = row
 
         ts_e = _parse_ms(opened_at)
-        ts_x = _parse_ms(closed_at)
+        ts_x = _parse_ms(closed_at) if closed_at else None
         i1   = _bar_idx(ts1h, ts_e)
         i4   = _bar_idx(ts4h, ts_e)
 
@@ -188,7 +188,10 @@ def get_enriched_trades(book: str = None) -> list:
             "size":           size,
             "leverage":       leverage,
             "opened_at":      opened_at[:19].replace("T", " "),
-            "closed_at":      closed_at[:19].replace("T", " "),
+            # open positions have no close — they belong in the log so the plan
+            # can be recorded BEFORE the outcome exists
+            "closed_at":      closed_at[:19].replace("T", " ") if closed_at else "",
+            "is_open":        closed_at is None,
             "notes":          notes or "",
             "balance_after":  bal_after,
             "balance_before": bal_before,
@@ -199,7 +202,7 @@ def get_enriched_trades(book: str = None) -> list:
             "symbol":         symbol or "BTC/USD",
             "setup_tag":      setup_tag or "",
             "ts_entry":       ts_e // 1000,
-            "ts_exit":        ts_x // 1000,
+            "ts_exit":        (ts_x // 1000) if ts_x else None,
             "bar_dir":        bar_dir,
             "bar_aligned":    bar_aligned,
             "rsi":            round(rsi_val, 1) if rsi_val else None,

@@ -154,6 +154,7 @@ const SETUPS=["S1","S2","S3","S4","S5","NONE"];
 let TRADES=[], CANDLES=[], VISIBLE=[], SEL=null;
 const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
+let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>v==null?'—':(v<0?'-':'+')+'€'+Math.abs(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=(v)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:0});
@@ -173,7 +174,19 @@ async function loadOpenPositions(){
   // readable API, so its open position is the logged fill on /prop-ledger.
   if(BOOK==='prop'){ el.innerHTML='<div class="sub" style="font-size:11px;color:var(--dim)">Open prop positions live on <a href="/prop-ledger" class="ac">/prop-ledger</a> — the eval account has no readable API.</div>'; return; }
   try{
-    const [d,lvl]=await Promise.all([fetch('/api/positions/live').then(r=>r.json()), goalLevels()]);
+    // Open trades logged from /position carry their own tp/sl. Key them by entry
+    // so a live Kraken position can be matched to the plan recorded for it.
+    const [d,lvl,logged]=await Promise.all([
+      fetch('/api/positions/live').then(r=>r.json()),
+      goalLevels(),
+      fetch('/api/review/trades?book='+BOOK).then(r=>r.json()).catch(()=>[])]);
+    // Match on direction + recency, not exact entry: Kraken reports an average
+    // fill price that rarely equals the entry you logged, so keying on price
+    // silently never matches. Most recent open trade per side wins.
+    LOGGED_PLANS={};
+    (logged||[]).filter(t=>t.is_open&&t.tp!=null&&t.sl!=null)
+      .sort((a,b)=>(a.ts_entry||0)-(b.ts_entry||0))
+      .forEach(t=>{ LOGGED_PLANS[t.direction]={tp:t.tp,sl:t.sl,id:t.id,entry:t.entry}; });
     const ps=d.positions||[];
     if(!ps.length){ el.innerHTML=''; return; }
     const usd=(v,d=2)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:d});
@@ -184,11 +197,27 @@ async function loadOpenPositions(){
     const cards=ps.map(p=>{
       const isL=p.direction==='long', up=p.upnl_usd||0;
       let plan='';
-      if(lvl){
+      // Prefer THIS trade's own recorded plan over the config default. The plan
+      // differs trade to trade — overrides on /position, a stop moved by hand —
+      // and a card that always shows the config is describing a trade you may
+      // not have taken. Falls back to the Goal levels only when nothing is
+      // stored, and says which of the two it is showing.
+      const own = LOGGED_PLANS[p.direction] || null;
+      if(own && own.tp!=null && own.sl!=null){
+        const tp=own.tp, sl=own.sl;
+        const upP=Math.abs(tp-p.entry)/p.entry, dnP=Math.abs(p.entry-sl)/p.entry;
+        const win=(p.cost_usd||0)*upP, loss=(p.cost_usd||0)*dnP;
+        plan=`<div class="opsec">Plan — this trade</div>`
+          +row('Take profit',`${usd(tp,1)} <small>+${(upP*100).toFixed(2)}%</small>`,'g')
+          +row('Stop loss',`${usd(sl,1)} <small>-${(dnP*100).toFixed(2)}%</small>`,'r')
+          +row('Expected win',`${sUsd(win)} <small>${pc(upP*100)}</small>`,'g')
+          +row('Expected loss',`${sUsd(-loss)} <small>${pc(-dnP*100)}</small>`,'r')
+          +row('R:R',(upP/dnP).toFixed(2),'dim');
+      } else if(lvl){
         const tp=isL?p.entry*(1+lvl.tp):p.entry*(1-lvl.tp);
         const sl=isL?p.entry*(1-lvl.sl):p.entry*(1+lvl.sl);
         const win=(p.cost_usd||0)*lvl.tp, loss=(p.cost_usd||0)*lvl.sl;
-        plan=`<div class="opsec">Plan — from Goal</div>`
+        plan=`<div class="opsec">Plan — from Goal <small style="color:var(--dim)">(no per-trade plan logged)</small></div>`
           +row('Take profit',`${usd(tp,1)} <small>+${(lvl.tp*100).toFixed(1)}%</small>`,'g')
           +row('Stop loss',`${usd(sl,1)} <small>-${(lvl.sl*100).toFixed(1)}%</small>`,'r')
           +row('Expected win',`${sUsd(win)} <small>${pc(lvl.tp*100)}</small>`,'g')
