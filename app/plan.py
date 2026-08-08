@@ -151,31 +151,81 @@ def _age_days(iso_date: str) -> int:
 # ─── Derived milestone dates ─────────────────────────────────────────────────
 
 def milestone_dates(plan: dict, current_btc: float | None, today: date = None) -> list[dict]:
-    """Constant-CAGR interpolation (current_btc, today) → (goal_btc, goal_date).
+    """Constant-CAGR interpolation, but between the nearest FIXED points rather
+    than always spanning (today -> goal_date).
 
-    Rung m lands at fraction ln(m/cur) / ln(goal/cur) of the remaining window.
-    Returns each rung with `done` and a derived `date` (None when underivable:
-    no snapshot, stack ≥ goal, or the goal date is already past).
+    A rung may carry `"by": "YYYY-MM-DD"` — a date you chose. Those are anchors,
+    not suggestions, and are never recomputed. Every other rung is derived by
+    log-interpolating between the anchors that bracket it: (today, stack) on the
+    left, the next pinned rung or (goal_date, goal_btc) on the right.
+
+    The bracketing is the whole point. Spreading every rung across the full
+    2.5-year window is what pushed the NEXT rung months out and made the ladder
+    useless as a daily target. Pin one near rung and the ones under it compress
+    to fit, instead of the pin being averaged away.
+
+    Returns each rung with `done`, `date`, `pinned`. `date` is None when
+    underivable: no snapshot, rung above the goal, or no bracketing anchors.
     """
     today = today or date.today()
-    out = []
     goal_btc = plan["goal_btc"]
-    try:
-        days_left = (date.fromisoformat(plan["goal_date"]) - today).days
-    except Exception:
-        days_left = None
-    derivable = (current_btc is not None and current_btc > 0
-                 and current_btc < goal_btc and days_left and days_left > 0)
-    span = math.log(goal_btc / current_btc) if derivable else None
+    ms = plan["milestones"]
 
-    for m in plan["milestones"]:
+    def _pin(m):
+        try:
+            return date.fromisoformat(m["by"]) if m.get("by") else None
+        except (ValueError, TypeError):
+            return None
+
+    # Left anchor is where you actually are; right anchor is the goal. Any rung
+    # you pinned a date on becomes an anchor in between.
+    usable = current_btc is not None and current_btc > 0
+    anchors: list[tuple[float, date]] = []
+    if usable:
+        anchors.append((current_btc, today))
+    for m in ms:
+        p = _pin(m)
+        if p and m["btc"] > (current_btc or 0):
+            anchors.append((m["btc"], p))
+    try:
+        anchors.append((goal_btc, date.fromisoformat(plan["goal_date"])))
+    except (ValueError, TypeError):
+        pass
+    # Sorting by BTC keeps bracketing well-defined; a pin that contradicts the
+    # ordering (an earlier date on a higher rung) degrades to "no date" rather
+    # than silently inverting the curve.
+    anchors.sort(key=lambda a: a[0])
+
+    def _derive(btc: float):
+        lo = hi = None
+        for a in anchors:
+            if a[0] <= btc:
+                lo = a
+            elif hi is None:
+                hi = a
+        # A rung sitting exactly ON an anchor (the goal itself, or a pinned
+        # rung's own value) takes that anchor's date — there is nothing to
+        # interpolate, and falling through would drop the top rung's date.
+        if lo and lo[0] == btc:
+            return lo[1].isoformat()
+        if not lo or not hi or hi[0] <= lo[0] or hi[1] <= lo[1]:
+            return None
+        frac = math.log(btc / lo[0]) / math.log(hi[0] / lo[0])
+        return date.fromordinal(
+            lo[1].toordinal() + round(frac * (hi[1] - lo[1]).days)).isoformat()
+
+    out = []
+    for m in ms:
         btc = m["btc"]
         done = current_btc is not None and current_btc >= btc
-        d = None
-        if derivable and not done and btc <= goal_btc:
-            frac = math.log(btc / current_btc) / span
-            d = date.fromordinal(today.toordinal() + round(frac * days_left)).isoformat()
-        out.append({**m, "done": done, "date": d})
+        pin = _pin(m)
+        if pin:
+            d = pin.isoformat()
+        elif done or not usable or btc > goal_btc:
+            d = None
+        else:
+            d = _derive(btc)
+        out.append({**m, "done": done, "date": d, "pinned": bool(pin)})
     return out
 
 

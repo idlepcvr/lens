@@ -76,3 +76,47 @@ def test_measured():
 if __name__ == "__main__":
     test_seed_and_amend(); test_milestone_dates(); test_measured()
     print("ok — plan ladder, derived dates, measured params")
+
+
+def test_pinned_dates_anchor_the_ladder():
+    """A pinned rung is never recomputed, and the rungs under it compress to
+    fit rather than being stretched across the whole goal window."""
+    from datetime import date
+    p = {
+        "goal_btc": 1.0, "goal_date": "2028-12-31",
+        "milestones": [
+            {"btc": 0.005, "label": "Half step"},
+            {"btc": 0.01, "label": "One percent", "by": "2026-08-31"},
+            {"btc": 0.1, "label": "Seed"},
+            {"btc": 1.0, "label": "Goal"},
+        ],
+    }
+    today = date(2026, 8, 9)
+    out = plan.milestone_dates(p, 0.0033, today=today)
+    by_label = {m["label"]: m for m in out}
+
+    # the pin is honoured verbatim
+    assert by_label["One percent"]["date"] == "2026-08-31"
+    assert by_label["One percent"]["pinned"] is True
+
+    # the rung BELOW the pin lands before it, not months later
+    half = by_label["Half step"]
+    assert half["pinned"] is False
+    assert today.isoformat() < half["date"] < "2026-08-31", half["date"]
+
+    # a rung ABOVE the pin still runs out to the goal
+    assert by_label["Seed"]["date"] > "2026-08-31"
+    # the top rung lands exactly on the goal date
+    assert by_label["Goal"]["date"] == "2028-12-31"
+
+
+def test_unpinned_ladder_is_unchanged_by_the_pin_feature():
+    """No pins anywhere = the original constant-CAGR curve, so existing plans
+    keep their dates."""
+    from datetime import date
+    p = {"goal_btc": 1.0, "goal_date": "2027-08-09",
+         "milestones": [{"btc": 0.1, "label": "a"}, {"btc": 1.0, "label": "b"}]}
+    out = plan.milestone_dates(p, 0.01, today=date(2026, 8, 9))
+    # 0.1 is the geometric midpoint of 0.01 -> 1.0, so it lands mid-window
+    assert out[0]["date"] == "2027-02-07", out[0]["date"]
+    assert out[1]["date"] == "2027-08-09"
