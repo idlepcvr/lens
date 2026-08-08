@@ -68,6 +68,7 @@ NAV_HEDGE = [
     ("/hedge-desk", "Desk"),
     ("/hedge-plan", "Plan"),
     ("/hedge-goal", "Goal"),
+    ("/hedge-track", "Track"),
     ("/hedge-position", "Position"),
     ("/hedge-calendar", "Calendar"),
     ("/hedge-journal", "Journal"),

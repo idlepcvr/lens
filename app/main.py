@@ -950,6 +950,18 @@ def goal_page():
     return render()
 
 
+@app.get("/hedge-track", response_class=HTMLResponse)
+def track_page():
+    from .track_page import render
+    return render()
+
+
+@app.get("/api/track")
+def api_track(days: int = 30):
+    from .track import track
+    return track(days=max(7, min(days, 120)))
+
+
 @app.get("/api/research/{name}.json")
 def api_research_json(name: str):
     """Raw results/<name>.json — the evidence file behind a /research card."""
