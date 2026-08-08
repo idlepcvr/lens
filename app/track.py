@@ -249,6 +249,19 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
         row["date"] = d
         scored.append(row)
 
+    # Real account equity, straight from the daily snapshots. The cone projects
+    # cumulative P&L (deposits and withdrawals never touch it, which is why it is
+    # the axis to PROJECT in) — but the number you actually recognise is the
+    # balance, so the page can show it and the band is transformed to match.
+    balances = []
+    try:
+        from .cone import _balances
+        cutoff = (today - timedelta(days=400)).isoformat()
+        balances = [{"t": _ts(d), "v": round(v, 2)}
+                    for d, v in _balances() if d >= cutoff and v is not None]
+    except Exception:
+        balances = []
+
     nxt = H.get("next") or {}
     days_left = None
     if nxt.get("date"):
@@ -281,5 +294,6 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
         },
         "cone": C,
         "actual": actual,
+        "balances": balances,
         "status": C.get("status") or H.get("status"),
     }

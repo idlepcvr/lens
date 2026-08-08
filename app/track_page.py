@@ -59,6 +59,15 @@ def _eur_of(btc, px) -> str:
     return "—" if (btc is None or not px) else _eur(btc * px)
 
 
+def _to_bal(v, cone: dict):
+    """Cumulative-P&L value -> account equity, shifted by the balance the cone was
+    anchored on. The projection is grown in P&L so deposits and withdrawals can't
+    move it; this puts it back in the units you actually recognise."""
+    if v is None:
+        return None
+    return (cone.get("base_balance") or 0) + (v - (cone.get("anchor_cum") or 0))
+
+
 def _date_label(iso: str, year: bool = False) -> str:
     """`year=True` for the ladder, which spans three calendar years — "9 Dec"
     alone is genuinely ambiguous there. The fan sits inside one horizon."""
@@ -160,8 +169,7 @@ def _editor(ms: list[dict], px) -> str:
             '<td><button type="button" class="tk-x" title="remove rung">×</button></td>'
             '</tr>')
     return f"""
-<details class="tk-editor">
-  <summary>Edit rungs</summary>
+<div class="tk-editor">
   <p class="tk-sub">Type a target in ₿ (EUR follows at the rate below). Leave the
      date blank to let it be derived; set one to <b>pin</b> it — pinned dates are
      never recomputed, and the rungs beneath them compress to fit.</p>
@@ -177,7 +185,7 @@ def _editor(ms: list[dict], px) -> str:
     <button type="button" class="tk-btn prim" id="e-save">Save plan</button>
   </div>
   <p class="tk-msg" id="e-msg"></p>
-</details>"""
+</div>"""
 
 
 # ─── client ──────────────────────────────────────────────────────────────────
@@ -189,7 +197,7 @@ _JS = r"""
   var SVG="http://www.w3.org/2000/svg", W=720, H=260;
   var L=54, Rt=16, Tp=16, Bt=32, PW=W-L-Rt, PH=H-Tp-Bt;
   var svg=document.getElementById("fan"); if(!svg) return;
-  var range="rung", mode="eur";
+  var range="rung", mode="bal";
   var readEl=document.getElementById("fan-read");
 
   function eur(v,dp){ dp=dp||0;
@@ -201,10 +209,22 @@ _JS = r"""
   // account instead gives −1000%+, because the cumulative runs from the first
   // trade ever while the account is today's. A log axis is not an option here:
   // cumulative P&L goes negative, where log is undefined.
+  // Three ways to read the same projection.
+  //   bal — account equity. The cone is grown in cumulative P&L because
+  //         deposits and withdrawals must not move it, but equity is the number
+  //         you actually recognise, so shift it by the balance it was anchored
+  //         on. Both series meet at the anchor by construction, and the ruin
+  //         floor lands on a literal zero.
+  //   eur — raw cumulative realised P&L, the cone's native axis.
+  //   pct — the swing since the anchor as a share of the account.
   function conv(v){
-    return mode==="pct"
-      ? (FAN.base ? (v-(FAN.anchorCum||0))/FAN.base*100 : 0)
-      : v; }
+    if(mode==="bal") return (FAN.base||0) + (v-(FAN.anchorCum||0));
+    if(mode==="pct") return FAN.base ? (v-(FAN.anchorCum||0))/FAN.base*100 : 0;
+    return v; }
+  // the ruin floor in whatever unit is on screen
+  function floorVal(){
+    if(FAN.floor==null) return null;
+    return mode==="bal" ? 0 : (mode==="pct" ? -100 : FAN.floor); }
   function el(n,a){ var e=document.createElementNS(SVG,n);
     for(var k in a) e.setAttribute(k,a[k]); return e; }
 
@@ -230,17 +250,29 @@ _JS = r"""
     if(vis.length<2) vis=pts;
     var va=act.filter(function(a){return a.t>=x0 && a.t<=x1;});
 
+    // In balance mode the realised line is the REAL equity snapshots, not the
+    // band's transform — actual money beats a derivation, and the two agree at
+    // the anchor anyway.
+    var vb = mode==="bal"
+      ? (FAN.balances||[]).filter(function(b){return b.t>=x0 && b.t<=x1;})
+      : [];
+
     var vals=[];
     vis.forEach(function(p){ ["p10","p25","p50","p75","p90"].forEach(function(k){
       if(p[k]!=null) vals.push(conv(p[k])); }); });
-    va.forEach(function(a){ vals.push(conv(a.cum)); });
+    if(mode==="bal"){ vb.forEach(function(b){ vals.push(b.v); }); }
+    else { va.forEach(function(a){ vals.push(conv(a.cum)); }); }
+    var fv0=floorVal(); if(fv0!=null) vals.push(fv0);
     if(!vals.length) return;
     var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
     if(hi-lo<1e-9){ lo-=1; hi+=1; }
     var pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
+    // an account cannot hold less than nothing, so the balance axis stops at 0
+    if(mode==="bal") lo=Math.max(lo,0);
 
     function px(t){ return L+(t-x0)/Math.max(x1-x0,1)*PW; }
-    function py(v){ return Tp+(hi-conv(v))/(hi-lo)*PH; }
+    function pyRaw(v){ return Tp+(hi-v)/(hi-lo)*PH; }
+    function py(v){ return pyRaw(conv(v)); }
 
     function ribbon(a,b){
       var up=vis.map(function(p){return px(p.t).toFixed(1)+","+py(p[b]).toFixed(1);}).join(" ");
@@ -263,21 +295,24 @@ _JS = r"""
     // The ruin floor. A fan drawn without it looks like a spread of outcomes;
     // with it you can see how much of the spread is "account gone".
     if(FAN.floor!=null){
-      var fy=py(FAN.floor);
+      var fv=floorVal(), fy=Tp+(hi-fv)/(hi-lo)*PH;
       if(fy>=Tp-2&&fy<=Tp+PH+2){
         svg.appendChild(el("line",{x1:L,y1:fy.toFixed(1),x2:W-Rt,y2:fy.toFixed(1),class:"tk-floor"}));
         var ft=el("text",{x:W-Rt,y:(fy-5).toFixed(1),class:"tk-ax tk-ax-e tk-ax-bad"});
-        ft.textContent="account gone"; svg.appendChild(ft);
+        ft.textContent=mode==="bal"?"account gone (€0)":"account gone"; svg.appendChild(ft);
       }
     }
     svg.appendChild(el("polyline",{class:"tk-p50",
       points:vis.map(function(p){return px(p.t).toFixed(1)+","+py(p.p50).toFixed(1);}).join(" ")}));
 
-    if(va.length>1){
+    var line = mode==="bal"
+      ? vb.map(function(b){return {t:b.t, y:pyRaw(b.v)};})
+      : va.map(function(a){return {t:a.t, y:py(a.cum)};});
+    if(line.length>1){
       svg.appendChild(el("polyline",{class:"tk-act",
-        points:va.map(function(a){return px(a.t).toFixed(1)+","+py(a.cum).toFixed(1);}).join(" ")}));
-      var last=va[va.length-1];
-      svg.appendChild(el("circle",{cx:px(last.t).toFixed(1),cy:py(last.cum).toFixed(1),
+        points:line.map(function(q){return px(q.t).toFixed(1)+","+q.y.toFixed(1);}).join(" ")}));
+      var last=line[line.length-1];
+      svg.appendChild(el("circle",{cx:px(last.t).toFixed(1),cy:last.y.toFixed(1),
         r:3.8,class:"tk-act-dot"}));
     }
 
@@ -322,7 +357,11 @@ _JS = r"""
       if(!near) return;
       var s=new Date(near.t*1000).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+
         "  P10 "+fmt(conv(near.p10))+"  P50 "+fmt(conv(near.p50))+"  P90 "+fmt(conv(near.p90));
-      if(na) s+="   ·  you "+fmt(conv(na.cum));
+      if(mode==="bal"){
+        var nb=null, bmin=1e18;
+        vb.forEach(function(b){ var d=Math.abs(b.t-t); if(d<bmin){bmin=d;nb=b;} });
+        if(nb) s+="   ·  you "+eur(nb.v);
+      } else if(na) s+="   ·  you "+fmt(conv(na.cum));
       readEl.textContent=s;
     });
     hit.addEventListener("mouseleave",function(){ cross.style.display="none"; readEl.textContent=""; });
@@ -343,6 +382,16 @@ _JS = r"""
 // ── rung editor ─────────────────────────────────────────────────────────────
 (function(){
   var body=document.getElementById("e-body"); if(!body) return;
+
+  // "Edit ladder" points at a collapsed <details>; a fragment link scrolls to it
+  // but does not open it, so open it here and on any later hash change.
+  function openIfTargeted(){
+    if(location.hash!=="#edit") return;
+    var d=document.getElementById("edit");
+    if(d){ d.open=true; d.scrollIntoView({block:"start",behavior:"smooth"}); }
+  }
+  addEventListener("hashchange",openIfTargeted);
+  openIfTargeted();
   var msg=document.getElementById("e-msg");
 
   function eurCells(){
@@ -538,11 +587,11 @@ _CSS = """<style>
 .tk-pin{color:var(--accent);font-size:9px;margin-left:5px}
 
 /* editor */
-.tk-editor{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-.tk-editor>summary{cursor:pointer;font-family:var(--mono);font-size:11px;
-  color:var(--accent);list-style:none}
-.tk-editor>summary::-webkit-details-marker{display:none}
-.tk-editor>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tk-editor{margin-top:2px}
+.tk-hero-r{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none}
+.tk-edit-link{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+.tk-edit-link:hover{color:var(--accent);border-color:var(--accent)}
 .tk-etw{overflow-x:auto}
 .tk-etab{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;min-width:460px}
 .tk-etab th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;
@@ -605,6 +654,7 @@ def parts() -> dict:
     except Exception:
         ms = []
 
+    bal_now = T["balances"][-1]["v"] if T["balances"] else None
     bar_pct = 0.0 if R.get("progress_pct") is None else max(0.0, min(100.0, R["progress_pct"]))
     left = R.get("days_left")
     stale = (f'<span class="tk-stale">stack snapshot is {R.get("age_days")} d old</span>'
@@ -637,6 +687,7 @@ def parts() -> dict:
     fan_data = json.dumps({
         "points": C.get("points") or [],
         "actual": T["actual"],
+        "balances": T["balances"],
         "base": C.get("base_balance") or 0,
         "rung": {"date": R.get("date"), "label": R.get("label")},
         "anchor": C.get("anchor"),
@@ -654,7 +705,10 @@ def parts() -> dict:
         <span class="tk-eyebrow">next rung</span>
         <h1 class="tk-rung">{R.get('label') or 'No rung derivable'}</h1>
       </div>
-      <span class="tk-status s-{status}">{status}</span>
+      <div class="tk-hero-r">
+        <span class="tk-status s-{status}">{status}</span>
+        <a class="tk-edit-link" href="#edit">Edit ladder</a>
+      </div>
     </div>
 
     <div class="tk-nums">
@@ -690,8 +744,9 @@ def parts() -> dict:
         <button type="button" data-range="90">90d</button>
         <button type="button" data-range="30">30d</button>
       </span>
-      <span class="tk-seg" role="group" aria-label="Scale">
-        <button type="button" data-mode="eur" class="on">€</button>
+      <span class="tk-seg" role="group" aria-label="What to plot">
+        <button type="button" data-mode="bal" class="on">Balance €</button>
+        <button type="button" data-mode="eur">Realised P&amp;L</button>
         <button type="button" data-mode="pct">% of account</button>
       </span>
       <span class="tk-read" id="fan-read" aria-live="polite"></span>
@@ -700,10 +755,12 @@ def parts() -> dict:
       aria-label="Projection fan: simulated cumulative profit and loss from
       {C.get('anchor')} to the {R.get('label') or 'next'} rung, with the realised
       line drawn through it."></svg></div>
-    <p class="tk-sub">Realised <b>{_eur(now.get('cum'), 2)}</b> against a P25–P75 band of
-       {_eur(now.get('p25'), 2)} – {_eur(now.get('p75'), 2)} today. The shaded fan is
-       {C.get('paths') or 0} simulated paths drawn from your own closed trades — not a
-       straight line, because your equity curve isn't one.</p>
+    <p class="tk-sub">Balance <b>{_eur(bal_now, 2)}</b> today, against a P25–P75 band of
+       {_eur(_to_bal(now.get('p25'), C), 2)} – {_eur(_to_bal(now.get('p75'), C), 2)}.
+       The shaded fan is {C.get('paths') or 0} simulated paths drawn from your own closed
+       trades — not a straight line, because your equity curve isn't one. Switch to
+       <b>Realised P&amp;L</b> for the cone's native axis, where deposits and withdrawals
+       can't move the line.</p>
     {ruin}
   </section>
 
@@ -735,6 +792,11 @@ def parts() -> dict:
     <summary><span class="tk-sum-h">After that</span>
       <span class="tk-of">the rest of the ladder</span></summary>
     {_ladder_rows(ms, R, px)}
+  </details>
+
+  <details class="tk-panel tk-det" id="edit" aria-label="Edit the ladder">
+    <summary><span class="tk-sum-h">Edit the ladder</span>
+      <span class="tk-of">rungs, targets and the dates you pin</span></summary>
     {_editor(ms, px)}
   </details>
 
