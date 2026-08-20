@@ -944,6 +944,77 @@ class ConfigUpdate(BaseModel):
     btc_growth_monthly:      Optional[float] = None
 
 
+@app.get("/today", response_class=HTMLResponse)
+def today_page():
+    """The next rung, and whether the book followed the engine yesterday."""
+    from .today_page import render
+    return render()
+
+
+class ExecuteRequest(BaseModel):
+    direction: str                        # "long" | "short"
+    size_btc: float
+    confirm: bool = False                 # nothing is sent without this
+    order_type: str = "mkt"               # mkt | lmt | post
+    limit_price: Optional[float] = None
+    take_profit: Optional[float] = None
+    stop_loss: Optional[float] = None
+    mark: Optional[float] = None          # reference price when there's no limit
+    reduce_only: bool = False
+    post_only: bool = False
+    trigger_signal: str = "mark"          # mark | index | last
+    leverage: float = 10.0
+    signal_id: Optional[str] = None
+    account: str = "personal"
+
+    def ticket(self) -> dict:
+        return {"order_type": self.order_type, "limit_price": self.limit_price,
+                "take_profit": self.take_profit, "stop_loss": self.stop_loss,
+                "mark": self.mark, "reduce_only": self.reduce_only,
+                "post_only": self.post_only, "trigger_signal": self.trigger_signal,
+                "leverage": self.leverage, "signal_id": self.signal_id}
+
+
+@app.post("/api/execute/check")
+def api_execute_check(req: ExecuteRequest):
+    """Every gate evaluated plus the exact batch that would be sent. Sends nothing."""
+    from .execute import check
+    return check(req.direction, req.size_btc, **req.ticket())
+
+
+@app.post("/api/execute")
+def api_execute(req: ExecuteRequest):
+    """Place the ticket: entry, plus TP/SL as reduce-only triggers when given."""
+    from .execute import execute as do
+    return do(req.direction, req.size_btc, confirm=req.confirm,
+              account=req.account, **req.ticket())
+
+
+@app.post("/api/execute/close")
+def api_execute_close(req: ExecuteRequest):
+    """Close or trim an open position — opposite side, reduce-only, market.
+    `direction` is the direction of the POSITION, not of the order."""
+    from .execute import close
+    return close(req.direction, req.size_btc, confirm=req.confirm,
+                 account=req.account, mark=req.mark, leverage=req.leverage)
+
+
+@app.post("/api/execute/cancel-all")
+def api_execute_cancel_all(account: str = "personal"):
+    """Pull every resting order — for orphaned TP/SL legs after a manual close."""
+    from .execute import cancel_all
+    return cancel_all(account)
+
+
+@app.post("/api/signals/link")
+def api_signal_link():
+    """Backfill linked_signal_id on unlinked fills. Idempotent.
+    Sync links each fill as it lands (database._link_signal); this is the repair
+    path for rows that predate that, or that arrived while a signal was pending."""
+    from .database import backfill_signal_links
+    return {"linked": backfill_signal_links()}
+
+
 @app.get("/hedge-goal", response_class=HTMLResponse)
 def goal_page():
     from .goal_page import render

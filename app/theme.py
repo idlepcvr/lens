@@ -91,7 +91,7 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 # glossary, now a tab of /manual. /about joined 2026-08-04 — the page for a
 # reader who can judge the work, as distinct from "/" which is for someone who
 # just wants to know he's okay.
-NAV_NEUTRAL = [("/about", "About"), ("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+NAV_NEUTRAL = [("/today", "Today"), ("/about", "About"), ("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
@@ -149,6 +149,15 @@ FONT_LINKS = (
 LENS_CSS = r"""
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  /* Spacing scale. Added 2026-08-21: there wasn't one, so every page invented
+     its own gaps. Additive — nothing existing reads these, so adopting them is
+     page by page. */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r1:6px; --r2:9px; --r3:12px;
+  /* --faint measured 2.26–2.47:1 against every surface: below the 4.5 this
+     product requires of body text. It is a DECORATION token — borders, rules,
+     disabled fills — never text a user has to read. --dim (5.5–6.1:1) is the
+     quiet text colour. */
   --bg:#06080c; --bg2:#04050a;
   --panel:#0b0f16; --panel2:#10151e; --panel3:#161d28;
   --line:#192232; --line2:#28344a;
@@ -617,8 +626,8 @@ def shell(current_path: str, page_label: str, body: str, *,
         "<style>"
         "footer.navftr{max-width:1000px;margin:38px auto 0;padding:13px 14px 44px;"
         "border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:7px 15px;align-items:center}"
-        "footer.navftr .ftl{font-family:var(--mono);font-size:9px;letter-spacing:.18em;"
-        "text-transform:uppercase;color:var(--faint);margin-right:4px}"
+        "footer.navftr .ftl{font-family:var(--mono);font-size:10px;letter-spacing:.18em;"
+        "text-transform:uppercase;color:var(--dim);margin-right:4px}"
         # the SYSTEM group starts a new line so the trading pages above it read
         # as their own set — the whole point of splitting the strip in two
         "footer.navftr .ftl2{flex-basis:100%;margin-top:9px;padding-top:9px;"
