@@ -1,4 +1,6 @@
 # LENS — Build Plan v1
+
+[Open as HTML](LENS_PLAN.html)
 *Replacing PRISM v0.1 as the production trading system.*
 *Created: 2026-05-25 — Target v1 ship: 2026-07-20 (8 weeks)*
 

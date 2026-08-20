@@ -1,5 +1,7 @@
 # LENS — Brand
 
+[Open as HTML](BRAND.html)
+
 > The live version of this page renders in the app at **`/style`** (every token +
 > component straight from `lens.css`). This file is the written reference. Source
 > of truth for all values: **`app/theme.py`**.

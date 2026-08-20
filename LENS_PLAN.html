@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // LENS — Build Plan v1</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>LENS — Build Plan v1</h1>
+<p><a href="LENS_PLAN.html">Open as HTML</a> <em>Replacing PRISM v0.1 as the production trading system.</em> <em>Created: 2026-05-25 — Target v1 ship: 2026-07-20 (8 weeks)</em></p>
+<hr>
+<h2>Open items (2026-07-14)</h2>
+<ol>
+<li><strong>Run the loop.</strong> Still the real bottleneck, not code — 4 of ~500 trades carry a signal link. Take the next valid alert, let it auto-tag on sync, accumulate tagged live trades toward the v4 re-mine (~3 months needed).</li>
+<li><strong>Log a stack snapshot on <code>/goal</code></strong> (two minutes). The projection has a 0 ₿ fallback since 2026-07-11, but real rung dates need a real snapshot.</li>
+<li><strong>Retire the stale engine target</strong> — <code>lens_config</code> still carries <code>€100 → €55,000 by 2026-12-31</code>; it feeds the /edge Fit sweep and <code>compute_goal</code>, so feasibility verdicts measure against a number nobody ratified. Pick an engine-equity target or delete it. (The stack-level goal is settled: 50 BTC by 2028-12-31, <code>goal_plan</code> v1.)</li>
+<li><strong>Forward-test before any promotion</strong> (~early Aug 2026) — the three v3 search families stay shadow-registered until they hold on fresh data.</li>
+<li><strong>Next dimension:</strong> order-flow features (CVD, delta, funding, OI) — needs a data source first.</li>
+</ol>
+<hr>
+<h2>What changed (and why)</h2>
+<p>PRISM v0.1 was a proof of concept. It validated that local SQLite + FastAPI + exchange sync works, that the goal calculator math is sound, and that a single-user trading dashboard can run on a miniPC without cloud dependencies. But the architecture grew around discoveries instead of intent — alerts were bolted on then ripped out, Supabase came and went, scope kept expanding.</p>
+<p>LENS starts clean with a single intent: <strong>build the dataset that makes month-6 predictive scoring possible.</strong> Every architectural decision serves that one goal.</p>
+<p>The mechanism: every trade decision in LENS originates from a Pine Script strategy that emits structured features. Every signal — taken or skipped — is stored as a row with the full feature schema. Every taken signal links to an executed trade via exchange sync, which attaches outcome data. After ~150–300 trades, the dataset (features → outcome) is ready to train predictive models on. Until then, per-strategy expectancy on real fills is the edge-discovery feedback loop.</p>
+<hr>
+<h2>Scope</h2>
+<h3>In v1</h3>
+<ul>
+<li>Local SQLite (port schema from v0.1)</li>
+<li>Kraken + Bybit sync (port from v0.1)</li>
+<li>Goal calculator + ATR-adaptive sizing (port from v0.1)</li>
+<li>Pine Script strategies emitting locked JSON schema</li>
+<li>Signal ingestion endpoint (webhook or alternative)</li>
+<li><code>signals</code> table with full feature schema</li>
+<li>Pending-signals decision view (approve / reject)</li>
+<li>Signal → trade linking via symbol + timestamp match</li>
+<li>Per-strategy stats view (n, win rate, avg R, expectancy)</li>
+<li>Chart screenshot capture on approve</li>
+<li>Single-page dashboard on miniPC, accessed via LAN or tunnel</li>
+<li><strong>Persisted goal config + interactive goal dashboard at <code>/</code></strong> <em>(pulled forward from Wk 4 sizing dependency; added Wk 1)</em></li>
+<li><strong>Server-side discipline filters in <code>/api/signals</code></strong> auto-reject Saturday / sub-5min cooldown / bleed hours / wrong venue <em>(added Wk 1 after PRISM fingerprint research showed bulk discretionary trading is break-even; selection discipline is the bottleneck)</em></li>
+<li><strong><code>/glossary</code> (&quot;Learn&quot;) reference page</strong> plain-English explainer for every goal-model / ticket metric — EV, R:R, leverage, notional, fee drag, account risk, true R:R, Kelly + sixth-Kelly, DD constraint, optimal-vs-required, expectancy/PF + a worked example <em>(added 2026-06-21 — static page on the shared .help-body style, no compute; serves the &quot;I don&#x27;t understand the elements&quot; gap)</em>. Inline <code>?</code> badges (<code>.qh</code>) on <code>/goal</code> (EV / Actual R cards + Risk &amp; Kelly title) and the order ticket (R:R, risk, full-ticket header on <code>/desk</code> + <code>/signals</code>) deep-link to the matching <code>/glossary#anchor</code>.</li>
+</ul>
+<h3>Out of v1 (defer to v2+)</h3>
+<ul>
+<li>ML prediction model — earn in at month 6 once dataset exists</li>
+<li>AI journaling layer (Claude API per trade) — earn in if v1 reveals discretionary trades that don&#x27;t fit defined strategies</li>
+<li>Mobile app — TradingView app + LENS web view is enough</li>
+<li>Execution bot — never until edge is proven on n≥100 per strategy</li>
+<li>Client management — AKA is in CVL, not relevant</li>
+<li>Cloud sync of any kind — local-first by choice</li>
+</ul>
+<h3>Hard constraints</h3>
+<ul>
+<li>Local data only (no Supabase, no external DB)</li>
+<li>Existing v0.1 keeps running until v1 is cut over</li>
+<li>No work on LENS that doesn&#x27;t appear in this plan without updating this plan first</li>
+</ul>
+<hr>
+<h2>Architecture</h2>
+<pre><code>                TradingView
+                    │
+                    │  Pine Script v5 strategy
+                    │  emits JSON alert with full schema
+                    ▼
+              ╔═════════════╗
+              ║  INGESTION  ║  (Cloudflare tunnel webhook
+              ║   ENDPOINT  ║   OR email poll OR phone-tap URL)
+              ╚══════╦══════╝
+                     │
+                     ▼
+             ┌───────────────┐
+             │ signals table │  pending → approved/rejected
+             │   (SQLite)    │
+             └───────┬───────┘
+                     │
+                     │  approve → create pending trade
+                     │  link via symbol + ts window
+                     ▼
+             ┌───────────────┐
+             │  trades table │ ← Kraken/Bybit sync attaches fills
+             └───────┬───────┘
+                     │
+                     │  trade closes → outcome computed
+                     ▼
+             ┌───────────────┐
+             │  stats engine │ → per-strategy WR, expectancy, R
+             └───────────────┘
+                     │
+                     ▼
+            month 6: train (features → outcome)
+            classifier, feed prediction back to
+            incoming signals</code></pre>
+<hr>
+<h2>Feature Schema (LOCKED — don&#x27;t drift)</h2>
+<p>Every signal row must carry every field. Schema consistency is the lever for month-6 ML. If a field can&#x27;t be filled, store <code>null</code> — don&#x27;t omit the column.</p>
+<pre><code># Identity
+signal_id            UUID
+strategy_name        TEXT  (e.g. &quot;MACD_MTF_v1&quot;)
+strategy_version     TEXT  (e.g. &quot;v1.0.3&quot;)
+received_at          TIMESTAMPTZ
+
+# Context
+symbol               TEXT  (e.g. &quot;BTCUSDT.P&quot;)
+venue                TEXT  (kraken | bybit)
+session_utc          TEXT  (asia | london | ny | off-hours)
+btc_1d_trend         TEXT  (up | down | range)
+btc_1w_trend         TEXT  (up | down | range)
+atr_14d_pct          NUMERIC
+
+# Setup
+trigger_type         TEXT  (macd_cross | bos | obr | fvg_fill | etc.)
+htf_bias             TEXT  (bullish | bearish | neutral)
+mtf_confluence       JSON  (array of confirming signals)
+confluence_count     INT   (0–5)
+
+# Trade plan
+direction            TEXT  (long | short)
+entry_price          NUMERIC
+stop_price           NUMERIC
+target_price         NUMERIC
+suggested_size_pct   NUMERIC  (% of account at signal time)
+suggested_leverage   NUMERIC
+expected_rr          NUMERIC
+
+# Decision (filled at approve/reject)
+status               TEXT  (pending | approved | rejected | expired)
+your_conviction      INT   (1–5, filled on approve)
+rejection_reason     TEXT  (filled on reject)
+decided_at           TIMESTAMPTZ
+
+# Execution linkage (filled by sync)
+linked_trade_id      INT   (FK to trades table)
+
+# Outcome (filled when trade closes)
+outcome              TEXT  (win | loss | breakeven | open)
+r_realized           NUMERIC
+pnl_eur              NUMERIC
+hold_duration_min    INT
+
+# Optional enrichment
+screenshot_path      TEXT
+notes                TEXT</code></pre>
+<p>This schema is the contract between Pine Script (producer) and LENS (consumer). Every Pine strategy must output every Setup + Trade plan field. Every LENS table column matches a schema field. Changes require a version bump on <code>strategy_version</code> and a migration entry in CHANGELOG.</p>
+<hr>
+<h2>8-Week Plan</h2>
+<h3>Week 1: Foundation (May 26 – Jun 1)</h3>
+<p><strong>Objective:</strong> New repo, clean SQLite schema, sync ported from v0.1.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] New repo <code>lens</code> initialized, README with one-paragraph mission</li>
+<li>[ ] SQLite schema migrated: <code>trades</code>, <code>signals</code>, <code>daily_snapshots</code>, <code>transfers</code></li>
+<li>[x] Kraken sync ported, writes to LENS DB <em>(cron deferred — manual <code>/api/sync/kraken</code> works; timer to be added when needed)</em></li>
+<li>[x] Bybit sync ported, writes to LENS DB</li>
+<li>[x] FastAPI scaffold, <code>/health</code> and <code>/api/trades</code> working</li>
+<li>[x] systemd user unit installed, runs on boot</li>
+<li>[x] <strong>(bonus)</strong> Interactive goal dashboard at <code>/</code> with persisted <code>lens_config</code></li>
+<li>[x] <strong>(bonus)</strong> Server-side discipline filters auto-reject bad signals</li>
+<li>[x] <strong>(bonus)</strong> PRISM trade-history fingerprint analysis → <code>strategies/_research/prism_fingerprint.md</code></li>
+</ul>
+<p><strong>Definition of done:</strong> ✅ <code>curl localhost:8765/api/trades</code> works; LENS persistent across reboots.</p>
+<hr>
+<h3>Week 2: Pine Script v1 (Jun 2 – Jun 8)  <em>(started early)</em></h3>
+<p><strong>Objective:</strong> First strategy emitting locked schema, baseline backtest captured.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[x] <code>MACD_MTF_v1</code> Pine v6 strategy file <em>(now DEPRECATED — baseline PF 0.11, no edge)</em></li>
+<li>[x] <code>alert()</code> message emits full JSON matching Setup + Trade plan schema fields</li>
+<li>[x] Strategy Tester run on 9 months BYBIT BTCUSD.P 15m → see <code>MACD_MTF_v1/BASELINE.md</code> (failed)</li>
+<li>[x] Document baseline (failure documented as negative reference)</li>
+<li>[x] Manual webhook test: JSON shape validated against <code>/api/signals</code> → 201 round-trip works</li>
+<li>[ ] <strong><code>MOM_BREAK_v1</code> Pine v6 strategy</strong> — consolidation-break scalp built from PRISM fingerprint, ready to backtest</li>
+<li>[ ] Strategy Tester run on <code>MOM_BREAK_v1</code> → fill <code>MOM_BREAK_v1/BASELINE.md</code></li>
+</ul>
+<p><strong>Definition of done:</strong> <code>MOM_BREAK_v1</code> Strategy Tester baseline shows PF ≥ 1.4 and WR ≥ 45% over 6 months. If not, iterate or pivot entry premise.</p>
+<hr>
+<h3>Week 3: Ingestion + signals table (Jun 9 – Jun 15)</h3>
+<p><strong>Objective:</strong> TradingView → LENS database end-to-end.</p>
+<p><strong>Decision before Week 3 starts:</strong> ingestion path.</p>
+<ul>
+<li>(a) Cloudflare tunnel + webhook — cleanest, requires tunnel back up</li>
+<li>(b) Email-to-LENS — TradingView emails JSON, LENS polls Gmail</li>
+<li>(c) Phone-tap URL — alert opens <code>lens.local/signals/new?payload=...</code></li>
+</ul>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] Ingestion path chosen + provisioned</li>
+<li>[ ] <code>POST /api/signals</code> endpoint validates JSON against schema, writes to DB</li>
+<li>[ ] Schema validation rejects malformed payloads with clear error</li>
+<li>[ ] End-to-end test: alert fires → row in <code>signals</code> table within 30 sec</li>
+<li>[ ] First 5–10 live signals captured (paper-mode strategy still fine)</li>
+</ul>
+<p><strong>Definition of done:</strong> signal arrives in LENS DB without manual intervention.</p>
+<hr>
+<h3>Week 4: Decision view (Jun 16 – Jun 22)</h3>
+<p><strong>Objective:</strong> Approve/reject UI with live context.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] <code>/signals</code> page lists pending signals</li>
+<li>[ ] Each row shows: full feature JSON, live-balance-adjusted size in EUR, strategy historical stats (even if n&lt;20)</li>
+<li>[ ] APPROVE button: requires conviction score (1–5), creates pending trade record, links signal_id</li>
+<li>[ ] REJECT button: requires reason text, marks signal rejected</li>
+<li>[ ] Auto-expire signals older than 30 min (status → <code>expired</code>)</li>
+<li>[ ] Mobile-responsive layout (you&#x27;ll use this on phone)</li>
+</ul>
+<p><strong>Definition of done:</strong> end-to-end: signal arrives → you see it on phone → tap approve → trade record created in <code>trades</code> with <code>linked_signal_id</code> set.</p>
+<hr>
+<h3>Week 5: Linking + outcomes (Jun 23 – Jun 29)</h3>
+<p><strong>Objective:</strong> Real fills auto-link to signals, outcomes compute.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] Sync job matches new fills to approved signals: symbol match + entry within ±10 min of approval timestamp</li>
+<li>[ ] Match confidence score logged; ambiguous matches flagged for manual review</li>
+<li>[ ] Trade close → outcome computed: win/loss/BE, R realized, PnL EUR, hold duration</li>
+<li>[ ] Signal record updated with outcome</li>
+<li>[ ] Backfill: link any historical signals from week 3–4 to their trades</li>
+</ul>
+<p><strong>Definition of done:</strong> trade closes on Kraken → within 1 sync cycle, signal row shows outcome + R realized.</p>
+<hr>
+<h3>Week 6: Stats + polish (Jun 30 – Jul 6)</h3>
+<p><strong>Objective:</strong> Per-strategy stats view, screenshot field, UI cleanup.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] <code>/stats</code> page: per <code>strategy_name</code> table showing n, WR%, avg R, expectancy, current streak</li>
+<li>[ ] Below n=20 shows &quot;building sample&quot; — no stats until threshold</li>
+<li>[ ] Approve flow accepts chart screenshot upload (optional)</li>
+<li>[ ] Screenshots stored at <code>data/screenshots/{signal_id}.png</code></li>
+<li>[ ] Equity curve chart for taken trades</li>
+<li>[ ] Cutover plan written: how to transition off v0.1 (v0.1 stops, LENS becomes primary)</li>
+</ul>
+<p><strong>Definition of done:</strong> stats view reflects week 4–5 live signals correctly.</p>
+<hr>
+<h3>Week 7: Go live (Jul 7 – Jul 13)</h3>
+<p><strong>Objective:</strong> LENS becomes the system you trade through.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] PRISM v0.1 stopped (kept for read-only reference)</li>
+<li>[ ] All trading goes through LENS Pine alerts → decision view → execution</li>
+<li>[ ] Daily review: any UX friction logged in <code>SCRATCHPAD.md</code></li>
+<li>[ ] Hot fixes only — no scope expansion this week</li>
+</ul>
+<p><strong>Definition of done:</strong> 7 days of live trading exclusively through LENS, ~15 signals captured, 0 manual paste workarounds.</p>
+<hr>
+<h3>Week 8: Iteration + second strategy (Jul 14 – Jul 20)</h3>
+<p><strong>Objective:</strong> Add strategy #2, fix anything painful from week 7.</p>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>[ ] <code>MACD_MTF_BOS_v1</code> strategy (MACD MTF + Break of Structure confirmation)</li>
+<li>[ ] BASELINE.md for new strategy</li>
+<li>[ ] Address top 3 friction points from week 7 SCRATCHPAD</li>
+<li>[ ] Retro: write <code>RETRO_W8.md</code> covering what shipped, what was harder than expected, what changed about your understanding</li>
+</ul>
+<p><strong>Definition of done:</strong> Two strategies live in PRISM, 30+ signals captured with full schema, retro published.</p>
+<hr>
+<h2>Workflow</h2>
+<h3>Daily (15 min, morning)</h3>
+<ul>
+<li>Check last 24h signals: any expired due to slow decision? any rejected — note why</li>
+<li>Skim <code>SCRATCHPAD.md</code>, add any new friction items</li>
+<li>Pick one critical-path task from current week, time-box one focused block</li>
+<li>Don&#x27;t context-switch to a different week&#x27;s task — finish current week first</li>
+</ul>
+<h3>Weekly retro (Sunday, 30 min)</h3>
+<ul>
+<li>Update <code>PROGRESS.md</code> with the week&#x27;s actuals (use format below)</li>
+<li>Mark shipped vs not-shipped from week&#x27;s deliverables</li>
+<li>For not-shipped: write the reason (one sentence) and decide: roll forward, deprioritize, or kill</li>
+<li>Identify top 3 tasks for next week, write them at the bottom of <code>PROGRESS.md</code></li>
+<li>If blocked on a decision, write the decision needed at the top of next week&#x27;s section</li>
+</ul>
+<h3>Monthly (last Sunday of month)</h3>
+<ul>
+<li>Per-strategy stats review (once any strategy has n≥20)</li>
+<li>Decide: keep firing / kill / version-bump and adjust</li>
+<li>Architecture review: anything to retire from this plan? anything to add?</li>
+<li>Update this PLAN.md file directly if scope changes — don&#x27;t let scope drift silently</li>
+</ul>
+<h3>Anti-rituals (things NOT to do)</h3>
+<ul>
+<li>No rebuilding or &quot;refactoring while you&#x27;re there&quot; — only the deliverables on the plan ship</li>
+<li>No new feature ideas committed mid-week — they go in <code>IDEAS.md</code>, reviewed monthly</li>
+<li>No comparing to PRISM v0.1&#x27;s UX — v1 is a different system, decide on its own merits</li>
+</ul>
+<hr>
+<h2>Metrics</h2>
+<h3>Lead metrics (weeks 1–6 — build phase)</h3>
+<ul>
+<li>Weekly objectives shipped % (target: ≥80% per week)</li>
+<li>Days since last commit (target: ≤2)</li>
+<li>Signals ingested per week (track from week 3, expect 0 → 15 by week 7)</li>
+</ul>
+<h3>Lag metrics (weeks 7+ — live phase)</h3>
+<ul>
+<li>Signals per week (expect 15–20 given your ~63 trades/mo cadence)</li>
+<li>Approve rate vs reject rate (no target, just observe)</li>
+<li>Per-strategy expectancy after n≥20 — this is the real edge signal</li>
+<li>Rolling 30-trade win rate (compare to v0.1&#x27;s 43.1% baseline; improvement = selection working)</li>
+</ul>
+<h3>Health checks (always on)</h3>
+<ul>
+<li>Sync failures &gt; 0 in 24h = drop everything, fix</li>
+<li>Signals stuck <code>pending</code> &gt; 1h = ingestion broken or you stopped looking</li>
+<li>Trades without <code>linked_signal_id</code> after week 7 = either manual entry (note in notes field) or linking is broken</li>
+</ul>
+<hr>
+<h2>Progress Tracking</h2>
+<h3>File: <code>PROGRESS.md</code> (in repo root)</h3>
+<p>Append a section per week, append-only, never edit history:</p>
+<pre><code>## Week N: [start date] – [end date]
+
+### Shipped
+- [x] task 1
+- [x] task 2
+
+### Not shipped
+- [ ] task 3 — reason: blocked on tunnel decision
+
+### Blockers
+- decision needed on X
+
+### Decisions made
+- chose option (a) for ingestion because...
+
+### Top 3 for next week
+1. ...
+2. ...
+3. ...</code></pre>
+<h3>File: <code>SCRATCHPAD.md</code></h3>
+<p>Append-only daily notes. Friction, ideas, bugs, dead-ends. Reviewed during weekly retro.</p>
+<h3>File: <code>IDEAS.md</code></h3>
+<p>Park lot for v2+ ideas. Reviewed monthly. If nothing&#x27;s been added in a month, the system is too constrained — relax. If it&#x27;s filling up weekly, scope is being threatened — be ruthless.</p>
+<hr>
+<h2>Open decisions (need answer before Week 1)</h2>
+<ul>
+<li>[ ] <strong>Project name confirmed?</strong> Default: LENS. Alternatives: HELM, AXIS.</li>
+<li>[ ] <strong>Ingestion path for Week 3?</strong> (a) Cloudflare tunnel + webhook | (b) email poll | (c) phone-tap URL.</li>
+<li>[ ] <strong>First Pine strategy:</strong> MACD MTF alone, or MACD MTF + BOS combined as v1? Recommend alone first — cleaner baseline.</li>
+<li>[ ] <strong>Cutover behavior:</strong> v0.1 keeps logging in parallel during weeks 7–8, or stops on day 1 of week 7? Recommend parallel — fallback if LENS breaks.</li>
+</ul>
+<hr>
+<h2>What this plan is not</h2>
+<p>It&#x27;s not the final architecture. It&#x27;s the smallest version that builds the dataset. v2 decisions (ML model, AI journaling, mobile app, execution bot) get made based on what v1 data shows you. Don&#x27;t preempt those decisions now — let the data do its job.</p>
+<p>If at week 8 the data says one strategy works and others don&#x27;t: kill the others, specialize, scale that one. If nothing works: the methodology is the problem, not the tooling, and you go reread ICT or pivot to a different framework. Either way, you have evidence instead of guesses, which is the whole point.</p>
+<hr>
+<p><em>Goal remains: 150 BTC @ €250k target by 31 Dec 2028.</em> <em>v0.1 proved the system can run locally. v1 proves the system can identify edge. v2+ proves the system can scale it.</em></p>
+<footer>Twin of <code>LENS_PLAN.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

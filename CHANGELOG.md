@@ -1,5 +1,7 @@
 # LENS — Changelog
 
+[Open as HTML](CHANGELOG.html)
+
 Dated build history, newest first. Forward-looking plan and open next-steps
 live in `LENS_PLAN.md`; commit detail is in `git log`.
 

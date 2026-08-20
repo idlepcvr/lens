@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // LENS — Brand</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>LENS — Brand</h1>
+<p><a href="BRAND.html">Open as HTML</a></p>
+<blockquote>The live version of this page renders in the app at <strong><code>/style</code></strong> (every token + component straight from <code>lens.css</code>). This file is the written reference. Source of truth for all values: <strong><code>app/theme.py</code></strong>.</blockquote>
+<p>LENS is a trading <strong>instrument cluster</strong> — it reads market state and reports it flat. The whole brand follows from that one idea: a cockpit gauge, not a hype deck.</p>
+<hr>
+<h2>Logo</h2>
+<p><code>LEN</code> + accent <code>S</code> — the <code>S</code> is the only colored letter (<code>var(--accent)</code>).</p>
+<pre><code>&lt;span class=&quot;logo&quot;&gt;LEN&lt;span class=&quot;s&quot;&gt;S&lt;/span&gt;&lt;/span&gt;</code></pre>
+<ul>
+<li>Display face: <strong>Chakra Petch 700</strong>, letter-spacing <code>.32em</code>, white.</li>
+<li>With a page label: <code>LENS &lt;span class=&quot;pg&quot;&gt;Desk&lt;/span&gt;</code> — label is <code>--dim</code>, lighter weight.</li>
+<li><strong>Mark / favicon:</strong> a scope / aperture iris (LENS = optics; concentric circles read as a target/scope at 16px). <code>FAVICON_SVG</code> in <code>app/theme.py</code>, served at <code>/assets/favicon.svg</code>. Accent ring, <code>--long</code> center dot, accent crosshair ticks on <code>--bg</code>, <code>7px</code> radius.</li>
+<li>Don&#x27;t: recolor the whole word, add a tagline lockup, skew, or put it on a busy background. The mark sits on <code>--bg</code> only.</li>
+</ul>
+<h2>Voice</h2>
+<p><strong>Instrument cluster, not a hype deck.</strong> Report state; let the trader decide.</p>
+<ul>
+<li><strong>Terse + mechanical.</strong> <code>ENTER</code> / <code>BLOCKED</code> / <code>STAND DOWN</code>, never &quot;Great setup!!&quot;.</li>
+<li><strong>Numbers first, prose second.</strong> Anything you&#x27;d read off a gauge is monospace.</li>
+<li><strong>Honest about edge.</strong> A pattern is a coin-flip alone — say so. Never imply certainty.</li>
+<li><strong>Lowercase labels, UPPERCASE verdicts.</strong> The interface whispers; the verdict speaks.</li>
+<li>No exclamation marks, no emoji in data, no &quot;to the moon&quot;. Caution is <code>amber</code>, not hidden.</li>
+</ul>
+<h2>Colors</h2>
+<p>Dark cockpit palette. Each status color pairs a bright foreground with a deep <code>-d</code> fill for badges/banners.</p>
+<div class=tw><table><thead><tr><th>Role</th><th>Token</th><th>Hex</th></tr></thead><tbody><tr><td>App background</td><td><code>--bg</code></td><td><code>#06080c</code></td></tr><tr><td>Panel / card</td><td><code>--panel</code></td><td><code>#0b0f16</code></td></tr><tr><td>Hairline border</td><td><code>--line</code></td><td><code>#192232</code></td></tr><tr><td>Primary text</td><td><code>--ink</code></td><td><code>#e8eef8</code></td></tr><tr><td>Secondary / labels</td><td><code>--dim</code></td><td><code>#828ea6</code></td></tr><tr><td>Captions</td><td><code>--faint</code></td><td><code>#465064</code></td></tr><tr><td>Accent / brand / interactive</td><td><code>--accent</code></td><td><code>#5b9dff</code></td></tr><tr><td>Long / positive / GO</td><td><code>--long</code></td><td><code>#1fd989</code></td></tr><tr><td>Short / negative / STOP</td><td><code>--short</code></td><td><code>#ff5468</code></td></tr><tr><td>Warn / veto / caution</td><td><code>--amber</code></td><td><code>#f6ad3c</code></td></tr></tbody></table></div>
+<p>Semantics are fixed: <strong>green = long/win/go, red = short/loss/stop, amber = warn/veto, blue = neutral interactive.</strong> Never use green/red decoratively.</p>
+<h2>Type</h2>
+<ul>
+<li><strong>Chakra Petch</strong> (<code>--hud</code>) — display, verdicts, labels, UI chrome. Weights 400–700.</li>
+<li><strong>JetBrains Mono</strong> (<code>--mono</code>) — all data: prices, R, %, tables, nav chips, timestamps. Weights 400–800.</li>
+<li><strong>Libre Caslon Text</strong> (<code>--serif</code>) — <strong>the front door only.</strong> One serif line: the thesis on <code>/</code>. Caslon is the serif of engraved scientific printing, so it reads as an instrument plate, not a fashion magazine. The tension between it and the mono data is the point. Loaded by <code>home_page.py</code> alone, never by <code>theme.py</code> — no other page pays for it, and no other page may use it. An app screen that reaches for the serif is off-brand.</li>
+</ul>
+<p>Scale (representative): price <code>30px/800</code>, verdict <code>34px/700</code>, big <code>24px/800</code>, logo <code>17px/700</code>, body <code>14px/400</code>, mono data <code>12px/500</code>, nav <code>11px</code>, label <code>10px</code> uppercase <code>.16em</code>.</p>
+<h2>Spacing</h2>
+<ul>
+<li><strong>Radii:</strong> <code>7</code> (mark) · <code>8–10</code> (cards/chips) · <code>12–13</code> (panels/buttons) · <code>16</code> (hero gauge) · <code>999</code> (nav chips, badges).</li>
+<li><strong>Elevation:</strong> flat <code>--line</code> border by default; <code>--glow-g</code> / <code>--glow-r</code> glows signal an active ENTER / STOP state — elevation carries meaning, it isn&#x27;t decoration.</li>
+<li><strong>Layout:</strong> single column, max <code>460 → 720 → 1120px</code> at the <code>680 / 1080px</code> breakpoints. Phone-first.</li>
+</ul>
+<h2>Components</h2>
+<p>Defined in <code>LENS_CSS</code>, shown live at <code>/style</code>: <code>.badge</code> (pending/approved/ rejected/expired), <code>.btn</code> (skip/take/aplus/ghost), <code>.chip</code> (good/bad), inputs, topbar + scroll nav, <code>.scard</code> / <code>.panel</code> / <code>.gauge</code> cards, <code>.sb</code> tables, <code>.kv</code> lists, the collapsible <code>.help-body</code> explainer.</p>
+<footer>Twin of <code>BRAND.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

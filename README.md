@@ -1,5 +1,7 @@
 # LENS
 
+[Open as HTML](README.html)
+
 **A cockpit for trading BTC perpetual futures with discipline.**
 
 I trade crypto with my own money. LENS is the system I'm building to help me do

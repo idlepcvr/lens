@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // LENS</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>LENS</h1>
+<p><a href="README.html">Open as HTML</a></p>
+<p><strong>A cockpit for trading BTC perpetual futures with discipline.</strong></p>
+<p>I trade crypto with my own money. LENS is the system I&#x27;m building to help me do that well — it scans, alerts, checklists, journals and measures, so the decisions are mine but the record isn&#x27;t a guess. Slow and steady wins the race: the goal is 50 ₿ by the end of 2028, reached one rung at a time, not one heroic month.</p>
+<p>The money philosophy underneath is FIRE, extended past index funds — bitcoin is the engine, but the plan only works with an understanding of the other asset classes around it, a burn rate that&#x27;s actually known, and income that survives a bad quarter. That&#x27;s the whole of personal finance in a paragraph: spend less than you make, know your number, own assets that compound, and don&#x27;t blow up.</p>
+<p>LENS runs on the miniPC (FastAPI + SQLite, no cloud dependencies) — open <strong>https://lens.restedpc.com</strong> from the tailnet, or http://localhost:8765 on the box.</p>
+<p>!<a href="docs/home.png">Home</a></p>
+<h2>Two books, one front door</h2>
+<p>Each has its own nav, ledger and maths:</p>
+<ul>
+<li><strong>HEDGE</strong> — discretionary own-money trading on the mined edge (<code>LENS_EDGE_v3</code>: five momentum-continuation setups + seven vetoes, mined from the real fill history). Playbook: <a href="strategies/LENS_EDGE_v3_ICT/FINDINGS.md"><code>strategies/LENS_EDGE_v3_ICT/FINDINGS.md</code></a>.</li>
+<li><strong>PROP</strong> — surviving a Breakout (Kraken Prop) evaluation, which is the opposite game: pass-probability against equity walls, not expectancy. Its own simulator, ledger (<code>book=&#x27;prop&#x27;</code>), desk and goal pages.</li>
+</ul>
+<h2>The goal, and how it&#x27;s tracked</h2>
+<p>50 ₿ by 2028-12-31, broken into rungs that get harder at a constant rate rather than a constant size — each one is a similar percentage climb, so each one feels about the same. Rung dates are derived from where the stack actually is, except where I&#x27;ve pinned one; a pinned date is never recomputed and the rungs beneath it compress to fit.</p>
+<p><code>/hedge-track</code> is the daily surface for that: the next rung and nothing else at a glance, with the rest folded away until I go looking.</p>
+<p>!<a href="docs/track.png">Track</a></p>
+<p>The fan is a Monte-Carlo projection bootstrapped from my own closed trades, not a tidy Gaussian — so the expectancy and the variance are the ones I really trade. The red line is the point where the account is gone, and it&#x27;s drawn on purpose: a projection that hides its own ruin cases isn&#x27;t honest.</p>
+<p>Underneath it is a daily score. Four components, and discipline is a gate rather than the heaviest weight — a day with an off-plan trade scores zero however profitable it was, because the thing that costs me money is frequency and rule-breaking, not being wrong.</p>
+<h2>The loop</h2>
+<p>Scanner cron → ntfy push with one-tap <strong>TAKE / SKIP</strong> buttons → <code>/hedge-desk</code> checklist → trade on Kraken → hourly sync pulls the fill, auto-tags it and links it to the signal that caused it → per-setup scoreboard → re-mine when enough tagged trades accumulate. Signals pass discipline filters (bleed-hour veto, cooldown) before they reach the phone.</p>
+<p><strong>LENS does not place trades today.</strong> Every order is typed into Kraken by hand. That&#x27;s a current fact, not a permanent law — see below.</p>
+<p>!<a href="docs/desk.png">Desk</a></p>
+<h2>Where it&#x27;s going</h2>
+<ul>
+<li><strong>Order routing, at 10%.</strong> Bridging the gap between an approved signal and a placed order — I decide, LENS sends. Not autonomous trading: a human decision with a machine hand. It ships behind a scale model — 10% of volume through the system, 90% by hand — and the ratio only moves when the record earns it. Needs a trade-scoped API key, OCO/reduce-only brackets so a filled take-profit can&#x27;t leave a live stop behind, a <code>cancel-after</code> dead-man&#x27;s switch, and a hard trades-per-day cap.</li>
+<li><strong>One venue.</strong> Kraken for everything; Bybit comes out. Two price sources in one system is two clocks, and a dashboard with two clocks can&#x27;t be trusted.</li>
+<li><strong>My vocabulary, not the tool&#x27;s.</strong> Renaming everything I wouldn&#x27;t say out loud, and deleting what I never use. A cockpit whose labels need translating is one I can&#x27;t fly under pressure.</li>
+<li><strong>Paper first.</strong> <code>kraken paper</code> runs approved tickets against live prices with no keys and no money — the cheap way to prove the loop before it holds a real credential.</li>
+</ul>
+<p>Open items live in <a href="LENS_PLAN.md"><code>LENS_PLAN.md</code></a>; shipped history in <a href="CHANGELOG.md"><code>CHANGELOG.md</code></a>.</p>
+<h2>Running it</h2>
+<pre><code>pip install -r requirements.txt   # first time; then create .env (see app/setups.py header)
+./start.sh                        # prints the dashboard link
+./stop.sh</code></pre>
+<p>The crons that keep the loop alive (installed on the miniPC):</p>
+<pre><code># hourly HEDGE scanner (minute 2, right after the 1H close)
+2 * * * *  /home/mini/lens/.venv/bin/python3 -m app.setups &gt;&gt; logs/setup_scan.log 2&gt;&amp;1
+# hourly Kraken fill sync (closes the loop — trades self-tag)
+5 * * * *  curl -s -X POST http://localhost:8765/api/sync/kraken &gt;/dev/null
+# PROP scanner on 4H closes (gates internally to the Asian 00/04 UTC windows)
+5 3,7,11,15,19,23 * * *  cd /home/mini/lens &amp;&amp; /home/mini/lens/.venv/bin/python3 -m app.prop_scan &gt;&gt; logs/prop_scan.log 2&gt;&amp;1
+# weekly strategy R-sweep re-rank (Mon 04:17)
+17 4 * * 1  cd /home/mini/lens &amp;&amp; .venv/bin/python3 -m app.strategy_eval &gt;&gt; logs/strategy_eval.log 2&gt;&amp;1</code></pre>
+<p>Phone alerts need <code>LENS_NTFY_TOPIC</code> and <code>LENS_BASE_URL</code> (the server address <em>as seen from the phone</em> — the TAKE/SKIP buttons POST to it) in <code>.env</code>.</p>
+<p>Health: <code>curl localhost:8765/health</code> · API docs: http://localhost:8765/docs · deploy: <code>systemctl --user restart lens.service</code></p>
+<h2>Layout</h2>
+<pre><code>app/          the server — FastAPI, pages, engines, scanners
+strategies/   Pine strategies, one folder each + BASELINE/FINDINGS
+research/     one-off analysis scripts, not wired into the app. They import
+              each other by bare name (edge_miner, ict_miner and trade_review
+              are one family), so they have to share a directory
+tests/        assert-based self-checks
+docs/         reference docs, screenshots, and completed build specs
+data/         lens.db — the ledger. The one irreplaceable thing here.
+              Gitignored, backups in data/backups/
+results/      generated output: searches, breeder runs, dedup clusters.
+              strategy_scores.json is the live board cache the app reads
+logs/         everything systemd and cron redirect into</code></pre>
+<p>Every path is defined once in <code>app/paths.py</code>, anchored to the repo root via <code>__file__</code> rather than the cwd. That matters more than tidiness: the database path used to be a bare relative <code>&quot;lens.db&quot;</code>, so a script run from the wrong directory silently opened a <strong>different, empty</strong> database instead of failing.</p>
+<p>Reading the docs: <strong><code>/manual</code></strong> renders README, the plan, the changelog, PRODUCT and BRAND live from disk, in the app&#x27;s own theme. (<code>/docs</code> is FastAPI&#x27;s API reference — different thing, same-sounding name.)</p>
+<p>Scripts in <code>research/</code> and <code>tests/</code> open with <code>import _bootstrap</code>, which puts the repo root on <code>sys.path</code> and makes it the cwd — they import <code>app</code> and some open <code>lens.db</code> by its bare relative name, which only works from the root.</p>
+<pre><code>.venv/bin/python3 -m pytest tests/ -q</code></pre>
+<h2>Docs</h2>
+<div class=tw><table><thead><tr><th>File</th><th>What</th></tr></thead><tbody><tr><td><code>CHANGELOG.md</code></td><td>Dated build history — what shipped, when, and the gotchas</td></tr><tr><td><code>LENS_PLAN.md</code></td><td>Roadmap and open next-steps</td></tr><tr><td><code>strategies/LENS_EDGE_v3_ICT/FINDINGS.md</code></td><td>The mined edge, full detail</td></tr><tr><td><code>PRODUCT.md</code> / <code>BRAND.md</code> / <code>/style</code></td><td>Product definition · brand voice · living style guide</td></tr><tr><td><code>strategies/README.md</code></td><td>Pine Script side (TradingView HUD indicator)</td></tr></tbody></table></div>
+<h2>Status (2026-08-09)</h2>
+<p>The build is ahead of the usage, deliberately. The loop has been live since 2026-06-16 — crons firing, phone buttons working — and the bottleneck is reps: taking the alerts, letting trades tag themselves, accumulating the dataset the v4 re-mine needs.</p>
+<p>The book is gross-profitable. What it loses to is cost × frequency, which is why the daily score punishes rule-breaking rather than rewarding activity, and why every routing feature above arrives with a cap attached.</p>
+<p>Development is on <strong><code>master</code></strong> — one branch, no ceremony.</p>
+<footer>Twin of <code>README.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>
