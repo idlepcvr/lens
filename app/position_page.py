@@ -124,7 +124,12 @@ _XCSS = """<style>
 .xcl.sm{padding:5px 10px;font-size:10px}
 
 /* Confirm dialog. Native <dialog>: Esc and the backdrop come free. */
-.xdlg{border:1px solid var(--line);border-radius:11px;background:var(--panel);
+/* A modal <dialog> only centres itself while the UA's own margin:auto survives.
+   The page reset zeroes margins, so it was pinned top-left — set it explicitly
+   rather than relying on the default. */
+.xdlg{position:fixed;inset:0;margin:auto;height:fit-content;
+  max-height:calc(100dvh - 32px);overflow:auto;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel);
   color:var(--ink);padding:0;width:min(440px,calc(100vw - 32px));max-width:none}
 .xdlg::backdrop{background:rgba(3,5,9,.72)}
 .xdlg .dh{display:flex;justify-content:space-between;align-items:center;gap:10px;
