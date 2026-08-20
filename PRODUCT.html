@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // Product</title>
+<style>
+/* Offline-absolute: no CDN, no webfont, no build step. Tokens mirror app/theme.py. */
+:root{--bg:#06080c;--panel:#0c1017;--line:#1b2430;--ink:#e8eef6;--dim:#8b9bb0;
+      --faint:#5b6b80;--accent:#4da3ff;--long:#1fd989;--short:#ff5468;--amber:#ffb454;
+      --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:15px;line-height:1.65;padding:40px 20px}
+main{max-width:72ch;margin:0 auto}
+h1{font-size:26px;letter-spacing:-.01em;margin:0 0 6px}
+h1+p{color:var(--dim);margin:0 0 34px}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+p{margin:0 0 14px}
+ul{margin:0 0 14px;padding-left:20px}
+li{margin-bottom:9px}
+strong{color:var(--ink);font-weight:700}
+code{background:var(--panel);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:13px;color:var(--accent)}
+a{color:var(--accent)}
+footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--faint);font-size:12px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>Product</h1>
+<p><a href="PRODUCT.html">Open as HTML</a></p>
+<h2>Register</h2>
+<p>product</p>
+<h2>Users</h2>
+<p>A single user — the owner, a solo crypto-futures trader running two books: a Kraken prop-firm evaluation ladder (PROP) and a personal account (HEDGE). Primary device is <strong>phone</strong> (daily driver, checked pre-trade and at review); <strong>desktop</strong> is the secondary, deeper-work surface. Context of use: &quot;where am I, can I trade right now, and how did the last trade go.&quot; Quick glances, not long sessions.</p>
+<h2>Product Purpose</h2>
+<p>LENS is a <strong>trading cockpit that now closes the loop</strong>. It reads live Kraken equity and open positions, tracks prop-eval progress against target/floor walls, journals closed trades, scores strategies from a real backtest — and, since 2026-08-20, <strong>places the order too</strong>. That last step is the point of the whole thing, not a feature bolted on. The levels were always computed here and then retyped into the exchange&#x27;s form, and that double entry is measurable: over the 30 days to 2026-08-20, 147 signals fired and 4 were acted on. A decision made twice is a decision usually not made. So LENS now sends the entry with its take profit and stop loss attached, at a size it worked out itself. Success is a clean, trustworthy instrument panel the owner is proud to show people as &quot;my system&quot; — not to sell, but as a thing made with craft.</p>
+<h2>Brand Personality</h2>
+<p>Precise, optical, disciplined. The name is LENS — optics, a scope, a measuring instrument. The feel is a cockpit/HUD: dark, calm under fire, every number where you expect it. Three words: <strong>instrument, legible, composed.</strong></p>
+<h2>Anti-references</h2>
+<ul>
+<li>Hype crypto-bro dashboards: neon gradient slop, &quot;to the moon&quot; green, gamified confetti, gauge-needle theatrics.</li>
+<li>Generic SaaS-cream admin templates (light warm-neutral bg, identical card grids, tracked-uppercase eyebrow on every section).</li>
+<li>A Bloomberg-terminal wall of undifferentiated numbers with no hierarchy.</li>
+</ul>
+<h2>Design Principles</h2>
+<ul>
+<li><strong>Instrument, not toy.</strong> Every element earns its place by informing a decision.</li>
+<li><strong>Legible at a glance.</strong> Hierarchy first; the one number that matters is the loudest thing on the screen.</li>
+<li><strong>One source of truth.</strong> All styling flows from the <code>LENS_CSS</code> tokens in <code>app/theme.py</code>; no hard-coded hex in pages.</li>
+<li><strong>Execution is deliberate, never ambient.</strong> LENS places orders, so the UI owes the opposite of reassurance: every send is two clicks, arms with the exact order written on the button, and disarms itself after six seconds. Nothing fires from a page load, a scan, or a single click. The environment badge (DEMO / LIVE) is read from the server on every gate check, never assumed by the page — if it says LIVE it is live.</li>
+<li><strong>The rules bind at the moment of the trade.</strong> Execution runs through <code>discipline.py</code>, so the bleed hour and the revenge cooldown block an *order*, not just a signal. A rule that only annotates history is decoration.</li>
+<li><strong>Mobile-first, desktop-equal.</strong> Phone is already strong; desktop must feel as deliberate, not a stretched phone.</li>
+</ul>
+<h2>Accessibility &amp; Inclusion</h2>
+<p>Dark theme throughout; body text must hold ≥4.5:1 against its surface (the dim grays are the risk). Color is never the only signal (long/short also carry arrows and labels). Every animation needs a <code>prefers-reduced-motion</code> fallback. Destructive and irreversible actions carry their consequence in words, not just in color: the confirm state spells out side, size and whether a bracket is attached, because a red button alone is not an explanation.</p>
+<h2>Change log</h2>
+<ul>
+<li><strong>2026-08-20</strong> — Execution added. &quot;Watch-only honesty&quot; retired as a design principle; replaced by *Execution is deliberate, never ambient* and *The rules bind at the moment of the trade*. The claim that LENS &quot;never executes&quot; was true until this date and is preserved here as history, not as current state.</li>
+</ul>
+<footer>Twin of <code>PRODUCT.md</code> — edit the Markdown, regenerate this.
+Generated 2026-08-21.</footer>
+</main></body></html>

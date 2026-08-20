@@ -1,5 +1,7 @@
 # Product
 
+[Open as HTML](PRODUCT.html)
+
 ## Register
 
 product
@@ -15,12 +17,20 @@ sessions.
 
 ## Product Purpose
 
-LENS is a **watch-only trading cockpit**. It reads live Kraken equity and open
-positions, tracks prop-eval progress against target/floor walls, journals
-closed trades, and scores strategies from a real backtest. The owner places
-every trade manually; LENS observes and measures — it never executes. Success
-is a clean, trustworthy instrument panel the owner is proud to show people as
-"my system" — not to sell, but as a thing made with craft.
+LENS is a **trading cockpit that now closes the loop**. It reads live Kraken
+equity and open positions, tracks prop-eval progress against target/floor
+walls, journals closed trades, scores strategies from a real backtest — and,
+since 2026-08-20, **places the order too**.
+
+That last step is the point of the whole thing, not a feature bolted on. The
+levels were always computed here and then retyped into the exchange's form,
+and that double entry is measurable: over the 30 days to 2026-08-20, 147
+signals fired and 4 were acted on. A decision made twice is a decision usually
+not made. So LENS now sends the entry with its take profit and stop loss
+attached, at a size it worked out itself.
+
+Success is a clean, trustworthy instrument panel the owner is proud to show
+people as "my system" — not to sell, but as a thing made with craft.
 
 ## Brand Personality
 
@@ -43,7 +53,15 @@ where you expect it. Three words: **instrument, legible, composed.**
   loudest thing on the screen.
 - **One source of truth.** All styling flows from the `LENS_CSS` tokens in
   `app/theme.py`; no hard-coded hex in pages.
-- **Watch-only honesty.** The UI never implies LENS trades for you.
+- **Execution is deliberate, never ambient.** LENS places orders, so the UI owes
+  the opposite of reassurance: every send is two clicks, arms with the exact
+  order written on the button, and disarms itself after six seconds. Nothing
+  fires from a page load, a scan, or a single click. The environment badge
+  (DEMO / LIVE) is read from the server on every gate check, never assumed by
+  the page — if it says LIVE it is live.
+- **The rules bind at the moment of the trade.** Execution runs through
+  `discipline.py`, so the bleed hour and the revenge cooldown block an *order*,
+  not just a signal. A rule that only annotates history is decoration.
 - **Mobile-first, desktop-equal.** Phone is already strong; desktop must feel
   as deliberate, not a stretched phone.
 
@@ -52,3 +70,14 @@ where you expect it. Three words: **instrument, legible, composed.**
 Dark theme throughout; body text must hold ≥4.5:1 against its surface (the dim
 grays are the risk). Color is never the only signal (long/short also carry
 arrows and labels). Every animation needs a `prefers-reduced-motion` fallback.
+
+Destructive and irreversible actions carry their consequence in words, not just
+in color: the confirm state spells out side, size and whether a bracket is
+attached, because a red button alone is not an explanation.
+
+## Change log
+
+- **2026-08-20** — Execution added. "Watch-only honesty" retired as a design
+  principle; replaced by *Execution is deliberate, never ambient* and *The rules
+  bind at the moment of the trade*. The claim that LENS "never executes" was
+  true until this date and is preserved here as history, not as current state.
