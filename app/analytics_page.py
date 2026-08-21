@@ -68,6 +68,61 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .cone-bar .badge{font-family:var(--mono);font-size:10px;color:var(--faint)}
 .cone-bar .badge.plan{color:var(--amber)}
 .cone-bar .sp{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+/* review surfaces (moved off /hedge-track) */
+.rq-top{display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;margin-bottom:11px}
+.rq-rate{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
+.rq-rate b{font-family:var(--mono);font-size:34px;font-weight:800;line-height:1;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.rq-rate>span{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--dim)}
+.rq-nums{display:flex;flex-wrap:wrap;gap:10px 24px;flex:1 1 240px}
+.rq-nums>div{display:flex;flex-direction:column;gap:1px}
+.rq-nums span{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--dim)}
+.rq-nums b{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink)}
+.rq-rate.rq-ok b{color:var(--long)} .rq-rate.rq-mid b{color:var(--amber)}
+.rq-rate.rq-bad b{color:var(--short)} .rq-rate.rq-na b{color:var(--dim)}
+.rq-nums b.rq-bad{color:var(--short)}
+.an-d>summary .tag.rq-ok{color:var(--long)} .an-d>summary .tag.rq-mid{color:var(--amber)}
+.an-d>summary .tag.rq-bad{color:var(--short)} .an-d>summary .tag.rq-na{color:var(--dim)}
+.rq-bar{height:8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);
+  overflow:hidden;margin-bottom:11px}
+.rq-bar>span{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.rq-bar>span.rq-ok{background:var(--long)} .rq-bar>span.rq-mid{background:var(--amber)}
+.rq-bar>span.rq-bad{background:var(--short)} .rq-bar>span.rq-na{background:var(--line2)}
+.rq-p{font-size:12px;line-height:1.55;color:var(--dim);margin:0 0 9px;max-width:74ch}
+.rq-p b{color:var(--ink)}
+.rq-dim{color:var(--dim);font-size:11px}
+.rq-warn{color:var(--amber)}
+
+.rq-strip{display:flex;align-items:flex-end;gap:3px;height:46px;margin-bottom:9px}
+.rq-c{flex:1 1 0;min-width:3px;height:var(--h);border-radius:2px;display:block;
+  background:var(--line)}
+.rq-c.kept{background:var(--long)} .rq-c.part{background:var(--accent);opacity:.55}
+.rq-c.brk{background:var(--short)}
+.rq-legend{display:flex;flex-wrap:wrap;gap:5px 15px;align-items:center;
+  font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:12px}
+.rq-legend span{display:flex;align-items:center;gap:5px}
+.rq-legend .rq-c{flex:none;width:9px}
+
+/* The score table has five columns and two of them are numeric pairs, which is
+   wider than a phone. It used to just overflow its panel — the numbers ran out
+   past the border. It scrolls inside its own box now instead. */
+.rq-tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px}
+.rq-tab{width:100%;min-width:440px;border-collapse:collapse;font-size:12px}
+.rq-tab th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;
+  padding:0 8px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.rq-tab td{padding:9px 8px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.rq-tab tfoot td{border-bottom:none;padding-top:11px}
+.rq-w{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--accent);width:26px}
+.rq-k{font-weight:600;color:var(--ink);white-space:nowrap}
+.rq-what{color:var(--dim);line-height:1.5}
+.rq-n{font-family:var(--mono);text-align:right;color:var(--dim);white-space:nowrap}
+.rq-tot{color:var(--ink);font-weight:700}
+.rq-tab th:nth-child(4),.rq-tab th:nth-child(5){text-align:right}
+@media(max-width:620px){ .rq-rate b{font-size:28px} }
 </style>
 """
 
@@ -424,6 +479,157 @@ function renderSections(E,A,X){
 }
 """
 
+# ─── review surfaces, moved off /hedge-track 2026-08-21 ──────────────────────
+# Both answer "how have I been behaving", which is a review question. Track is
+# read before an entry — the rung, the band, the next step — and these were
+# sitting in front of that. They belong on the page you open when you want to
+# look back, which is this one.
+#
+# Hedge-only: adherence and the daily score are both scoped to LENS_BOOK, so the
+# prop view does not render them rather than showing hedge numbers under a prop
+# heading.
+
+def _grade(rate):
+    """(class, word). Never colour alone — the word carries the same meaning."""
+    if rate is None:
+        return "na", "nothing to grade"
+    if rate >= 0.70:
+        return "ok", "following the engine"
+    if rate >= 0.40:
+        return "mid", "drifting off the engine"
+    return "bad", "running off-engine"
+
+
+def _day(iso):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(iso)[:10]).strftime("%-d %b")
+    except Exception:
+        return str(iso or "—")
+
+
+def _signal_quality(A):
+    w, y = A["window"], A["yesterday"]
+    cls, word = _grade(w["rate"])
+    pct = "—" if w["rate"] is None else f"{w['rate'] * 100:.0f}%"
+    bar = 0.0 if w["rate"] is None else max(0.0, min(1.0, w["rate"])) * 100
+    yd = _day(A["yesterday_date"])
+    ytxt = (f"Yesterday · {yd} — {y['fired']} fired, {y['fills']} "
+            f"fill{'' if y['fills'] == 1 else 's'}, {y['orphan']} with no signal"
+            if (y["fired"] or y["fills"])
+            else f"Yesterday · {yd} — nothing fired, nothing filled")
+    return f"""
+<details class="an-d" id="a-signal">
+  <summary>Signal quality<span class="sub"> · did the book take what the engine
+    fired?</span><span class="tag rq-{cls}">{pct}</span></summary>
+  <div class="an-d-body">
+    <div class="rq-top">
+      <div class="rq-rate rq-{cls}"><b>{pct}</b><span>on-signal</span></div>
+      <div class="rq-nums">
+        <div><span>signals fired</span><b>{w['fired']}</b></div>
+        <div><span>fills</span><b>{w['fills']}</b></div>
+        <div><span>no signal</span><b class="rq-bad">{w['orphan']}</b></div>
+      </div>
+    </div>
+    <div class="rq-bar"><span class="rq-{cls}" style="width:{bar:.1f}%"></span></div>
+    <p class="rq-p"><b>{word}</b> — {w['fills'] - w['orphan']} of {w['fills']} fills
+       had an approved signal behind them. {ytxt}.</p>
+    <p class="rq-p rq-dim">A fill counts as on-signal when a signal was approved,
+       same direction, entry within tolerance. A signal left pending or expired
+       never links, so a low rate can mean signals were never <em>decided</em> as
+       much as never followed. Fills are the hedge book; signals have no book.</p>
+  </div>
+</details>"""
+
+
+def _last_days(T):
+    from .track import MAX_POINTS, WEIGHTS
+    days, sc, S = T["days"], T["score"], T["streak"]
+    cells = []
+    for d in days:
+        if d["breaches"]:
+            cls, why = "brk", f"{d['breaches']} off-plan"
+        elif d["kept"]:
+            cls, why = "kept", "kept"
+        elif d["trades"] or d["decisions"]:
+            cls, why = "part", "partial"
+        else:
+            cls, why = "idle", "nothing logged"
+        h = 18 + round(d["points"] / d["max_points"] * 26)
+        bits = [d["date"], why, f"{d['points']:g}/{d['max_points']} pts"]
+        if d["trades"]:
+            bits.append(f"{d['trades']} trade{'s' if d['trades'] != 1 else ''}")
+        if d["decisions"]:
+            bits.append(f"{d['decisions']} decided")
+        cells.append(f'<i class="rq-c {cls}" style="--h:{h}px" '
+                     f'title="{" · ".join(bits)}"></i>')
+
+    meta = [("discipline", "No trade flagged off-plan."),
+            ("plan", "A trade taken that WAS the plan."),
+            ("band", "Inside the projection band."),
+            ("decision", "A signal approved or rejected.")]
+    n = len(days) or 1
+    rows = []
+    for key, what in meta:
+        hit = sum(1 for d in days if d["parts"][key] > 0)
+        got = sum(d["parts"][key] for d in days)
+        rows.append(f'<tr><td class="rq-w">{WEIGHTS[key]}</td><td class="rq-k">{key}</td>'
+                    f'<td class="rq-what">{what}</td>'
+                    f'<td class="rq-n">{hit}/{n} d</td>'
+                    f'<td class="rq-n rq-tot">{got:g}/{WEIGHTS[key] * n:g}</td></tr>')
+
+    unrev = ""
+    if sc["unreviewed"]:
+        unrev = (f'<p class="rq-p rq-warn">{sc["unreviewed"]} trade'
+                 f'{"s" if sc["unreviewed"] != 1 else ""} in this window are unmarked, '
+                 'so discipline is scoring silence rather than conduct.</p>')
+
+    return f"""
+<details class="an-d" id="a-days">
+  <summary>The last {T['window_days']} days<span class="sub"> · daily discipline
+    score</span><span class="tag">{S['current']}d streak</span></summary>
+  <div class="an-d-body">
+    <div class="rq-strip">{"".join(cells)}</div>
+    <div class="rq-legend">
+      <span><i class="rq-c kept" style="--h:10px"></i>kept</span>
+      <span><i class="rq-c part" style="--h:10px"></i>partial</span>
+      <span><i class="rq-c brk" style="--h:10px"></i>breach</span>
+      <span><i class="rq-c idle" style="--h:10px"></i>nothing logged</span>
+      <span class="rq-dim">bar height = points · best streak {S['best']}d</span>
+    </div>
+    <div class="rq-tw"><table class="rq-tab">
+      <thead><tr><th>pts</th><th>component</th><th>earned when</th>
+        <th>days</th><th>total</th></tr></thead>
+      <tbody>{"".join(rows)}</tbody>
+      <tfoot><tr><td class="rq-w">{MAX_POINTS}</td><td class="rq-k">score</td>
+        <td class="rq-what">Streak needs discipline kept AND something logged.</td>
+        <td class="rq-n">{sc['traded_days']}/{len(days)}</td>
+        <td class="rq-n rq-tot">{sc['earned']:g}/{sc['possible']:g}</td></tr></tfoot>
+    </table></div>
+    {unrev}
+  </div>
+</details>"""
+
+
+def review_sections() -> str:
+    """Both hedge review surfaces, or nothing if the ledger cannot answer."""
+    try:
+        from .track import track
+        T = track()
+    except Exception:
+        return ""
+    out = ""
+    try:
+        out += _signal_quality(T["adherence"])
+    except Exception:
+        pass
+    try:
+        out += _last_days(T)
+    except Exception:
+        pass
+    return f'<div class="an-sec"><div class="an-h">Review</div>{out}</div>' if out else ""
+
+
 def render(book: str = "hedge") -> str:
     """One page, two books. 'prop' spans every eval attempt (see review.book_filter)
     — the current eval alone is /prop-ledger."""
@@ -436,6 +642,8 @@ def render(book: str = "hedge") -> str:
             f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
             f'<a href="{"/hedge-analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
             f'switch to {other}</a>{eval_cone}</div>') + BODY
+    if book == "hedge":
+        body += review_sections()
     return shell(path, "Analytics", body,
                  script=f"const BOOK={book!r};\n".replace("'", '"') + SCRIPT,
                  head_extra=_CSS, meta="how am I doing?")
