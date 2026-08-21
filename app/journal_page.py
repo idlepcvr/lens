@@ -156,6 +156,9 @@ const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
 let LIVE_ORDERS={};    // role -> the resting order actually on the exchange
+let PLAN_STALE=[];     // logged plans too old to belong to anything live
+const PLAN_MAX_AGE_DAYS=7;
+const PLAN_ENTRY_TOL=0.05;   // a logged entry this far from the fill is another trade
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>v==null?'—':(v<0?'-':'+')+'€'+Math.abs(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=(v)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:0});
@@ -193,10 +196,23 @@ async function loadOpenPositions(){
     // Match on direction + recency, not exact entry: Kraken reports an average
     // fill price that rarely equals the entry you logged, so keying on price
     // silently never matches. Most recent open trade per side wins.
+    // Direction and recency alone are not enough. Three hand-logged trades have
+    // sat open since July, so "most recent open long" resolved to a plan from
+    // 6 August and drew 64k-era levels onto a position opened today at 75.9k —
+    // the numbers looked invented because they belonged to a different trade.
+    // A logged plan is only this position's if its entry is near this position's
+    // and it was opened recently. Kraken's average fill never equals the logged
+    // entry exactly, so the band is generous; 15% away is a different trade.
     LOGGED_PLANS={};
+    PLAN_STALE=[];
+    const nowMs=Date.now();
     (logged||[]).filter(t=>t.is_open&&t.tp!=null&&t.sl!=null)
       .sort((a,b)=>(a.ts_entry||0)-(b.ts_entry||0))
-      .forEach(t=>{ LOGGED_PLANS[t.direction]={tp:t.tp,sl:t.sl,id:t.id,entry:t.entry}; });
+      .forEach(t=>{
+        const ageDays=t.ts_entry?(nowMs-new Date(t.ts_entry).getTime())/864e5:999;
+        if(ageDays>PLAN_MAX_AGE_DAYS){ PLAN_STALE.push({...t,ageDays}); return; }
+        LOGGED_PLANS[t.direction]={tp:t.tp,sl:t.sl,id:t.id,entry:t.entry,ageDays};
+      });
     const ps=d.positions||[];
     if(!ps.length){ el.innerHTML=''; return; }
     const usd=(v,d=2)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:d});
@@ -223,7 +239,11 @@ async function loadOpenPositions(){
           +row('Stop loss',   ls?usd(lp(ls),1)+dist(lp(ls)):'none resting', ls?'r':'dim')
           +row('Triggers on', (lt||ls) ? ((lt||ls).trigger_on||'—') : '—','dim');
       }
-      const own = LOGGED_PLANS[p.direction] || null;
+      let own = LOGGED_PLANS[p.direction] || null;
+      if(own && p.entry && own.entry &&
+         Math.abs(own.entry-p.entry)/p.entry > PLAN_ENTRY_TOL){
+        own = null;      // logged at a price this position never traded at
+      }
       if(own && own.tp!=null && own.sl!=null){
         const tp=own.tp, sl=own.sl;
         const upP=Math.abs(tp-p.entry)/p.entry, dnP=Math.abs(p.entry-sl)/p.entry;
@@ -245,6 +265,10 @@ async function loadOpenPositions(){
           +row('Expected loss',`${sUsd(-loss)} <small>${pc(-lvl.sl*100)}</small>`,'r')
           +row('R:R',lvl.rr!=null?lvl.rr.toFixed(2):(lvl.tp/lvl.sl).toFixed(2),'dim');
       } else { plan=`<div class="opsec">Plan</div>`+row('levels','set Goal config to see plan','dim'); }
+      if(PLAN_STALE.length){
+        plan += row('Ignored', PLAN_STALE.map(t=>`#${t.id} (${Math.round(t.ageDays)}d open)`).join(', ')
+          + ' <small>hand-logged trades still marked open — close them or they keep claiming plans</small>','a');
+      }
       // Name the gap rather than leaving two sets of numbers to be reconciled
       // by eye. A stop sitting wide of plan is a fact worth reading, not a bug.
       if(lt||ls){
