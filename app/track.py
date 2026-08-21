@@ -147,6 +147,53 @@ def band_position(cum: float, band: dict | None) -> tuple[int | None, float]:
     return 0, 0.0
 
 
+# ─── adherence ───────────────────────────────────────────────────────────────
+# Did the book follow the engine? Absorbed from /today on 2026-08-21 when the two
+# pages merged. This is NOT the discipline score above: discipline asks whether a
+# trade obeyed its own plan, adherence asks whether a signal existed at all.
+#
+# The trade side is scoped to LENS_BOOK. /today was not, so its fill and orphan
+# counts included every prop attempt — the same bug main.py fixed for /hedge-plan.
+# `signals` has no book column (the engine fires once, not per book), so `fired`
+# is genuinely cross-book and the page says so rather than implying a hedge-only
+# denominator.
+
+ADHERENCE_DAYS = 30
+
+
+def adherence(since: str, until: str) -> dict:
+    """Signals fired vs fills that had one, over [since, until). Counts only."""
+    c = _conn()
+    fired = c.execute(
+        "SELECT COUNT(*) FROM signals WHERE received_at >= ? AND received_at < ?",
+        (since, until)).fetchone()[0]
+    acted = c.execute(
+        "SELECT COUNT(DISTINCT linked_signal_id) FROM trades "
+        "WHERE linked_signal_id IS NOT NULL AND book = ? "
+        "AND opened_at >= ? AND opened_at < ?", (LENS_BOOK, since, until)).fetchone()[0]
+    fills = c.execute(
+        "SELECT COUNT(*) FROM trades WHERE book = ? AND opened_at >= ? AND opened_at < ?",
+        (LENS_BOOK, since, until)).fetchone()[0]
+    orphan = c.execute(
+        "SELECT COUNT(*) FROM trades WHERE linked_signal_id IS NULL AND book = ? "
+        "AND opened_at >= ? AND opened_at < ?", (LENS_BOOK, since, until)).fetchone()[0]
+    c.close()
+    return {"fired": fired, "acted": acted, "fills": fills, "orphan": orphan,
+            "rate": (fills - orphan) / fills if fills else None}
+
+
+def adherence_pair(today: date, days: int = ADHERENCE_DAYS) -> dict:
+    """Yesterday, and the trailing window — the two frames /today showed."""
+    y = today - timedelta(days=1)
+    return {
+        "yesterday": adherence(y.isoformat(), today.isoformat()),
+        "yesterday_date": y.isoformat(),
+        "window": adherence((today - timedelta(days=days)).isoformat(),
+                            (today + timedelta(days=1)).isoformat()),
+        "window_days": days,
+    }
+
+
 # ─── scoring ─────────────────────────────────────────────────────────────────
 
 def score_day(trades: dict | None, decisions: int, cum: float,
@@ -292,6 +339,7 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
             "overall_pct": H.get("overall_pct"),
             "stale": H.get("stack_stale"), "age_days": H.get("stack_age_days"),
         },
+        "adherence": adherence_pair(today),
         "cone": C,
         "actual": actual,
         "balances": balances,

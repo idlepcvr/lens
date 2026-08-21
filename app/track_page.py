@@ -5,6 +5,16 @@ ladders, coverage. That is a monthly question and it reads like one. This page
 answers the daily one: what is the NEXT rung, am I inside the band that gets me
 there, and did today count.
 
+/today merged in here on 2026-08-21. It had been built the day before around the
+same opening number — the next rung — so the two pages led with an identical
+block and disagreed only in how much they said after it. What /today owned alone
+was the adherence count: signals fired against fills that had a signal behind
+them. That is the "Did the book follow the engine?" section, and it sits ABOVE
+the fan on purpose. The fan asks whether the book is on pace; adherence asks
+whether the book is running the system at all, and that question comes first.
+Its trade side is scoped to LENS_BOOK, which /today never was — its fill and
+orphan counts silently included every prop attempt.
+
 Everything below the rung is COLLAPSED by default. At a glance you should see one
 target and whether you are on pace for it; the 30-day detail and the rest of the
 ladder are there when you go looking, not before. Native <details>, so the
@@ -131,6 +141,76 @@ def _score_rows(days: list[dict]) -> str:
             f'<td class="tk-n">{hit}<span class="tk-of">/{n} d</span></td>'
             f'<td class="tk-n tk-tot">{got:g}<span class="tk-of">/{cap:g}</span></td></tr>')
     return "".join(rows)
+
+
+# ─── adherence ───────────────────────────────────────────────────────────────
+# Absorbed from /today on 2026-08-21. The score table below asks whether a trade
+# obeyed its plan; this asks the blunter question underneath it — was there a
+# signal at all. They are deliberately not merged into one number: a book can
+# score full discipline while running entirely off-engine, and that is exactly
+# the state this section exists to make visible.
+
+def _grade(rate: float | None) -> tuple[str, str]:
+    """(class, word). Never colour alone — the word carries the same meaning."""
+    if rate is None:
+        return "na", "nothing to grade"
+    if rate >= 0.70:
+        return "ok", "following the engine"
+    if rate >= 0.40:
+        return "mid", "drifting off the engine"
+    return "bad", "running off-engine"
+
+
+def _adherence(A: dict) -> str:
+    w, y = A["window"], A["yesterday"]
+    cls, word = _grade(w["rate"])
+    pct = "—" if w["rate"] is None else f"{w['rate'] * 100:.0f}%"
+    bar = 0.0 if w["rate"] is None else max(0.0, min(1.0, w["rate"])) * 100
+
+    yd = _date_label(A["yesterday_date"])
+    ytxt = (f"Yesterday · {yd} — {y['fired']} fired, {y['fills']} "
+            f"fill{'' if y['fills'] == 1 else 's'}, {y['orphan']} with no signal"
+            if (y["fired"] or y["fills"])
+            else f"Yesterday · {yd} — nothing fired, nothing filled")
+
+    return f"""
+  <section class="tk-panel tk-adh" aria-label="Signal adherence">
+    <header class="tk-h">
+      <h2>Did the book follow the engine?</h2>
+      <span class="tk-badge">last {A['window_days']} days</span>
+    </header>
+
+    <div class="tk-adh-top">
+      <div class="tk-adh-rate g-{cls}">
+        <b>{pct}</b>
+        <span class="tk-lab">on-signal</span>
+        <div class="tk-bar" role="progressbar" aria-valuenow="{bar:.0f}"
+             aria-valuemin="0" aria-valuemax="100"
+             aria-label="Share of fills that had a signal behind them">
+          <span class="g-{cls}" style="width:{bar:.1f}%"></span>
+        </div>
+      </div>
+      <div class="tk-nums tk-adh-nums">
+        <div><span class="tk-lab">signals fired</span><b>{w['fired']}</b>
+             <span class="tk-eu">engine output</span></div>
+        <div><span class="tk-lab">fills</span><b>{w['fills']}</b>
+             <span class="tk-eu">hedge book</span></div>
+        <div><span class="tk-lab">no signal</span><b class="g-bad">{w['orphan']}</b>
+             <span class="tk-eu">off-engine</span></div>
+      </div>
+    </div>
+
+    <p class="tk-sub"><b>{word}</b> — {w['fills'] - w['orphan']} of {w['fills']}
+       fills had an approved signal behind them. {ytxt}.</p>
+    <p class="tk-sub tk-adh-note">A fill counts as on-signal when
+       <code>database._link_signal</code> claimed one: an <b>approved</b> signal, same
+       direction, entry within tolerance. A signal left pending or expired never
+       links, so a low rate can mean signals were never <em>decided</em> as much as
+       never followed. Fills are the hedge book; <b>signals have no book</b> — the
+       engine fires once — so treat fired as the cross-book total, not a hedge-only
+       denominator. Counts only, no P&amp;L attribution.</p>
+  </section>
+"""
 
 
 # ─── the ladder, and the editor for it ───────────────────────────────────────
@@ -465,7 +545,7 @@ _CSS = """<style>
   padding:18px 18px 20px;margin-top:14px}
 .tk-hero-top{display:flex;align-items:flex-start;gap:14px;justify-content:space-between}
 .tk-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.16em;
-  text-transform:uppercase;color:var(--faint);display:block;margin-bottom:5px}
+  text-transform:uppercase;color:var(--dim);display:block;margin-bottom:5px}
 .tk-rung{font-family:var(--hud);font-size:30px;font-weight:700;color:var(--ink);
   margin:0;line-height:1.05;text-wrap:balance}
 .tk-status{font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.1em;
@@ -477,7 +557,7 @@ _CSS = """<style>
 .tk-nums{display:flex;flex-wrap:wrap;gap:12px 30px;margin:16px 0 13px}
 .tk-nums>div{display:flex;flex-direction:column;gap:1px}
 .tk-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--faint)}
+  text-transform:uppercase;color:var(--dim)}
 .tk-nums b{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--ink)}
 .tk-eu{font-family:var(--mono);font-size:11px;color:var(--dim)}
 .tk-bar{height:8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);
@@ -488,8 +568,44 @@ _CSS = """<style>
 .tk-sub b{color:var(--ink);font-family:var(--mono)}
 .tk-stale{color:var(--amber);margin-left:6px}
 .tk-warn{font-size:12px;line-height:1.55;color:var(--amber);margin:12px 0 0;max-width:74ch}
-.tk-badge{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.tk-badge{font-family:var(--mono);font-size:10px;color:var(--dim)}
 
+/* adherence — absorbed from /today 2026-08-21. Uses the spacing and radius
+   scale theme.py added the same day; the rest of this file predates it and
+   still hard-codes its gaps. The rate keeps its own bar rather than one
+   spanning the panel, which read as an underline of the first count instead
+   of a gauge for the percentage.
+   NB: never write the scale's token names with a star-slash in a comment —
+   the slash closes the comment early and silently eats the rules below it. */
+.tk-adh-top{display:flex;align-items:stretch;gap:var(--s5);flex-wrap:wrap;
+  margin-bottom:var(--s4)}
+.tk-adh-rate{display:flex;flex-direction:column;flex:0 0 auto;min-width:158px}
+.tk-adh-rate b{font-family:var(--mono);font-size:46px;font-weight:800;line-height:.92;
+  color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.tk-adh-rate .tk-lab{margin-top:var(--s2)}
+.tk-adh-rate .tk-bar{margin-top:auto}
+.tk-adh-nums{margin:0;flex:1 1 320px;align-items:center;gap:var(--s3) var(--s5);
+  padding-left:var(--s5);border-left:1px solid var(--line)}
+.tk-adh-note{color:var(--dim);margin-top:var(--s3)}
+.tk-adh-note code{font-family:var(--mono);font-size:11px;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--r1);padding:1px 5px;color:var(--dim)}
+/* grade carries in colour AND in the word beside it, never colour alone */
+.tk-adh-rate.g-ok b{color:var(--long)}
+.tk-adh-rate.g-mid b{color:var(--amber)}
+.tk-adh-rate.g-bad b{color:var(--short)}
+.tk-adh-rate.g-na b{color:var(--dim)}
+.tk-nums b.g-bad{color:var(--short)}
+.tk-bar>span.g-ok{background:var(--long)}
+.tk-bar>span.g-mid{background:var(--amber)}
+.tk-bar>span.g-bad{background:var(--short)}
+.tk-bar>span.g-na{background:var(--line2)}
+@media (max-width:620px){
+  .tk-adh-rate{flex:1 1 100%;min-width:0}
+  .tk-adh-rate .tk-bar{margin-top:var(--s3)}
+  .tk-adh-rate b{font-size:38px}
+  .tk-adh-nums{flex-basis:100%;padding-left:0;padding-top:var(--s4);
+    border-left:0;border-top:1px solid var(--line)}
+}
 /* chart controls */
 .tk-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px}
 .tk-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -516,7 +632,7 @@ _CSS = """<style>
 .tk-cross{stroke:var(--dim);stroke-width:1;stroke-dasharray:2 2;opacity:.7}
 .tk-zero{stroke:var(--line);stroke-width:1.2}
 .tk-grid{stroke:var(--line);stroke-width:.6;opacity:.5}
-.tk-ax{font-family:var(--mono);font-size:9px;fill:var(--faint)}
+.tk-ax{font-family:var(--mono);font-size:9px;fill:var(--dim)}
 .tk-ax-r{text-anchor:end}.tk-ax-c{text-anchor:middle}.tk-ax-e{text-anchor:end}
 .tk-ax-hl{fill:var(--accent)}
 .tk-ax-bad{fill:var(--short)}
@@ -527,7 +643,7 @@ _CSS = """<style>
 .tk-det>summary{list-style:none;cursor:pointer;padding:15px 16px;display:flex;
   align-items:baseline;gap:12px;flex-wrap:wrap;border-radius:13px}
 .tk-det>summary::-webkit-details-marker{display:none}
-.tk-det>summary::after{content:"+";font-family:var(--mono);color:var(--faint);
+.tk-det>summary::after{content:"+";font-family:var(--mono);color:var(--dim);
   margin-left:auto;font-size:14px;line-height:1}
 .tk-det[open]>summary::after{content:"−"}
 .tk-det>summary:hover .tk-sum-h{color:var(--accent)}
@@ -551,19 +667,19 @@ _CSS = """<style>
 .tk-legend .tk-c{flex:none;width:9px}
 .tk-streak{font-family:var(--mono);font-size:11px;color:var(--dim)}
 .tk-streak b{font-size:17px;color:var(--ink);font-weight:800}
-.tk-of{color:var(--faint);font-family:var(--mono);font-size:10px;margin-left:5px}
+.tk-of{color:var(--dim);font-family:var(--mono);font-size:10px;margin-left:5px}
 
 /* score table */
 .tk-score{width:100%;border-collapse:collapse;font-size:12px}
 .tk-score th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--faint);text-align:left;font-weight:400;
+  text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;
   padding:0 8px 7px 0;border-bottom:1px solid var(--line)}
 .tk-score td{padding:9px 8px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .tk-score tfoot td{border-bottom:none;padding-top:11px}
 .tk-w{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--accent);width:26px}
 .tk-k{font-family:var(--hud);font-weight:600;color:var(--ink);white-space:nowrap}
 .tk-note{display:block;font-family:var(--hud);font-weight:400;font-size:10.5px;
-  color:var(--faint);white-space:normal;max-width:30ch;margin-top:2px}
+  color:var(--dim);white-space:normal;max-width:30ch;margin-top:2px}
 .tk-what{color:var(--dim);line-height:1.5}
 .tk-n{font-family:var(--mono);text-align:right;color:var(--dim);white-space:nowrap}
 .tk-tot{color:var(--ink);font-weight:700}
@@ -580,9 +696,9 @@ _CSS = """<style>
 .tk-ladder li.now{background:var(--bg);border:1px solid var(--accent)}
 .tk-ladder li.now b{color:var(--ink)}
 .tk-lb{font-family:var(--mono);font-size:11px;width:74px;text-align:right;flex:none}
-.tk-le{font-family:var(--mono);font-size:11px;color:var(--faint);width:70px;
+.tk-le{font-family:var(--mono);font-size:11px;color:var(--dim);width:70px;
   text-align:right;flex:none}
-.tk-ld{font-family:var(--mono);font-size:11px;color:var(--faint);width:96px;
+.tk-ld{font-family:var(--mono);font-size:11px;color:var(--dim);width:96px;
   text-align:right;flex:none;white-space:nowrap}
 .tk-pin{color:var(--accent);font-size:9px;margin-left:5px}
 
@@ -595,7 +711,7 @@ _CSS = """<style>
 .tk-etw{overflow-x:auto}
 .tk-etab{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;min-width:460px}
 .tk-etab th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--faint);text-align:left;font-weight:400;
+  text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;
   padding:0 6px 6px 0}
 .tk-etab td{padding:3px 6px 3px 0}
 .tk-etab input{background:var(--bg);border:1px solid var(--line);border-radius:6px;
@@ -733,6 +849,7 @@ def parts() -> dict:
        · EUR at {_eur(px)}/₿ {stale}</p>
   </section>
 
+{_adherence(T['adherence'])}
   <section class="tk-panel" aria-label="Projection band">
     <header class="tk-h">
       <h2>Where you should be</h2>

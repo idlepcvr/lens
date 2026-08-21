@@ -944,13 +944,6 @@ class ConfigUpdate(BaseModel):
     btc_growth_monthly:      Optional[float] = None
 
 
-@app.get("/today", response_class=HTMLResponse)
-def today_page():
-    """The next rung, and whether the book followed the engine yesterday."""
-    from .today_page import render
-    return render()
-
-
 class ExecuteRequest(BaseModel):
     direction: str                        # "long" | "short"
     size_btc: float
@@ -2744,6 +2737,11 @@ LEGACY_ROUTES = {
     "/short": "/evidence#verdict",
     "/robustness": "/evidence#luck",
     "/research": "/evidence#notebook",
+    # 2026-08-21: /today merged into /hedge-track. Both opened on the next rung;
+    # /today's unique half was the signal-adherence count, which now lives there
+    # as "Did the book follow the engine?" — scoped to the hedge book on the way
+    # in, which /today never was.
+    "/today": "/hedge-track",
 }
 def _legacy_redirect(new: str):
     # A factory, not a loop closure: closing over the loop variable would send
