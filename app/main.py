@@ -1518,6 +1518,49 @@ def positions_live():
     return {"positions": out}
 
 
+@app.get("/api/orders/live")
+def orders_live():
+    """Resting orders on the exchange — what is actually working, as opposed to
+    what the model planned. Read-only.
+
+    Also returns the prices the triggers fire on, because a stop that triggers
+    on mark and a page that only shows last are two different truths."""
+    out = []
+    for account in ("personal", "biz"):
+        try:
+            key, secret = kraken_sync.get_api_keys(account)
+            out.extend(kraken_sync.fetch_open_orders(key, secret, account))
+        except Exception:
+            pass
+    prices = {}
+    try:
+        from kraken.futures import Market
+        key, secret = kraken_sync.get_api_keys("personal")
+        t = [x for x in Market(key=key, secret=secret).get_tickers()["tickers"]
+             if x.get("symbol") == "PF_XBTUSD"]
+        if t:
+            t = t[0]
+            prices = {"mark": t.get("markPrice"), "index": t.get("indexPrice"),
+                      "last": t.get("last"), "bid": t.get("bid"), "ask": t.get("ask"),
+                      "funding": t.get("fundingRate"),
+                      "high24h": t.get("high24h"), "low24h": t.get("low24h")}
+    except Exception:
+        pass
+    return {"orders": out, "prices": prices}
+
+
+@app.post("/api/orders/cancel")
+def orders_cancel(order_id: str, account: str = "personal"):
+    """Cancel one resting order."""
+    try:
+        from kraken.futures import Trade
+        key, secret = kraken_sync.get_api_keys(account)
+        return {"ok": True, "response": Trade(key=key, secret=secret,
+                sandbox=False).cancel_order(order_id=order_id)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
 @app.get("/api/account/live")
 def account_live():
     """Read-only live balances — no snapshot write. Powers /overview.

@@ -631,6 +631,48 @@ def fetch_open_positions(api_key: str, api_secret: str) -> list[dict]:
     return client.get_open_positions().get("openPositions", [])
 
 
+def fetch_open_orders(api_key: str, api_secret: str, account: str = "") -> list[dict]:
+    """Resting orders on the exchange, normalised.
+
+    This is the difference between what LENS *planned* and what is actually
+    working. The position page has been showing model-derived take-profit and
+    stop-loss levels while the real orders sat here unread — on 2026-08-21 the
+    page implied one pair of levels while Kraken held TP 74464 and stop 70168,
+    both placed from the website.
+
+    `role` is the useful part: a reduce-only take_profit is the trade's target,
+    a reduce-only stp is its stop, anything else is a working entry.
+    """
+    orders = User(key=api_key, secret=api_secret).get_open_orders().get("openOrders", [])
+    out: list[dict] = []
+    for o in orders:
+        otype = (o.get("orderType") or "").lower()
+        reduce_only = bool(o.get("reduceOnly"))
+        if reduce_only and otype in ("take_profit", "takeprofit"):
+            role = "take_profit"
+        elif reduce_only and otype in ("stp", "stop", "stop_loss"):
+            role = "stop_loss"
+        else:
+            role = "entry"
+        out.append({
+            "account":      account,
+            "order_id":     o.get("order_id"),
+            "symbol":       o.get("symbol"),
+            "side":         o.get("side"),
+            "order_type":   otype,
+            "role":         role,
+            "trigger":      o.get("stopPrice"),
+            "limit":        o.get("limitPrice"),
+            "size":         o.get("unfilledSize", o.get("size")),
+            "filled":       o.get("filledSize"),
+            "reduce_only":  reduce_only,
+            "trigger_on":   o.get("triggerSignal"),
+            "status":       o.get("status"),
+            "placed_at":    o.get("receivedTime"),
+        })
+    return out
+
+
 def fetch_open_positions_enriched(api_key: str, api_secret: str, account: str = "") -> list[dict]:
     """Live open positions with the Kraken-style detail: mark price, value,
     unrealised P&L (€ + %), RoE, initial margin, est. liquidation, leverage.

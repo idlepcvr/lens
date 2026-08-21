@@ -47,6 +47,24 @@ _CSS = r"""<style>
 .pz .empty{text-align:center;padding:30px;color:var(--dim);border:1px dashed var(--line2);border-radius:11px}
 </style>"""
 _XCSS = """<style>
+/* Working orders — what is actually resting on the exchange, as opposed to what
+   the ticket above proposes. The two were never shown side by side, which is
+   how the planned levels came to be read as the real ones. */
+.ords{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:12px}
+.ordh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.ord{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:baseline;
+  padding:7px 0;border-bottom:1px solid var(--line);font:400 12px/1.3 var(--mono)}
+.ord:last-child{border-bottom:none}
+.ord .role{font-weight:600}
+.ord.tp .role{color:var(--long)}
+.ord.sl .role{color:var(--short)}
+.ord.entry .role{color:var(--accent)}
+.ord .meta{color:var(--dim);font-size:11px}
+.ord .px{font-weight:600;color:var(--ink);text-align:right}
+.ord button{background:none;border:1px solid var(--line);border-radius:4px;color:var(--dim);
+  font:600 10px/1 var(--mono);padding:5px 8px;cursor:pointer}
+.ord button:hover{color:var(--short);border-color:var(--short)}
+.ordnone{font:400 11px/1.6 var(--mono);color:var(--dim)}
 .si.grow{margin-left:auto;justify-content:flex-end}
 .strip{gap:12px var(--s5)}
 /* ── Polish pass 2026-08-21 ────────────────────────────────────────────────
@@ -124,9 +142,11 @@ _XCSS = """<style>
 .xcl.sm{padding:5px 10px;font-size:10px}
 
 /* Confirm dialog. Native <dialog>: Esc and the backdrop come free. */
-/* A modal <dialog> only centres itself while the UA's own margin:auto survives.
-   The page reset zeroes margins, so it was pinned top-left — set it explicitly
-   rather than relying on the default. */
+/* ROOT CAUSE of the top-left dialog: lens.css carries
+   `*,*::before,*::after{margin:0}`, and that universal reset zeroes the margin
+   on <dialog> as well — which is exactly the `margin:auto` the browser uses to
+   centre a modal. Restating it here wins on specificity (.xdlg beats *).
+   Do not "simplify" this away; the reset will silently un-centre it again. */
 .xdlg{position:fixed;inset:0;margin:auto;height:fit-content;
   max-height:calc(100dvh - 32px);overflow:auto;
   border:1px solid var(--line);border-radius:11px;background:var(--panel);
@@ -325,13 +345,18 @@ def position_page(book: str = "hedge") -> str:
   <div class="sub">""" + sub + r"""</div>
 
   <div class="strip" id="strip">
-    <div class="si"><span class="sl">contract</span><span class="sv" id="s-sym">PF_XBTUSD</span></div>
+    <div class="si"><span class="sl">contract</span><span class="sv" id="s-sym">PF_XBTUSD</span>
+      <span class="xenv" id="s-env">—</span></div>
     <div class="si"><span class="sl">mark</span><span class="sv hero" id="s-mark">—</span></div>
+    <div class="si"><span class="sl">index</span><span class="sv" id="s-index">—</span></div>
+    <div class="si"><span class="sl">last</span><span class="sv" id="s-last">—</span></div>
     <div class="si"><span class="sl">balance</span><span class="sv" id="s-bal">—</span></div>
     <div class="si"><span class="sl">available</span><span class="sv" id="s-avail">—</span></div>
     <div class="si"><span class="sl">open</span><span class="sv" id="s-open">—</span></div>
     <div class="si"><span class="sl">unrealised</span><span class="sv" id="s-upnl">—</span></div>
     <div class="si"><span class="sl">entry · liq</span><span class="sv" id="s-entry">—</span></div>
+    <div class="si"><span class="sl">live TP</span><span class="sv g" id="s-tp">—</span></div>
+    <div class="si"><span class="sl">live SL</span><span class="sv r" id="s-sl">—</span></div>
     <div class="si grow"><span class="sl">&nbsp;</span>
       <button type="button" id="s-close" class="xcl sm" onclick="askClose()" disabled>Close position</button></div>
   </div>
@@ -421,6 +446,11 @@ def position_page(book: str = "hedge") -> str:
     </div>
     <div class="xrow one" id="f-btc">
       <div class="xf"><label>BTC price €</label><input id="p-btc" type="text" inputmode="decimal" placeholder="—"></div>
+    </div>
+
+    <div class="ords" id="x-ords">
+      <div class="ordh"><span class="xl">working orders</span><span class="xl" id="ord-n">—</span></div>
+      <div id="ord-list"></div>
     </div>
 
     <div id="x-gates" class="xgates">—</div>
@@ -873,6 +903,8 @@ async function paintExec(){
     const c=await post('/api/execute/check', t);
     $('x-env').textContent = c.sandbox ? 'DEMO' : 'LIVE';
     $('x-env').className   = 'xenv '+(c.sandbox?'demo':'live');
+    $('s-env').textContent = c.sandbox ? 'DEMO' : 'LIVE';
+    $('s-env').className   = 'xenv '+(c.sandbox?'demo':'live');
     $('d-margin').textContent = c.required_margin_usd!=null ? '$'+c.required_margin_usd.toFixed(2) : '—';
     $('d-cap').textContent    = (+c.size_cap_btc).toFixed(6)+' ₿';
     if(c.ok){
@@ -981,6 +1013,46 @@ async function cancelAll(){
 
 const fU = v => v==null ? '—' : '$'+(+v).toLocaleString(undefined,{maximumFractionDigits:0});
 
+// Resting orders and the prices the triggers fire on. This is the exchange's
+// truth; the ticket above is a proposal. Keeping them visibly separate is the
+// whole point — the planned take-profit was being read as the live one.
+async function loadOrders(){
+  try{
+    const d = await fetch('/api/orders/live').then(r=>r.json());
+    const p = d.prices || {};
+    if(p.mark)  { $('s-mark').textContent  = Math.round(p.mark).toLocaleString('en'); XMARK = p.mark; }
+    if(p.index) { $('s-index').textContent = Math.round(p.index).toLocaleString('en'); }
+    if(p.last)  { $('s-last').textContent  = Math.round(p.last).toLocaleString('en'); }
+
+    const mine = (d.orders||[]).filter(o=>o.account==='personal');
+    const tp = mine.find(o=>o.role==='take_profit');
+    const sl = mine.find(o=>o.role==='stop_loss');
+    $('s-tp').textContent = tp ? fP(tp.trigger) : '—';
+    $('s-sl').textContent = sl ? fP(sl.trigger) : '—';
+
+    $('ord-n').textContent = mine.length ? mine.length+' resting' : 'none';
+    $('ord-list').innerHTML = mine.length ? mine.map(o=>{
+      const cls = o.role==='take_profit' ? 'tp' : o.role==='stop_loss' ? 'sl' : 'entry';
+      const name = o.role==='take_profit' ? 'take profit'
+                 : o.role==='stop_loss'   ? 'stop loss' : (o.order_type+' '+o.side);
+      const px = o.trigger || o.limit;
+      return `<div class="ord ${cls}"><span class="role">${name}</span>`
+        + `<span class="meta">${o.size||''} ${o.reduce_only?'· reduce-only':''}`
+        + ` · on ${o.trigger_on||'—'}</span>`
+        + `<span class="px">${px?fP(px):'—'}</span>`
+        + `<button type="button" onclick="cancelOne('${o.order_id}')">cancel</button></div>`;
+    }).join('') : '<div class="ordnone">Nothing resting on the exchange.</div>';
+  }catch(e){}
+}
+
+async function cancelOne(id){
+  $('x-msg').textContent='cancelling…';
+  const r = await fetch('/api/orders/cancel?order_id='+encodeURIComponent(id),
+                        {method:'POST'}).then(r=>r.json());
+  $('x-msg').textContent = r.ok ? '✓ order cancelled' : '✗ '+(r.error||'failed');
+  loadOrders(); loadLive();
+}
+
 async function loadLive(){
   try{
     const a=await fetch('/api/account/live').then(r=>r.json());
@@ -1012,6 +1084,7 @@ async function loadLive(){
       $('s-open').textContent='flat'; $('s-open').className='sv';
       $('s-entry').textContent='—';
     }
+    loadOrders();
   }catch(e){}
 }
 
