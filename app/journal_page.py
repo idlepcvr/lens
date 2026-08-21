@@ -155,6 +155,7 @@ let TRADES=[], CANDLES=[], VISIBLE=[], SEL=null;
 const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
+let LIVE_ORDERS={};    // role -> the resting order actually on the exchange
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>v==null?'—':(v<0?'-':'+')+'€'+Math.abs(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const usd=(v)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:0});
@@ -176,10 +177,19 @@ async function loadOpenPositions(){
   try{
     // Open trades logged from /position carry their own tp/sl. Key them by entry
     // so a live Kraken position can be matched to the plan recorded for it.
-    const [d,lvl,logged]=await Promise.all([
+    const [d,lvl,logged,live]=await Promise.all([
       fetch('/api/positions/live').then(r=>r.json()),
       goalLevels(),
-      fetch('/api/review/trades?book='+BOOK).then(r=>r.json()).catch(()=>[])]);
+      fetch('/api/review/trades?book='+BOOK).then(r=>r.json()).catch(()=>[]),
+      fetch('/api/orders/live').then(r=>r.json()).catch(()=>({orders:[]}))]);
+    // The exchange's own resting orders. Everything else on this card is a plan
+    // — something LENS intended. These are the only levels that will actually
+    // fire, and until now the card never showed them, so a model-derived target
+    // read as if it were live.
+    LIVE_ORDERS={};
+    ((live&&live.orders)||[]).filter(o=>o.account==='personal').forEach(o=>{
+      if(o.role==='take_profit'||o.role==='stop_loss') LIVE_ORDERS[o.role]=o;
+    });
     // Match on direction + recency, not exact entry: Kraken reports an average
     // fill price that rarely equals the entry you logged, so keying on price
     // silently never matches. Most recent open trade per side wins.
@@ -202,6 +212,17 @@ async function loadOpenPositions(){
       // and a card that always shows the config is describing a trade you may
       // not have taken. Falls back to the Goal levels only when nothing is
       // stored, and says which of the two it is showing.
+      // What is actually working, before anything we intended.
+      const lt=LIVE_ORDERS.take_profit, ls=LIVE_ORDERS.stop_loss;
+      let liveSec='';
+      if(lt||ls){
+        const lp=(o)=>o?(o.trigger||o.limit):null;
+        const dist=(v)=>v==null?'':` <small>${((v-p.entry)/p.entry*100).toFixed(2)}%</small>`;
+        liveSec=`<div class="opsec">Working on the exchange <small style="color:var(--dim)">(these are the orders that will fire)</small></div>`
+          +row('Take profit', lt?usd(lp(lt),1)+dist(lp(lt)):'none resting', lt?'g':'dim')
+          +row('Stop loss',   ls?usd(lp(ls),1)+dist(lp(ls)):'none resting', ls?'r':'dim')
+          +row('Triggers on', (lt||ls) ? ((lt||ls).trigger_on||'—') : '—','dim');
+      }
       const own = LOGGED_PLANS[p.direction] || null;
       if(own && own.tp!=null && own.sl!=null){
         const tp=own.tp, sl=own.sl;
@@ -224,6 +245,19 @@ async function loadOpenPositions(){
           +row('Expected loss',`${sUsd(-loss)} <small>${pc(-lvl.sl*100)}</small>`,'r')
           +row('R:R',lvl.rr!=null?lvl.rr.toFixed(2):(lvl.tp/lvl.sl).toFixed(2),'dim');
       } else { plan=`<div class="opsec">Plan</div>`+row('levels','set Goal config to see plan','dim'); }
+      // Name the gap rather than leaving two sets of numbers to be reconciled
+      // by eye. A stop sitting wide of plan is a fact worth reading, not a bug.
+      if(lt||ls){
+        const planTp = own&&own.tp!=null ? own.tp : (lvl? (isL?p.entry*(1+lvl.tp):p.entry*(1-lvl.tp)) : null);
+        const planSl = own&&own.sl!=null ? own.sl : (lvl? (isL?p.entry*(1-lvl.sl):p.entry*(1+lvl.sl)) : null);
+        const gaps=[];
+        const g=(label,live,plan)=>{ if(live==null||plan==null) return;
+          const d=live-plan; if(Math.abs(d)/plan>0.001) gaps.push(`${label} ${d>0?'+':''}${d.toFixed(0)}`); };
+        g('TP', lt?(lt.trigger||lt.limit):null, planTp);
+        g('SL', ls?(ls.trigger||ls.limit):null, planSl);
+        if(gaps.length) plan += row('Live vs plan', gaps.join(' · ')+' <small>USD</small>','a');
+      }
+      plan = liveSec + plan;
       const upe=p.upnl_eur||0;
       return `<div class="opcard ${isL?'long':'short'}">
         <div class="top"><div><div class="ven">${p.venue}</div><div class="mkt">${p.symbol}</div></div>
