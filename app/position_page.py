@@ -47,6 +47,27 @@ _CSS = r"""<style>
 .pz .empty{text-align:center;padding:30px;color:var(--dim);border:1px dashed var(--line2);border-radius:11px}
 </style>"""
 _XCSS = """<style>
+/* The live price belongs where the order is built, not only in the strip. */
+.tick{font:700 13px/1 var(--mono);color:var(--accent)}
+.tick small{font-weight:400;color:var(--dim);font-size:10px;margin-left:5px}
+
+/* Colour carries meaning, and two axes were being conflated. Outcomes are
+   green, red and amber. Entry and breakeven are neither good nor bad — they are
+   facts about where the position sits — so they read as plain text, and the
+   accent is freed for the one thing that actually moves: the live price. */
+.sv.be{color:var(--dim)}
+.sv.a{color:var(--amber)}
+
+.dsize{padding:10px 18px 0}
+.dsize label{display:block;font:400 10px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.dsize-r{display:grid;grid-template-columns:1fr auto auto auto;gap:7px}
+.dsize-r input{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;
+  color:var(--ink);font:600 13px/1.2 var(--mono);padding:8px 10px;width:100%}
+.dsize-r input:focus{outline:none;border-color:var(--accent)}
+.dsize-r button{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;
+  color:var(--dim);font:600 11px/1 var(--mono);padding:8px 10px;cursor:pointer}
+.dsize-r button:hover{color:var(--ink);border-color:var(--dim)}
 .mread{margin:10px 0 2px;border-top:1px solid var(--line);padding-top:9px}
 .mrh{font:600 10px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);margin-bottom:7px;display:flex;justify-content:space-between;gap:8px}
@@ -377,7 +398,9 @@ def position_page(book: str = "hedge") -> str:
     <div class="si"><span class="sl">available</span><span class="sv" id="s-avail">—</span></div>
     <div class="si"><span class="sl">open</span><span class="sv" id="s-open">—</span></div>
     <div class="si"><span class="sl">unrealised</span><span class="sv" id="s-upnl">—</span></div>
-    <div class="si"><span class="sl">entry · liq</span><span class="sv" id="s-entry">—</span></div>
+    <div class="si"><span class="sl">entry</span><span class="sv" id="s-entry">—</span></div>
+    <div class="si"><span class="sl">breakeven</span><span class="sv" id="s-be">—</span></div>
+    <div class="si"><span class="sl">liquidation</span><span class="sv a" id="s-liq">—</span></div>
     <div class="si"><span class="sl">live TP</span><span class="sv g" id="s-tp">—</span></div>
     <div class="si"><span class="sl">live SL</span><span class="sv r" id="s-sl">—</span></div>
     <div class="si grow"><span class="sl">&nbsp;</span>
@@ -389,7 +412,7 @@ def position_page(book: str = "hedge") -> str:
   <div id="xbar" class="xw" style="display:none">
     <div class="xh">
       <span class="xt">Order</span>
-      <span class="xhr"><span id="x-mark" class="xl">mark —</span><span id="x-env" class="xenv">—</span></span>
+      <span class="xhr"><span id="x-tick" class="tick">—</span><span id="x-env" class="xenv">—</span></span>
     </div>
 
     <div class="seg bseg" id="book-preset-row">
@@ -508,6 +531,15 @@ def position_page(book: str = "hedge") -> str:
 <dialog id="x-dlg" class="xdlg">
   <div class="dh"><span id="dlg-t">Confirm order</span><span id="dlg-env" class="xenv">—</span></div>
   <div class="dlead" id="dlg-lead">—</div>
+  <div id="dlg-size" class="dsize" style="display:none">
+    <label>Close how much</label>
+    <div class="dsize-r">
+      <input id="dlg-qty" type="text" inputmode="decimal" oninput="closeQtyEdited()">
+      <button type="button" onclick="setClosePct(25)">25%</button>
+      <button type="button" onclick="setClosePct(50)">50%</button>
+      <button type="button" onclick="setClosePct(100)">all</button>
+    </div>
+  </div>
   <div class="xdetail">
     <div class="xd"><span>Order</span><span id="d-inc">—</span></div>
     <div class="xd"><span>Take profit</span><span id="d-tp">—</span></div>
@@ -926,7 +958,6 @@ async function paintExec(){
   if(!XFULL) return;
   const t=ticket();
   const lev=t.leverage, r=ref();
-  $('x-mark').textContent = XMARK ? 'mark '+XMARK.toFixed(1) : 'mark —';
   $('d-inc').textContent  = (dir==='long'?'Long ':'Short ')+xqty().toFixed(6)+' BTC';
   $('d-liq').textContent  = XLIQ ? '$'+XLIQ.toFixed(0) : '—';
   $('d-fee').textContent  = r ? '$'+(xqty()*r*0.0005).toFixed(4) : '—';
@@ -1007,6 +1038,23 @@ async function askExec(){
   $('x-dlg').showModal();
 }
 
+function setClosePct(pct){
+  if(!XOPEN) return;
+  $('dlg-qty').value = (Number(XOPEN.size)*pct/100).toFixed(6);
+  closeQtyEdited();
+}
+
+function closeQtyEdited(){
+  const q = parseFloat($('dlg-qty').value);
+  if(!XOPEN || !isFinite(q) || q<=0) return;
+  const full = Math.abs(q - Number(XOPEN.size)) < 1e-9;
+  $('dlg-lead').textContent = (full?'Close ':'Trim ')+q.toFixed(6)+' BTC '+XOPEN.direction
+    + (full?'':' of '+XOPEN.size);
+  $('dlg-go').textContent = full ? 'Close position' : 'Trim position';
+  $('d-inc').textContent = 'Reduce-only market order, '+q.toFixed(6)+' BTC';
+  if(PENDING) PENDING.t.size_btc = q;
+}
+
 async function askClose(){
   if(!XOPEN){ $('x-msg').textContent='no open position'; return; }
   const t = {direction:XOPEN.direction, size_btc:XOPEN.size, order_type:'mkt',
@@ -1024,6 +1072,10 @@ async function askClose(){
                   size_btc: XOPEN.size, order_type:'mkt'});
   $('d-inc').textContent   = 'Reduce-only market order, '+XOPEN.size+' BTC';
   $('d-tp').textContent='—'; $('d-sl').textContent='—';
+  // Closing all of it is one option among several, not the only one.
+  $('dlg-size').style.display='block';
+  $('dlg-qty').value = Number(XOPEN.size).toFixed(6);
+  closeQtyEdited();
   $('x-dlg').showModal();
 }
 
@@ -1117,6 +1169,11 @@ async function loadOrders(){
     const d = await fetch('/api/orders/live').then(r=>r.json());
     const p = d.prices || {};
     if(p.mark)  { $('s-mark').textContent  = Math.round(p.mark).toLocaleString('en'); XMARK = p.mark; }
+    // The ticker sits with the order form because that is where it is read.
+    // `last` is what a limit fills against; mark is what triggers and liquidation
+    // use, so both are shown rather than picking one and being wrong half the time.
+    if(p.last) $('x-tick').innerHTML = Math.round(p.last).toLocaleString('en')
+      + `<small>last · mark ${p.mark?Math.round(p.mark).toLocaleString('en'):'—'}</small>`;
     if(p.index) { $('s-index').textContent = Math.round(p.index).toLocaleString('en'); }
     if(p.last)  { $('s-last').textContent  = Math.round(p.last).toLocaleString('en'); }
 
@@ -1174,11 +1231,18 @@ async function loadLive(){
       $('s-upnl').textContent  = (up>=0?'+':'')+'€'+up.toFixed(2)
                                  +' · '+(o.roe_pct||0).toFixed(1)+'% RoE';
       $('s-upnl').className    = 'sv '+(up>=0?'g':'r');
-      $('s-entry').textContent = fU(o.entry)+' · '+fU(o.liquidation);
+      $('s-entry').textContent = fU(o.entry);
+      $('s-liq').textContent   = fU(o.liquidation);
+      // Breakeven is entry plus the round-trip fee, which is the price at which
+      // closing stops costing money — not the same as entry, and not shown until now.
+      const feeRt = 0.001;
+      const be = o.direction==='long' ? o.entry*(1+feeRt) : o.entry*(1-feeRt);
+      $('s-be').textContent = fU(be);
+      $('s-be').className = 'sv be';
       $('s-mark').textContent  = o.mark ? Math.round(o.mark).toLocaleString('en') : '—';
     } else {
       $('s-open').textContent='flat'; $('s-open').className='sv';
-      $('s-entry').textContent='—';
+      $('s-entry').textContent='—'; $('s-be').textContent='—'; $('s-liq').textContent='—';
     }
     loadOrders();
   }catch(e){}
