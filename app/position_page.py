@@ -47,6 +47,17 @@ _CSS = r"""<style>
 .pz .empty{text-align:center;padding:30px;color:var(--dim);border:1px dashed var(--line2);border-radius:11px}
 </style>"""
 _XCSS = """<style>
+.mread{margin:10px 0 2px;border-top:1px solid var(--line);padding-top:9px}
+.mrh{font:600 10px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:7px;display:flex;justify-content:space-between;gap:8px}
+.mrh .tally{letter-spacing:0;text-transform:none}
+.mr{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:baseline;
+  padding:5px 0;font:400 11px/1.4 var(--mono);border-bottom:1px solid var(--line)}
+.mr:last-child{border-bottom:none}
+.mr .n{color:var(--dim);white-space:nowrap}
+.mr .v{font-weight:600;color:var(--ink);text-align:right;white-space:nowrap}
+.mr .t{font-size:10px}
+.mr.bull .t{color:var(--long)} .mr.bear .t{color:var(--short)} .mr.flat .t{color:var(--dim)}
 /* The veto asks rather than refuses. A blocked entry is the most interesting
    signal in the system — he has seen something the rules do not encode — and
    refusing it just moves the trade to his phone where nothing can measure it. */
@@ -468,6 +479,7 @@ def position_page(book: str = "hedge") -> str:
       <div class="ovrh">The scanner says no. What do you see?</div>
       <textarea id="x-ovr-why" rows="2" oninput="paintExec()"
         placeholder="e.g. momentum break above 75.3k with the daily trend, FVG retrace already filled"></textarea>
+      <div class="mread" id="x-mread"></div>
       <div class="ovrn" id="x-ovr-n">Recorded with the trade, so it can be checked against the outcome later.</div>
     </div>
     <div class="xbtns">
@@ -929,6 +941,7 @@ async function paintExec(){
       ? c.reasons.some(r=>r.startsWith('no_setup')||r.startsWith('setup_veto'))
       : c.overriding);
     $('x-ovr').style.display = setupBlocked ? 'block' : 'none';
+    if(setupBlocked) loadMarketRead(); else MREAD_DIR = null;
     if(setupBlocked) $('x-ovr-n').textContent = c.overriding
       ? 'Recorded with the trade — ' + c.setup_note
       : 'The scanner: ' + c.setup_note + '. Say what you see and it goes through, logged.';
@@ -1044,6 +1057,26 @@ const fU = v => v==null ? '—' : '$'+(+v).toLocaleString(undefined,{maximumFrac
 // Resting orders and the prices the triggers fire on. This is the exchange's
 // truth; the ticket above is a proposal. Keeping them visibly separate is the
 // whole point — the planned take-profit was being read as the live one.
+// The argument behind the refusal. A verdict with a hit rate attached is not a
+// case; these are the readings he actually trades off, each with a stance, so
+// going against the scanner is a decision rather than a shrug.
+let MREAD_DIR = null;
+async function loadMarketRead(){
+  if(MREAD_DIR === dir) return;             // only refetch when the side changes
+  MREAD_DIR = dir;
+  try{
+    const d = await fetch('/api/market/read?direction='+dir).then(r=>r.json());
+    if(!d.ok){ $('x-mread').innerHTML=''; return; }
+    const tally = `<span class="tally">${d.agree} agree · <b>${d.against} against</b> your ${dir}</span>`;
+    $('x-mread').innerHTML =
+      `<div class="mrh"><span>What the market reads — 1h</span>${tally}</div>`
+      + d.readings.map(r=>`<div class="mr ${r.stance}">`
+          + `<span class="n">${r.name}</span>`
+          + `<span class="t">${r.note}</span>`
+          + `<span class="v">${r.value}</span></div>`).join('');
+  }catch(e){ $('x-mread').innerHTML=''; }
+}
+
 async function loadOrders(){
   try{
     const d = await fetch('/api/orders/live').then(r=>r.json());

@@ -1563,6 +1563,15 @@ def orders_cancel(order_id: str, account: str = "personal"):
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
 
 
+@app.get("/api/market/read")
+def market_read(direction: str = "long"):
+    """The briefing shown before he trades against the scanner: RSI, MACD, the
+    moving averages, Bollinger position and ATR, each with a stance and a
+    sentence, from the locally cached candles."""
+    from .market_read import read
+    return read(direction)
+
+
 @app.get("/api/veto-overrides")
 def veto_overrides(limit: int = Query(50, ge=1, le=500)):
     """Trades taken against the scanner, with the reasoning attached. The
