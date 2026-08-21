@@ -2,8 +2,174 @@
 
 [Open as HTML](CHANGELOG.html)
 
-Dated build history, newest first. Forward-looking plan and open next-steps
-live in `LENS_PLAN.md`; commit detail is in `git log`.
+Dated build history, newest first. Open next-steps live in
+`NEXT_SESSION.md`; commit detail is in `git log`.
+
+---
+
+## 2026-08-22
+
+**The ladder got phases, and then got rounded.** The rates had run 100/50/10
+since v7 but lived only as prose inside `amendment_reason`, so nothing could read
+them and no page could say which phase you were in. `goal_plan.phases` is a real
+column now — `[{name, to_btc, rate_monthly}]` — carried through `amend()` with an
+additive migration; NULL parses as `[]`, since every plan up to v7 genuinely was
+one flat rate.
+
+**v8 compounded exactly and produced rungs like `0.01489`, `1.90592`,
+`73.26997`.** Correct and unusable — a rung is something you hold in your head
+between now and hitting it. v9 snaps each target to the nearest human number the
+phase rate implies, ties rounding **up** so no step is quietly made easier. The
+standard 1‑1.5‑2‑3‑5‑7.5 log-scale mantissa set reproduces his own sequence
+exactly; phase 3 snaps to multiples of five instead, since that set is far too
+coarse to land a 10% step at 50–150 ₿.
+
+⚠️ **Rungs overshoot phase boundaries rather than being capped at them.** Capping
+discards the growth above the boundary — at 0.95 ₿ a double gives 1.9, and a
+ladder insisting the rung is "1.0" is behind reality the moment it clears. But
+rounding costs the schedule the other way: v8 reached 150 in 24 steps *only* by
+overshooting 50 to 73.3, so the rounded ladder is genuinely slower and the final
+rung is dated to the north star date rather than a month past it.
+
+**The cone stopped quoting nine figures.** It compounds one risk appetite to the
+horizon, so upper percentiles run away. Reported percentiles now bend toward a
+€40M ceiling — below a €20M knee they pass through untouched, above it they
+approach and never arrive. Applied to the **reported** percentiles, not the
+simulation: capping the paths themselves would change the odds the band claims to
+describe while still calling it a percentile.
+
+---
+
+## 2026-08-21 (later) — Track rebuilt
+
+**`/today` folded into `/hedge-track` one day after being built.** Both opened on
+the same block and `/hedge-track`'s was strictly richer. What `/today` owned alone
+was the signal-adherence count; that survived, the duplicate did not. It 301s
+through the existing `LEGACY_ROUTES` table rather than a new handler.
+
+⚠️ `/today`'s fill and orphan counts were never scoped to `LENS_BOOK`, so they
+silently included every prop attempt — the same bug `main.py` had already fixed
+for `/hedge-plan`. No prop trades fell in the window, so the numbers did not
+move; the next eval would have moved them.
+
+**The fan became a real chart.** TradingView Lightweight Charts, **vendored** into
+`app/vendor/` and served from `/assets` — `/analytics` had been pulling it from a
+CDN, which contradicted the no-network rule the rest of the app keeps. Drag to
+pan, scroll to zoom, crosshair that reads the band under the cursor.
+
+Bands are four **opaque** area series blended against the panel colour, not
+translucent overlays: an area series fills to the bottom of the pane, so
+translucent bands stack where they overlap and the P25–P75 core comes out darker
+than its own edges.
+
+**New `Next 14 days` range.** `cone()` anchors at the month start and steps per
+trade, which makes it useless for "where should tomorrow land" — by the time it
+reaches tomorrow it has spent its variance on days already past. `cone.near()`
+anchors on today and steps per calendar **day**. Days sharing a trade count share
+a band, so a day the measured rate says he would not trade reads flat.
+
+**`Next steps` — the rung divided by the trades left.** "62% of the way to M1" is
+true and useless at the moment of a trade. `track.step_plan()` divides by expected
+**trades** (`days_left × trades_per_day`), not days, because a per-day figure
+assumes he trades every day and the ledger says otherwise. Drawn as a staircase:
+the point is that the step is small and countable.
+
+⚠️ Three chart bugs, all self-inflicted and all invisible: `fitContent()` on the
+rung range fitted *every* series including a year of balance history, squashing
+the cone behind a €10k spike from February; the chart was sized from the element
+it then resized, so the observer read back its own output and ratcheted to 560px
+inside a 310px wrapper; and `.tk-fan{min-width:560px}` had survived from the SVG
+era, which was the *actual* source of the phone overflow the wrapper-sizing had
+been treating as a symptom.
+
+**Track cut to three things.** Three paragraphs of prose under the chart deleted —
+it already draws the band and the ruin floor. Signal adherence and the 30-day
+score moved to `/hedge-analytics` under **Review**: they answer "how have I been
+behaving", which is not a question to read before an entry. Renamed to what things
+are rather than the question they were built to answer — **Tracker**, **Next
+steps**, **Milestones**, **Edit milestones**, **Signal quality**. Every section
+collapses and remembers its state.
+
+⚠️ Ten rules painted read text with `--faint`, documented in `theme.py` as a
+decoration token at 2.26–2.47:1 against `PRODUCT.md`'s 4.5:1 requirement. All
+moved to `--dim`.
+
+---
+
+## 2026-08-21 — LENS places orders
+
+**Watch-only honesty retired as a design principle.** The ledger had 147 signals
+fired against 4 acted on: a decision made twice is a decision usually not made,
+and the cost of that gap was larger than the risk the rule guarded. LENS now
+places HEDGE entries with bracketed reduce-only TP/SL, every gate evaluated
+before send, nothing sent without an explicit confirm.
+
+**"Sent" is no longer the claim.** After a send the page polls the exchange for
+5s and reports what actually changed, or warns that nothing did. A rejected order
+used to report as sent.
+
+**Partial close, and a live ticker in the ticket.** Before this, Close shut the
+entire position — the dialog offered no size but all of it. It now carries the
+amount with 25/50/all and relabels itself **Trim** vs **Close**.
+
+⚠️ **The journal was borrowing plans from other trades.** Matching was direction +
+recency only, so a 15-day-old plan claimed a current position. A logged plan must
+now be ≤7 days old and within 5% of the actual fill. Three phantom rows (#940,
+#860, #784) from `Log as open trade` were deleted — that button still writes rows
+nothing ever closes.
+
+⚠️ **Size ceiling was computed on total balance, not free margin.** Corrected.
+
+---
+
+## 2026-08-09
+
+**`/hedge-track` added** — the next rung, the projection band, and whether today
+counted, with everything below the rung collapsed by default. The ladder became
+editable inline, posting the whole milestone list through the same versioned,
+reason-required amendment path as any other plan change.
+
+**README rewritten as the thing it describes** rather than a deploy note.
+
+---
+
+## 2026-08-01 → 2026-08-06 — the edge, measured properly
+
+**The geometry was derived instead of fitted:** 0.63/1.5 → 1.42/5.66. Replaying
+514 real entries showed the edge sits at *low* R:R and dies out of sample.
+
+**One edge survived all four gates** — non-VETO shorts at R:R 1, through
+permutation, sweep and leave-one-month-out. Everything else did not.
+
+⚠️ **`FRICTION_PCT` was 0.30 against a measured 0.085**, and three tests had
+encoded the old value. The desk ticket quoted maker fees while the book paid
+taker. Both surfaces now price measured friction.
+
+⚠️ **The 68.1% counted trades he could not have taken** — one position at a time
+is a real constraint and the backtest had ignored it.
+
+**Chart patterns tested as a cadence fix:** 1 survivor in 318 cells. Trade-every-
+clean-bar fails sequentially at every cap and fee model — the selection *before*
+the veto filter is load-bearing.
+
+**Public site split out of the cockpit** — `/about` is the story, `/philosophy`
+the system, both drawn rather than written.
+
+---
+
+## 2026-07-25 → 2026-07-31
+
+**S2–S5 disarmed: the mined edge did not survive out of sample.** The front door
+was redrawn around five pictures and the claim the ledger denies was cut.
+
+**The breeder's champions must now beat a direction-matched baseline** — beating
+one is not the same as making money.
+
+**The VETO rules were tested as the scanner itself.** They cannot be, and the
+reason is now recorded rather than assumed.
+
+⚠️ **Veto stats now come from the ledger.** The frozen ones had inverted the
+finding.
 
 ---
 

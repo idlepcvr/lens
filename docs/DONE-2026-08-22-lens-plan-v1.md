@@ -1,8 +1,26 @@
-# LENS — Build Plan v1
+# DONE — LENS Build Plan v1 (archived 2026-08-22)
 
-[Open as HTML](LENS_PLAN.html)
-*Replacing PRISM v0.1 as the production trading system.*
-*Created: 2026-05-25 — Target v1 ship: 2026-07-20 (8 weeks)*
+[Open as HTML](DONE-2026-08-22-lens-plan-v1.html)
+
+*Archived, not deleted. This was the v1 build plan, written 2026-05-25 against
+an 8-week target. v1 shipped; the loop has been live since 2026-06-16 and has
+placed live orders since 2026-08-20.*
+
+**Two reasons it is archived rather than updated.** Its open items were last
+touched 2026-07-14 and every one of them has either shipped or moved to
+`NEXT_SESSION.md`. And it contradicts itself on the goal — line ~20 calls
+"50 BTC by 2028-12-31, goal_plan v1" settled, while the closing line says
+"150 BTC @ €250k target". The second is the live one: `goal_plan` is at **v9**,
+north star **150 ₿**, with 50 ₿ as the waypoint.
+
+**Where its job went:** open work is `NEXT_SESSION.md`, shipped history is
+`CHANGELOG.md`, and what the product *is* lives in `PRODUCT.md`. Three files with
+one owner each, rather than a fourth drifting between them.
+
+Kept because the reasoning below — especially "let the data do its job, don't
+preempt v2 decisions" — is the reasoning the project has actually followed.
+
+---
 
 ---
 

@@ -24,7 +24,7 @@ from .theme import shell
 
 DOCS = [
     ("readme",    "README",    "README.md",     "what it is, how to run it"),
-    ("plan",      "Plan",      "LENS_PLAN.md",  "the build plan + open items"),
+    ("next",      "Next",      "NEXT_SESSION.md",  "open items, verified each session"),
     ("changelog", "Changelog", "CHANGELOG.md",  "what shipped, and what broke"),
     ("product",   "Product",   "PRODUCT.md",    "who it's for, what it's for"),
     ("brand",     "Brand",     "BRAND.md",      "how it should look and sound"),
