@@ -46,39 +46,67 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 <body><main>
 <h1>LENS — Next session</h1>
 <p><a href="NEXT_SESSION.html">Open as HTML</a></p>
-<p><em>Written 2026-08-22. The previous list is archived at <code>docs/DONE-2026-08-22-track-rebuild-phased-ladder.md</code> — Track rebuilt, the ladder phased and rounded to plan v9, the cone given a ceiling. Every item below was checked against the code or the database on 2026-08-22, not carried forward on faith.</em></p>
+<p><em>Written 2026-08-22. Previous list archived at <code>docs/DONE-2026-08-22-track-rebuild-phased-ladder.md</code>. Every item checked against the code or the database, not carried forward on faith.</em></p>
 <hr>
-<h2>🔴 The only thing that matters</h2>
-<p>The ladder needs <strong>+2.14% per trade</strong> through Acceleration. The ledger says the edge is negative:</p>
-<div class=tw><table><thead><tr><th></th><th>measured</th><th>expectancy</th></tr></thead><tbody><tr><td>all time (527 trades)</td><td>WR 39.1%, RR 1.32</td><td><strong>−0.206 R/trade</strong></td></tr><tr><td>last 90 days (84)</td><td>WR 32.1%, RR 1.54</td><td><strong>−0.260 R/trade</strong></td></tr></tbody></table></div>
-<p>No position size converts a negative expectancy into a positive one — it only changes how fast it plays out. At the measured 39% win rate, risking 2% per trade:</p>
-<div class=tw><table><thead><tr><th>RR</th><th>per trade</th><th></th></tr></thead><tbody><tr><td>1.32 (current)</td><td>−0.41%</td><td></td></tr><tr><td>2.00</td><td>+0.12%</td><td>18× short of what the ladder needs</td></tr><tr><td>3.00</td><td>+0.90%</td><td></td></tr><tr><td>5.00</td><td><strong>+2.47%</strong></td><td>clears it</td></tr></tbody></table></div>
-<p><strong>The lever is the reward multiple, not the risk amount.</strong> Everything else on this list is instrumentation; none of it moves this number.</p>
-<p>The <code>veto_overrides</code> table now has <strong>4 rows</strong> — the first labelled examples in the only experiment that matters: do the discretionary reads beat the rules, or fund them? Four is not yet a population. It is a start.</p>
+<h2>🔴 1 · Point the miner at the overrides</h2>
+<p><strong>This is the whole next session. Everything else here can wait.</strong></p>
+<h3>What was found on 2026-08-22</h3>
+<p>Splitting the hedge book by <code>setup_tag</code> — what the scanner saw at the moment each trade was opened:</p>
+<div class=tw><table><thead><tr><th>scanner said</th><th>trades</th><th>total</th><th>avg/trade</th><th>win rate</th></tr></thead><tbody><tr><td><strong>a setup fired</strong></td><td>93</td><td><strong>+€3,853</strong></td><td><strong>+€41.43</strong></td><td><strong>57.0%</strong></td></tr><tr><td>nothing</td><td>97</td><td>−€2,440</td><td>−€25.16</td><td>35.1%</td></tr><tr><td><strong>VETO — do not take</strong></td><td>337</td><td><strong>−€5,944</strong></td><td>−€17.64</td><td>35.3%</td></tr></tbody></table></div>
+<p><strong>The system&#x27;s edge is strongly positive.</strong> The aggregate is negative only because 434 of 527 trades were taken outside it. Any earlier note in this repo claiming &quot;the measured edge is negative, you need 5R&quot; was reading one number across three populations — it is wrong and this table supersedes it.</p>
+<h3>Where the overrides split</h3>
+<div class=tw><table><thead><tr><th>veto combination</th><th>n</th><th>total</th><th>avg</th><th>win%</th></tr></thead><tbody><tr><td><code>rsi_neutral,fvg_entry</code></td><td>13</td><td>+€1,329</td><td>+€102.22</td><td>30.8%</td></tr><tr><td><code>slope_against</code></td><td>23</td><td>+€265</td><td>+€11.53</td><td>47.8%</td></tr><tr><td><code>rsi_neutral</code></td><td>57</td><td>−€13</td><td>−€0.23</td><td>38.6%</td></tr><tr><td><code>slope_against,sweep_fade,pd_raid_fade</code></td><td>46</td><td>−€1,925</td><td>−€41.84</td><td>32.6%</td></tr><tr><td><code>ny_pm_kz</code></td><td>14</td><td>−€1,434</td><td>−€102.40</td><td>35.7%</td></tr><tr><td><code>slope_against,pd_raid_fade</code></td><td>15</td><td>−€1,753</td><td>−€116.89</td><td>20.0%</td></tr></tbody></table></div>
+<p>⚠️ <strong><code>rsi_neutral,fvg_entry</code> does not survive inspection.</strong> Two trades (2026-02-23 +€792, 2026-02-28 +€1,030, both shorts, five days apart) carry the whole result. The other eleven total <strong>−€493</strong>. It is one good week, not a setup. 11 of the 13 were shorts and all three longs lost.</p>
+<p><code>slope_against</code> alone is the more credible candidate <em>because</em> it is unspectacular — 23 trades, no single trade carrying it, win rate near coin-flip with a positive tail.</p>
+<h3>The job</h3>
+<p>Point <code>research/edge_miner.py</code> at the <strong>override population specifically</strong> and run it through the gates that already exist — <code>perm_test.py</code>, <code>filter_significance.py</code>, the sweep and leave-one-month-out. The question is narrow and has a yes/no answer:</p>
+<blockquote>Does any veto combination survive permutation testing when overridden?</blockquote>
+<p><strong>This is not &quot;build more strategies.&quot;</strong> That is the job that cannot be started. This is a script run against data already on disk, and it returns either a name or a no. The machinery was built in early August — see the commits <em>&quot;Find the one edge that survives all four gates&quot;</em> and <em>&quot;Robustness: the non-VETO short filter survives permutation, sweep and LOMO&quot;</em>. It has never been aimed here.</p>
+<p>Anything that survives becomes a named setup, which turns an override into a signal — and the override stops being a rule-break.</p>
+<hr>
+<h2>2 · A monthly review that actually exists</h2>
+<p>There is no surface and no ritual for reviewing the book. Consequences, both already visible:</p>
+<ul>
+<li><strong>511 of 528 hedge trades have <code>followed_plan IS NULL</code></strong> — 3.2% reviewed. The discipline score is measuring silence.</li>
+<li>The finding in §1 sat in a column that has been populated the whole time and nobody looked.</li>
+</ul>
+<p>What to build, in rough order of value:</p>
+<ul>
+<li>A <strong>monthly review page</strong> — the month&#x27;s trades grouped by <code>setup_tag</code>, with the §1 table computed live rather than by hand in sqlite.</li>
+<li>A cadence that fires: cron → ntfy on the 1st, same topic as everything else.</li>
+<li>Somewhere to record the verdict, so a tuned or retired veto has a date and a reason the way a plan amendment does.</li>
+</ul>
+<p>The gates need tuning against evidence, not memory. A monthly pass is where that happens.</p>
+<hr>
+<h2>3 · Give Track a prop twin</h2>
+<p><code>tests/test_nav_parity.py</code> fails: <code>hedge pages with no prop twin: [&#x27;Track&#x27;]</code>.</p>
+<p>Two fixes, and the second matters more:</p>
+<ol>
+<li>Build <code>/prop-track</code> — the prop book has a goal, a ladder and a horizon too, and the evaluation has never had the surface the hedge book got.</li>
+<li><strong>Make the failure visible.</strong> The file is a standalone <code>main()</code>, so pytest collects nothing from it and reports the suite green while the check fails. Every &quot;52 passed&quot; logged on 2026-08-22 was true and misleading at once. A check nothing runs is not a check.</li>
+</ol>
+<hr>
+<h2>4 · The prop evaluation, cold</h2>
+<p>Deferred deliberately to its own session, ~next week.</p>
+<p>The question is not &quot;how do I pass&quot; but <strong>&quot;what does passing require, and how likely is that?&quot;</strong> The eval needs roughly <strong>10–12% to cover expenses</strong> — that number wants modelling against the same measured distribution the cone uses, not against hope. <code>/prop-survival</code> and the prop simulator already exist; the honest version of this is a pass-probability, and it may come back low.</p>
+<p>Worth doing before more time goes into the evaluation, not after.</p>
+<hr>
+<h2>Carried over — verified 2026-08-22</h2>
+<ul>
+<li><strong>Stack snapshot is 12 days old</strong> (<code>2026-08-09</code>). Everything on Track measures from it. <code>daily_snapshots</code> already runs daily and holds the <em>account balance</em> automatically — the stack is the other number (total BTC, including what is not on the exchange) and only a human can supply it. Wire a weekly ntfy nudge; the <code>btc_balance</code> column in <code>daily_snapshots</code> exists and is unused, so part of it may be derivable.</li>
+<li><strong><code>Log as open trade</code> writes rows nothing ever closes</strong> — three phantom trades poisoned journal matching for weeks. Button still live at <code>position_page.py:523</code>.</li>
+<li><strong>Partial exits leave no trace.</strong> The trim works; the record does not. <code>_build_trades</code> aggregates fills into one open→close row.</li>
+<li><strong><code>Trade.edit_order</code> is unwired</strong> — zero references in <code>app/</code>. Moving a stop means cancel-and-replace.</li>
+<li><strong><code>.env</code> has five unparseable lines</strong> — 2, 5, 6, 31, 42. dotenv skips silently.</li>
+<li><strong>Six <code>--faint</code>-as-body-text rules in <code>theme.py</code></strong> at 2.3:1: <code>.muted</code> <code>.foot</code> <code>.badge.expired</code> <code>.cond.no</code> <code>.tg .sub</code> <code>.sect .caret</code>.</li>
+<li><strong>A <code>post-commit</code> hook to draft CHANGELOG entries.</strong> There is no automation and never was. Draft from commits since the last dated section and leave them to be sharpened — auto-appending subject lines produces a second <code>git log</code>, and what makes the file worth reading is the <em>why</em>.</li>
+<li><strong><code>tests/test_measured</code></strong> fails on a full run, passes alone — earlier tests seed the shared database.</li>
+</ul>
 <hr>
 <h2>Still to model</h2>
 <ul>
-<li><strong>Past 150 BTC: 6% nominal, 4% withdrawn, 2% real.</strong> The steady state after the north star — withdraw 4% a year, grow 2%, stop. Not modelled anywhere. <em>(Revised 2026-08-22 from the earlier 5/4/1.)</em></li>
-<li><strong>The $37.5M figure assumes BTC at $250,000</strong> by end-2028, roughly 3.4× the price at the time it was written. That assumption should live in the plan, not inside a round number.</li>
+<li><strong>Past 150 ₿: 6% nominal, 4% withdrawn, 2% real.</strong> The steady state after the north star. Wealthfolio holds the real retirement plan — <strong>€23,496/mo</strong>, FI at €13.82M ≈ 55 ₿, FAT FIRE €20.74M ≈ 83 ₿ — which is where the 150 ₿ north star comes from. LENS&#x27;s <code>burn_monthly_eur</code> of €6,250 is the <em>current</em> burn and deliberately not the retirement figure; do not &quot;correct&quot; it.</li>
+<li><strong>The €250k/BTC assumption</strong> currently lives in prose only. It belongs in <code>goal_plan</code> beside the numbers that depend on it.</li>
 </ul>
-<hr>
-<h2>Carried over — verified still true 2026-08-22</h2>
-<ul>
-<li><strong><code>Log as open trade</code> writes rows nothing ever closes.</strong> It made three phantom trades (#940, #860, #784) that poisoned the journal&#x27;s plan matching for weeks. Deleted; the button is still live at <code>position_page.py:523</code>. Fix it or remove it.</li>
-<li><strong>Partial exits leave no trace.</strong> The trim itself works — one was placed through LENS on 2026-08-21. What does not exist is the <em>record</em>: <code>_build_trades</code> aggregates fills into one open→close row, so a partial exit shows only as a smaller final size. A decision that records nothing.</li>
-<li><strong>Working orders cannot be edited</strong>, only cancelled. <code>Trade.edit_order</code> has zero references anywhere in <code>app/</code>, so moving a stop means cancel-and-replace or the website.</li>
-<li><strong><code>.env</code> has five unparseable lines, not three</strong> — 2, 5, 6, <strong>31, 42</strong>. dotenv skips them silently.</li>
-<li><strong>Six rules in the shared stylesheet still use <code>--faint</code> as readable text</strong> at 2.3:1: <code>.muted</code> <code>.foot</code> <code>.badge.expired</code> <code>.cond.no</code> <code>.tg .sub</code> <code>.sect .caret</code>. Track&#x27;s own CSS was fixed on 2026-08-22; <code>theme.py</code> was not.</li>
-</ul>
-<hr>
-<h2>⚠️ A failing check the test suite cannot see</h2>
-<p><code>tests/test_nav_parity.py</code> <strong>fails</strong> — <code>hedge pages with no prop twin: [&#x27;Track&#x27;]</code>.</p>
-<p>It is written as a standalone <code>main()</code> rather than pytest functions, so pytest collects nothing from it and reports the suite green while the check is failing. Every &quot;52 passed&quot; recorded during the 2026-08-22 session was true and misleading at the same time.</p>
-<p>Two separate fixes, and the second matters more than the first:</p>
-<ol>
-<li>Give <code>Track</code> a prop twin, or record why it should not have one.</li>
-<li>Make the file pytest-shaped so a failure is <em>visible</em>. A check nothing runs is not a check.</li>
-</ol>
-<p><code>tests/test_measured</code> also fails on a full-suite run and passes alone — earlier tests seed rows into the shared database. Pre-existing, and the reason a single run cannot tell a regression from a flake.</p>
 <footer>Twin of <code>NEXT_SESSION.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
 </main></body></html>
