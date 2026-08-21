@@ -3249,6 +3249,17 @@ def lens_css():
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/assets/lightweight-charts.js")
+def charts_js():
+    """TradingView Lightweight Charts, vendored. /analytics pulled this from a
+    CDN, which contradicted the no-network rule the rest of the app keeps — and
+    a chart that fails to load offline takes the page's answer with it."""
+    from fastapi.responses import FileResponse
+    from .paths import CHARTS_JS
+    return FileResponse(CHARTS_JS, media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/favicon.svg")
 def favicon_svg():
     """Brand mark (scope/aperture iris) — see app/theme.py FAVICON_SVG."""

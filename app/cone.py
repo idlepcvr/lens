@@ -181,6 +181,79 @@ def _ts(d: date) -> int:
     return int(datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp())
 
 
+# ─── the near band ───────────────────────────────────────────────────────────
+
+def near(days: int = 14) -> dict:
+    """The next `days` days, one step per calendar day, anchored on TODAY.
+
+    cone() answers "where should I be by the rung" — it anchors at the start of
+    the month and steps per trade, because that is the horizon the milestone is
+    measured on. This answers the question underneath it: given where I actually
+    am right now, where should tomorrow land?
+
+    Two things differ from cone() and both matter:
+
+      * It anchors on today's cumulative and today's balance, not the month's.
+        A band that starts three weeks ago cannot tell you anything about
+        tomorrow — by the time it reaches tomorrow it has already spent its
+        variance on days that are now history.
+      * It steps per DAY, not per trade. A day is converted to an expected trade
+        count with the measured trades-per-week rate, so a day you would not
+        normally trade carries the same band as the day before it. That flat
+        stretch is the honest answer: no expected trades means no expected
+        spread, and a band that fans out on a quiet Sunday would be a lie.
+
+    Same draw as cone(): resampled from real closed trades when there are
+    enough, the typed plan otherwise.
+    """
+    today = date.today()
+    trades = _trades()
+    bals = _balances()
+    if not trades or not bals:
+        return {"n": 0, "reason": "no closed trades or no balance snapshots"}
+
+    now_bal = bals[-1][1]
+    cum_now = sum(t["pnl"] for t in trades)
+    n = len(trades)
+    if n >= MIN_N:
+        source = "measured"
+        badge = f"measured — {n} closed trades"
+        tpw = _trades_per_week(trades)
+        k = _scale(trades, bals, now_bal)
+        pnls = [t["pnl"] * k for t in trades]
+
+        def draw(rng, _p=pnls):
+            return _p[rng.randrange(len(_p))]
+    else:
+        source = "plan"
+        badge = f"plan-assumed — insufficient sample (n={n})"
+        draw, tpw = _plan_draw(now_bal)
+
+    tpd = max(tpw, 0.01) / 7.0
+    n_trades = max(1, min(round(tpd * days), 20_000))
+    floor = cum_now - now_bal              # the account is gone at this cum P&L
+
+    # day -> how many trades are expected to have happened by then. Days that
+    # share a trade count share a band, which is what makes a quiet day flat.
+    pairs = [(d, min(n_trades, round(d * tpd))) for d in range(days + 1)]
+    sample_at = sorted({idx for _, idx in pairs})
+    by_idx = dict(zip(sample_at, _simulate(cum_now, floor, draw, n_trades, sample_at)))
+
+    points = [{"t": _ts(today + timedelta(days=d)), **by_idx[idx]} for d, idx in pairs]
+    tomorrow = points[1] if len(points) > 1 else points[0]
+
+    return {
+        "n": n, "source": source, "badge": badge,
+        "anchor": today.isoformat(), "anchor_cum": round(cum_now, 2),
+        "balance": round(now_bal, 2), "base_balance": round(now_bal, 2),
+        "floor": round(floor, 2),
+        "trades_per_week": round(tpw, 2), "trades_per_day": round(tpd, 3),
+        "n_trades": n_trades, "paths": PATHS, "days": days,
+        "points": points,
+        "tomorrow": {k: round(v, 2) for k, v in tomorrow.items() if k != "t"},
+    }
+
+
 def cone() -> dict:
     """The whole C3 payload: bands, badge, status word. `{"n": 0}` when there's
     nothing to project from."""

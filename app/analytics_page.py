@@ -10,7 +10,7 @@ the scorecard. Data from /api/review/equity (curve + timing) and
 from .theme import shell
 
 _CSS = """
-<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="/assets/lightweight-charts.js"></script>
 <style>
 .an-sec{margin-bottom:16px}
 .an-h{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:0 0 9px;

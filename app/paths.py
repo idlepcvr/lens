@@ -23,6 +23,11 @@ LOGS = ROOT / "logs"          # systemd + the cron jobs redirect here
 
 DB_PATH = str(DATA / "lens.db")
 
+# Third-party JS served from /assets. Vendored rather than fetched from a CDN:
+# this box may have no network, and a chart that silently fails to load takes
+# the page's whole answer with it. Apache-2.0, see the file header.
+CHARTS_JS = str(ROOT / "app" / "vendor" / "lightweight-charts.js")
+
 # Generated result files. All are rewritten wholesale by their producer, so
 # nothing here is precious — but strategy_scores.json IS read live by the
 # strategy board on every page render, so it is not merely an artifact.

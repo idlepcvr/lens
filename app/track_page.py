@@ -34,7 +34,7 @@ from datetime import date, datetime
 
 from .database import get_lens_config
 from .theme import shell
-from .track import MAX_POINTS, WEIGHTS, track
+from .track import MAX_POINTS, NEAR_DAYS, WEIGHTS, track
 
 BANDS = ("p10", "p25", "p50", "p75", "p90")
 
@@ -274,260 +274,200 @@ def _editor(ms: list[dict], px) -> str:
 
 _JS = r"""
 (function(){
-  var SVG="http://www.w3.org/2000/svg", W=720, H=260;
-  var L=54, Rt=16, Tp=16, Bt=32, PW=W-L-Rt, PH=H-Tp-Bt;
-  var svg=document.getElementById("fan"); if(!svg) return;
-  var range="rung", mode="bal";
+  var el=document.getElementById("fan");
+  if(!el) return;
+  if(!window.LightweightCharts){
+    el.innerHTML='<p class="tk-sub">Chart library failed to load. '+
+      'The numbers above and below are unaffected.</p>';
+    return;
+  }
+  var LC=window.LightweightCharts, cs=getComputedStyle(document.documentElement);
+  function V(n){ return cs.getPropertyValue(n).trim(); }
+
+  // Opaque band fills, blended against the panel colour rather than layered as
+  // translucent areas. An area series fills from its line to the bottom of the
+  // pane, so translucent bands stack where they overlap and the P25-P75 core
+  // comes out darker than either edge. Painting p90/p75/p25/p10 in that order
+  // with solid colours lets each one repaint the region below it, which leaves
+  // exactly the two nested bands the eye expects.
+  function hex(v){ if(v[0]!=="#") return v;
+    return v.length===4 ? "#"+v[1]+v[1]+v[2]+v[2]+v[3]+v[3] : v; }
+  function rgb(h){ h=hex(h);
+    return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+  function mix(a,b,t){ var A=rgb(a),B=rgb(b),o="#",i,c;
+    for(i=0;i<3;i++){ c=Math.round(A[i]+(B[i]-A[i])*t).toString(16);
+      o+=c.length<2?"0"+c:c; } return o; }
+
+  var PANEL=V("--panel"), ACCENT=V("--accent"), INK=V("--ink"), DIM=V("--dim");
+  var LINE=V("--line"), LONG=V("--long"), SHORT=V("--short"), AMBER=V("--amber");
+  var OUTER=mix(PANEL,ACCENT,.13), INNER=mix(PANEL,ACCENT,.26);
+
+  var range="next", mode="bal";
   var readEl=document.getElementById("fan-read");
 
-  function eur(v,dp){ dp=dp||0;
+  function eur(v,dp){ dp=dp==null?0:dp;
     return (v<0?"−":"")+"€"+Math.abs(v).toLocaleString("en-GB",
       {minimumFractionDigits:dp,maximumFractionDigits:dp}); }
-  function fmt(v){ return mode==="pct" ? (v>=0?"+":"−")+Math.abs(v).toFixed(1)+"%" : eur(v); }
-  // % mode measures the swing SINCE THE ANCHOR as a share of the account, so it
-  // starts at 0 and reads like a return. Dividing raw cumulative P&L by the
-  // account instead gives −1000%+, because the cumulative runs from the first
-  // trade ever while the account is today's. A log axis is not an option here:
-  // cumulative P&L goes negative, where log is undefined.
-  // Three ways to read the same projection.
-  //   bal — account equity. The cone is grown in cumulative P&L because
-  //         deposits and withdrawals must not move it, but equity is the number
-  //         you actually recognise, so shift it by the balance it was anchored
-  //         on. Both series meet at the anchor by construction, and the ruin
-  //         floor lands on a literal zero.
-  //   eur — raw cumulative realised P&L, the cone's native axis.
-  //   pct — the swing since the anchor as a share of the account.
-  function conv(v){
-    if(mode==="bal") return (FAN.base||0) + (v-(FAN.anchorCum||0));
-    if(mode==="pct") return FAN.base ? (v-(FAN.anchorCum||0))/FAN.base*100 : 0;
-    return v; }
-  // the ruin floor in whatever unit is on screen
-  function floorVal(){
-    if(FAN.floor==null) return null;
-    return mode==="bal" ? 0 : (mode==="pct" ? -100 : FAN.floor); }
-  function el(n,a){ var e=document.createElementNS(SVG,n);
-    for(var k in a) e.setAttribute(k,a[k]); return e; }
+  function fmt(v){ return v==null?"—":(mode==="pct"
+    ? (v>=0?"+":"−")+Math.abs(v).toFixed(1)+"%" : eur(v)); }
 
-  function windowTs(){
-    var now=Date.now()/1000|0;
-    if(range==="rung") return [FAN.points.length?FAN.points[0].t:now,
-                               FAN.points.length?FAN.points[FAN.points.length-1].t:now];
-    var d=(range==="90"?90:30)*86400;
-    return [now-d, now+d/3];
+  // Which projection this range is reading. They are NOT interchangeable: NEAR
+  // is anchored on today and stepped per day, FAN on the month start and
+  // stepped per trade, so each carries its own base for the balance transform.
+  function src(){ return range==="next" && NEAR && NEAR.points && NEAR.points.length
+    ? NEAR : FAN; }
+  function base(){ var s=src();
+    return s===NEAR ? (NEAR.base_balance||0) : (FAN.base||0); }
+  function anchorCum(){ var s=src();
+    return s===NEAR ? (NEAR.anchor_cum||0) : (FAN.anchorCum||0); }
+
+  function conv(v){
+    if(v==null) return null;
+    if(mode==="bal") return base()+(v-anchorCum());
+    if(mode==="pct") return base() ? (v-anchorCum())/base()*100 : 0;
+    return v; }
+  function floorVal(){
+    var f = src()===NEAR ? NEAR.floor : FAN.floor;
+    if(f==null) return null;
+    return mode==="bal" ? 0 : (mode==="pct" ? -100 : f); }
+
+  var chart=LC.createChart(el,{
+    layout:{ background:{color:"transparent"}, textColor:DIM, attributionLogo:false,
+             fontFamily:"'JetBrains Mono','SF Mono',ui-monospace,monospace", fontSize:10 },
+    grid:{ vertLines:{color:LINE}, horzLines:{color:LINE} },
+    rightPriceScale:{ borderColor:LINE, scaleMargins:{top:.12,bottom:.08} },
+    timeScale:{ borderColor:LINE, timeVisible:false, secondsVisible:false,
+                rightOffset:4, fixLeftEdge:false, lockVisibleTimeRangeOnResize:true },
+    crosshair:{ mode:LC.CrosshairMode.Normal,
+      vertLine:{color:ACCENT,width:1,style:LC.LineStyle.Dotted,labelBackgroundColor:ACCENT},
+      horzLine:{color:ACCENT,width:1,style:LC.LineStyle.Dotted,labelBackgroundColor:ACCENT} },
+    handleScroll:true, handleScale:true,
+    localization:{ priceFormatter:function(v){ return fmt(v); } }
+  });
+
+  function area(color){ return chart.addAreaSeries({
+    topColor:color, bottomColor:color, lineColor:color, lineWidth:1,
+    priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false }); }
+  function line(color,w,style){ return chart.addLineSeries({
+    color:color, lineWidth:w, lineStyle:style==null?LC.LineStyle.Solid:style,
+    priceLineVisible:false, lastValueVisible:false,
+    crosshairMarkerVisible:false, lineJoin:"round" }); }
+
+  // paint order matters — see the note on mix() above
+  var s90=area(OUTER), s75=area(INNER), s25=area(OUTER), s10=area(PANEL);
+  var s50=line(DIM,1,LC.LineStyle.Dashed);
+  var sFloor=line(SHORT,1,LC.LineStyle.Dashed);
+  var sReal=line(LONG,2);
+
+  function dedupe(rows){
+    var out=[],seen={},i;
+    rows.sort(function(a,b){ return a.time-b.time; });
+    for(i=0;i<rows.length;i++){ if(rows[i].value==null||isNaN(rows[i].value)) continue;
+      if(seen[rows[i].time]) continue; seen[rows[i].time]=1; out.push(rows[i]); }
+    return out; }
+
+  function bandRows(key){
+    return dedupe((src().points||[]).map(function(p){
+      return {time:p.t, value:conv(p[key])}; })); }
+
+  // The realised line. In balance mode these are the actual daily equity
+  // snapshots rather than the band's own transform: real money beats a
+  // derivation, and the two meet at the anchor by construction anyway.
+  function realRows(){
+    var rows = mode==="bal"
+      ? (FAN.balances||[]).map(function(b){ return {time:b.t, value:b.v}; })
+      : (FAN.actual||[]).map(function(a){ return {time:a.t, value:conv(a.cum)}; });
+    if(range==="next"){
+      var cut=(Date.now()/1000|0)-NEAR_DAYS*86400*1.2;
+      rows=rows.filter(function(r){ return r.time>=cut; });
+    }
+    return dedupe(rows); }
+
+  function floorRows(){
+    var fv=floorVal(), pts=src().points||[];
+    if(fv==null||!pts.length) return [];
+    return dedupe(pts.map(function(p){ return {time:p.t, value:fv}; })); }
+
+  function paint(){
+    s90.setData(bandRows("p90")); s75.setData(bandRows("p75"));
+    s25.setData(bandRows("p25")); s10.setData(bandRows("p10"));
+    s50.setData(bandRows("p50"));
+    sFloor.setData(floorRows());
+    sReal.setData(realRows());
+    applyRange();
+    readout(null);
   }
 
-  function draw(){
-    while(svg.firstChild) svg.removeChild(svg.firstChild);
-    svg.setAttribute("viewBox","0 0 "+W+" "+H);
-    var pts=FAN.points||[], act=FAN.actual||[];
-    if(pts.length<2){
-      svg.appendChild(el("text",{x:W/2,y:H/2,class:"tk-ax tk-ax-c"})).textContent=
-        "No projection yet — needs closed trades and a balance snapshot.";
+  function applyRange(){
+    var ts=chart.timeScale(), pts=src().points||[], now=Date.now()/1000|0;
+    if(!pts.length){ ts.fitContent(); return; }
+    // NEVER fitContent on the rung range. The realised series carries the whole
+    // balance history — a year of it — so fitting every series squashes the
+    // cone into the right-hand edge behind whatever the account's largest past
+    // swing was. Fit the PROJECTION's own span instead and let panning reach
+    // the history, which is what panning is for.
+    try{
+      if(range==="rung"){
+        ts.setVisibleRange({from:pts[0].t-30*86400, to:pts[pts.length-1].t});
+      } else if(range==="next"){
+        ts.setVisibleRange({from:pts[0].t-NEAR_DAYS*86400, to:pts[pts.length-1].t});
+      } else {
+        var d=(range==="90"?90:30)*86400;
+        ts.setVisibleRange({from:now-d, to:Math.min(pts[pts.length-1].t, now+d/3)});
+      }
+    }catch(e){ ts.fitContent(); }
+  }
+
+  // The readout is the whole reason the crosshair exists here: hovering a day
+  // should say what that day means, not just show a price label.
+  function readout(param){
+    if(!readEl) return;
+    var pts=src().points||[], p=null, i, best=Infinity, d;
+    if(param&&param.time){
+      for(i=0;i<pts.length;i++){ d=Math.abs(pts[i].t-param.time);
+        if(d<best){ best=d; p=pts[i]; } }
+      // past the last sample the band has nothing to say — don't quote the
+      // final point as though it applied to a date it never covered
+      if(best>86400*10) p=null;
+    }
+    if(!p){
+      var tm = src()===NEAR ? (NEAR.tomorrow||null) : null;
+      readEl.textContent = tm
+        ? "tomorrow "+fmt(conv(tm.p25))+" … "+fmt(conv(tm.p75))+"  (P25–P75)"
+        : "drag to pan · scroll to zoom";
       return;
     }
-    var w=windowTs(), x0=w[0], x1=w[1];
-    var vis=pts.filter(function(p){return p.t>=x0-86400*7 && p.t<=x1+86400*7;});
-    if(vis.length<2) vis=pts;
-    var va=act.filter(function(a){return a.t>=x0 && a.t<=x1;});
-
-    // In balance mode the realised line is the REAL equity snapshots, not the
-    // band's transform — actual money beats a derivation, and the two agree at
-    // the anchor anyway.
-    var vb = mode==="bal"
-      ? (FAN.balances||[]).filter(function(b){return b.t>=x0 && b.t<=x1;})
-      : [];
-
-    var vals=[];
-    vis.forEach(function(p){ ["p10","p25","p50","p75","p90"].forEach(function(k){
-      if(p[k]!=null) vals.push(conv(p[k])); }); });
-    if(mode==="bal"){ vb.forEach(function(b){ vals.push(b.v); }); }
-    else { va.forEach(function(a){ vals.push(conv(a.cum)); }); }
-    var fv0=floorVal(); if(fv0!=null) vals.push(fv0);
-    if(!vals.length) return;
-    var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
-    if(hi-lo<1e-9){ lo-=1; hi+=1; }
-    var pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
-    // an account cannot hold less than nothing, so the balance axis stops at 0
-    if(mode==="bal") lo=Math.max(lo,0);
-
-    function px(t){ return L+(t-x0)/Math.max(x1-x0,1)*PW; }
-    function pyRaw(v){ return Tp+(hi-v)/(hi-lo)*PH; }
-    function py(v){ return pyRaw(conv(v)); }
-
-    function ribbon(a,b){
-      var up=vis.map(function(p){return px(p.t).toFixed(1)+","+py(p[b]).toFixed(1);}).join(" ");
-      var dn=vis.slice().reverse().map(function(p){return px(p.t).toFixed(1)+","+py(p[a]).toFixed(1);}).join(" ");
-      return up+" "+dn;
-    }
-    svg.appendChild(el("polygon",{points:ribbon("p10","p90"),class:"tk-b10"}));
-    svg.appendChild(el("polygon",{points:ribbon("p25","p75"),class:"tk-b25"}));
-
-    // gridlines: five ticks, labelled in the active unit
-    for(var i=0;i<=4;i++){
-      var v=lo+(hi-lo)*i/4, y=Tp+(hi-v)/(hi-lo)*PH;
-      svg.appendChild(el("line",{x1:L,y1:y.toFixed(1),x2:W-Rt,y2:y.toFixed(1),
-        class:(Math.abs(v)<1e-9?"tk-zero":"tk-grid")}));
-      var t=el("text",{x:L-7,y:(y+3.5).toFixed(1),class:"tk-ax tk-ax-r"});
-      t.textContent=mode==="pct"?(v>=0?"+":"−")+Math.abs(v).toFixed(1)+"%":eur(v);
-      svg.appendChild(t);
-    }
-
-    // The ruin floor. A fan drawn without it looks like a spread of outcomes;
-    // with it you can see how much of the spread is "account gone".
-    if(FAN.floor!=null){
-      var fv=floorVal(), fy=Tp+(hi-fv)/(hi-lo)*PH;
-      if(fy>=Tp-2&&fy<=Tp+PH+2){
-        svg.appendChild(el("line",{x1:L,y1:fy.toFixed(1),x2:W-Rt,y2:fy.toFixed(1),class:"tk-floor"}));
-        var ft=el("text",{x:W-Rt,y:(fy-5).toFixed(1),class:"tk-ax tk-ax-e tk-ax-bad"});
-        ft.textContent=mode==="bal"?"account gone (€0)":"account gone"; svg.appendChild(ft);
-      }
-    }
-    svg.appendChild(el("polyline",{class:"tk-p50",
-      points:vis.map(function(p){return px(p.t).toFixed(1)+","+py(p.p50).toFixed(1);}).join(" ")}));
-
-    var line = mode==="bal"
-      ? vb.map(function(b){return {t:b.t, y:pyRaw(b.v)};})
-      : va.map(function(a){return {t:a.t, y:py(a.cum)};});
-    if(line.length>1){
-      svg.appendChild(el("polyline",{class:"tk-act",
-        points:line.map(function(q){return px(q.t).toFixed(1)+","+q.y.toFixed(1);}).join(" ")}));
-      var last=line[line.length-1];
-      svg.appendChild(el("circle",{cx:px(last.t).toFixed(1),cy:last.y.toFixed(1),
-        r:3.8,class:"tk-act-dot"}));
-    }
-
-    var now=Date.now()/1000|0, nx=px(now);
-    if(nx>=L&&nx<=W-Rt){
-      svg.appendChild(el("line",{x1:nx.toFixed(1),y1:Tp,x2:nx.toFixed(1),y2:Tp+PH,class:"tk-now"}));
-      var tn=el("text",{x:nx.toFixed(1),y:Tp+PH+13,class:"tk-ax tk-ax-c"});
-      tn.textContent="today"; svg.appendChild(tn);
-    }
-    // rung deadline, when it is inside the window
-    if(FAN.rung && FAN.rung.date){
-      var rt=Date.parse(FAN.rung.date+"T00:00:00Z")/1000, rx=px(rt);
-      if(rx>=L&&rx<=W-Rt){
-        svg.appendChild(el("line",{x1:rx.toFixed(1),y1:Tp,x2:rx.toFixed(1),y2:Tp+PH,class:"tk-rungline"}));
-        // anchor flips near the edges or the label clips out of the viewBox
-        var anc=rx>W-Rt-40?"tk-ax-e":(rx<L+40?"":"tk-ax-c");
-        var tr=el("text",{x:rx.toFixed(1),y:Tp+PH+26,class:"tk-ax tk-ax-hl "+anc});
-        tr.textContent=FAN.rung.label||"rung"; svg.appendChild(tr);
-      }
-    }
-    var d0=el("text",{x:L,y:Tp+PH+13,class:"tk-ax"});
-    d0.textContent=new Date(x0*1000).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
-    svg.appendChild(d0);
-    var d1=el("text",{x:W-Rt,y:Tp+PH+13,class:"tk-ax tk-ax-e"});
-    d1.textContent=new Date(x1*1000).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
-    svg.appendChild(d1);
-
-    // hover readout — the "more detail" that a static image can't give
-    var hit=el("rect",{x:L,y:Tp,width:PW,height:PH,fill:"transparent"});
-    svg.appendChild(hit);
-    var cross=el("line",{class:"tk-cross",x1:0,y1:Tp,x2:0,y2:Tp+PH,style:"display:none"});
-    svg.appendChild(cross);
-    hit.addEventListener("mousemove",function(ev){
-      var r=svg.getBoundingClientRect(), sx=(ev.clientX-r.left)/r.width*W;
-      if(sx<L||sx>W-Rt) return;
-      cross.setAttribute("x1",sx); cross.setAttribute("x2",sx);
-      cross.style.display="";
-      var t=x0+(sx-L)/PW*(x1-x0), near=null, dmin=1e18;
-      vis.forEach(function(p){ var d=Math.abs(p.t-t); if(d<dmin){dmin=d;near=p;} });
-      var na=null; dmin=1e18;
-      va.forEach(function(a){ var d=Math.abs(a.t-t); if(d<dmin){dmin=d;na=a;} });
-      if(!near) return;
-      var s=new Date(near.t*1000).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+
-        "  P10 "+fmt(conv(near.p10))+"  P50 "+fmt(conv(near.p50))+"  P90 "+fmt(conv(near.p90));
-      if(mode==="bal"){
-        var nb=null, bmin=1e18;
-        vb.forEach(function(b){ var d=Math.abs(b.t-t); if(d<bmin){bmin=d;nb=b;} });
-        if(nb) s+="   ·  you "+eur(nb.v);
-      } else if(na) s+="   ·  you "+fmt(conv(na.cum));
-      readEl.textContent=s;
-    });
-    hit.addEventListener("mouseleave",function(){ cross.style.display="none"; readEl.textContent=""; });
+    var d=new Date(p.t*1000);
+    readEl.textContent = d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})+
+      "  "+fmt(conv(p.p25))+" … "+fmt(conv(p.p75))+
+      "   P50 "+fmt(conv(p.p50));
   }
+  chart.subscribeCrosshairMove(readout);
+
+  var wrap=el.parentElement;
+  function size(){
+    var w=wrap.clientWidth, h=window.innerWidth<620?240:300;
+    if(w>0){ el.style.width=w+"px"; chart.applyOptions({width:w, height:h}); }
+  }
+  if(window.ResizeObserver) new ResizeObserver(size).observe(wrap);
+  else window.addEventListener("resize",size);
+  size();
+
 
   document.querySelectorAll("[data-range]").forEach(function(b){
     b.addEventListener("click",function(){
-      document.querySelectorAll("[data-range]").forEach(function(o){o.classList.remove("on");});
-      b.classList.add("on"); range=b.dataset.range; draw(); }); });
+      document.querySelectorAll("[data-range]").forEach(function(o){ o.classList.remove("on"); });
+      b.classList.add("on"); range=b.getAttribute("data-range"); paint(); }); });
   document.querySelectorAll("[data-mode]").forEach(function(b){
     b.addEventListener("click",function(){
-      document.querySelectorAll("[data-mode]").forEach(function(o){o.classList.remove("on");});
-      b.classList.add("on"); mode=b.dataset.mode; draw(); }); });
-  draw();
-  addEventListener("resize",draw);
-})();
+      document.querySelectorAll("[data-mode]").forEach(function(o){ o.classList.remove("on"); });
+      b.classList.add("on"); mode=b.getAttribute("data-mode"); paint(); }); });
 
-// ── rung editor ─────────────────────────────────────────────────────────────
-(function(){
-  var body=document.getElementById("e-body"); if(!body) return;
+  var fit=document.getElementById("fan-fit");
+  if(fit) fit.addEventListener("click",function(){ applyRange(); });
 
-  // "Edit ladder" points at a collapsed <details>; a fragment link scrolls to it
-  // but does not open it, so open it here and on any later hash change.
-  function openIfTargeted(){
-    if(location.hash!=="#edit") return;
-    var d=document.getElementById("edit");
-    if(d){ d.open=true; d.scrollIntoView({block:"start",behavior:"smooth"}); }
-  }
-  addEventListener("hashchange",openIfTargeted);
-  openIfTargeted();
-  var msg=document.getElementById("e-msg");
-
-  function eurCells(){
-    body.querySelectorAll("tr").forEach(function(tr){
-      var v=parseFloat(tr.querySelector(".e-btc").value);
-      var c=tr.querySelector(".e-eur");
-      c.textContent=(PX&&isFinite(v))
-        ? "€"+(v*PX).toLocaleString("en-GB",{maximumFractionDigits:0}) : "—";
-    });
-  }
-  function wire(tr){
-    tr.querySelector(".e-btc").addEventListener("input",eurCells);
-    tr.querySelector(".tk-x").addEventListener("click",function(){ tr.remove(); eurCells(); });
-  }
-  body.querySelectorAll("tr").forEach(wire);
-  eurCells();
-
-  document.getElementById("e-add").addEventListener("click",function(){
-    var tr=document.createElement("tr"); tr.className="tk-er";
-    tr.innerHTML='<td><input class="e-label" type="text" value="New rung"></td>'+
-      '<td><input class="e-btc" type="text" inputmode="decimal" value=""></td>'+
-      '<td class="e-eur">—</td>'+
-      '<td><input class="e-by" type="date" value=""></td>'+
-      '<td><button type="button" class="tk-x" title="remove rung">×</button></td>';
-    body.appendChild(tr); wire(tr); eurCells();
-    tr.querySelector(".e-btc").focus();
-  });
-
-  document.getElementById("e-save").addEventListener("click",function(){
-    var out=[], bad=null;
-    body.querySelectorAll("tr").forEach(function(tr){
-      var label=tr.querySelector(".e-label").value.trim();
-      var btc=parseFloat(tr.querySelector(".e-btc").value);
-      var by=tr.querySelector(".e-by").value;
-      if(!label||!isFinite(btc)||btc<=0){ bad=label||"a rung"; return; }
-      var m={btc:btc,label:label};
-      if(by) m.by=by;
-      out.push(m);
-    });
-    if(bad){ msg.className="tk-msg bad";
-      msg.textContent="“"+bad+"” needs a name and a positive ₿ target."; return; }
-    if(!out.length){ msg.className="tk-msg bad"; msg.textContent="Keep at least one rung."; return; }
-    out.sort(function(a,b){ return a.btc-b.btc; });
-    var reason=document.getElementById("e-reason").value.trim();
-    msg.className="tk-msg"; msg.textContent="Saving…";
-    fetch("/api/plan/amend",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({milestones:out,reason:reason})})
-      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
-      .then(function(res){
-        if(!res.ok){ msg.className="tk-msg bad";
-          msg.textContent=(res.j && res.j.detail) || "Save failed."; return; }
-        msg.className="tk-msg good"; msg.textContent="Saved — reloading…";
-        setTimeout(function(){ location.reload(); },500);
-      })
-      .catch(function(){ msg.className="tk-msg bad"; msg.textContent="Save failed — no response."; });
-  });
+  paint();
+  size();
 })();
 """
 
@@ -619,24 +559,18 @@ _CSS = """<style>
 .tk-read{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-left:auto;
   min-height:14px;text-align:right}
 
-/* fan */
-.tk-fanwrap{overflow-x:auto}
-.tk-fan{width:100%;height:auto;display:block;min-height:210px}
-.tk-b10{fill:var(--accent);opacity:.09}
-.tk-b25{fill:var(--accent);opacity:.17}
-.tk-p50{fill:none;stroke:var(--dim);stroke-width:1.3;stroke-dasharray:4 3}
-.tk-act{fill:none;stroke:var(--long);stroke-width:2.1;stroke-linejoin:round;stroke-linecap:round}
-.tk-act-dot{fill:var(--long)}
-.tk-now{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 3}
-.tk-rungline{stroke:var(--accent);stroke-width:1;stroke-dasharray:3 3;opacity:.7}
-.tk-cross{stroke:var(--dim);stroke-width:1;stroke-dasharray:2 2;opacity:.7}
-.tk-zero{stroke:var(--line);stroke-width:1.2}
-.tk-grid{stroke:var(--line);stroke-width:.6;opacity:.5}
-.tk-ax{font-family:var(--mono);font-size:9px;fill:var(--dim)}
-.tk-ax-r{text-anchor:end}.tk-ax-c{text-anchor:middle}.tk-ax-e{text-anchor:end}
-.tk-ax-hl{fill:var(--accent)}
-.tk-ax-bad{fill:var(--short)}
-.tk-floor{stroke:var(--short);stroke-width:1.1;stroke-dasharray:5 3;opacity:.85}
+/* fan — the library paints into a canvas, so the container carries the size
+   and nothing here can reach the series. Series colours are read from the
+   design tokens in JS instead, which keeps theme.py the single source. */
+.tk-fanwrap{position:relative}
+.tk-fanwrap{overflow:hidden}
+.tk-fan{max-width:100%;min-width:0;height:300px}
+.tk-hint{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
+  font-family:var(--mono);font-size:10px;color:var(--dim);margin:var(--s2) 0 0}
+.tk-fitbtn{padding:3px 9px;font-size:10px}
+.tk-amber{color:var(--amber)}
+.tk-credit{margin-left:auto;color:var(--dim);font-size:9.5px}
+@media (max-width:620px){ .tk-fan{height:240px} }
 
 /* collapsible sections */
 .tk-det{padding:0}
@@ -800,6 +734,31 @@ def parts() -> dict:
                     'account gone before this rung is due. The status word grades where '
                     'today sits inside that band — it is not a verdict on the band.</p>')
 
+    # The near band, said in words. The chart shows the shape; this says what
+    # tomorrow actually means in euros, because a band you have to read off an
+    # axis is a band nobody reads.
+    N = T.get("near") or {}
+    near_line = ""
+    if N.get("points"):
+        tm = N.get("tomorrow") or {}
+        nb = lambda v: (N.get("base_balance") or 0) + (v - (N.get("anchor_cum") or 0))
+        lo, mid, hi = nb(tm.get("p25", 0)), nb(tm.get("p50", 0)), nb(tm.get("p75", 0))
+        near_ruin = ""
+        nf = N.get("floor")
+        if nf is not None:
+            hit = next((q for q in N["points"]
+                        if q.get("p10") is not None and q["p10"] <= nf + 1e-6), None)
+            if hit:
+                when = _date_label(datetime.utcfromtimestamp(hit["t"]).date().isoformat())
+                near_ruin = (f' <span class="tk-amber">One path in ten is already at the '
+                             f'ruin floor by {when}.</span>')
+        near_line = (
+            f'<p class="tk-sub">At <b>{N.get("trades_per_day", 0):.2f}</b> trades a day '
+            f'measured off your own ledger, <b>tomorrow</b> lands between '
+            f'<b>{_eur(lo, 2)}</b> and <b>{_eur(hi, 2)}</b> with a midpoint of '
+            f'<b>{_eur(mid, 2)}</b>. A flat stretch is a day the rate says you would '
+            f'not normally trade — no expected trades, no expected spread.{near_ruin}</p>')
+
     fan_data = json.dumps({
         "points": C.get("points") or [],
         "actual": T["actual"],
@@ -811,6 +770,7 @@ def parts() -> dict:
         "floor": C.get("floor"),
         "paths": C.get("paths") or 0,
     })
+    near_data = json.dumps(N)
 
     body = f"""
 <main class="tk">
@@ -857,7 +817,8 @@ def parts() -> dict:
     </header>
     <div class="tk-ctl" role="group" aria-label="Chart controls">
       <span class="tk-seg" role="group" aria-label="Time range">
-        <button type="button" data-range="rung" class="on">To the rung</button>
+        <button type="button" data-range="next" class="on">Next {NEAR_DAYS} days</button>
+        <button type="button" data-range="rung">To the rung</button>
         <button type="button" data-range="90">90d</button>
         <button type="button" data-range="30">30d</button>
       </span>
@@ -868,10 +829,13 @@ def parts() -> dict:
       </span>
       <span class="tk-read" id="fan-read" aria-live="polite"></span>
     </div>
-    <div class="tk-fanwrap"><svg id="fan" class="tk-fan" role="img"
-      aria-label="Projection fan: simulated cumulative profit and loss from
-      {C.get('anchor')} to the {R.get('label') or 'next'} rung, with the realised
-      line drawn through it."></svg></div>
+    <div class="tk-fanwrap"><div id="fan" class="tk-fan" role="img"
+      aria-label="Projection band with the realised line drawn through it.
+      Drag to pan, scroll to zoom."></div></div>
+    <p class="tk-hint">Drag to pan · scroll to zoom · hover a day for its band
+       <button type="button" class="tk-btn tk-fitbtn" id="fan-fit">Reset view</button>
+       <span class="tk-credit">chart: TradingView Lightweight Charts (Apache-2.0), served locally</span></p>
+    {near_line}
     <p class="tk-sub">Balance <b>{_eur(bal_now, 2)}</b> today, against a P25–P75 band of
        {_eur(_to_bal(now.get('p25'), C), 2)} – {_eur(_to_bal(now.get('p75'), C), 2)}.
        The shaded fan is {C.get('paths') or 0} simulated paths drawn from your own closed
@@ -880,6 +844,19 @@ def parts() -> dict:
        can't move the line.</p>
     {ruin}
   </section>
+
+
+  <details class="tk-panel tk-det" aria-label="Remaining rungs">
+    <summary><span class="tk-sum-h">After that</span>
+      <span class="tk-of">the rest of the ladder</span></summary>
+    {_ladder_rows(ms, R, px)}
+  </details>
+
+  <details class="tk-panel tk-det" id="edit" aria-label="Edit the ladder">
+    <summary><span class="tk-sum-h">Edit the ladder</span>
+      <span class="tk-of">rungs, targets and the dates you pin</span></summary>
+    {_editor(ms, px)}
+  </details>
 
   <details class="tk-panel tk-det" aria-label="Daily score">
     <summary><span class="tk-sum-h">The last {T['window_days']} days</span>
@@ -904,26 +881,18 @@ def parts() -> dict:
     </table>
     {unrev}
   </details>
-
-  <details class="tk-panel tk-det" aria-label="Remaining rungs">
-    <summary><span class="tk-sum-h">After that</span>
-      <span class="tk-of">the rest of the ladder</span></summary>
-    {_ladder_rows(ms, R, px)}
-  </details>
-
-  <details class="tk-panel tk-det" id="edit" aria-label="Edit the ladder">
-    <summary><span class="tk-sum-h">Edit the ladder</span>
-      <span class="tk-of">rungs, targets and the dates you pin</span></summary>
-    {_editor(ms, px)}
-  </details>
-
 </main>"""
 
-    script = "const FAN=" + fan_data + ";const PX=" + json.dumps(px) + ";" + _JS
+    script = ("const FAN=" + fan_data + ";const NEAR=" + near_data +
+              ";const NEAR_DAYS=" + str(NEAR_DAYS) +
+              ";const PX=" + json.dumps(px) + ";" + _JS)
     return {"body": body, "css": _CSS, "script": script}
 
 
 def render() -> str:
     p = parts()
-    return shell("/hedge-track", "Track", p["body"], head_extra=p["css"],
+    # The library is a blocking <script> in <head> so it is defined by the time
+    # the page script runs. Vendored locally — see main.charts_js.
+    head = '<script src="/assets/lightweight-charts.js"></script>' + p["css"]
+    return shell("/hedge-track", "Track", p["body"], head_extra=head,
                  script=p["script"], meta="am I on pace?")

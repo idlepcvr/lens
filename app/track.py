@@ -29,6 +29,7 @@ from .plan import LENS_BOOK
 WEIGHTS = {"discipline": 4, "plan": 3, "band": 2, "decision": 1}
 MAX_POINTS = sum(WEIGHTS.values())
 WINDOW_DAYS = 30
+NEAR_DAYS = 14        # horizon of the day-stepped band on /hedge-track
 
 # Percentile position -> share of the band weight. Above the median pays more
 # than below it, and under P10 pays nothing: that is the band saying you are
@@ -250,12 +251,20 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
     window = _window(days, today)
     since = window[0]
 
-    from .cone import cone as _cone
+    from .cone import cone as _cone, near as _near
     from .plan import hero as _hero
     try:
         C = _cone()
     except Exception:
         C = {"n": 0}
+    # The near band is a second, shorter projection anchored on today — see
+    # cone.near(). Kept separate from C rather than merged into it: they use
+    # different anchors and different axes, and averaging them would produce a
+    # band that describes neither question.
+    try:
+        NEAR = _near(NEAR_DAYS)
+    except Exception:
+        NEAR = {"n": 0}
     try:
         H = _hero()
     except Exception:
@@ -341,6 +350,7 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
         },
         "adherence": adherence_pair(today),
         "cone": C,
+        "near": NEAR,
         "actual": actual,
         "balances": balances,
         "status": C.get("status") or H.get("status"),
