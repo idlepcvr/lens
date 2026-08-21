@@ -44,6 +44,27 @@ def _save(d: dict) -> None:
     STATE.write_text(json.dumps(d, indent=1))
 
 
+def _executed_order_ids(window_s: int = 900) -> set:
+    """Order ids that actually executed recently, straight from the exchange.
+    A cancelled order never appears here; a filled one always does."""
+    try:
+        from kraken.futures import User
+        key, secret = get_api_keys("personal")
+        ev = User(key=key, secret=secret).get_execution_events()
+        cutoff = (datetime.now(timezone.utc).timestamp() - window_s) * 1000
+        out = set()
+        for e in (ev.get("elements") or []):
+            if (e.get("timestamp") or 0) < cutoff:
+                continue
+            ex = ((e.get("event") or {}).get("execution") or {}).get("execution") or {}
+            uid = (ex.get("order") or {}).get("uid")
+            if uid:
+                out.add(uid)
+        return out
+    except Exception:
+        return set()
+
+
 def _fmt(v, dp=0) -> str:
     return "—" if v is None else f"{v:,.{dp}f}"
 
@@ -84,28 +105,52 @@ def check(dry: bool = False) -> dict:
 
     fired = []
     live_ids = {o["order_id"] for o in orders}
-    for oid, o in prev_orders.items():
-        if oid in live_ids:
-            continue
-        # Gone from the book. If the position shrank too, it filled rather than
-        # being cancelled — a cancel leaves the position exactly where it was.
-        if prev_size is not None and size < prev_size - 1e-9:
-            fired.append(o)
+    vanished = [o for oid, o in prev_orders.items() if oid not in live_ids]
+
+    if vanished and prev_size is not None and size < prev_size - 1e-9:
+        # Both legs disappear when one fills: the exchange cancels the other the
+        # moment the position is flat. Announcing every vanished order therefore
+        # reported a take profit AND a stop for the same trade, which is a
+        # heart attack and a lie. Only one of them executed — ask which.
+        executed = _executed_order_ids()
+        if executed:
+            fired = [o for o in vanished if o["order_id"] in executed]
+        if not fired:
+            # No event data. The money says which: a target pays, a stop costs.
+            moved = (eur - prev_eur) if (eur is not None and prev_eur is not None) else 0
+            want = "take_profit" if moved >= 0 else "stop_loss"
+            fired = [o for o in vanished if o["role"] == want][:1] or vanished[:1]
 
     out = {"fired": [], "rung": None}
 
     for o in fired:
         win = o["role"] == "take_profit"
         moved = (eur - prev_eur) if (eur is not None and prev_eur is not None) else None
-        title = ("Take profit hit" if win else
-                 "Stop hit" if o["role"] == "stop_loss" else "Order filled")
-        body = (f"{_fmt(o.get('trigger'))} · "
-                + (f"{'+' if moved >= 0 else '−'}€{abs(moved):,.2f} · "
-                   if moved is not None else "")
-                + (f"position now {size:.4f} BTC" if size else "position now flat"))
+        entry = prev.get("entry")
+        exit_px = o.get("trigger")
+        side = (prev.get("direction") or "").upper()
+
+        pct = None
+        if entry and exit_px:
+            pct = (exit_px - entry) / entry * 100
+            if side == "SHORT":
+                pct = -pct
+
+        title = (f"{'✅' if win else '❌'} {side or 'POSITION'} "
+                 f"{'take profit' if win else 'stop loss' if o['role']=='stop_loss' else 'closed'}")
+        lines = []
+        if entry and exit_px:
+            lines.append(f"{_fmt(entry)} → {_fmt(exit_px)}"
+                         + (f"  ({pct:+.2f}%)" if pct is not None else ""))
+        if moved is not None:
+            lines.append(f"{'+' if moved >= 0 else '−'}€{abs(moved):,.2f}"
+                         f"  ·  balance €{eur:,.2f}" if eur is not None else "")
+        lines.append("flat" if not size else f"still open: {size:.4f} BTC")
         r = rung_line()
         if r:
-            body += f"\n{r}"
+            lines.append(r)
+        body = "\n".join(x for x in lines if x)
+
         out["fired"].append({"title": title, "body": body})
         if not dry:
             _notify(title, body, tags="white_check_mark" if win else "x")
@@ -122,6 +167,8 @@ def check(dry: bool = False) -> dict:
 
     if not dry:
         _save({"orders": orders, "size": size, "eur": eur,
+               "entry": (pos[0].get("entry") if pos else prev.get("entry")),
+               "direction": (pos[0].get("direction") if pos else prev.get("direction")),
                "ts": now.isoformat(), "rung_date": prev.get("rung_date")})
     return out
 
