@@ -2,124 +2,77 @@
 
 [Open as HTML](NEXT_SESSION.html)
 
-*Written 2026-08-21 03:00 after the first live order went through. Everything
-below is a consequence of actually using the thing.*
+*Written 2026-08-21 after LENS placed, bracketed, verified and trimmed its first
+live orders. The previous list is archived at
+`docs/DONE-2026-08-21-execution-live-orders-veto-override.md` — all five items
+done, plus partial close.*
 
-## Where this picks up
+## The main piece: three phases, not one climb
 
-LENS placed its first live order tonight: a 0.001 BTC reduce on the open long,
-which filled and took the position 0.043 → 0.042. The chain works end to end —
-form, checks, confirm dialog, Kraken. Execution is **live**
-(`KRAKEN_FUTURES_SANDBOX=0`) with a **0.005 BTC** ceiling.
+The ladder is now 28 even monthly rungs at 35.9%/month, which is honest arithmetic
+but a single undifferentiated slope. It isn't one journey. It's three, and they
+demand completely different behaviour:
 
-What's wrong is everything *around* the order: the app can send one, but it
-can't yet show you what happened afterwards, and the numbers it shows about an
-open trade are its own guesses rather than the exchange's facts.
+| phase | from → to | duration at 35.9%/mo | what it actually is |
+|---|---|---|---|
+| **1 · Acceleration** | 0.00931 → **1 BTC** | ~15 months | the hard part. Small account, every rung a large % move, no margin for a bad week |
+| **2 · Growth** | 1 → **50 BTC** | ~13 months | the same rate on a base that can absorb a loss. Position sizing stops being the constraint |
+| **3 · Maintenance** | 50 → **150 BTC** | 48 months | **2.32%/month, 32%/year.** No longer a trading problem |
 
----
+Then it stops being growth at all. At 150 BTC the plan is **5% nominal return,
+4% withdrawal, 1% real** — inflation plus living, nothing more. Not a target to
+beat.
 
-## 1. Read the live orders — the one that matters
+**Why this matters more than it looks.** The Monte Carlo goes astronomical at P95
+because it models one risk appetite forever. It doesn't know he stops. Phasing
+the model is what makes the tail believable, and a believable tail is what lets
+him hold a month-to-month structure without reaching for the account-blowing
+trade to close a gap that only exists in an unphased projection.
 
-**The problem.** `/hedge-position` shows a take profit and a stop loss computed
-from the win/loss model. The real resting orders on Kraken right now are:
+**To build:**
+- `goal_plan` grows a `phases` field: boundaries, the rate each demands, and the
+  behaviour that belongs to it.
+- `/goal` and `/today` show *this phase*, not the 2032 number.
+- The Monte Carlo caps risk appetite at each phase boundary rather than
+  compounding one assumption to the horizon.
 
-| | LENS shows | Kraken actually has |
-|---|---|---|
-| Take profit | model-derived | **74464** · reduce-only · mark trigger |
-| Stop loss | model-derived | **70168** · reduce-only · mark trigger |
-
-Both were placed from the website at 12:10:16 on 2026-08-20. LENS has never
-read them. That is the entire reason the numbers look wrong on the open
-position and in the journal — they were never claiming to be real, but nothing
-on screen said so.
-
-**The fix.** `User.get_open_orders()` returns them, already normalised:
-`orderType`, `side`, `stopPrice`, `limitPrice`, `reduceOnly`, `triggerSignal`,
-`status`, `receivedTime`, `order_id`.
-
-- New `GET /api/orders/live` wrapping it.
-- On the open position, show the **real** TP/SL, not the planned ones.
-- Keep the planned levels where they belong: on the *ticket being built*, which
-  is a forecast. Two different things that must stop sharing a label.
-- Where they disagree, say so. A trade running with a stop 300 wide of plan is
-  a fact worth seeing, not an error to hide.
-
-## 2. Feedback that an order exists
-
-Right now an order is placed and then vanishes from the interface. No resting
-order list, nothing in the journal, no way to answer "did that go through" from
-inside LENS. With multiple orders working this becomes untenable.
-
-- Resting orders visible on the position page, with a cancel control per order.
-- The journal should show placed orders, not only filled trades.
-- `cancel_all` already exists in `execute.py`; per-order cancel needs
-  `Trade.cancel_order(order_id=...)`.
-
-## 3. Replace the size cap with something that means something
-
-`LENS_MAX_ORDER_BTC` was added on my own initiative, never requested, and `0.005`
-was a guess. BTC is the wrong unit — the number is meaningless until converted.
-Against a €305 balance:
-
-| cap | notional | leverage on balance |
-|---|---|---|
-| 0.001 | €62 | 0.2× |
-| 0.005 | €310 | 1.0× |
-| 0.05 | €3,100 | 10.2× |
-| 0.5 | €30,999 | **101.5×** |
-
-Expressed as leverage the fat-finger case rejects itself without a magic number.
-
-- Ceiling becomes **balance × max leverage**, derived live.
-- Displayed in **BTC and USD**, not BTC alone.
-- Removing the cap entirely is a legitimate alternative — Kraken enforces its own
-  leverage limit regardless.
-
-## 4. The price strip
-
-Only mark price is shown, and the LIVE badge went missing from the header. The
-ticker already carries everything:
-
-`markPrice 72599.26` · `indexPrice 72610.95` · `last 72599` · `bid 72597` ·
-`ask 72598` · `fundingRate` · 24h high/low.
-
-Mark, index and last should sit together in the strip — the TP/SL trigger source
-is selectable, so the price it triggers on should be visible.
-
-## 5. Centre the confirm dialog
-
-Still rendering top-left. I set `position:fixed; inset:0; margin:auto` and it
-did not take, so the cause is elsewhere — likely a competing rule on `dialog`
-or the entrance transform. **Verify in the browser, not in the source.**
+**Open decisions — his, not to be assumed:**
+- He said "North Star, 150 BTC by the end of 2028". Current plan is 150 by
+  **2032-12-31** with 50 by 2028-12-31. 150 by 2028 compresses all three phases
+  into 28 months. Confirm which he means before amending.
+- **150 BTC is $10.9M at today's $72,648.** The $40M figure needs BTC at
+  **$266,667**. That is a price assumption doing the heavy lifting and it should
+  be stated in the plan rather than sitting inside a round number.
+- Real inflation rather than the assumed 4% — from actual spending, not a
+  headline rate.
 
 ---
-
-## Not doing
-
-- **Prop execution.** The eval is `BREAKOUT_1STEP_TURBO`, at Breakout, not
-  Kraken. No credentials, no API in the codebase. He places those by phone and
-  that is fine. Do not build toward it without first confirming Breakout even
-  offers an API.
 
 ## Carried over, still true
 
-- `.env` lines 2, 5 and 6 do not parse and dotenv skips them silently.
-- Four pre-existing test failures: three in `tests/test_plan.py` (temp-DB
-  fixture has no tables), one in `tests/test_nav_parity.py` (`Track` has no
-  prop twin).
+- **`Log as open trade` writes rows nothing ever closes.** It made three phantom
+  trades (#940, #860, #784) that poisoned the journal's plan matching for weeks.
+  Deleted; the button remains. Fix it or remove it.
+- **Partial exits leave no trace.** Kraken reports fills and `_build_trades`
+  aggregates them into one open→close row, so today's trim shows only in the
+  final size. A partial exit is a decision that records nothing.
+- **Working orders cannot be edited**, only cancelled. `Trade.edit_order(orderId,
+  limitPrice, stopPrice, size)` exists and is unwired, so moving a stop means
+  cancel-and-replace or the website.
+- `.env` lines 2, 5 and 6 do not parse; dotenv skips them silently.
 - Six rules in `lens.css` still use `--faint` as readable text at 2.3:1:
   `.muted` `.foot` `.badge.expired` `.cond.no` `.tg .sub` `.sect .caret`.
-- `docs/` has six `.md` files with no HTML twins. One command:
-  `python3 tools/md2html.py docs/*.md`.
-- Close position is all-or-nothing; there is no partial close.
+- `tests/test_nav_parity.py` fails: `Track` has no prop twin.
+- `docs/` has seven `.md` with no HTML twins — `python3 tools/md2html.py docs/*.md`.
 
 ## The one that isn't code
 
-`LENS_PLAN.md`'s first open item, written 2026-07-14: *"Run the loop. Still the
-real bottleneck, not code — 4 of ~500 trades carry a signal link."* Five weeks
-later it is 11 of 540, and tonight added more code. Over the 30 days to
-2026-08-20: **147 signals fired, 4 were acted on.**
+The veto override now records his reasoning against the scanner's verdict, and
+the market briefing states the case before he commits. Nothing has been written
+to `veto_overrides` yet.
 
-Tonight was worth it — the loop can only be run once the order can be placed
-from the same screen that calls it. But the plan has been right about the
-bottleneck since July, and nothing on this list closes it.
+The first row in that table is worth more than anything on this list. It is the
+first labelled example in the only experiment that matters: **do his
+discretionary reads beat the rules, or fund them?** `NONE` currently stands at 98
+trades, 34.7% win rate, −€2,472 — undifferentiated. Overrides with a stated
+reason are a separate population, and now a measurable one.
