@@ -47,26 +47,27 @@ def sandbox() -> bool:
     return os.getenv("KRAKEN_FUTURES_SANDBOX", "1").strip() != "0"
 
 
-_BAL_CACHE: dict = {"t": 0.0, "eur": None, "fx": None}
+_BAL_CACHE: dict = {"t": 0.0, "eur": None, "fx": None, "avail": None}
 _BAL_TTL = 60.0
 
 
-def _account() -> tuple[Optional[float], float]:
-    """(balance EUR, EUR/USD). Cached — check() runs on every keystroke and the
-    exchange does not need to hear about each one."""
+def _account() -> tuple[Optional[float], float, Optional[float]]:
+    """(balance EUR, EUR/USD, available margin EUR). Cached — check() runs on
+    every keystroke and the exchange does not need to hear about each one."""
     import time
     now = time.time()
     if _BAL_CACHE["eur"] is not None and now - _BAL_CACHE["t"] < _BAL_TTL:
-        return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0
+        return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0, _BAL_CACHE["avail"]
     try:
         from .kraken_sync import fetch_live_balance
         key, secret = get_api_keys("personal")
         b = fetch_live_balance(key, secret)
         _BAL_CACHE.update({"t": now, "eur": b.get("eur_balance"),
-                           "fx": b.get("eur_usd") or 1.0})
+                           "fx": b.get("eur_usd") or 1.0,
+                           "avail": b.get("available_margin")})
     except Exception:
         pass
-    return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0
+    return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0, _BAL_CACHE["avail"]
 
 
 def max_order_btc(leverage: float = 10.0, mark_usd: Optional[float] = None) -> float:
@@ -84,11 +85,18 @@ def max_order_btc(leverage: float = 10.0, mark_usd: Optional[float] = None) -> f
     hard = os.getenv("LENS_MAX_ORDER_BTC", "").strip()
     if hard:
         return float(hard)
-    bal_eur, fx = _account()
-    if not bal_eur or not mark_usd or not leverage:
-        return 0.01                      # no balance yet — stay conservative
+    bal_eur, fx, avail_eur = _account()
+    # AVAILABLE margin, not total balance. With a position open the two are
+    # nothing alike — on 2026-08-21 the balance was EUR 366 while only EUR 23.59
+    # was free, and a ceiling drawn from the balance approved an order the
+    # account could not fund. The exchange rejected it and LENS called it sent.
+    free = avail_eur if avail_eur is not None else bal_eur
+    if not free or not mark_usd or not leverage:
+        return 0.001                     # nothing readable — stay small
     btc_eur = mark_usd / (fx or 1.0)
-    return (bal_eur * leverage) / btc_eur
+    # a little headroom, because fees and a tick against him both come out of
+    # the same margin the order is about to consume
+    return (free * leverage * 0.95) / btc_eur
 
 
 def _client(account: str = "personal"):
@@ -210,7 +218,7 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
     cap = max_order_btc(leverage, limit_price or mark)
     if size_btc and size_btc > cap:
         reasons.append(f"over_size_cap:{size_btc:.5f}>{cap:.5f} "
-                       f"(= balance x {leverage:g} leverage)")
+                       f"(free margin x {leverage:g} leverage, minus fee headroom)")
 
     if (order_type in ("lmt", "post", "ioc") or post_only) and not limit_price:
         reasons.append("limit_price_required")

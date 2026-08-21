@@ -169,6 +169,21 @@ def main():
     assert r["blocked"] == "exchange_rejected", r
     assert "insufficientAvailableFunds" in r["error"], r
 
+    # 13) the ceiling must come from FREE margin, not total balance. With a
+    #     position open the two diverge completely — EUR 366 balance against
+    #     EUR 23.59 free — and drawing it from the balance approves orders the
+    #     account cannot fund, which is how the live rejection happened.
+    os.environ.pop("LENS_MAX_ORDER_BTC", None)
+    execute._BAL_CACHE.update({"t": 9e18, "eur": 366.54, "fx": 1.1718, "avail": 23.59})
+    cap = execute.max_order_btc(leverage=10, mark_usd=75900)
+    assert 0.003 < cap < 0.004, ("cap must reflect free margin, got", cap)
+
+    execute._BAL_CACHE.update({"t": 9e18, "eur": 366.54, "fx": 1.1718, "avail": None})
+    flat = execute.max_order_btc(leverage=10, mark_usd=75900)
+    assert flat > cap, "with no position the ceiling falls back to balance and is larger"
+
+    execute._BAL_CACHE.update({"t": 0.0, "eur": None, "fx": None, "avail": None})
+
     print("test_execute OK")
 
 
