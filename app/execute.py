@@ -106,6 +106,48 @@ def build_orders(direction: str, size_btc: float, *, order_type: str = "mkt",
     return batch
 
 
+def setup_gate(direction: str) -> Optional[str]:
+    """Refuse an entry the setup scanner has already judged.
+
+    Measured over the whole hedge book on 2026-08-21, by setup_tag:
+
+        S1                   12 trades   83.3% WR   +EUR 933
+        S3                   42 trades   45.2% WR   +EUR 178
+        NONE                 97 trades   35.1% WR   -EUR 2432
+        VETO:* (all)        ~258 trades  20-48% WR  -EUR 6000+
+
+    The three clean setups are +EUR 1239 between them. Everything else is the
+    loss. discipline.evaluate() never looked at this — it checks the clock, the
+    cooldown and the venue, so a NONE entry at a good hour sailed through.
+
+    Returns a reason string to block, or None to allow. Never raises: a scanner
+    that cannot read a bar must not also stop him closing a position.
+    """
+    if os.getenv("LENS_ALLOW_UNTAGGED", "0").strip() == "1":
+        return None
+    try:
+        from . import setups
+        state = setups.desk_state(refresh=False)
+        v = (state.get("verdicts") or {}).get(direction) or {}
+        vetoes = v.get("vetoes") or []
+        hits = v.get("setups") or []
+        board = state.get("scoreboard") or {}
+
+        def stat(tag):
+            row = board.get(tag) or {}
+            if not row.get("n"):
+                return ""
+            return f" [{tag}: {row['n']} trades, {row['wr']}% WR, EUR {row['pnl']:.0f}]"
+
+        if hits and not vetoes:
+            return None
+        if vetoes:
+            return "setup_veto:" + ",".join(vetoes)[:120] + stat("VETO:" + ",".join(vetoes))
+        return "no_setup" + stat("NONE")
+    except Exception:
+        return None
+
+
 def check(direction: str, size_btc: float, *, order_type: str = "mkt",
           limit_price: Optional[float] = None, take_profit: Optional[float] = None,
           stop_loss: Optional[float] = None, mark: Optional[float] = None,
@@ -150,6 +192,13 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
     veto = discipline.evaluate({"venue": venue}, last_signal)
     if veto:
         reasons.append(veto)
+
+    # An exit is never blocked by the setup: closing a losing position is the
+    # one trade that must always be available.
+    if not reduce_only:
+        sg = setup_gate(direction)
+        if sg:
+            reasons.append(sg)
 
     notional = (size_btc or 0) * (ref or 0)
     return {

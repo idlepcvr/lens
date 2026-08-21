@@ -4,6 +4,7 @@ is stubbed, so a regression that would send a real order fails here.
 The expensive mistake this file exists to prevent is a stop on the wrong side of
 the entry — the exchange accepts it and fills instantly at market.
 """
+import importlib
 import os
 
 import _bootstrap  # noqa: F401
@@ -28,6 +29,10 @@ def _patch(cap="1.0"):
     execute._client = lambda account="personal": _FakeClient()
     os.environ["LENS_MAX_ORDER_BTC"] = cap
     os.environ["KRAKEN_FUTURES_SANDBOX"] = "1"
+    # The setup gate reads live market state, so leaving it real would make
+    # every entry test depend on what BTC is doing right now. Stubbed open by
+    # default; the gate has its own test below.
+    execute.setup_gate = lambda d: None
 
 
 def _nothing_sent():
@@ -117,6 +122,26 @@ def main():
     c = execute.check("long", 0.001, mark=70000, leverage=10)
     assert _nothing_sent()
     assert c["notional_usd"] == 70.0 and c["required_margin_usd"] == 7.0, c
+
+    # 11) the setup gate blocks an entry the scanner vetoed, but never an exit —
+    #     closing a losing position must always be possible
+    _patch()
+    execute.setup_gate = lambda d: "no_setup [NONE: 97 trades, 35.1% WR, EUR -2432]"
+    try:
+        r = execute.execute("long", 0.001, confirm=True, mark=70000)
+        assert r["sent"] is False and r["blocked"].startswith("no_setup"), r
+        assert _nothing_sent()
+
+        _patch()
+        r = execute.close("long", 0.043, confirm=True, mark=70000)
+        assert r["sent"] is True, ("an exit must not be blocked by the setup gate", r)
+    finally:
+        importlib.reload(execute)      # restore the real gate
+
+    # the escape hatch exists and is off by default
+    os.environ["LENS_ALLOW_UNTAGGED"] = "1"
+    assert execute.setup_gate("long") is None
+    os.environ.pop("LENS_ALLOW_UNTAGGED")
 
     print("test_execute OK")
 
