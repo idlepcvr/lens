@@ -7,46 +7,57 @@ live orders. The previous list is archived at
 `docs/DONE-2026-08-21-execution-live-orders-veto-override.md` — all five items
 done, plus partial close.*
 
-## The main piece: three phases, not one climb
+## The ladder is now phased — plan v7
 
-The ladder is now 28 even monthly rungs at 35.9%/month, which is honest arithmetic
-but a single undifferentiated slope. It isn't one journey. It's three, and they
-demand completely different behaviour:
+North star moved to **150 BTC by 2028-12-31**, burn corrected to **€6,250/month**,
+and the ladder runs three rates instead of one flat 41.3%.
 
-| phase | from → to | duration at 35.9%/mo | what it actually is |
+| phase | from → to | rate | reaches |
 |---|---|---|---|
-| **1 · Acceleration** | 0.00931 → **1 BTC** | ~15 months | the hard part. Small account, every rung a large % move, no margin for a bad week |
-| **2 · Growth** | 1 → **50 BTC** | ~13 months | the same rate on a base that can absorb a loss. Position sizing stops being the constraint |
-| **3 · Maintenance** | 50 → **150 BTC** | 48 months | **2.32%/month, 32%/year.** No longer a trading problem |
+| **1 · Acceleration** | 0.00931 → 1 BTC | **60%/mo** | Jun 2027 |
+| **2 · Growth** | 1 → 50 BTC | **50%/mo** | Apr 2028 |
+| **3 · Maintenance** | 50 → 150 BTC | **14%/mo** | Dec 2028 |
 
-Then it stops being growth at all. At 150 BTC the plan is **5% nominal return,
-4% withdrawal, 1% real** — inflation plus living, nothing more. Not a target to
-beat.
+Next rung: **0.01489 BTC by 1 Sept**, and the stack is at 0.00931 — **62% of the
+way with ten days left**.
 
-**Why this matters more than it looks.** The Monte Carlo goes astronomical at P95
-because it models one risk appetite forever. It doesn't know he stops. Phasing
-the model is what makes the tail believable, and a believable tail is what lets
-him hold a month-to-month structure without reaching for the account-blowing
-trade to close a gap that only exists in an unphased projection.
+### 🔴 Phase 2 is the whole plan, and it is not phase 1
 
-**To build:**
-- `goal_plan` grows a `phases` field: boundaries, the rate each demands, and the
-  behaviour that belongs to it.
-- `/goal` and `/today` show *this phase*, not the 2032 number.
-- The Monte Carlo caps risk appetite at each phase boundary rather than
-  compounding one assumption to the horizon.
+Every combination was modelled against the 28-month horizon:
 
-**Open decisions — his, not to be assumed:**
-- He said "North Star, 150 BTC by the end of 2028". Current plan is 150 by
-  **2032-12-31** with 50 by 2028-12-31. 150 by 2028 compresses all three phases
-  into 28 months. Confirm which he means before amending.
-- **150 BTC is $10.9M at today's $72,648.** The $40M figure needs BTC at
-  **$266,667**. That is a price assumption doing the heavy lifting and it should
-  be stated in the plan rather than sitting inside a round number.
-- Real inflation rather than the assumed 4% — from actual spending, not a
-  headline rate.
+| phase 1 | phase 2 | reaches 50 | phase 3 then needs |
+|---|---|---|---|
+| 50% | 20% | — | **impossible** |
+| 60% | 20% | — | **impossible** |
+| 70% | 20% | — | **impossible** |
+| 50% | 35% | Sep 2028 | 38%/mo |
+| 60% | 35% | Jul 2028 | 24%/mo |
+| 70% | 35% | Jun 2028 | 20%/mo |
+| 60% | **50%** | Apr 2028 | **14%/mo** |
+| 70% | 50% | Feb 2028 | 12%/mo |
 
----
+Phase 1 barely moves the outcome — 50% to 70% changes it by under three months,
+because 0.00931 → 1 BTC is only ~10 months at any rate in that band. **Phase 2
+decides everything.** At 20%/month the horizon is unreachable no matter how fast
+the acceleration goes. At 35% the "maintenance" phase needs 24%/month, which is
+not maintenance — it is the hardest sprint of the plan arriving exactly where he
+said he would slow down.
+
+**So the load-bearing claim is 50%/month sustained for ten months on an account
+between 1 and 50 BTC** — the stretch where size, not skill, starts to bind. That
+is the number to watch, and the one to revisit first when reality disagrees.
+
+### Still to build
+
+- `goal_plan` has no `phases` field yet — the rates live only in the amendment
+  reason. They should be structured so `/goal` and `/today` can show *this phase*
+  and its rate rather than the 2028 number.
+- The Monte Carlo still compounds one risk appetite to the horizon, which is why
+  P95 goes astronomical. Cap it at each phase boundary.
+- Past 150 BTC the plan is **5% nominal, 4% withdrawn, 1% real** — not modelled
+  anywhere yet.
+- **The $37.5M assumes BTC at $250,000** by end-2028, roughly 3.4× today's
+  $72,648. That assumption should live in the plan, not inside a round number.
 
 ## Carried over, still true
 

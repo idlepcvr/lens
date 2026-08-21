@@ -47,24 +47,22 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 <h1>LENS — Next session</h1>
 <p><a href="NEXT_SESSION.html">Open as HTML</a></p>
 <p><em>Written 2026-08-21 after LENS placed, bracketed, verified and trimmed its first live orders. The previous list is archived at <code>docs/DONE-2026-08-21-execution-live-orders-veto-override.md</code> — all five items done, plus partial close.</em></p>
-<h2>The main piece: three phases, not one climb</h2>
-<p>The ladder is now 28 even monthly rungs at 35.9%/month, which is honest arithmetic but a single undifferentiated slope. It isn&#x27;t one journey. It&#x27;s three, and they demand completely different behaviour:</p>
-<div class=tw><table><thead><tr><th>phase</th><th>from → to</th><th>duration at 35.9%/mo</th><th>what it actually is</th></tr></thead><tbody><tr><td><strong>1 · Acceleration</strong></td><td>0.00931 → <strong>1 BTC</strong></td><td>~15 months</td><td>the hard part. Small account, every rung a large % move, no margin for a bad week</td></tr><tr><td><strong>2 · Growth</strong></td><td>1 → <strong>50 BTC</strong></td><td>~13 months</td><td>the same rate on a base that can absorb a loss. Position sizing stops being the constraint</td></tr><tr><td><strong>3 · Maintenance</strong></td><td>50 → <strong>150 BTC</strong></td><td>48 months</td><td><strong>2.32%/month, 32%/year.</strong> No longer a trading problem</td></tr></tbody></table></div>
-<p>Then it stops being growth at all. At 150 BTC the plan is <strong>5% nominal return, 4% withdrawal, 1% real</strong> — inflation plus living, nothing more. Not a target to beat.</p>
-<p><strong>Why this matters more than it looks.</strong> The Monte Carlo goes astronomical at P95 because it models one risk appetite forever. It doesn&#x27;t know he stops. Phasing the model is what makes the tail believable, and a believable tail is what lets him hold a month-to-month structure without reaching for the account-blowing trade to close a gap that only exists in an unphased projection.</p>
-<p><strong>To build:</strong></p>
+<h2>The ladder is now phased — plan v7</h2>
+<p>North star moved to <strong>150 BTC by 2028-12-31</strong>, burn corrected to <strong>€6,250/month</strong>, and the ladder runs three rates instead of one flat 41.3%.</p>
+<div class=tw><table><thead><tr><th>phase</th><th>from → to</th><th>rate</th><th>reaches</th></tr></thead><tbody><tr><td><strong>1 · Acceleration</strong></td><td>0.00931 → 1 BTC</td><td><strong>60%/mo</strong></td><td>Jun 2027</td></tr><tr><td><strong>2 · Growth</strong></td><td>1 → 50 BTC</td><td><strong>50%/mo</strong></td><td>Apr 2028</td></tr><tr><td><strong>3 · Maintenance</strong></td><td>50 → 150 BTC</td><td><strong>14%/mo</strong></td><td>Dec 2028</td></tr></tbody></table></div>
+<p>Next rung: <strong>0.01489 BTC by 1 Sept</strong>, and the stack is at 0.00931 — <strong>62% of the way with ten days left</strong>.</p>
+<h3>🔴 Phase 2 is the whole plan, and it is not phase 1</h3>
+<p>Every combination was modelled against the 28-month horizon:</p>
+<div class=tw><table><thead><tr><th>phase 1</th><th>phase 2</th><th>reaches 50</th><th>phase 3 then needs</th></tr></thead><tbody><tr><td>50%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>60%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>70%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>50%</td><td>35%</td><td>Sep 2028</td><td>38%/mo</td></tr><tr><td>60%</td><td>35%</td><td>Jul 2028</td><td>24%/mo</td></tr><tr><td>70%</td><td>35%</td><td>Jun 2028</td><td>20%/mo</td></tr><tr><td>60%</td><td><strong>50%</strong></td><td>Apr 2028</td><td><strong>14%/mo</strong></td></tr><tr><td>70%</td><td>50%</td><td>Feb 2028</td><td>12%/mo</td></tr></tbody></table></div>
+<p>Phase 1 barely moves the outcome — 50% to 70% changes it by under three months, because 0.00931 → 1 BTC is only ~10 months at any rate in that band. <strong>Phase 2 decides everything.</strong> At 20%/month the horizon is unreachable no matter how fast the acceleration goes. At 35% the &quot;maintenance&quot; phase needs 24%/month, which is not maintenance — it is the hardest sprint of the plan arriving exactly where he said he would slow down.</p>
+<p><strong>So the load-bearing claim is 50%/month sustained for ten months on an account between 1 and 50 BTC</strong> — the stretch where size, not skill, starts to bind. That is the number to watch, and the one to revisit first when reality disagrees.</p>
+<h3>Still to build</h3>
 <ul>
-<li><code>goal_plan</code> grows a <code>phases</code> field: boundaries, the rate each demands, and the behaviour that belongs to it.</li>
-<li><code>/goal</code> and <code>/today</code> show <em>this phase</em>, not the 2032 number.</li>
-<li>The Monte Carlo caps risk appetite at each phase boundary rather than compounding one assumption to the horizon.</li>
+<li><code>goal_plan</code> has no <code>phases</code> field yet — the rates live only in the amendment reason. They should be structured so <code>/goal</code> and <code>/today</code> can show <em>this phase</em> and its rate rather than the 2028 number.</li>
+<li>The Monte Carlo still compounds one risk appetite to the horizon, which is why P95 goes astronomical. Cap it at each phase boundary.</li>
+<li>Past 150 BTC the plan is <strong>5% nominal, 4% withdrawn, 1% real</strong> — not modelled anywhere yet.</li>
+<li><strong>The $37.5M assumes BTC at $250,000</strong> by end-2028, roughly 3.4× today&#x27;s $72,648. That assumption should live in the plan, not inside a round number.</li>
 </ul>
-<p><strong>Open decisions — his, not to be assumed:</strong></p>
-<ul>
-<li>He said &quot;North Star, 150 BTC by the end of 2028&quot;. Current plan is 150 by <strong>2032-12-31</strong> with 50 by 2028-12-31. 150 by 2028 compresses all three phases into 28 months. Confirm which he means before amending.</li>
-<li><strong>150 BTC is $10.9M at today&#x27;s $72,648.</strong> The $40M figure needs BTC at <strong>$266,667</strong>. That is a price assumption doing the heavy lifting and it should be stated in the plan rather than sitting inside a round number.</li>
-<li>Real inflation rather than the assumed 4% — from actual spending, not a headline rate.</li>
-</ul>
-<hr>
 <h2>Carried over, still true</h2>
 <ul>
 <li><strong><code>Log as open trade</code> writes rows nothing ever closes.</strong> It made three phantom trades (#940, #860, #784) that poisoned the journal&#x27;s plan matching for weeks. Deleted; the button remains. Fix it or remove it.</li>
