@@ -338,6 +338,8 @@ _XCSS = """<style>
 .xgo:disabled,.xcl:disabled{background:transparent;color:var(--faint);border:1px solid var(--line);cursor:not-allowed}
 .xcl{background:transparent;color:var(--dim);border:1px solid var(--line)}
 .xmsg{font:400 11px/1.5 var(--mono);color:var(--dim)}
+.xmsg .good{color:var(--long)} .xmsg .bad{color:var(--short)}
+.xmsg .wait{color:var(--accent)} .xmsg .warn2{color:var(--amber)}
 .xtbl{width:100%;border-collapse:collapse;font:400 12px/1 var(--mono);white-space:nowrap}
 .xtbl th{font:400 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   text-align:right;padding:0 0 8px;border-bottom:1px solid var(--line)}
@@ -1038,11 +1040,18 @@ async function confirmDlg(){
         {direction:t.direction, size_btc:t.size_btc, confirm:true, mark:XMARK||null});
   $('dlg-go').disabled = false;
   closeDlg();
-  $('x-msg').textContent = r.sent
-    ? (kind==='exec' ? '✓ sent — '+t.direction+' '+Number(t.size_btc).toFixed(6)+' ₿'
-                     : '✓ close sent')
-    : '✗ '+(r.blocked||'blocked')+(r.error?' — '+r.error:'');
-  loadLive();
+
+  if(!r.sent){
+    $('x-msg').innerHTML = '<span class="bad">✗ '+(r.blocked||'blocked')
+      + (r.error ? ' — '+r.error : '')+'</span>';
+    loadLive(); loadOrders();
+    return;
+  }
+
+  // "Sent" is what our side did. What the exchange did is a separate question,
+  // and answering it by asking the exchange is the only version he can trust.
+  $('x-msg').innerHTML = '<span class="wait">⟳ accepted ('+(r.accepted||'')+') — confirming…</span>';
+  await confirmAtExchange(kind, t);
 }
 
 async function cancelAll(){
@@ -1075,6 +1084,32 @@ async function loadMarketRead(){
           + `<span class="t">${r.note}</span>`
           + `<span class="v">${r.value}</span></div>`).join('');
   }catch(e){ $('x-mread').innerHTML=''; }
+}
+
+// Poll the exchange until the position or the resting orders reflect the order.
+// Without this the only evidence an order existed was a line of our own text.
+async function confirmAtExchange(kind, t){
+  const before = XOPEN ? Number(XOPEN.size) : 0;
+  for(let i=0;i<6;i++){
+    await new Promise(r=>setTimeout(r, 900));
+    await loadLive(); await loadOrders();
+    const now = XOPEN ? Number(XOPEN.size) : 0;
+    const resting = document.querySelectorAll('#ord-list .ord').length;
+
+    if(kind==='close' && now < before){
+      $('x-msg').innerHTML = '<span class="good">✓ confirmed — position now '
+        + (now ? now+' ₿' : 'flat')+'</span>';
+      return;
+    }
+    if(kind==='exec' && (now !== before || resting > 0)){
+      $('x-msg').innerHTML = '<span class="good">✓ confirmed on the exchange — '
+        + (now ? 'position '+now+' ₿' : 'no position')
+        + (resting ? ' · '+resting+' resting order'+(resting>1?'s':'') : '')+'</span>';
+      return;
+    }
+  }
+  $('x-msg').innerHTML = '<span class="warn2">⚠ accepted, but nothing changed on the '
+    + 'exchange after 5s — no position and nothing resting. Check Kraken before retrying.</span>';
 }
 
 async function loadOrders(){

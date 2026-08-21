@@ -279,6 +279,42 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
     }
 
 
+# Kraken answers `result: success` for the API CALL, and puts the fate of the
+# order in a status field alongside it. An order rejected for insufficient funds
+# comes back inside a "successful" response, which is how a rejection was
+# reported to him as "sent" on 2026-08-21 — the position stayed flat and nothing
+# in LENS said otherwise.
+_ACCEPTED = {"placed", "partiallyfilled", "filled", "edited", "untouched"}
+
+
+def interpret(resp: dict) -> dict:
+    """What the exchange actually did, out of its envelope.
+
+    Returns {ok, states, detail} where ok is True only if every leg landed.
+    """
+    if not isinstance(resp, dict):
+        return {"ok": False, "states": [], "detail": "no response"}
+
+    legs: list[tuple[str, str]] = []
+    for item in (resp.get("batchStatus") or []):
+        legs.append((item.get("order_tag") or "order",
+                     (item.get("status") or "unknown")))
+    send = resp.get("sendStatus")
+    if send:
+        legs.append(("order", (send.get("status") or "unknown")))
+
+    if not legs:
+        # nothing to read: treat a bare success as unconfirmed, not as done
+        return {"ok": resp.get("result") == "success", "states": [],
+                "detail": "no per-order status returned — treat as unconfirmed"}
+
+    bad = [f"{tag}: {st}" for tag, st in legs if st.lower() not in _ACCEPTED]
+    return {"ok": not bad,
+            "states": [{"leg": t, "status": st} for t, st in legs],
+            "detail": "; ".join(bad) if bad else
+                      "; ".join(f"{t}: {st}" for t, st in legs)}
+
+
 def execute(direction: str, size_btc: float, *, confirm: bool = False,
             account: str = "personal", last_signal: Optional[dict] = None,
             **ticket) -> dict:
@@ -308,6 +344,14 @@ def execute(direction: str, size_btc: float, *, confirm: bool = False,
                    "or the reverse)")
         return {**pre, "sent": False, "blocked": "exchange_error", "error": msg[:300]}
 
+    verdict = interpret(resp)
+    if not verdict["ok"]:
+        # The call succeeded and the order did not. Saying "sent" here is how a
+        # rejection became invisible.
+        return {**pre, "sent": False, "blocked": "exchange_rejected",
+                "error": verdict["detail"], "states": verdict["states"],
+                "response": resp}
+
     if pre.get("overriding"):
         try:
             from .veto_log import record
@@ -325,7 +369,8 @@ def execute(direction: str, size_btc: float, *, confirm: bool = False,
         except Exception:
             pass          # a failed note must never unsend a placed order
 
-    return {**pre, "sent": True, "response": resp}
+    return {**pre, "sent": True, "accepted": verdict["detail"],
+            "states": verdict["states"], "response": resp}
 
 
 def close(direction_of_position: str, size_btc: float, **kw) -> dict:

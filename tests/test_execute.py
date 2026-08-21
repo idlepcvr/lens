@@ -143,6 +143,32 @@ def main():
     assert execute.setup_gate("long") is None
     os.environ.pop("LENS_ALLOW_UNTAGGED")
 
+    # 12) THE ONE THAT LIED: Kraken answers result:success for the API call and
+    #     puts the order's fate in a status field. A rejection must never report
+    #     as sent — that is exactly what happened live on 2026-08-21.
+    from app.execute import interpret
+    assert interpret({"result":"success","sendStatus":{"status":"placed"}})["ok"] is True
+    assert interpret({"result":"success","sendStatus":
+                      {"status":"insufficientAvailableFunds"}})["ok"] is False
+    assert interpret({"result":"success","batchStatus":[
+        {"order_tag":"entry","status":"placed"},
+        {"order_tag":"sl","status":"insufficientAvailableFunds"}]})["ok"] is False, \
+        "one rejected leg must fail the whole send"
+    assert interpret({})["ok"] is False
+
+    class _Reject(_FakeClient):
+        def create_order(self, **kw):
+            _FakeClient.single.append(kw)
+            return {"result": "success", "sendStatus":
+                    {"status": "insufficientAvailableFunds"}}
+
+    _patch()
+    execute._client = lambda account="personal": _Reject()
+    r = execute.execute("long", 0.001, confirm=True, mark=70000)
+    assert r["sent"] is False, "a rejected order must not report as sent"
+    assert r["blocked"] == "exchange_rejected", r
+    assert "insufficientAvailableFunds" in r["error"], r
+
     print("test_execute OK")
 
 
