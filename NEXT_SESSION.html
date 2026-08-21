@@ -46,35 +46,39 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 <body><main>
 <h1>LENS — Next session</h1>
 <p><a href="NEXT_SESSION.html">Open as HTML</a></p>
-<p><em>Written 2026-08-21 after LENS placed, bracketed, verified and trimmed its first live orders. The previous list is archived at <code>docs/DONE-2026-08-21-execution-live-orders-veto-override.md</code> — all five items done, plus partial close.</em></p>
-<h2>The ladder is now phased — plan v7</h2>
-<p>North star moved to <strong>150 BTC by 2028-12-31</strong>, burn corrected to <strong>€6,250/month</strong>, and the ladder runs three rates instead of one flat 41.3%.</p>
-<div class=tw><table><thead><tr><th>phase</th><th>from → to</th><th>rate</th><th>reaches</th></tr></thead><tbody><tr><td><strong>1 · Acceleration</strong></td><td>0.00931 → 1 BTC</td><td><strong>60%/mo</strong></td><td>Jun 2027</td></tr><tr><td><strong>2 · Growth</strong></td><td>1 → 50 BTC</td><td><strong>50%/mo</strong></td><td>Apr 2028</td></tr><tr><td><strong>3 · Maintenance</strong></td><td>50 → 150 BTC</td><td><strong>14%/mo</strong></td><td>Dec 2028</td></tr></tbody></table></div>
-<p>Next rung: <strong>0.01489 BTC by 1 Sept</strong>, and the stack is at 0.00931 — <strong>62% of the way with ten days left</strong>.</p>
-<h3>🔴 Phase 2 is the whole plan, and it is not phase 1</h3>
-<p>Every combination was modelled against the 28-month horizon:</p>
-<div class=tw><table><thead><tr><th>phase 1</th><th>phase 2</th><th>reaches 50</th><th>phase 3 then needs</th></tr></thead><tbody><tr><td>50%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>60%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>70%</td><td>20%</td><td>—</td><td><strong>impossible</strong></td></tr><tr><td>50%</td><td>35%</td><td>Sep 2028</td><td>38%/mo</td></tr><tr><td>60%</td><td>35%</td><td>Jul 2028</td><td>24%/mo</td></tr><tr><td>70%</td><td>35%</td><td>Jun 2028</td><td>20%/mo</td></tr><tr><td>60%</td><td><strong>50%</strong></td><td>Apr 2028</td><td><strong>14%/mo</strong></td></tr><tr><td>70%</td><td>50%</td><td>Feb 2028</td><td>12%/mo</td></tr></tbody></table></div>
-<p>Phase 1 barely moves the outcome — 50% to 70% changes it by under three months, because 0.00931 → 1 BTC is only ~10 months at any rate in that band. <strong>Phase 2 decides everything.</strong> At 20%/month the horizon is unreachable no matter how fast the acceleration goes. At 35% the &quot;maintenance&quot; phase needs 24%/month, which is not maintenance — it is the hardest sprint of the plan arriving exactly where he said he would slow down.</p>
-<p><strong>So the load-bearing claim is 50%/month sustained for ten months on an account between 1 and 50 BTC</strong> — the stretch where size, not skill, starts to bind. That is the number to watch, and the one to revisit first when reality disagrees.</p>
-<h3>Still to build</h3>
+<p><em>Written 2026-08-22. The previous list is archived at <code>docs/DONE-2026-08-22-track-rebuild-phased-ladder.md</code> — Track rebuilt, the ladder phased and rounded to plan v9, the cone given a ceiling. Every item below was checked against the code or the database on 2026-08-22, not carried forward on faith.</em></p>
+<hr>
+<h2>🔴 The only thing that matters</h2>
+<p>The ladder needs <strong>+2.14% per trade</strong> through Acceleration. The ledger says the edge is negative:</p>
+<div class=tw><table><thead><tr><th></th><th>measured</th><th>expectancy</th></tr></thead><tbody><tr><td>all time (527 trades)</td><td>WR 39.1%, RR 1.32</td><td><strong>−0.206 R/trade</strong></td></tr><tr><td>last 90 days (84)</td><td>WR 32.1%, RR 1.54</td><td><strong>−0.260 R/trade</strong></td></tr></tbody></table></div>
+<p>No position size converts a negative expectancy into a positive one — it only changes how fast it plays out. At the measured 39% win rate, risking 2% per trade:</p>
+<div class=tw><table><thead><tr><th>RR</th><th>per trade</th><th></th></tr></thead><tbody><tr><td>1.32 (current)</td><td>−0.41%</td><td></td></tr><tr><td>2.00</td><td>+0.12%</td><td>18× short of what the ladder needs</td></tr><tr><td>3.00</td><td>+0.90%</td><td></td></tr><tr><td>5.00</td><td><strong>+2.47%</strong></td><td>clears it</td></tr></tbody></table></div>
+<p><strong>The lever is the reward multiple, not the risk amount.</strong> Everything else on this list is instrumentation; none of it moves this number.</p>
+<p>The <code>veto_overrides</code> table now has <strong>4 rows</strong> — the first labelled examples in the only experiment that matters: do the discretionary reads beat the rules, or fund them? Four is not yet a population. It is a start.</p>
+<hr>
+<h2>Still to model</h2>
 <ul>
-<li><code>goal_plan</code> has no <code>phases</code> field yet — the rates live only in the amendment reason. They should be structured so <code>/goal</code> and <code>/today</code> can show <em>this phase</em> and its rate rather than the 2028 number.</li>
-<li>The Monte Carlo still compounds one risk appetite to the horizon, which is why P95 goes astronomical. Cap it at each phase boundary.</li>
-<li>Past 150 BTC the plan is <strong>5% nominal, 4% withdrawn, 1% real</strong> — not modelled anywhere yet.</li>
-<li><strong>The $37.5M assumes BTC at $250,000</strong> by end-2028, roughly 3.4× today&#x27;s $72,648. That assumption should live in the plan, not inside a round number.</li>
+<li><strong>Past 150 BTC: 6% nominal, 4% withdrawn, 2% real.</strong> The steady state after the north star — withdraw 4% a year, grow 2%, stop. Not modelled anywhere. <em>(Revised 2026-08-22 from the earlier 5/4/1.)</em></li>
+<li><strong>The $37.5M figure assumes BTC at $250,000</strong> by end-2028, roughly 3.4× the price at the time it was written. That assumption should live in the plan, not inside a round number.</li>
 </ul>
-<h2>Carried over, still true</h2>
+<hr>
+<h2>Carried over — verified still true 2026-08-22</h2>
 <ul>
-<li><strong><code>Log as open trade</code> writes rows nothing ever closes.</strong> It made three phantom trades (#940, #860, #784) that poisoned the journal&#x27;s plan matching for weeks. Deleted; the button remains. Fix it or remove it.</li>
-<li><strong>Partial exits leave no trace.</strong> Kraken reports fills and <code>_build_trades</code> aggregates them into one open→close row, so today&#x27;s trim shows only in the final size. A partial exit is a decision that records nothing.</li>
-<li><strong>Working orders cannot be edited</strong>, only cancelled. `Trade.edit_order(orderId, limitPrice, stopPrice, size)` exists and is unwired, so moving a stop means cancel-and-replace or the website.</li>
-<li><code>.env</code> lines 2, 5 and 6 do not parse; dotenv skips them silently.</li>
-<li>Six rules in <code>lens.css</code> still use <code>--faint</code> as readable text at 2.3:1: <code>.muted</code> <code>.foot</code> <code>.badge.expired</code> <code>.cond.no</code> <code>.tg .sub</code> <code>.sect .caret</code>.</li>
-<li><code>tests/test_nav_parity.py</code> fails: <code>Track</code> has no prop twin.</li>
-<li><code>docs/</code> has seven <code>.md</code> with no HTML twins — <code>python3 tools/md2html.py docs/*.md</code>.</li>
+<li><strong><code>Log as open trade</code> writes rows nothing ever closes.</strong> It made three phantom trades (#940, #860, #784) that poisoned the journal&#x27;s plan matching for weeks. Deleted; the button is still live at <code>position_page.py:523</code>. Fix it or remove it.</li>
+<li><strong>Partial exits leave no trace.</strong> The trim itself works — one was placed through LENS on 2026-08-21. What does not exist is the <em>record</em>: <code>_build_trades</code> aggregates fills into one open→close row, so a partial exit shows only as a smaller final size. A decision that records nothing.</li>
+<li><strong>Working orders cannot be edited</strong>, only cancelled. <code>Trade.edit_order</code> has zero references anywhere in <code>app/</code>, so moving a stop means cancel-and-replace or the website.</li>
+<li><strong><code>.env</code> has five unparseable lines, not three</strong> — 2, 5, 6, <strong>31, 42</strong>. dotenv skips them silently.</li>
+<li><strong>Six rules in the shared stylesheet still use <code>--faint</code> as readable text</strong> at 2.3:1: <code>.muted</code> <code>.foot</code> <code>.badge.expired</code> <code>.cond.no</code> <code>.tg .sub</code> <code>.sect .caret</code>. Track&#x27;s own CSS was fixed on 2026-08-22; <code>theme.py</code> was not.</li>
 </ul>
-<h2>The one that isn&#x27;t code</h2>
-<p>The veto override now records his reasoning against the scanner&#x27;s verdict, and the market briefing states the case before he commits. Nothing has been written to <code>veto_overrides</code> yet.</p>
-<p>The first row in that table is worth more than anything on this list. It is the first labelled example in the only experiment that matters: <strong>do his discretionary reads beat the rules, or fund them?</strong> <code>NONE</code> currently stands at 98 trades, 34.7% win rate, −€2,472 — undifferentiated. Overrides with a stated reason are a separate population, and now a measurable one.</p>
+<hr>
+<h2>⚠️ A failing check the test suite cannot see</h2>
+<p><code>tests/test_nav_parity.py</code> <strong>fails</strong> — <code>hedge pages with no prop twin: [&#x27;Track&#x27;]</code>.</p>
+<p>It is written as a standalone <code>main()</code> rather than pytest functions, so pytest collects nothing from it and reports the suite green while the check is failing. Every &quot;52 passed&quot; recorded during the 2026-08-22 session was true and misleading at the same time.</p>
+<p>Two separate fixes, and the second matters more than the first:</p>
+<ol>
+<li>Give <code>Track</code> a prop twin, or record why it should not have one.</li>
+<li>Make the file pytest-shaped so a failure is <em>visible</em>. A check nothing runs is not a check.</li>
+</ol>
+<p><code>tests/test_measured</code> also fails on a full-suite run and passes alone — earlier tests seed rows into the shared database. Pre-existing, and the reason a single run cannot tell a regression from a flake.</p>
 <footer>Twin of <code>NEXT_SESSION.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
 </main></body></html>

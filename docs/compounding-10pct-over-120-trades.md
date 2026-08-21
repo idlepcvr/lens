@@ -1,3 +1,5 @@
+[Open as HTML](compounding-10pct-over-120-trades.html)
+
 
 So just to be clear… 360x1.1^120 
 Is 360 euro by 10% in perp future with 120 success trades with 44% win at 3r means like  300 trades or about a year of trading right ? 

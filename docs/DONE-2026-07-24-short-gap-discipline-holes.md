@@ -1,5 +1,7 @@
 # NEXT SESSION — LENS: close the short gap, then the discipline holes
 
+[Open as HTML](DONE-2026-07-24-short-gap-discipline-holes.html)
+
 > **CLOSED SESSION — built 2026-07-24.** Close the short gap, then the discipline holes. Renamed from
 > `NEXT_SESSION*` on 2026-07-31: three files named "next session" all
 > described finished work. As of 2026-07-31 there is no live handoff at all —

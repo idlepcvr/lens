@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // DONE — 2026-08-22 · Track rebuilt, ladder phased and rounded</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>DONE — 2026-08-22 · Track rebuilt, ladder phased and rounded</h1>
+<p><a href="DONE-2026-08-22-track-rebuild-phased-ladder.html">Open as HTML</a></p>
+<p><em>Archived from <code>NEXT_SESSION.md</code>. Five commits, <code>3ca5619</code> → <code>9592c3c</code>, plus plan versions v8 and v9 written to <code>goal_plan</code>.</em></p>
+<hr>
+<h2>What this was</h2>
+<p>Track opened as a page with two jobs it was doing badly: it duplicated <code>/today</code>&#x27;s opening block, and everything below the rung was either a chart nobody could zoom or prose nobody read. It now answers three questions and stops: what is the rung, am I inside the band, what does the next trade have to make.</p>
+<p>The ladder underneath it changed shape twice — first to real phases, then to numbers a person can actually hold in their head.</p>
+<hr>
+<h2><code>/today</code> folded into <code>/hedge-track</code> — <code>3ca5619</code></h2>
+<p>Both pages opened on the same block. <code>/hedge-track</code>&#x27;s version was strictly richer, so <code>/today</code> was a day-old duplicate of a page that already existed.</p>
+<p>What <code>/today</code> owned alone was the adherence count — signals fired against fills that had a signal behind them. That survived; the rest went. <code>/today</code> 301s through the existing <code>LEGACY_ROUTES</code> table rather than a new handler.</p>
+<p><strong>Bug fixed on the way:</strong> <code>/today</code>&#x27;s fill and orphan counts were never scoped to <code>LENS_BOOK</code>, so they silently included every prop attempt — the same bug <code>main.py</code> had already fixed for <code>/hedge-plan</code>. No prop trades fell inside the window at the time, so the numbers did not move; the next eval would have moved them.</p>
+<hr>
+<h2>A real chart — <code>d91bb2e</code></h2>
+<p>The fan was ~70 lines of hand-built SVG with three preset ranges and no way to look closer. It now uses TradingView Lightweight Charts: drag to pan, scroll to zoom, crosshair that reads out the band under the cursor.</p>
+<p><strong>The library is vendored</strong> at <code>app/vendor/</code> and served from <code>/assets</code>. <code>/analytics</code> had been pulling it from unpkg, which contradicted the no-network rule the rest of the app keeps — a chart that fails to load offline takes the page&#x27;s whole answer with it. That page loads the local copy now too.</p>
+<p>Bands are painted as four opaque area series blended against the panel colour, not as translucent overlays. An area series fills from its line to the bottom of the pane, so translucent bands stack where they overlap and the P25–P75 core comes out darker than its own edges. Painting p90/p75/p25/p10 in descending order lets each repaint the region below it.</p>
+<p><strong>Two bugs, both mine, both invisible:</strong></p>
+<ul>
+<li><code>To the rung</code> called <code>fitContent()</code>, which fits <em>every</em> series — including a year of balance history. The cone was squashed into the right-hand edge behind a €10k spike from February. Each range now fits the projection&#x27;s own span.</li>
+<li>The chart was sized from the element it then resized, so the observer read back its own output and the container ratcheted to 560px inside a 310px wrapper — horizontal scroll on a phone. It measures the wrapper now, whose width CSS owns and the chart cannot touch.</li>
+</ul>
+<p>A third surfaced later: <code>.tk-fan{min-width:560px}</code> had survived from the SVG era, which needed a scroll floor to stay readable. That was the <em>actual</em> source of the overflow; the wrapper-sizing had been treating a symptom.</p>
+<hr>
+<h2>A band for tomorrow — <code>d91bb2e</code></h2>
+<p><code>cone()</code> anchors at the month start and steps per trade, because that is the horizon a milestone is measured on. That makes it useless for &quot;where should tomorrow land&quot; — by the time it reaches tomorrow it has spent its variance on days that are already history.</p>
+<p><code>cone.near()</code> anchors on today and steps per calendar <strong>day</strong>, converting a day into an expected trade count from the measured trades-per-week rate. Days that share a trade count share a band, so a day the rate says you would not trade reads flat. A band that fanned out on a quiet Sunday would be a lie.</p>
+<hr>
+<h2>Next steps — the rung divided by the trades left — <code>7ce35b1</code></h2>
+<p>&quot;62% of the way to M1&quot; is true and useless at the moment of a trade. Nobody sizes an entry against a percentage of a milestone.</p>
+<p><code>track.step_plan()</code> divides the rung by expected <strong>trades</strong> — <code>days_left × trades_per_day</code> — not by days, because a per-day figure assumes you trade every day and the ledger says otherwise. Drawn as a staircase, because the point is that the step is small and there is a countable number of them.</p>
+<p>The staircase floor is anchored just under where the stack has been, not at zero. Zero-anchored, twelve compounding 4% trades all land between 62% and 100% of the height and render as twelve identical bars — flattening the exact thing the section exists to show.</p>
+<p>Everything is in <strong>stack</strong> euros. The rung is a BTC target and the stack is what gets measured against it; a step in account-equity terms would answer a different question than the hero above it asks.</p>
+<hr>
+<h2>Cut to the three things it is for — <code>52a8bab</code></h2>
+<p>Gone from the page: three paragraphs under the chart (the near-band summary, the fan explainer, the ruin warning). The chart already draws the band and the ruin floor is already a red line on it.</p>
+<p>Also gone, to <code>/hedge-analytics</code> under a <strong>Review</strong> heading: signal adherence and the 30-day score. Both answer &quot;how have I been behaving&quot;, which is a review question, not something consulted before an entry. Hedge-only there, since both are scoped to <code>LENS_BOOK</code>.</p>
+<p>Renamed to what things are rather than to the question they were built to answer: <strong>Tracker</strong>, <strong>Next steps</strong>, <strong>Milestones</strong>, <strong>Edit milestones</strong>, and <strong>Signal quality</strong>. Every section collapses, and the state is remembered per section in <code>localStorage</code> — a section you have to re-minimise on every load is not really minimisable.</p>
+<p><strong>Bug fixed:</strong> the score table has five columns and ran past its panel border on a phone. It scrolls inside its own container now.</p>
+<p><strong>Contrast:</strong> ten rules on Track painted read text with <code>--faint</code>, which <code>theme.py</code> documents as a decoration token at 2.26–2.47:1 while <code>PRODUCT.md</code> requires 4.5:1 of body text. All moved to <code>--dim</code>. Struck-through cleared rungs keep <code>--faint</code> deliberately — line-through already carries &quot;cleared&quot;, so colour is not the only signal.</p>
+<hr>
+<h2>The ladder got phases — <code>9592c3c</code>, plan v8</h2>
+<p>The ladder had run three different rates since v7, but the rates lived only as prose inside <code>amendment_reason</code>. Nothing could read them, so no page could say which phase you were in.</p>
+<p><code>goal_plan.phases</code> is now a real column — <code>[{name, to_btc, rate_monthly}]</code> — carried through <code>amend()</code> like any other amendable field, with an additive migration. NULL parses as <code>[]</code>, since every plan up to v7 genuinely was one flat rate.</p>
+<p><strong>Rates: 100% / 50% / 10%.</strong> Phase 1 doubles to 1 BTC rather than running 60%: the gap from here to 1 BTC is small in absolute terms, so the rate that clears it costs little risk per trade, and reaching phase 2 sooner matters more than the rate inside phase 1.</p>
+<p><strong>Rungs overshoot phase boundaries rather than being capped at them.</strong> Capping discards the growth above the boundary — if you are at 0.95 ₿ and double, you have 1.9, and a ladder insisting your rung is &quot;1.0&quot; is behind reality the moment you clear it. Capping cost roughly five months to the north star.</p>
+<hr>
+<h2>The cone stopped quoting nine figures — <code>9592c3c</code></h2>
+<p>The projection compounds one risk appetite to the horizon, so upper percentiles run away. P90 in the tens of millions says nothing except that exponentials are exponential.</p>
+<p>Reported percentiles are bent toward a €40M ceiling: below a €20M knee they pass through untouched, above it they approach and never arrive. Applied to the <strong>reported</strong> percentiles, not the simulation — capping the paths themselves would change the odds the band claims to describe while still calling it a percentile.</p>
+<hr>
+<h2>Plan v9 — every rung a number a person aims at</h2>
+<p>v8 compounded exactly and produced <code>0.01489</code>, <code>1.90592</code>, <code>73.26997</code>. Arithmetically correct and unusable: a rung is something you hold in your head between now and hitting it.</p>
+<p>v9 snaps each target to the nearest human number the phase rate implies, ties rounding <strong>up</strong> so no step is quietly made easier. The standard 1‑1.5‑2‑3‑5‑7.5 log-scale mantissa set reproduces his own sequence exactly. Phase 3 snaps to multiples of five instead — the mantissa set is far too coarse to land a 10% step at that scale.</p>
+<pre><code>0.015 → 0.03 → 0.05 → 0.1 → 0.2 → 0.5 → 1
+   → 1.5 → 2 → 3 → 5 → 7.5 → 10 → 15 → 20 → 30 → 50
+      → 55 → 60 → 65 → 70 → 75 → 85 → 95 → 105 → 115 → 125 → 140 → 150</code></pre>
+<div class=tw><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>Whole coin</td><td>2027-03-01</td></tr><tr><td>GOAL 50</td><td>2028-01-01</td></tr><tr><td>NORTH STAR 150</td><td><strong>2028-12-31</strong></td></tr></tbody></table></div>
+<p>Rounding costs the schedule. v8 reached 150 in 24 steps only by overshooting 50 to 73.3; landing exactly on 1 and 50 is rounder and slower. The final rung is dated to the north star date rather than a month past it — the last step is +7%, so pulling it a day earlier costs nothing real.</p>
+<p><strong><code>0.2 → 0.5</code> is +150%,</strong> the one rung harder than its own phase rate. Kept because 0.5 is the target that means something and 0.4 is not.</p>
+<h3>What the ladder actually asks for</h3>
+<div class=tw><table><thead><tr><th>phase</th><th>steps</th><th>geo mean/mo</th><th>min</th><th>max</th><th>per trade</th></tr></thead><tbody><tr><td>Acceleration</td><td>6</td><td><strong>101%</strong></td><td>67%</td><td>150%</td><td>2.14%</td></tr><tr><td>Growth</td><td>10</td><td><strong>48%</strong></td><td>33%</td><td>67%</td><td>1.19%</td></tr><tr><td>Maintenance</td><td>12</td><td><strong>10%</strong></td><td>7%</td><td>13%</td><td>0.28%</td></tr><tr><td>whole ladder</td><td>28</td><td><strong>39%</strong></td><td>7%</td><td>150%</td><td></td></tr></tbody></table></div>
+<p>Median month 33%. Only <strong>5 of 28 months</strong> ever ask for 100% or more, and the last is 2027-03. Per-trade figures assume the measured 1.08 trades/day.</p>
+<hr>
+<h2>🔴 The finding that outranks everything above</h2>
+<p>The ladder needs <strong>+2.14% per trade</strong> through Acceleration. The ledger says:</p>
+<div class=tw><table><thead><tr><th></th><th></th><th>expectancy</th></tr></thead><tbody><tr><td>all time (527)</td><td>WR 39.1%, RR 1.32</td><td><strong>−0.206 R/trade</strong></td></tr><tr><td>last 90d (84)</td><td>WR 32.1%, RR 1.54</td><td><strong>−0.260 R/trade</strong></td></tr></tbody></table></div>
+<p>The measured edge is <strong>negative</strong>, and no position size converts that. At 39% win rate risking 2%, RR 2.0 returns +0.12% per trade against the 2.14% needed — 18× short. Roughly <strong>5R</strong> clears it. The lever is the reward multiple, not the risk amount.</p>
+<p>Everything in this document is instrumentation. None of it changes that number.</p>
+<footer>Twin of <code>DONE-2026-08-22-track-rebuild-phased-ladder.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

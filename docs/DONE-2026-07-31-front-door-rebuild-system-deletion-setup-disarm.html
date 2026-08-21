@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // NEXT SESSION — LENS</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>NEXT SESSION — LENS</h1>
+<p><a href="DONE-2026-07-31-front-door-rebuild-system-deletion-setup-disarm.html">Open as HTML</a></p>
+<blockquote><strong>CLOSED SESSION — 2026-07-31.</strong> Everything in this file is done, moot, or deliberately moved out of the repo. It was <code>NEXT_SESSION.md</code> at the root until its last item was built on 2026-07-31; it is archived here so that no file in this repository claims to be pending work when none is.  <strong>There is deliberately no <code>NEXT_SESSION.md</code> right now.</strong> That is the honest state, not an oversight — see <code>## ▶ NOTHING IS PENDING IN THIS REPO</code> below. The next session that genuinely has scope should create a fresh one.  Still worth reading here: the out-of-sample disarm of S2–S5, the short-side &quot;no edge&quot; finding, his recorded position on splitting the prop and hedge engines (raise only when he opens the topic), and the 2026-07-25 log.</blockquote>
+<p><em>Revised 2026-07-31 — one priority only. Supersedes the 2026-07-25 spec, whose public-exposure alarm was wrong (see below). Prior spec archived at <code>docs/DONE-2026-07-24-short-gap-discipline-holes.md</code>.</em></p>
+<hr>
+<h2>✅ DONE 2026-07-31 — negative-expectancy setups disarmed</h2>
+<p>Was the top item here. Built and deployed the same day, so it is no longer pending. <code>app/setups.py</code> now carries <code>ARMED_SETUPS = frozenset({&quot;S1&quot;})</code>.</p>
+<p><strong>Why.</strong> S1–S5 were mined from 464 of his own trades and showed 57–91% win rates <em>in that sample</em>. Scored out-of-sample over 63,270 candles, 2019-05 → 2026-07 (<code>results/strategy_scores.json</code>, 2026-07-26):</p>
+<div class=tw><table><thead><tr><th>setup</th><th>in-sample claim</th><th>out-of-sample net R</th><th>n</th><th></th></tr></thead><tbody><tr><td>S1</td><td>90.9% (n=11)</td><td><strong>+0.042</strong></td><td>431</td><td>armed — the only non-negative one</td></tr><tr><td>S2</td><td>65% (n=23)</td><td>−0.256</td><td>1,649</td><td>disarmed</td></tr><tr><td>S3</td><td>56.7% (n=30)</td><td>−0.146</td><td>9,340</td><td>disarmed</td></tr><tr><td>S4</td><td>62% (n=29)</td><td>−0.296</td><td>4,060</td><td>disarmed</td></tr><tr><td>S5</td><td>60% (n=5)</td><td>−0.086</td><td>2,714</td><td>disarmed</td></tr></tbody></table></div>
+<p>The setups were fit to the data that produced them and the edge did not survive. This is the mechanism behind the hedge book: 496 fills, 39.5% WR, −€4,347. Measured effect of the change, over a 5,800-bar window: <strong>1,588 live signals → 30.</strong></p>
+<p><strong>What was gated, and what deliberately was not.</strong></p>
+<p>· <code>scan_latest()</code> — the signals pipeline. Gated. · <code>desk_state()</code> — the ENTER / STAND DOWN verdict. Gated. · The desk labels no longer advertise the in-sample win rates. Each setup now reads <code>ARMED · +0.04R out-of-sample (n=431)</code> or <code>DISARMED · −0.26R …</code>. · <code>classify()</code> / <code>backfill_setup_tags()</code> — <strong>NOT gated, on purpose.</strong> They tag trades that already happened. Filtering them would silently rewrite every historical S2–S5 tag to NONE and destroy the realized-vs-mined scoreboard — which is the only evidence that could ever justify re-arming a setup.</p>
+<p><code>tests/test_armed_setups.py</code> locks both halves: the live surfaces must be gated, the tagger must not be.</p>
+<p><strong>To re-arm anything</strong>, edit the one frozenset — but only against a fresh <code>strategy_scores.json</code>, not against a realized run of 20 trades. The 57–91% numbers came from exactly that mistake.</p>
+<h2>▶ NOTHING IS PENDING IN THIS REPO</h2>
+<p>That is the honest state as of 2026-07-31, and it is deliberate — the two things that matter next are not LENS work:</p>
+<ol>
+<li><strong>Months-of-burn.</strong> One number, one hour. Kiki, not here (see below).</li>
+<li><strong>Ten paper trades on <code>ASIAN_RSI_DIP_v1</code> as written</strong> — 2x, killzone bars only. His desk work, not a Claude session. It is #1 of 27 by net R (+0.653R/trade); the busted eval ran it at 5x, 8 trades in 11 days, with 1 of 8 following the plan.</li>
+</ol>
+<p>⚠️ <strong>Do not open this repo looking for something to build.</strong> The pattern <code>focus-doctrine-2026-07.md</code> names — converting &quot;take a position&quot; into &quot;build an instrument&quot; — runs through a session that starts by hunting for work here.</p>
+<h2>⤴ MOVED OUT: months-of-burn is not a LENS task</h2>
+<p>Previously listed here as the top priority. It does not belong in this repo and cannot be computed from <code>lens.db</code>. <code>/money</code> tracks <strong>Kraken transfers</strong> — €51,783 deposited, −€11,334 withdrawn — i.e. cash in and out of the exchange. There is no expenses table, no rent, no food, no visa, no spending of any kind.</p>
+<p>It is a personal-finance item and belongs in Kiki. Still outstanding since 2026-07-06, still worth an hour, still not this repo&#x27;s job.</p>
+<h2>✅ RESOLVED: the public-exposure alarm above was wrong</h2>
+<p>The previous version of this file opened with a 🔴 &quot;lens.restedpc.com is public and unauthenticated, measured not theoretical&quot;. <strong>It is not.</strong> Public DNS resolves <code>lens.restedpc.com</code> to <code>fox.tail390a75.ts.net</code> → <code>100.103.43.66</code>, which is CGNAT and unroutable off-tailnet. The original <code>curl</code> was run from inside the tailnet, so it only ever proved the service was up. Corrected 2026-07-31.</p>
+<p>Still worth doing cheaply when convenient — <code>FastAPI(docs_url=None, redoc_url=None, openapi_url=None)</code> stops advertising the surface — but it is housekeeping, not an emergency, and it is <strong>not</strong> this session&#x27;s job.</p>
+<h2>📌 Findings from 2026-07-31 — already answered, do not re-derive</h2>
+<ul>
+<li><strong>The eval busted, it did not stall.</strong> 8 trades, 9–20 Jul, −$301.59 = −6.03% against <code>BREAKOUT_1STEP_CLASSIC</code>&#x27;s 6.0% static wall. Account closed.</li>
+<li><strong>It was never a strategy failure — the strategy was never run.</strong> Trade 1 has <code>followed_plan=1, followed_strategy=1</code> and is the only winner (+$49.79). The other seven are <code>None</code>/<code>0</code> and all lost. Trade 3&#x27;s own note: <em>&quot;No signal.&quot;</em> Six of eight ran <strong>5x</strong> leverage against a plan that specifies <strong>2x</strong>, and he took <strong>8 trades in 11 days</strong> against a model of <strong>~1.5/month</strong>.</li>
+<li><strong>The &quot;which eval can I afford&quot; question is closed.</strong> <code>BREAKOUT_5K_PLAN.md</code> (15 Jun): <em>&quot;rules are %-based, so odds are identical at any account size. Pass the cheap $5k first, then buy the biggest eval direct (don&#x27;t ladder).&quot;</em> Evals are ~$20. No hedge-book grinding is needed to afford one.</li>
+<li><strong>His action, not a Claude session:</strong> run <code>ASIAN_RSI_DIP_v1</code> as written — 2x, killzone bars only — on paper for 10 trades. Kraken CLI has a free paper-trading mode against live prices with no API keys. If he can follow it for ten, buy the $20 eval. If not, the eval was never the problem.</li>
+<li>⚠️ <strong>Do not wire order placement into LENS.</strong> The front door&#x27;s &quot;LENS holds no keys, it cannot place an order&quot; is now a drawn diagram on <code>/</code>. Giving Kraken CLI trade-permissioned keys makes that page false.</li>
+</ul>
+<h2>🗑️ Deleted 2026-07-31</h2>
+<p><code>/system</code> and <code>app/home_page.py</code> are gone — the instrument plate was a craft showcase with no audience. <code>/</code> is now five diagrams; its only exit is <code>/dashboard</code>. The dot-matrix renderer lives in git at <code>43468ca</code> if it ever wants a home.</p>
+<h2>His stated position on the architecture (2026-07-25) — recorded, not actioned</h2>
+<p>Venting captured verbatim in intent so it stops occupying his head. <strong>He explicitly said he is NOT asking for this to be fixed now.</strong> Do not start it; raise it when he opens the topic.</p>
+<blockquote>&quot;I almost feel like I should have two separate engines… almost have them just be two separate websites. One for prop and one for hedge. While they might use the same tool, same library, same things, it just feels so different.&quot;</blockquote>
+<p>Worth taking seriously rather than filing as a mood: the prop book is an evaluation with hard drawdown walls and a pass/fail end state, the hedge book is his own money with a 150 BTC end state. They share code but almost no decisions, and the mode switcher exists precisely because one interface kept having to be two. <code>test_nav_parity</code> currently <em>enforces</em> that the two modes mirror each other — if the split happens, that test is the first thing to reconsider.</p>
+<p><strong>His page-by-page complaints, all verified as real:</strong></p>
+<div class=tw><table><thead><tr><th>page</th><th>what it actually is</th><th>verdict</th></tr></thead><tbody><tr><td><code>/audit</code></td><td>plain-English view of the <strong>2026-07-02</strong> audit vs current config</td><td>dated document, nothing actionable</td></tr><tr><td><code>/audit-report</code></td><td>serves the static <code>strategies/_research/STRATEGY_AUDIT_20260702.html</code></td><td>merge with <code>/audit</code> or archive</td></tr><tr><td><code>/docs/oauth2-redirect</code></td><td><strong>not a page</strong> — FastAPI Swagger helper</td><td>disappears when docs are disabled</td></tr><tr><td><code>/money</code></td><td>only sees the <code>transfers</code> table (kraken_spot EUR + biz futures)</td><td>reports a PARTIAL number as a TOTAL — he wants to supply the real figure and have it stored</td></tr><tr><td><code>/prop-cone</code></td><td>Monte-Carlo cone for the eval: pass odds, milestone ladder, basket</td><td>genuinely prop-only; but <code>/goal</code> + <code>/prop-goal</code> + <code>/prop-cone</code> is three goal pages</td></tr><tr><td><code>/robustness</code></td><td>permutation test, 4,000 shuffles: how often does chance beat the rule</td><td>honest, but <strong>40 live trades cannot answer it</strong> — label it, don&#x27;t delete</td></tr><tr><td><code>/risk</code> <code>/rules</code> <code>/survival</code></td><td>prop engine cards, deliberately no nav entry</td><td>fine as-is</td></tr><tr><td><code>/strategy</code> <code>/strategy-hedge</code> <code>/prop-goal-old</code></td><td><strong>301 redirects</strong>, legacy URLs kept so bookmarks survive</td><td>not pages at all</td></tr></tbody></table></div>
+<p><strong>The reframe that matters:</strong> five of the nine are not destinations — three are redirect stubs, two are framework endpoints. <strong>The sitemap advertises routes, not pages.</strong> Teaching it to skip redirects and framework routes removes most of the complaint without deleting anything. Do that before proposing deletions.</p>
+<p><strong>⚠ He wants to redo the hedge nav himself.</strong> Today&#x27;s commit already reorders it (Desk · Signals first, footer split MORE/SYSTEM) — tell him it is already in PR #1 so he does not redo work, then leave the nav to him.</p>
+<hr>
+<h2>The headline: the short side has no edge</h2>
+<p>The previous spec called the short gap a <strong>coverage bug</strong> — LENS is structurally long-only outside 13:00–16:00 UTC, so it &quot;cannot speak&quot;. Correct but incomplete. Given a vocabulary for chart structure and higher timeframes, the breeder still cannot find a short worth taking:</p>
+<div class=tw><table><thead><tr><th>window</th><th>viable</th><th>beat baseline</th><th>tradeable</th><th>tradeable SHORTS</th></tr></thead><tbody><tr><td>deep (7y Binance spot)</td><td>74</td><td>43</td><td>39</td><td><strong>0</strong></td></tr><tr><td>w30 (30mo Bybit perp)</td><td>60</td><td>41</td><td>23</td><td><strong>0</strong></td></tr></tbody></table></div>
+<p><strong>32 viable shorts bred across both windows. Not one is tradeable</strong> (beats an every-bar baseline at its own geometry AND ends the window up). Treat &quot;add a short setup&quot; as answered: the mechanism was missing, and so is the edge.</p>
+<p>Next place to look: <strong>his own executed shorts</strong> — six since the loop went live. If those made money, the edge is in something he sees that is not in this feature set, and mining is the wrong tool for finding it.</p>
+<hr>
+<h2>✅ Open decisions — ALL THREE CLOSED 2026-07-31</h2>
+<ol>
+<li><strong>The front door</strong> — answered. <code>/</code> was rebuilt as five diagrams (<code>explain_page.py</code>); <code>/system</code> and <code>app/home_page.py</code> were deleted outright rather than moved, so &quot;which page did he mean&quot; is moot. No <code>/about</code>, no cockpit: he asked for one visual front door and one exit to the desk.</li>
+<li><strong>Cockpit content</strong> — moot, nothing was built. The two rules survive in <code>explain_page.py</code>: no P&amp;L or balance on the front door, and if a verdict ever appears there it reuses <code>desk_state(refresh=False)</code> rather than re-deriving one that could disagree with <code>/desk</code>.</li>
+<li><strong>Kill S4 and S2?</strong> — <strong>answered: yes, plus S3 and S5.</strong> &quot;Raised twice, not decided&quot; is now decided on out-of-sample evidence rather than on how often the vetoes were catching them. See the disarm section at the top.</li>
+</ol>
+<p>The original text of all three, as written 2026-07-25:</p>
+<h2>Open decisions — as asked on 2026-07-25 (kept for the reasoning)</h2>
+<p><strong>1. The front door.</strong> <code>/</code> is <code>explain_page.py</code>: a plain-English explainer, no numbers, no jargon, written to his own brief for a non-trading reader (a partner, a parent). He called it &quot;too much fluff&quot; — but he is not its reader, he just lands on it daily.</p>
+<p>· Recommendation: move the explainer to <code>/about</code> intact, put a cockpit on <code>/</code>. · <strong>Ask which page he meant</strong> before editing: <code>/</code> (explainer) or <code>/system</code> (<code>home_page.py</code> — the instrument plate, which genuinely IS a pitch page: wordmark, animated thesis, marketing prose, dot-matrix curve). · ⚠ On 2026-07-25 I gutted <code>/system</code> believing it was the homepage, then reverted it. Confirm the target first.</p>
+<p><strong>2. Cockpit content</strong>, if built. Proposed, unanswered: verdict per direction, open position, signals awaiting decision, link coverage. The reverted sketch&#x27;s one keepable idea: reuse <code>desk_state(refresh=False)</code> rather than re-deriving a verdict, so the front door can never disagree with <code>/desk</code>. <strong>No P&amp;L or balance on the front door</strong> — <code>_gauges()</code> set that rule deliberately, so the page stays safe to turn a screen toward.</p>
+<p><strong>3. Kill S4 and S2?</strong> Both read as active and structurally cannot fire (S4 matched 25 times in 30 days, vetoed 25; S2 vetoed 5 of 5). S4 is the direct cause of his &quot;LENS told me to go long into a collapse&quot; complaint: it proposed a long every hour for nine hours while price fell, and the vetoes killed every one. The vetoes worked — the desk showed him the blocked cards. Raised twice, not decided.</p>
+<hr>
+<h2>Done 2026-07-25</h2>
+<ul>
+<li><strong>Veto labels read live.</strong> <code>VETO_LABELS</code> baked in frozen stats; <code>fvg_entry</code> rendered &quot;−€15/trade&quot; on <code>/desk</code> while the ledger said otherwise. Labels are description-only now; stats come from <code>veto_bucket_stats()</code>.</li>
+<li><strong>Era scoping.</strong> <code>veto_bucket_stats(era=&quot;live&quot;)</code> is the default; <code>SYSTEM_START = 2026-06-16</code>. 469 of 509 trades predate the system, and pooling them produced the false &quot;fvg_entry is the only veto in profit, +€2,011&quot; finding — live-era it is −€79 over 10. <strong>Do not delete the pre-system trades</strong> (he asked about this): they are the sample the vetoes were mined from, and this scoping is the alternative that keeps them.</li>
+<li><strong>Pattern + HTF vocabulary</strong> (<code>app/patterns.py</code>): double top/bottom, structure, breakout, 4h/1d trend, merged into <code>SLOTS</code> so grid search, breeder and board all gain them. Grid search 2,934 → 9,694 combos. Causality proven by truncation in <code>tests/test_patterns.py</code>.</li>
+<li><strong>Lookahead bug fixed</strong> in <code>add_indicators</code>: <code>h4_*</code> was resampled and ffilled with no shift, so 3 of every 4 1h bars knew their own 4h close. Only <code>research/scalp_sweep.py</code> consumed it — that script&#x27;s past results were inflated.</li>
+<li><strong>Breeder baseline</strong> (<code>beats_baseline</code>, then <code>tradeable</code>). It had none, so a 7-year run returning 65 longs of 78 read as a finding. 0 of 74 beat buy-and-hold. <code>tradeable</code> exists because five w30 SHORTS beat a direction-matched baseline while losing 24–48%.</li>
+<li><strong>Linker fixed.</strong> It required the decision to PRECEDE the fill; across the live era 24 of 27 unlinked fills have the decision AFTER — he trades, then approves. Symmetric ±6h window, ordered by absolute gap. Links 5 → 8 of 40. Deliberately not widened further: the gaps jump to 20h/60h/300h+, and a false link corrupts the dataset the system exists to build.</li>
+<li><strong>Nav</strong> leads with Desk and Signals in both modes, ordered by the daily loop; footer split into MORE (book pages) and SYSTEM (utilities).</li>
+</ul>
+<hr>
+<h2>Standing context</h2>
+<ul>
+<li>Auto-execution is never in scope.</li>
+<li>**The goal is 150 BTC valued at current spot. He has confirmed the config is fine and does NOT want a fixed €37.5M target — do not re-litigate it.** <code>LENS_PLAN.md</code> line 18 still says &quot;50 BTC&quot; and line 395 &quot;150 BTC @ €250k&quot;; the config is what grades feasibility. Reconcile those two lines, nothing more.</li>
+<li><strong>Buy-and-hold is not the benchmark.</strong> The goal is a BTC count and he is accumulating, not trying to beat holding over four years. Use <code>tradeable</code> (beats baseline + ends up) as the gate instead.</li>
+<li>The live era is <strong>40 trades, 8 linked, 1–17 trades per veto rule</strong>. Almost nothing is statistically significant. The highest-value work is whatever raises the linked-trade count, because an unlinked trade cannot answer &quot;does following LENS beat ignoring it&quot; — the only question that matters.</li>
+<li>The 7-year window is Binance <strong>spot</strong>; the 30-month is Bybit <strong>perp</strong>. Never compare them bar-for-bar.</li>
+</ul>
+<footer>Twin of <code>DONE-2026-07-31-front-door-rebuild-system-deletion-setup-disarm.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // PRISM Trading System — Architecture Specification</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>PRISM Trading System — Architecture Specification</h1>
+<p><a href="prism-system-spec.html">Open as HTML</a></p>
+<h2>Overview</h2>
+<p>PRISM is a modular crypto trading system with four distinct components. Each component has a single responsibility and communicates through defined interfaces. This document is the source of truth for any developer or AI agent building on this system.</p>
+<p><strong>Owner:</strong> Lucky (solo trader, US LLC Wyoming structure) <strong>Market:</strong> BTC perpetual futures (Kraken) <strong>Repository:</strong> github.com/idlepcvr/prism</p>
+<hr>
+<h2>System Components</h2>
+<h3>1. PRISM Core — Trade Logger &amp; Portfolio Engine</h3>
+<p><strong>Language:</strong> Python (FastAPI) + Supabase <strong>Status:</strong> Partially built <strong>Responsibility:</strong> Logs real trades, tracks balances, calculates position sizing, shows per-setup expectancy on real fills.</p>
+<p><strong>What it does:</strong></p>
+<ul>
+<li>Cross-venue balance aggregation</li>
+<li>Real fill logging with <code>setup_type</code> tag</li>
+<li>ATR-adaptive position sizing (Kelly Criterion)</li>
+<li>Equity curve vs balance separation</li>
+<li>Goal calculator (milestone tracking: 1 BTC → 50 BTC → 150 BTC)</li>
+<li>Manual edit lock for trade journal integrity</li>
+</ul>
+<p><strong>What it does NOT do:</strong></p>
+<ul>
+<li>Signal detection (that&#x27;s Lens)</li>
+<li>Chart rendering (that&#x27;s TradingView)</li>
+<li>Alerting (that&#x27;s Notify)</li>
+</ul>
+<p><strong>Key data model:</strong></p>
+<pre><code>Trade {
+  id, timestamp, exchange, pair,
+  side (long/short), entry_price, exit_price,
+  stop_loss, take_profit, leverage,
+  position_size_usd, position_size_btc,
+  setup_type (string — maps to Lens signal name),
+  r_multiple (actual), pnl_usd, pnl_pct,
+  fees, funding_cost, hold_duration,
+  outcome (win/loss/breakeven)
+}</code></pre>
+<hr>
+<h3>2. Lens — Signal Detection Engine</h3>
+<p><strong>Language:</strong> Pine Script (TradingView) for indicators + Python for backtesting <strong>Status:</strong> Not yet built <strong>Responsibility:</strong> Detects trade setups on the 4H timeframe, calculates entry/SL/TP, fires alerts.</p>
+<p><strong>Trading Parameters (locked):</strong></p>
+<ul>
+<li>Timeframe: 4H candles</li>
+<li>Leverage: 10x (Kraken Perpetual)</li>
+<li>Stop Loss: 1% price move from entry</li>
+<li>Take Profit: 4% price move from entry (4R)</li>
+<li>Account risk per trade: 10%</li>
+<li>Account gain per trade: 40%</li>
+<li>Frequency: 1 trade per day maximum</li>
+<li>Hold time: 1-3 days typical</li>
+</ul>
+<p><strong>Trailing Stop Rules (for future automation):</strong></p>
+<div class=tw><table><thead><tr><th>Price hits</th><th>Trail stop to</th><th>Locked in</th></tr></thead><tbody><tr><td>1R (1%)</td><td>Entry (breakeven)</td><td>0%</td></tr><tr><td>2R (2%)</td><td>1R below entry</td><td>+10%</td></tr><tr><td>3R (3%)</td><td>2R below entry</td><td>+20%</td></tr><tr><td>4R (4%)</td><td>CLOSE</td><td>+40%</td></tr></tbody></table></div>
+<p><strong>Entry Signal Logic (v1 — to be backtested and refined):</strong></p>
+<ul>
+<li>Trend: Price below 20 EMA AND 50 EMA on 4H (for shorts; inverse for longs)</li>
+<li>Momentum: MACD histogram declining (shorts) or rising (longs)</li>
+<li>Structure: Break of previous support/resistance level</li>
+<li>Confirmation: Volume spike on breakout candle</li>
+<li>ICT concepts (future): Order blocks, fair value gaps, liquidity sweeps</li>
+</ul>
+<p><strong>Pine Script Indicator Output:</strong></p>
+<ul>
+<li>Visual: Entry arrow, SL line (red), TP line (green) drawn on chart</li>
+<li>Alert message format:</li>
+</ul>
+<pre><code>PRISM Signal: SHORT BTC
+Entry: $71,100
+SL: $71,811 (+1.0%)
+TP: $68,256 (-4.0%)
+Leverage: 10x
+Risk: 10% account
+R:R: 1:4
+Setup: MA_MACD_Break_v1</code></pre>
+<p><strong>Pine Script Strategy Output (backtesting):</strong></p>
+<ul>
+<li>Same logic as indicator but with <code>strategy.entry()</code> and <code>strategy.exit()</code> calls</li>
+<li>Reports: win rate, average R, profit factor, max drawdown, equity curve</li>
+<li>Validation target: 44%+ WR at 4R = profit factor &gt; 2.0</li>
+</ul>
+<p><strong>Python Backtester (optional, for Monte Carlo):</strong></p>
+<ul>
+<li>Reads TradingView strategy export CSV</li>
+<li>Runs Monte Carlo simulation (5000 iterations)</li>
+<li>Reports: median outcome, P10/P90, ruin probability at 50% drawdown</li>
+<li>Uses actual win rate and R from backtest, not assumptions</li>
+</ul>
+<hr>
+<h3>3. Dashboard — Visual Interface</h3>
+<p><strong>Language:</strong> React (Next.js) or vanilla SPA <strong>Status:</strong> Vanilla HTML SPA exists in PRISM repo <strong>Responsibility:</strong> Single screen to see everything — current position, recent trades, performance metrics, next signal.</p>
+<p><strong>Views:</strong></p>
+<ol>
+<li><strong>Active Position</strong> — current trade with live P&amp;L, SL/TP levels, time in trade</li>
+<li><strong>Trade Journal</strong> — list of all trades with setup_type, R multiple, outcome</li>
+<li><strong>Performance Metrics:</strong></li>
+<ul>
+<li>Win rate (overall and per setup_type)</li>
+<li>Average R (overall and per setup_type)</li>
+<li>Profit factor</li>
+<li>Current streak (wins/losses)</li>
+<li>Account equity curve</li>
+<li>Milestone progress (current balance vs 1 BTC / 50 BTC / 150 BTC targets)</li>
+</ul>
+<li><strong>Weekly Summary:</strong></li>
+<ul>
+<li>Trades taken, wins, losses</li>
+<li>Account change (€ and %)</li>
+<li>Expected vs actual doubling time</li>
+<li>Week-over-week comparison</li>
+</ul>
+</ol>
+<p><strong>Does NOT need:</strong></p>
+<ul>
+<li>Chart rendering (use TradingView for that)</li>
+<li>Signal detection (that&#x27;s Lens on TradingView)</li>
+<li>Complex analytics beyond what&#x27;s listed above</li>
+</ul>
+<hr>
+<h3>4. Notify — Alert Pipeline</h3>
+<p><strong>Language:</strong> Python (or shell script) <strong>Status:</strong> ntfy already self-hosted on homelab (fox) <strong>Responsibility:</strong> Receives TradingView webhook alerts, formats them, pushes to phone.</p>
+<p><strong>Flow:</strong></p>
+<pre><code>TradingView Alert (webhook)
+    → Notify endpoint on fox (via Cloudflare Tunnel)
+    → Parse alert message
+    → Push to ntfy topic (phone notification)
+    → Log alert in Supabase (for correlation with actual trades)</code></pre>
+<p><strong>Alert types:</strong></p>
+<ul>
+<li><code>SIGNAL</code> — new trade setup detected by Lens</li>
+<li><code>TRAILING</code> — price hit trailing stop level (future)</li>
+<li><code>CLOSED</code> — trade hit TP or SL</li>
+<li><code>RISK</code> — drawdown warning (3+ consecutive losses)</li>
+</ul>
+<hr>
+<h2>Data Flow</h2>
+<pre><code>TradingView (Lens Pine Script)
+    │
+    ├── Visual: arrows + lines on chart (you look at this)
+    ├── Alert webhook → Notify → phone notification
+    │
+    └── You decide: take trade or skip
+            │
+            ├── Execute on Kraken manually
+            │
+            └── PRISM Core logs the trade
+                    │
+                    └── Dashboard displays metrics</code></pre>
+<hr>
+<h2>Current Trading Metrics (Baseline — June 2026)</h2>
+<div class=tw><table><thead><tr><th>Metric</th><th>Current</th><th>Target</th></tr></thead><tbody><tr><td>Win Rate</td><td>44%</td><td>44-54%</td></tr><tr><td>Average R</td><td>1.58</td><td>4.0</td></tr><tr><td>Profit Factor</td><td>1.24</td><td>2.0+</td></tr><tr><td>Leverage</td><td>10x</td><td>10x</td></tr><tr><td>Account Risk/Trade</td><td>10%</td><td>10%</td></tr><tr><td>Doubling Time</td><td>unknown</td><td>1.6 weeks</td></tr><tr><td>Ruin Risk (50% DD)</td><td>unknown</td><td>&lt;5%</td></tr></tbody></table></div>
+<hr>
+<h2>Milestones</h2>
+<div class=tw><table><thead><tr><th>Date</th><th>Target</th><th>Account Value</th></tr></thead><tbody><tr><td>Jun 2026</td><td>First 4R trade</td><td>€504 ✅</td></tr><tr><td>Dec 2026</td><td>1 BTC</td><td>~€150,000</td></tr><tr><td>Dec 2027</td><td>50 BTC</td><td>~€7,500,000</td></tr><tr><td>Dec 2028</td><td>150 BTC</td><td>~€22,500,000</td></tr></tbody></table></div>
+<hr>
+<h2>Key Equations</h2>
+<p><strong>Account risk per trade:</strong></p>
+<pre><code>Account Risk % = Leverage × Stop Distance %
+10% = 10x × 1%</code></pre>
+<p><strong>Expected value per trade:</strong></p>
+<pre><code>EV = (Win Rate × R × Risk%) - ((1 - Win Rate) × Risk%)
+EV = (0.44 × 4.0 × 0.10) - (0.56 × 0.10) = +12.0% per trade</code></pre>
+<p><strong>Geometric mean per trade:</strong></p>
+<pre><code>Geo = (1 + Risk% × R)^WR × (1 - Risk%)^(1-WR)
+Geo = 1.40^0.44 × 0.90^0.56 = 1.0931</code></pre>
+<p><strong>Trades to double:</strong></p>
+<pre><code>ln(2) / ln(Geo) = ln(2) / ln(1.0931) = 7.8 trades</code></pre>
+<p><strong>Breakeven R at 44% WR:</strong></p>
+<pre><code>Min R = (1 - WR) / WR = 0.56 / 0.44 = 1.27R
+Below 1.27R at 44% WR = negative EV = losing money</code></pre>
+<hr>
+<h2>Rules for Claude Code</h2>
+<p>When working on this repository:</p>
+<ol>
+<li><strong>Lens is Pine Script on TradingView.</strong> Do not build chart analysis in Python or JavaScript. TradingView does this better than anything you can build.</li>
+</ol>
+<ol>
+<li><strong>PRISM Core is the trade logger.</strong> It does not detect signals. It records what actually happened.</li>
+</ol>
+<ol>
+<li><strong>Dashboard is read-only.</strong> It displays data from Supabase. It does not make decisions.</li>
+</ol>
+<ol>
+<li><strong>Notify is a thin webhook relay.</strong> TradingView → ntfy. Keep it simple.</li>
+</ol>
+<ol>
+<li><strong>All position sizing uses the locked parameters:</strong> 10x leverage, 1% stop, 4% TP, 10% account risk, 4R target.</li>
+</ol>
+<ol>
+<li><strong>The trailing stop system is defined but not yet automated.</strong> For now, trades use fixed SL/TP on Kraken. Trailing is a future feature.</li>
+</ol>
+<ol>
+<li><strong>Monte Carlo validation is required before changing any parameter.</strong> Run 5000 simulations with proposed changes and verify ruin risk stays below 5% at 50% drawdown threshold.</li>
+</ol>
+<ol>
+<li><strong>Win rate optimization is secondary. R optimization is primary.</strong> Any change that improves average R by 0.5 is worth more than a change that improves win rate by 10%.</li>
+</ol>
+<footer>Twin of <code>prism-system-spec.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

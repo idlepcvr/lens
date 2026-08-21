@@ -1,5 +1,7 @@
 # NEXT SESSION — LENS
 
+[Open as HTML](DONE-2026-07-31-front-door-rebuild-system-deletion-setup-disarm.html)
+
 > **CLOSED SESSION — 2026-07-31.** Everything in this file is done, moot, or
 > deliberately moved out of the repo. It was `NEXT_SESSION.md` at the root until
 > its last item was built on 2026-07-31; it is archived here so that no file in

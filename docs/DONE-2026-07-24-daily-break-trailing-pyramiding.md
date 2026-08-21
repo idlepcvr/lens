@@ -1,5 +1,7 @@
 # NEXT SESSION — LENS: Structure-trailing + pyramiding eval for DAILY_BREAK_v1
 
+[Open as HTML](DONE-2026-07-24-daily-break-trailing-pyramiding.html)
+
 > **CLOSED SESSION — built 2026-07-24.** Structure-trailing + pyramiding eval for DAILY_BREAK_v1. Renamed from
 > `NEXT_SESSION*` on 2026-07-31: three files named "next session" all
 > described finished work. As of 2026-07-31 there is no live handoff at all —

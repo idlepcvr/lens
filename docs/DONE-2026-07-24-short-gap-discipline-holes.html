@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // NEXT SESSION — LENS: close the short gap, then the discipline holes</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>NEXT SESSION — LENS: close the short gap, then the discipline holes</h1>
+<p><a href="DONE-2026-07-24-short-gap-discipline-holes.html">Open as HTML</a></p>
+<blockquote><strong>CLOSED SESSION — built 2026-07-24.</strong> Close the short gap, then the discipline holes. Renamed from <code>NEXT_SESSION*</code> on 2026-07-31: three files named &quot;next session&quot; all described finished work. As of 2026-07-31 there is no live handoff at all — the last one was archived alongside this file once its final item was built. Nothing in this repository is pending. A session with real scope should create a fresh <code>NEXT_SESSION.md</code> at the root.</blockquote>
+<p><em>Written 2026-07-24 from evidence gathered that day. The previous spec (DAILY_BREAK trailing/pyramiding, ✅ built, ❌ NO-GO) is archived at <code>docs/DONE-2026-07-24-daily-break-trailing-pyramiding.md</code>. Items are ordered by measured cost, not by effort.</em></p>
+<hr>
+<h2>Item 1 · LENS cannot signal a short for 21 hours of the day</h2>
+<p><strong>This is the headline, and it is a coverage bug, not a discipline problem.</strong></p>
+<p>He reported executing shorts that never appeared as signals. Measured — every short he has taken since the loop went live (2026-06-16):</p>
+<div class=tw><table><thead><tr><th>trade</th><th>UTC hour</th><th>could LENS have signalled it?</th></tr></thead><tbody><tr><td>2026-07-22 17:20</td><td>17</td><td>no</td></tr><tr><td>2026-07-21 04:09</td><td>04</td><td>no</td></tr><tr><td>2026-07-17 22:12</td><td>22</td><td>no</td></tr><tr><td>2026-07-16 22:17</td><td>22</td><td>no</td></tr><tr><td>2026-07-13 06:26</td><td>06</td><td>no</td></tr><tr><td>2026-07-09 01:38</td><td>01</td><td>no</td></tr></tbody></table></div>
+<p><strong>Six of six.</strong> Only two of the five playbook setups are shorts:</p>
+<ul>
+<li><strong>S1</strong> requires <code>killzone == &quot;ny_am_kz&quot;</code>, which is <strong>13:00–16:00 UTC only</strong>.</li>
+<li><strong>S2</strong> has no time gate — and was vetoed <strong>5 times out of 5</strong> in the last 30 days, and is structurally self-defeating (premium + bear displacement implies up-slope and a fresh PDH raid, which trips <code>slope_against</code> + <code>pd_raid_fade</code> automatically).</li>
+</ul>
+<p>So outside a three-hour window, LENS is <strong>structurally long-only</strong>. It is not that he ignored the feed; the feed cannot speak. This also fully explains the &quot;the engine looks asleep&quot; complaint that produced the veto log.</p>
+<p><strong>Do not fix this by loosening the vetoes.</strong> The vetoes are the measured edge. Fix it by giving the short side a setup that can fire outside 13–16 UTC. The raw material already exists: <code>strategy_search.json</code> holds hundreds of scored combos and the board already ranks short-capable strategies (H13 · weak-bounce fade is live). The question to answer is why the S-playbook has no short equivalent, and whether a board-derived short belongs in the playbook.</p>
+<p><strong>Also decide S2 and S4 explicitly.</strong> S4 matched 25 times in 30 days and was vetoed 25 times — a long on <code>rsi&lt;40</code> in discount trips <code>slope_against</code> every time. Both are rules that read as active and cannot fire. Kill them or fix them; leaving them is worse than either.</p>
+<hr>
+<h2>Item 2 · The board signal path applies no vetoes at all</h2>
+<p><code>emit_board_signals()</code> contains zero calls to <code>vetoes()</code>. The playbook path is veto-filtered; the board path is not. 21 signals have gone out unfiltered.</p>
+<p>The mining says the single biggest lever is not trading vetoed contexts, and half the pipeline does not apply it. Either the vetoes belong on both paths, or there is a reason they should not apply to board strategies — but right now that is an accident, not a decision.</p>
+<hr>
+<h2>Item 3 · The goal target exists in three contradictory versions</h2>
+<div class=tw><table><thead><tr><th>source</th><th>says</th></tr></thead><tbody><tr><td><code>lens_config</code> row 1 (feeds <code>/edge</code> Fit + <code>compute_goal</code>)</td><td>150 BTC, valued at spot</td></tr><tr><td><code>LENS_PLAN.md</code> line 18</td><td>&quot;50 BTC by 2028-12-31&quot;</td></tr><tr><td><code>LENS_PLAN.md</code> line 395</td><td>&quot;150 BTC @ €250k by 31 Dec 2028&quot;</td></tr></tbody></table></div>
+<p>The config is what actually grades feasibility verdicts. Pick one, write it in both places, delete the others. <code>LENS_PLAN.md</code> open item 3 flagged this class of problem; it is still live, just with different numbers than when it was written.</p>
+<hr>
+<h2>Item 4 · <code>fvg_entry</code> is the most-fired veto and the only one in profit</h2>
+<p>69 hits in 30 days — more than any other rule — and the bucket is <strong>+€2,000 over 26 trades</strong> while its frozen <code>VETO_LABELS</code> string still reads &quot;−€15/trade&quot;. Every other veto bucket is in the red, as designed.</p>
+<p>The blocked cards on <code>/signals</code> now show the live number, but <code>/desk</code> still renders the frozen one. Either re-derive <code>VETO_LABELS</code> from the ledger or drop the baked-in stats entirely and always read live.</p>
+<hr>
+<h2>Item 5 · The auto-linker may be missing about half the links</h2>
+<p>Corrected denominator: <strong>469 of the 509 trades predate the system</strong>. The live era is 40 trades, 5 linked — not 5 of 509. Do not quote the big number.</p>
+<p>Within the live era, 10 distinct trades sit within 6h of an approved signal in the same direction; 5 carry a link. That is an indication, not proof — the 6h same-direction test is looser than the real linker&#x27;s. Worth an hour to confirm before touching the linker, because the signal→trade dataset is the whole point of the system.</p>
+<p>Related and unmeasured: 41 signals approved, 38 expired. Nothing currently reports approve-to-execute conversion, only signal-to-trade.</p>
+<hr>
+<h2>Item 6 · The breeder&#x27;s champions have never met a baseline</h2>
+<p><code>strategy_search3</code> scores survivors against a buy-every-bar baseline and carries a <code>beats_baseline</code> flag. <code>strategy_breeder</code> has no baseline comparison at all, and its 7-year run returned 65 long genomes out of 78 over a period where BTC rose roughly tenfold. Run the champions through the same baseline gate before any of them is treated as a finding.</p>
+<hr>
+<h2>Standing context</h2>
+<ul>
+<li>Auto-execution is never in scope.</li>
+<li>The 7-year window is Binance <strong>spot</strong>; the 30-month is Bybit <strong>perp</strong>. Never compare them bar-for-bar.</li>
+<li>Three separate investigations on 2026-07-24 (exits, search depth, vault diversity) all returned &quot;the constraint is evidence, not machinery&quot;. Item 1 is the exception that genuinely is a machinery gap — the short side has no mechanism at all, which is a different thing from a weak mechanism.</li>
+</ul>
+<footer>Twin of <code>DONE-2026-07-24-short-gap-discipline-holes.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

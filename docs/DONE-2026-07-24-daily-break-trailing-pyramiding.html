@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // NEXT SESSION — LENS: Structure-trailing + pyramiding eval for DAILY_BREAK_v1</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>NEXT SESSION — LENS: Structure-trailing + pyramiding eval for DAILY_BREAK_v1</h1>
+<p><a href="DONE-2026-07-24-daily-break-trailing-pyramiding.html">Open as HTML</a></p>
+<blockquote><strong>CLOSED SESSION — built 2026-07-24.</strong> Structure-trailing + pyramiding eval for DAILY_BREAK_v1. Renamed from <code>NEXT_SESSION*</code> on 2026-07-31: three files named &quot;next session&quot; all described finished work. As of 2026-07-31 there is no live handoff at all — the last one was archived alongside this file once its final item was built. Nothing in this repository is pending. A session with real scope should create a fresh <code>NEXT_SESSION.md</code> at the root.</blockquote>
+<blockquote>## ✅ BUILT — 2026-07-24 (<code>1caa742</code>). Verdict: ❌ <strong>NO-GO</strong>.  Full write-up in <code>strategies/DAILY_BREAK_v1/BASELINE.md</code>; summary in CHANGELOG.  Deliverables 1–3 and 5 shipped: <code>backtest.py</code> (all five variants, real Bybit funding, per-unit fees, liquidation guard, the D4 risk-ledger invariant asserted on every add), <code>sweep.py</code> (54 cells, median-reported), <code>test_backtest.py</code>, BASELINE.md filled, CHANGELOG entry.  <strong>Deliverable 4 (<code>strategy.pine</code> v1.1.0) was correctly NOT built.</strong> It was conditional on a variant winning by D7. None did, so the Pine stays at v1.0.0.  <strong>The answer is not the one D7 had a branch for.</strong> The control loses money: variant A is PF 0.51 / WR 21.2% on n=104. Wins land at +2.85R and losses at −1.11R — exactly the geometry this spec designed, with fees behaving as modelled — so breakeven WR is 28.0% and it realizes 21.2%. <strong>The entry is not selective enough; exits were never what was wrong.</strong> All 54 sweep cells lose. Because A&#x27;s PF is under 1, D7&#x27;s &quot;1.2× A&#x27;s PF&quot; gate sits <em>beneath breakeven</em>, so <code>verdict()</code> says that out loud rather than letting a losing variant print as ADOPT.  The trail did work as specified — max drawdown 23.9% → 16.3%, giveback 1.32R → 2.10R. Pyramiding held its discipline: 11 adds taken, 9 refused by the invariant. Neither can rescue a negative-expectancy entry.  Also worth knowing: built for the &gt;24h hold bucket, the 1h version averages <strong>14 hours</strong> in trade. It never reached the bucket it was designed to exploit.  <em>Everything below is the original 2026-07-14 spec, kept for provenance.</em></blockquote>
+<hr>
+<p><em>Handoff file. <strong>Fable made every design call below on 2026-07-14</strong>; Opus executes. The previous spec (Goal Ladder, ✅ built 2026-07-09) lives in git history at <code>e1e52cc^</code> and in CHANGELOG.</em></p>
+<hr>
+<h2>What this is and is NOT</h2>
+<p><strong>Is:</strong> a backtest-only evaluation of two exit/add mechanics (Darvas-style structure trailing, and pyramiding) against <code>DAILY_BREAK_v1</code>&#x27;s designed fixed-3R exit. The strategy was specced 2026-06 but its <code>BASELINE.md</code> was never filled — this build runs the baseline AND the variants in one pass.</p>
+<p><strong>Is NOT:</strong> a live change, a new page, auto-execution (never), or a reason to trade. Measured live edge is −6.6%/mo; the #1 lever remains discipline, not exits. This is strategy R&amp;D that ends in a filled BASELINE.md and a go/no-go paragraph. Paper only.</p>
+<hr>
+<h2>Concepts being tested (context for the builder)</h2>
+<p><strong>Structure trailing (Darvas):</strong> no fixed take-profit. After entry, the stop ratchets up beneath each successive &quot;box&quot; the trend builds — here, each completed UTC day&#x27;s low (for longs). Exit happens when price falls back through the last box floor. Winners are open-ended; the trend decides the exit, not a 3R limit.</p>
+<p><strong>Pyramiding:</strong> when the market builds a new box above the last one and breaks out again, add to the position — but only when the trailed stop already locks the earlier units at ≥ breakeven, so an add never puts back at risk what the trade has banked. The invariant (below) formalizes this.</p>
+<p><strong>Why it might beat fixed 3R here:</strong> DAILY_BREAK_v1 was built for multi-day holds (the PF 1.62 / WR 56% &gt;24h bucket in the PRISM fingerprint). A fixed 3R amputates exactly the multi-day runners the premise selects for. Whether the giveback on retraces (amplified by leverage + funding on longer holds) eats that benefit is an empirical question — that&#x27;s what this backtest answers.</p>
+<hr>
+<h2>Design decisions (all ANSWERED — do not re-open)</h2>
+<h3>D1 · The &quot;box&quot; = the completed UTC day</h3>
+<p>For longs: once a UTC day closes whose low is above the current stop, the stop moves to <code>that day&#x27;s low − 0.25 × ATR(14, 1h)</code> (buffer against wick-hunts). Symmetric for shorts (day high + buffer). The stop only ratchets — never widens. Why days, not pivots: the strategy&#x27;s entry level is already the daily range; using the same structural unit for exits keeps one concept, and 1h pivot-based trails are noise on crypto. No Darvas &quot;3-touch box confirmation&quot; — a completed day IS the box; don&#x27;t add ceremony.</p>
+<h3>D2 · Breakeven rule</h3>
+<p>When unrealized profit ≥ +1R (R = entry-to-initial-stop distance), stop moves to entry + fees (breakeven-plus). This is a parameter (<code>be_at_r = 1.0</code>, <code>None</code> disables) and one of the swept axes — at 10× leverage a full −1R giveback from +1R open is a 20%-of-margin round trip, so test both.</p>
+<h3>D3 · Variants (the whole matrix — 5 cells, no more)</h3>
+<div class=tw><table><thead><tr><th>ID</th><th>Exit</th><th>Adds</th></tr></thead><tbody><tr><td>A</td><td>fixed 3R (designed baseline)</td><td>none</td></tr><tr><td>B</td><td>pure trail (D1+D2), no TP</td><td>none</td></tr><tr><td>B+P</td><td>pure trail</td><td>pyramiding (D4)</td></tr><tr><td>C</td><td>50% off at +2R, trail rest</td><td>none</td></tr><tr><td>C+P</td><td>50% off at +2R, trail rest</td><td>pyramiding on remaining</td></tr></tbody></table></div>
+<p>A is the control and fills the original BASELINE.md table. Do not invent variant D.</p>
+<h3>D4 · Pyramiding rules</h3>
+<ul>
+<li>Trigger: while in a position, a NEW <code>DAILY_BREAK_v1</code> long signal fires (same entry logic: first 1h close above the now-current previous-day high, volume spike, gates all pass).</li>
+<li>Add size: <strong>0.5 × initial unit</strong> (in risk terms). Max <strong>2 adds</strong> per position.</li>
+<li>After an add, the D1 trail governs the ENTIRE position at one stop.</li>
+<li><strong>Risk-ledger invariant (the core rule):</strong> an add is permitted only if, at the current trailed stop, total position P&amp;L-if-stopped (all units, entry fees + exit fees + funding accrued included) ≥ <strong>−1R of the ORIGINAL unit</strong>. The trade&#x27;s worst case never exceeds what was risked at entry — adds are financed by locked-in trend profit, never by new account risk. Assert this in code on every add; it is the difference between pyramiding and martingale-adjacent size creep.</li>
+</ul>
+<h3>D5 · Leverage / perp mechanics the backtest MUST model</h3>
+<p>These are why equity-market Darvas doesn&#x27;t transfer for free:</p>
+<ul>
+<li><strong>Fees on notional:</strong> 0.05%/side (Bybit taker-ish). At 10× that&#x27;s 0.5% of margin per side, ×2 sides, ×(1 + adds) entries. Pyramiding multiplies fee events — model per-unit.</li>
+<li><strong>Funding:</strong> perps pay/receive every 8h on notional. Multi-day trail holds make this material: at a typical +0.01%/8h a 5-day 10× long pays ~1.5% of margin in funding alone. Use <strong>Bybit historical funding</strong> via ccxt <code>fetch_funding_rate_history</code> (BTCUSDT); fall back to flat ±0.01%/8h (parameter) if the fetch is painful. Longs PAY positive funding — do not model it as free, and do not assume it nets to zero.</li>
+<li><strong>Liquidation guard:</strong> at 10× isolated, liq ≈ 9.5% adverse (1/lev − ~0.5% maintenance). Assert <code>stop distance &lt; 0.8 × liq distance</code> at entry and after every add (adds raise average entry → move liq closer). If violated, skip the add / reduce leverage tier — never let the exchange be the stop.</li>
+<li>Confluence sizing tiers from the strategy (10×/5%, 7×/3%, 5×/2%) apply to the INITIAL unit; adds inherit the position&#x27;s leverage.</li>
+</ul>
+<h3>D6 · Data + harness</h3>
+<ul>
+<li><strong>Copy the pattern from <code>strategies/TREND_4R_v1/backtest.py</code></strong> (ccxt fetch → indicator frame → bar loop → results table). Same style, same repo conventions. New file: <code>strategies/DAILY_BREAK_v1/backtest.py</code>.</li>
+<li><strong>⚠ Fetch 1h OHLCV from BYBIT, not Kraken.</strong> Kraken&#x27;s OHLC endpoint caps at ~720 candles regardless of <code>since</code> — 12 months of 1h needs ~8,760 bars. Bybit paginates fine in ccxt. (TREND_4R got away with Kraken only because 4h × 720 nearly covered its window.)</li>
+<li>Range: 24 months (regime diversity: chop + trend legs). Warmup-trim the first 200 daily bars for the 200-EMA gate.</li>
+<li>Replicate the Pine gates exactly: prev-day H/L break with <code>[1]</code> first-cross guard, vol &gt; 1.4× 20-SMA, min prev-day range 0.4%, daily-200-EMA bias, weekly-trend gate, skip Sat, skip 02/11 UTC, 07–21 UTC session, 60-min cooldown. Intrabar fill rule: same as TREND_4R harness (stop checked against bar low/high, conservative ordering — if both stop and box-break hit in one bar, stop first).</li>
+</ul>
+<h3>D7 · Success criteria (write the verdict against these, no vibes)</h3>
+<p>Adopt a trail variant over A only if, on the same trade set:</p>
+<ol>
+<li>Net PF (after fees + funding) ≥ <strong>1.2 × A&#x27;s net PF</strong>, and</li>
+<li>Max drawdown ≤ <strong>1.25 × A&#x27;s max DD</strong>, and</li>
+<li>n ≥ 30 closed trades in the window (else verdict = &quot;insufficient sample&quot;, full stop). Otherwise the verdict is &quot;fixed 3R stands&quot; — that is a fully successful outcome, record it and stop. No parameter-fishing beyond the declared sweep.</li>
+</ol>
+<h3>D8 · Sweep (bounded)</h3>
+<p>One sweep file (<code>sweep.py</code>, TREND_4R pattern): <code>be_at_r ∈ {None, 0.5, 1.0}</code>, trail buffer ∈ {0.15, 0.25, 0.40} × ATR, partial-at ∈ {1.5R, 2R} (C only). That&#x27;s it. Report the median cell, not the best cell — the best cell of a 45-cell sweep is noise.</p>
+<hr>
+<h2>Deliverables</h2>
+<ol>
+<li><code>strategies/DAILY_BREAK_v1/backtest.py</code> — variants A/B/B+P/C/C+P, funding + fee + liq modeling per D5, invariant assertions per D4.</li>
+<li><code>strategies/DAILY_BREAK_v1/sweep.py</code> — D8 grid, median-reported.</li>
+<li><code>strategies/DAILY_BREAK_v1/BASELINE.md</code> — filled: the original baseline table (variant A) + a variants table (net PF, WR, max DD, avg hold, funding paid, fees paid, avg MFE-giveback) + the D7 verdict paragraph.</li>
+<li>ONLY IF a variant wins by D7: <code>strategy.pine</code> v1.1.0 adding trail/pyramid as input-gated options (default OFF; Pine needs <code>pyramiding=2</code> in the <code>strategy()</code> declaration or adds are silently ignored — known gotcha). Version bump per strategies/README rules. If no variant wins, do not touch the Pine.</li>
+<li>One line in CHANGELOG. Commit to master (repo convention), do not push.</li>
+</ol>
+<h2>Build order</h2>
+<ol>
+<li>Harness with variant A only → sanity: trades fire, fills look right, fees/funding sum plausibly. Fill original BASELINE table.</li>
+<li>Add D1/D2 trail → variant B, C.</li>
+<li>Add D4 pyramiding + invariant asserts → B+P, C+P.</li>
+<li>Sweep, BASELINE.md verdict, CHANGELOG.</li>
+</ol>
+<p>Out of scope, explicitly: live wiring, signal-schema changes, new app pages, other strategies, auto-execution (never), funding-arb ideas, any ML.</p>
+<footer>Twin of <code>DONE-2026-07-24-daily-break-trailing-pyramiding.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

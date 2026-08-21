@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // WISHLIST — Strategy breeder + veto visibility</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>WISHLIST — Strategy breeder + veto visibility</h1>
+<p><a href="DONE-2026-07-24-strategy-breeder-veto-visibility.html">Open as HTML</a></p>
+<blockquote><strong>CLOSED SESSION — built 2026-07-24.</strong> Strategy breeder + veto visibility. Renamed from <code>NEXT_SESSION*</code> on 2026-07-31: three files named &quot;next session&quot; all described finished work. As of 2026-07-31 there is no live handoff at all — the last one was archived alongside this file once its final item was built. Nothing in this repository is pending. A session with real scope should create a fresh <code>NEXT_SESSION.md</code> at the root.</blockquote>
+<blockquote>## ✅ BOTH ITEMS BUILT — 2026-07-24. Nothing here is outstanding.  · <strong>Item 0 — log vetoed setups</strong> → <code>17ec6e1</code>. Vetoed matches persist as <code>rejected</code> <code>veto:&lt;rules&gt;</code> rows (deduped per bar+setup, never notify), and <code>/signals</code> gained a <strong>blocked</strong> section showing setup ✓ / rules ✗ / that veto bucket&#x27;s realized ledger. Both drop sites had to change — <code>emit_signals</code> AND the <code>m[&quot;clean&quot;]</code> filter in <code>run_scan_cli</code> — or the log stays empty. <strong>The S2 question this file raised is answered, and it was worse than asked:</strong> S2 is effectively dead (5 matches, 5 vetoed), and <strong>S4 is dead code</strong> (25 matches, 25 vetoed, zero emitted — a long on <code>rsi&lt;40</code> in discount trips <code>slope_against</code> structurally every time). Separately, <strong><code>fvg_entry</code> is the most-fired veto and the only one in profit</strong> (+€2,000 / 26 trades) while its frozen label still reads &quot;−€15/trade&quot;. Open decisions, not open build.  · <strong>Dedup prerequisite</strong> → <code>27a1b13</code>. This file&#x27;s hypothesis — that the 933 survivors are &quot;really ~20 ideas&quot; — is <strong>false</strong>. Measured: 933 → <strong>525 ideas</strong>, median pair shares 1.3% of entry bars. Nothing to unpack. It also found that Algory&#x27;s own diversity metric (correlation of equity curves) is the <strong>wrong instrument</strong> for this vault: these strategies trade ~59 days out of 770 and the median pair shares one, so Pearson mostly measures mutual zeros. Entry-mask overlap is the metric that works.  · <strong>Item 1 — genetic breeder</strong> → <code>1445f04</code>. Built, with the five OPEN design calls resolved in code (see CHANGELOG). Fitness is <code>min(train, holdout)</code> of drawdown-penalised expectancy in R, clamped <em>inside</em> selection so a curve-fit genome is scored by its bad half and dies before it can win. <strong>The GA works and its premise does not.</strong> Its whole functional case was reaching &gt;3 conditions; of 103 viable genomes, <strong>one</strong> does. By 5 conditions, fewer than 40 bars are selected in 30 months. <strong>Depth fails on data, not on search</strong> — <code>max_conditions=3</code> was never arbitrary, it is where this window runs out of evidence. The next move is the <strong>7-year window</strong>, not a cleverer algorithm.  <em>Everything below is the original 2026-07-18 capture, kept for provenance — including the assumptions that turned out to be wrong. Read it as history.</em></blockquote>
+<hr>
+<p><em>Captured 2026-07-18 from the Algory 2.0 teardown (algory.app). This was a <strong>wishlist, not a ratified spec</strong> when written; the design calls marked OPEN below were resolved during the 2026-07-24 build. Separate file on purpose: <code>NEXT_SESSION.md</code> holds the DAILY_BREAK_v1 trailing/pyramiding spec — also built 2026-07-24, verdict NO-GO.</em></p>
+<hr>
+<h2>Item 0 · Log vetoed setups (small, approved, do first)</h2>
+<p><strong>Problem, measured.</strong> Last short signal fired 2026-07-08. Replaying the 10 days after it: only 5 short-setup matches existed at all, and the 2 that weren&#x27;t already emitted (both S2, 2026-07-14 14:00 and 18:00 UTC) were vetoed and <strong>silently discarded</strong>. <code>app/setups.py:435</code> — <code>if not m[&quot;clean&quot;]: continue</code>. No row, no notification, no trace. The feed showed longs only, so the engine looked asleep when it was in fact working.</p>
+<p>The vetoes were correct. From his own ledger:</p>
+<div class=tw><table><thead><tr><th>short bucket</th><th>n</th><th>pnl</th></tr></thead><tbody><tr><td><code>slope_against,sweep_fade,pd_raid_fade</code> (killed 07-14 #1)</td><td>24</td><td>−€1,254</td></tr><tr><td><code>slope_against,pd_raid_fade</code> (killed 07-14 #2)</td><td>13</td><td>−€1,833</td></tr><tr><td>S1 clean</td><td>12</td><td>+€956</td></tr></tbody></table></div>
+<p>Being right is not the issue. Being invisible is.</p>
+<p><strong>Build:</strong> persist vetoed matches instead of dropping them. <code>insert_signal()</code> already takes <code>auto_rejection_reason</code> and the veto list is already computed (<code>vetoes(ctx, direction)</code>), so this is a status, not a new pipeline. Show them in the signals feed as blocked cards: setup ✓ / which filters ✗ / the realized ledger stat for that veto bucket. No notification (blocked ≠ actionable).</p>
+<p><strong>Why it matters beyond UX:</strong> with no log of blocked setups there is no denominator. Nobody can ask &quot;would I have made money taking the vetoed ones?&quot; <code>/robustness</code> has a veto counterfactual panel but it runs on closed trades — it cannot see setups that never became trades.</p>
+<p>⚠️ Also check whether S2 is dead code. Its definition (premium of 7d range + bear displacement) structurally implies up-slope + fresh PDH raid, which trips <code>slope_against</code> + <code>pd_raid_fade</code> automatically. Both 07-14 candidates died that exact way. Either S2 or those vetoes is wrong for shorts. Item 0&#x27;s log is what produces the evidence to decide.</p>
+<hr>
+<h2>Item 1 · Genetic strategy breeder</h2>
+<p><strong>Why, functionally.</strong> <code>strategy_search3</code> evaluated 43,703 combos → 933 survivors, but is capped at <code>max_conditions=3</code> — because grid enumeration explodes, not because 4+ conditions are uninteresting. A GA searches deeper genomes without enumerating the space. That is the whole functional case.</p>
+<p><strong>Not in scope:</strong> Algory&#x27;s visual layer. No neural map, no orbiting nodes, no helix, no embers. Functional only.</p>
+<p><strong>Reuse, do not rebuild</strong> (most of this exists):</p>
+<ul>
+<li><code>app/backtest_engine.py</code> — real fills, fees, slippage. The fitness evaluator.</li>
+<li><code>app/strategy_search3.py</code> — <code>SLOTS</code> condition vocabulary = the gene pool; dynamic ATR geometry (<code>k</code>, <code>rr</code>) = genes, not post-filters.</li>
+<li>The three honesty gates (split-half n≥40 · geometry neighbourhood · 7-year deep confirm) — these become the <strong>fitness function</strong>, not a post-screen.</li>
+</ul>
+<p><strong>Genome shape</strong> (borrowed from Algory&#x27;s gene categories, mapped to LENS): <code>signals</code> (entry conditions from SLOTS) · <code>bias</code> (direction, timeframe) · <code>filters</code> (session window, vol regime) · <code>execution</code> (k × ATR stop, R multiple) · <code>management</code> (cooldown, once-per-day, skip-Saturday).</p>
+<p><strong>The one non-negotiable design constraint.</strong> Fitness must be measured <strong>out-of-sample</strong>. A GA is an overfitting machine pointed at a fitness function; if fitness is in-sample PF, it will breed a curve-fit champion every time and report it proudly. Even Algory&#x27;s own page cites &quot;actual out-of-sample trades&quot; of strategies under test. Concretely: evolve on the first half, score on the held-out second half, and confirm on the 7-year deep set — a genome that only wins in-sample gets culled, not vaulted.</p>
+<p><strong>Related, worth stealing (functional):</strong> Algory&#x27;s diversity tracker computes correlation from <em>actual equity curves</em>, not strategy labels — &quot;real correlation, not label variety.&quot; A vault of 933 survivors is almost certainly full of near-duplicates. Correlation-based deduplication of survivors is probably higher value per hour than the GA itself, and is a much smaller build. <strong>Consider doing this before Item 1</strong> — it may reveal that the 933 are really ~20 ideas.</p>
+<blockquote><strong>DONE 2026-07-24 — and the hypothesis was wrong.</strong> <code>app/strategy_dedup.py</code>. The 933 are <strong>525 ideas</strong>, not ~20; the 402 baseline-beaters are <strong>230</strong>. The median pair of survivors shares <strong>1.3% of its entry bars</strong> and 0% of its realized trades. This vault is not full of near-duplicates — it is genuinely wide, and the GA is therefore searching a space that is already diverse rather than one that needs unpacking.  Two things the build settled that the breeder must inherit:  1. <strong>Correlation of equity curves is the wrong instrument here</strong>, measured, not argued. These survivors trade ~59 days out of 770 and the median pair shares <em>one</em> active day, so Pearson on daily pnl is dominated by mutual zeros. Algory can use it because Algory&#x27;s strategies trade often; LENS&#x27;s do not. The diversity tracker must use entry-mask overlap. 2. <strong>Geometry re-shuffles realized trades far more than expected.</strong> Two genomes with <em>identical</em> entry conditions differing only 3.0R vs 5.0R share just 0.38 of their realized trades — a different exit frees the position at a different bar, so a different set of later signals gets taken. Consequence for the GA: <code>execution</code> genes are not a cosmetic tail on the genome, they materially change which trades exist. Fitness must be evaluated per full genome, never by scoring a condition set once and sweeping geometry over it afterwards.  Counts are bounds, not a point estimate: mask overlap (525/230) is the upper bound, realized-trade overlap the lower. Both agree the vault is wide.</blockquote>
+<h3>Design calls — RATIFIED 2026-07-24</h3>
+<ol>
+<li>Population size, generations, mutation/crossover rates, cull fraction — <strong>left to the builder.</strong> Tuning knobs, cheap to change after the first run; not worth blocking on. Start small enough that a generation runs in minutes.</li>
+<li>Fitness scalar — <strong>drawdown-penalised expectancy in R</strong>: mean R per trade over max drawdown in R, scored out-of-sample. Raw PF was rejected because it is blind to path and will happily breed a champion with one catastrophic hole.</li>
+<li>Minimum <code>n</code> per genome — <strong>n ≥ 40 out-of-sample</strong>, matching the split-half gate already in <code>strategy_search3</code>. One standard, not two.</li>
+<li>Paper-only R&amp;D. <strong>Confirmed.</strong> Auto-execution is never in scope.</li>
+<li>Output — <strong>still open.</strong> Dedup writes <code>strategy_clusters_&lt;scope&gt;.json</code> alongside <code>strategy_search.json</code> rather than extending it; the breeder can follow that pattern or claim a vault table. Decide when there is output.</li>
+</ol>
+<h3>BUILT 2026-07-24 — <code>app/strategy_breeder.py</code></h3>
+<p>Item 1 is done, ran, and returned a negative result worth more than a champion.</p>
+<p><strong>Of 103 viable genomes, one uses &gt;3 conditions.</strong> The GA&#x27;s whole functional case was reaching depth the grid cannot afford. It reached almost none, and the reason is not the algorithm — 120 random genomes per depth on 4h:</p>
+<div class=tw><table><thead><tr><th>conditions</th><th>viable</th><th>too few signals</th><th>median holdout n</th></tr></thead><tbody><tr><td>1</td><td>94</td><td>0</td><td>69</td></tr><tr><td>3</td><td>26</td><td>57</td><td>33</td></tr><tr><td>5</td><td><strong>0</strong></td><td>111</td><td>14</td></tr><tr><td>6</td><td><strong>0</strong></td><td>114</td><td>17</td></tr></tbody></table></div>
+<p>By 5 conditions the filter selects under 40 bars in 30 months. <code>max_conditions=3</code> was not an arbitrary cap — it is where this window runs out of evidence.</p>
+<p><strong>So the open question is a data question, not a search question.</strong> Re-running the breeder against the 7-year Binance set (already wired for <code>strategy_search3</code> stage 3) is the only thing that would make depth reachable. That is a small change — <code>_load(tf, 84, exchange=&quot;binance&quot;)</code> in <code>evolve()</code> — and it is the honest next step. Until then a deeper GA on 30 months is searching for genomes the data cannot validate.</p>
+<p>Not done, deliberately: nothing bred here is anywhere near live. Best fitness 0.028, and every top genome sits inside the region the grid already enumerates.</p>
+<h3>Standing context for whoever builds this</h3>
+<p>Measured live edge is −6.6%/mo geometric; mining says the #1 lever is not trading VETO contexts. A better strategy generator does not fix a discipline problem. Ship Item 0 first — it is small, it is already agreed, and it produces the data the breeder&#x27;s fitness function should ultimately answer to.</p>
+<footer>Twin of <code>DONE-2026-07-24-strategy-breeder-veto-visibility.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

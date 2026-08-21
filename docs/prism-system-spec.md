@@ -1,5 +1,7 @@
 # PRISM Trading System — Architecture Specification
 
+[Open as HTML](prism-system-spec.html)
+
 ## Overview
 
 PRISM is a modular crypto trading system with four distinct components. Each component has a single responsibility and communicates through defined interfaces. This document is the source of truth for any developer or AI agent building on this system.
