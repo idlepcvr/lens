@@ -188,6 +188,11 @@ def init_db():
             goal_btc          REAL    NOT NULL,
             goal_date         TEXT    NOT NULL,
             milestones        TEXT    NOT NULL,   -- JSON [{btc,label}]
+            -- JSON [{name,to_btc,rate_monthly}] — the ladder is not one rate.
+            -- Before this the rates existed only in prose inside
+            -- amendment_reason, so no page could say which phase you are in or
+            -- what it is meant to compound at.
+            phases            TEXT,
             price_scenarios   TEXT    NOT NULL,   -- JSON {bear,base,bull} annual %
             burn_monthly_eur  REAL    NOT NULL,
             amendment_reason  TEXT,
@@ -302,6 +307,19 @@ def init_db():
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+    # Additive migration: goal_plan predates `phases`. Sqlite has no
+    # IF NOT EXISTS for columns, so ask first rather than swallowing every
+    # OperationalError — a typo'd ALTER should still be loud.
+    c = _conn()
+    try:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(goal_plan)")}
+        if cols and "phases" not in cols:
+            c.execute("ALTER TABLE goal_plan ADD COLUMN phases TEXT")
+            c.commit()
+    finally:
+        c.close()
 
 def _iso(v):
     if v is None:

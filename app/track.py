@@ -303,6 +303,19 @@ def step_plan(today: date = None) -> dict:
     if days_left and days_left > 0 and tpd > 0:
         steps = max(1, round(days_left * tpd))
 
+    # The phase the stack is in right now, and the rate the plan says it should
+    # compound at. Before v8 the rates lived only in prose inside the amendment
+    # reason, so no page could say which phase you were in — only how far from
+    # the 2028 number, which is not a thing anyone acts on.
+    phase = None
+    try:
+        for ph in (L.get("plan", {}).get("phases") or []):
+            if cur_btc < ph["to_btc"]:
+                phase = ph
+                break
+    except Exception:
+        phase = None
+
     growth = tgt_btc / cur_btc
     per_step = growth ** (1.0 / steps) - 1.0
     nxt_btc = cur_btc * (1.0 + per_step)
@@ -320,6 +333,9 @@ def step_plan(today: date = None) -> dict:
     eur = (lambda b: None if (b is None or not px) else round(b * px, 2))
     return {
         "ok": True, "px": px,
+        "phase": (phase or {}).get("name"),
+        "phase_rate": (phase or {}).get("rate_monthly"),
+        "phase_to": (phase or {}).get("to_btc"),
         "label": nxt.get("label"), "date": nxt.get("date"),
         "days_left": days_left, "steps": steps,
         "trades_per_day": round(tpd, 2),

@@ -47,6 +47,7 @@ SEED = {
 }
 
 AMENDABLE = ("north_star_btc", "north_star_date", "goal_btc", "goal_date",
+              "phases",
              "milestones", "price_scenarios", "burn_monthly_eur")
 MIN_REASON = 20
 STALE_DAYS = 40          # snapshot older than this → nag on the goal hero
@@ -63,6 +64,10 @@ def _row(r):
     d = dict(r)
     d["milestones"] = json.loads(d["milestones"])
     d["price_scenarios"] = json.loads(d["price_scenarios"])
+    # phases arrived after the table did, so rows written before the migration
+    # carry NULL rather than "[]" — an empty list means "one flat rate", which
+    # is what every plan up to v7 actually was.
+    d["phases"] = json.loads(d.get("phases") or "[]")
     return d
 
 
@@ -108,12 +113,13 @@ def amend(changes: dict, reason: str) -> dict:
     c.execute("UPDATE goal_plan SET active = 0")
     c.execute(
         """INSERT INTO goal_plan (version, created_at, north_star_btc, north_star_date,
-               goal_btc, goal_date, milestones, price_scenarios, burn_monthly_eur,
-               amendment_reason, active)
-           VALUES (?,?,?,?,?,?,?,?,?,?,1)""",
+               goal_btc, goal_date, milestones, phases, price_scenarios,
+               burn_monthly_eur, amendment_reason, active)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,1)""",
         (cur["version"] + 1, datetime.utcnow().isoformat(),
          new["north_star_btc"], new["north_star_date"], new["goal_btc"], new["goal_date"],
-         json.dumps(new["milestones"]), json.dumps(new["price_scenarios"]),
+         json.dumps(new["milestones"]), json.dumps(new.get("phases") or []),
+         json.dumps(new["price_scenarios"]),
          new["burn_monthly_eur"], reason),
     )
     c.commit()

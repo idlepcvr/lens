@@ -139,10 +139,34 @@ def _trades_per_week(trades: list[dict]) -> float:
 
 # ─── the simulation ──────────────────────────────────────────────────────────
 
+# The projection compounds one risk appetite to the horizon, so the upper
+# percentiles run away — P90 reaching tens of millions says nothing except that
+# exponentials are exponential. Rather than capping the SIMULATION (which would
+# quietly change the odds the band reports), the reported percentiles are bent
+# toward a ceiling: below the knee they pass through untouched, above it they
+# approach CEILING and never reach it.
+#
+# CEILING is "past this, LENS has nothing useful to say" — not a prediction and
+# not a target. Stated in EUR as a magnitude; it came from a round $40M, and no
+# FX conversion is applied because a soft asymptote does not deserve a rate.
+CEILING = 40_000_000.0
+KNEE = 20_000_000.0
+
+
+def _soften(v: float) -> float:
+    """Bend a value toward CEILING above KNEE. Continuous, and flat-passing
+    below the knee so ordinary numbers are never distorted."""
+    if v <= KNEE:
+        return v
+    import math
+    span = CEILING - KNEE
+    return KNEE + span * (1.0 - math.exp(-(v - KNEE) / span))
+
+
 def _percentiles(vals: list[float]) -> dict:
     v = sorted(vals)
     last = len(v) - 1
-    return {f"p{p}": round(v[min(last, int(p / 100 * last))], 2)
+    return {f"p{p}": round(_soften(v[min(last, int(p / 100 * last))]), 2)
             for p in (10, 25, 50, 75, 90)}
 
 

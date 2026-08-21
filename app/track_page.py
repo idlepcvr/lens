@@ -142,6 +142,12 @@ def _steps(S: dict) -> str:
             f'<div class="tk-st {cls}" style="--h:{h(v):.1f}%" title="{title}">'
             f'<i></i>{f"<span>{lab}</span>" if lab else ""}</div>')
 
+    phase_txt = ""
+    if S.get("phase"):
+        rate = S.get("phase_rate")
+        phase_txt = (f'<b class="tk-phase">{S["phase"]}</b> · '
+                     f'{rate * 100:.0f}%/mo to {_btc(S["phase_to"])} · '
+                     if rate else f'<b class="tk-phase">{S["phase"]}</b> · ')
     when = f' · {_date_label(S["date"])}' if S.get("date") else ""
     left = S.get("days_left")
     dtxt = (f"{left} days left" if left is not None and left >= 0
@@ -150,8 +156,8 @@ def _steps(S: dict) -> str:
     return f"""
   <details class="tk-panel tk-det tk-stp" id="s-steps" aria-label="Next steps" open>
     <summary><span class="tk-sum-h">Next steps</span>
-      <span class="tk-badge">{S['steps']} trades to {S.get('label') or 'the rung'}{when}
-        · {dtxt}</span></summary>
+      <span class="tk-badge">{phase_txt}{S['steps']} trades to
+        {S.get('label') or 'the rung'}{when} · {dtxt}</span></summary>
 
     <div class="tk-stp-top">
       <div class="tk-stp-big">
@@ -548,6 +554,7 @@ _CSS = """<style>
   font-family:var(--mono);font-size:10px;color:var(--dim);margin:var(--s2) 0 0}
 .tk-fitbtn{padding:3px 9px;font-size:10px}
 .tk-amber{color:var(--amber)}
+.tk-phase{color:var(--accent);font-weight:700}
 .tk-credit{margin-left:auto;color:var(--dim);font-size:9.5px}
 @media (max-width:620px){ .tk-fan{height:240px} }
 
