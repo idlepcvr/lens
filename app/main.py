@@ -965,6 +965,7 @@ class ExecuteRequest(BaseModel):
     trigger_signal: str = "mark"          # mark | index | last
     leverage: float = 10.0
     signal_id: Optional[str] = None
+    override_reason: Optional[str] = None
     account: str = "personal"
 
     def ticket(self) -> dict:
@@ -972,7 +973,8 @@ class ExecuteRequest(BaseModel):
                 "take_profit": self.take_profit, "stop_loss": self.stop_loss,
                 "mark": self.mark, "reduce_only": self.reduce_only,
                 "post_only": self.post_only, "trigger_signal": self.trigger_signal,
-                "leverage": self.leverage, "signal_id": self.signal_id}
+                "leverage": self.leverage, "signal_id": self.signal_id,
+                "override_reason": self.override_reason}
 
 
 @app.post("/api/execute/check")
@@ -1559,6 +1561,14 @@ def orders_cancel(order_id: str, account: str = "personal"):
                 sandbox=False).cancel_order(order_id=order_id)}
     except Exception as exc:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
+@app.get("/api/veto-overrides")
+def veto_overrides(limit: int = Query(50, ge=1, le=500)):
+    """Trades taken against the scanner, with the reasoning attached. The
+    training set for whether his read beats the rules."""
+    from .veto_log import recent
+    return {"overrides": recent(limit)}
 
 
 @app.get("/api/account/live")

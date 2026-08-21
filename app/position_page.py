@@ -47,6 +47,15 @@ _CSS = r"""<style>
 .pz .empty{text-align:center;padding:30px;color:var(--dim);border:1px dashed var(--line2);border-radius:11px}
 </style>"""
 _XCSS = """<style>
+/* The veto asks rather than refuses. A blocked entry is the most interesting
+   signal in the system — he has seen something the rules do not encode — and
+   refusing it just moves the trade to his phone where nothing can measure it. */
+.ovr{border:1px solid var(--amber-d);border-radius:6px;padding:10px 12px;margin-bottom:12px}
+.ovrh{font:600 11px/1.4 var(--mono);color:var(--amber);margin-bottom:8px}
+.ovr textarea{width:100%;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:6px;color:var(--ink);font:400 12px/1.5 var(--mono);padding:8px 10px;resize:vertical}
+.ovr textarea:focus{outline:none;border-color:var(--accent)}
+.ovrn{font:400 10px/1.5 var(--mono);color:var(--dim);margin-top:6px}
 /* Working orders — what is actually resting on the exchange, as opposed to what
    the ticket above proposes. The two were never shown side by side, which is
    how the planned levels came to be read as the real ones. */
@@ -310,6 +319,7 @@ _XCSS = """<style>
   padding:8px 10px;border:1px solid var(--line);border-radius:5px}
 .xgates .no{color:var(--short)}
 .xgates .yes{color:var(--long)}
+.xgates .ovrf{color:var(--amber)}
 .xbtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .xgo,.xcl{border:0;border-radius:7px;padding:10px 18px;font:700 12px/1 var(--mono);cursor:pointer}
 .xgo{background:var(--long);color:var(--bg)}
@@ -454,6 +464,12 @@ def position_page(book: str = "hedge") -> str:
     </div>
 
     <div id="x-gates" class="xgates">—</div>
+    <div id="x-ovr" class="ovr" style="display:none">
+      <div class="ovrh">The scanner says no. What do you see?</div>
+      <textarea id="x-ovr-why" rows="2" oninput="paintExec()"
+        placeholder="e.g. momentum break above 75.3k with the daily trend, FVG retrace already filled"></textarea>
+      <div class="ovrn" id="x-ovr-n">Recorded with the trade, so it can be checked against the outcome later.</div>
+    </div>
     <div class="xbtns">
       <button type="button" id="x-go" class="xgo" onclick="askExec()">▲ Execute</button>
       <button type="button" id="x-close" class="xcl" onclick="askClose()">Close position</button>
@@ -882,7 +898,8 @@ function ticket(){
           take_profit: useB ? xn('x-tp') : null,
           stop_loss:   useB ? xn('x-sl') : null,
           mark: XMARK || null,
-          trigger_signal: $('x-trig').value, leverage: xn('x-lev') || 10};
+          trigger_signal: $('x-trig').value, leverage: xn('x-lev') || 10,
+          override_reason: ($('x-ovr-why').value || '').trim() || null};
 }
 
 async function post(url, body){
@@ -907,9 +924,20 @@ async function paintExec(){
     $('s-env').className   = 'xenv '+(c.sandbox?'demo':'live');
     $('d-margin').textContent = c.required_margin_usd!=null ? '$'+c.required_margin_usd.toFixed(2) : '—';
     $('d-cap').textContent    = (+c.size_cap_btc).toFixed(6)+' ₿';
+    // A setup refusal opens the box instead of ending the conversation.
+    const setupBlocked = c.setup_note && (!c.ok
+      ? c.reasons.some(r=>r.startsWith('no_setup')||r.startsWith('setup_veto'))
+      : c.overriding);
+    $('x-ovr').style.display = setupBlocked ? 'block' : 'none';
+    if(setupBlocked) $('x-ovr-n').textContent = c.overriding
+      ? 'Recorded with the trade — ' + c.setup_note
+      : 'The scanner: ' + c.setup_note + '. Say what you see and it goes through, logged.';
+
     if(c.ok){
       const legs=c.orders.map(o=>o.order_tag).join(' + ');
-      $('x-gates').innerHTML='<span class="yes">✓</span> gates pass — sending: <b>'+legs+'</b>';
+      $('x-gates').innerHTML = c.overriding
+        ? '<span class="ovrf">⚑</span> going against the scanner — this will be recorded'
+        : '<span class="yes">✓</span> gates pass — sending: <b>'+legs+'</b>';
       $('x-go').disabled=false;
     } else {
       $('x-gates').innerHTML=c.reasons.map(x=>'<span class="no">✗ '+x+'</span>').join('<br>');

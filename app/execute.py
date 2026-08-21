@@ -47,8 +47,48 @@ def sandbox() -> bool:
     return os.getenv("KRAKEN_FUTURES_SANDBOX", "1").strip() != "0"
 
 
-def max_order_btc() -> float:
-    return float(os.getenv("LENS_MAX_ORDER_BTC", "0.01"))
+_BAL_CACHE: dict = {"t": 0.0, "eur": None, "fx": None}
+_BAL_TTL = 60.0
+
+
+def _account() -> tuple[Optional[float], float]:
+    """(balance EUR, EUR/USD). Cached — check() runs on every keystroke and the
+    exchange does not need to hear about each one."""
+    import time
+    now = time.time()
+    if _BAL_CACHE["eur"] is not None and now - _BAL_CACHE["t"] < _BAL_TTL:
+        return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0
+    try:
+        from .kraken_sync import fetch_live_balance
+        key, secret = get_api_keys("personal")
+        b = fetch_live_balance(key, secret)
+        _BAL_CACHE.update({"t": now, "eur": b.get("eur_balance"),
+                           "fx": b.get("eur_usd") or 1.0})
+    except Exception:
+        pass
+    return _BAL_CACHE["eur"], _BAL_CACHE["fx"] or 1.0
+
+
+def max_order_btc(leverage: float = 10.0, mark_usd: Optional[float] = None) -> float:
+    """The ceiling, derived rather than typed.
+
+    It used to be a fixed BTC number I picked (0.005), which is meaningless
+    until converted: against a EUR 305 balance that was 1.0x, while 0.5 BTC —
+    the fat-finger case it existed to stop — was 101x. Expressed as leverage the
+    limit explains itself, and it moves with the account instead of going stale.
+
+        ceiling = balance x max leverage, in BTC
+
+    LENS_MAX_ORDER_BTC still wins if set, as a deliberate manual brake.
+    """
+    hard = os.getenv("LENS_MAX_ORDER_BTC", "").strip()
+    if hard:
+        return float(hard)
+    bal_eur, fx = _account()
+    if not bal_eur or not mark_usd or not leverage:
+        return 0.01                      # no balance yet — stay conservative
+    btc_eur = mark_usd / (fx or 1.0)
+    return (bal_eur * leverage) / btc_eur
 
 
 def _client(account: str = "personal"):
@@ -153,7 +193,7 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
           stop_loss: Optional[float] = None, mark: Optional[float] = None,
           reduce_only: bool = False, post_only: bool = False,
           trigger_signal: str = "mark", leverage: float = 10.0,
-          signal_id: Optional[str] = None,
+          signal_id: Optional[str] = None, override_reason: Optional[str] = None,
           last_signal: Optional[dict] = None, venue: str = "kraken_futures") -> dict:
     """Every gate, evaluated, nothing sent."""
     reasons: list[str] = []
@@ -167,9 +207,10 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
     if not size_btc or size_btc <= 0:
         reasons.append("size_not_positive")
 
-    cap = max_order_btc()
+    cap = max_order_btc(leverage, limit_price or mark)
     if size_btc and size_btc > cap:
-        reasons.append(f"over_size_cap:{size_btc:.5f}>{cap:.5f}")
+        reasons.append(f"over_size_cap:{size_btc:.5f}>{cap:.5f} "
+                       f"(= balance x {leverage:g} leverage)")
 
     if (order_type in ("lmt", "post", "ioc") or post_only) and not limit_price:
         reasons.append("limit_price_required")
@@ -195,10 +236,19 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
 
     # An exit is never blocked by the setup: closing a losing position is the
     # one trade that must always be available.
+    overriding = False
+    setup_note = None
     if not reduce_only:
-        sg = setup_gate(direction)
-        if sg:
-            reasons.append(sg)
+        setup_note = setup_gate(direction)
+        if setup_note:
+            from .veto_log import valid_reason
+            if valid_reason(override_reason):
+                # He has stated what he sees. That is more useful recorded and
+                # taken than refused and repeated on his phone where nothing
+                # can measure it.
+                overriding = True
+            else:
+                reasons.append(setup_note)
 
     notional = (size_btc or 0) * (ref or 0)
     return {
@@ -209,6 +259,7 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
         "side": _SIDE.get(direction),
         "size_btc": size_btc,
         "size_cap_btc": cap,
+        "size_cap_usd": round(cap * (limit_price or mark or 0), 2) or None,
         "order_type": "post" if post_only else order_type,
         "notional_usd": round(notional, 2),
         "required_margin_usd": round(notional / leverage, 2) if leverage else None,
@@ -217,6 +268,8 @@ def check(direction: str, size_btc: float, *, order_type: str = "mkt",
         "stop_loss": stop_loss,
         "trigger_signal": trigger_signal,
         "discipline": discipline.settings(),
+        "setup_note": setup_note,
+        "overriding": overriding,
         "orders": build_orders(direction, size_btc or 0, order_type=order_type,
                                limit_price=limit_price, take_profit=take_profit,
                                stop_loss=stop_loss, reduce_only=reduce_only,
@@ -254,6 +307,23 @@ def execute(direction: str, size_btc: float, *, confirm: bool = False,
                    "always wrong-environment credentials (a live key sent to demo, "
                    "or the reverse)")
         return {**pre, "sent": False, "blocked": "exchange_error", "error": msg[:300]}
+
+    if pre.get("overriding"):
+        try:
+            from .veto_log import record
+            from . import setups
+            state = setups.desk_state(refresh=False)
+            record(direction, size_btc,
+                   entry=ticket.get("limit_price") or ticket.get("mark"),
+                   leverage=ticket.get("leverage"),
+                   take_profit=ticket.get("take_profit"),
+                   stop_loss=ticket.get("stop_loss"),
+                   setup_tag=pre.get("setup_note"),
+                   veto_reasons=((state.get("verdicts") or {}).get(direction) or {}).get("vetoes"),
+                   user_reason=ticket.get("override_reason") or "",
+                   context=state.get("context"))
+        except Exception:
+            pass          # a failed note must never unsend a placed order
 
     return {**pre, "sent": True, "response": resp}
 
