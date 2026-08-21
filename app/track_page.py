@@ -213,6 +213,106 @@ def _adherence(A: dict) -> str:
 """
 
 
+# ─── the step ladder ─────────────────────────────────────────────────────────
+# The hero says "62% of the way to the rung". This says what the next trade has
+# to make. Same gap, but a percentage of a milestone is not something anyone can
+# size an entry against, and this is the surface that gets read at the moment of
+# a trade.
+#
+# Drawn as bars rather than written as a sentence on purpose: the whole point is
+# that the step is small and there are a countable number of them. A staircase
+# shows that in one look; a paragraph makes you do the arithmetic that the
+# staircase already did.
+
+def _steps(S: dict) -> str:
+    if not S.get("ok"):
+        return ""
+    px, tgt = S.get("px"), S.get("target_btc") or 0
+    if not tgt:
+        return ""
+
+    floor = S.get("prev_btc")
+    if floor is None or floor >= S["cur_btc"]:
+        floor = S["cur_btc"] * 0.55
+    floor *= 0.92
+    span = max(tgt - floor, 1e-12)
+
+    def h(btc):
+        return 0.0 if not btc else max(3.0, min(100.0, (btc - floor) / span * 100.0))
+
+    bars = []
+    if S.get("prev_btc") is not None:
+        bars.append(("was", S["prev_btc"], "was", ""))
+    bars.append(("now", S["cur_btc"], "now", ""))
+
+    step, cur = S["per_step_pct"] / 100.0, S["cur_btc"]
+    n = S["steps"]
+    for i in range(1, n + 1):
+        v = cur * (1 + step) ** i
+        if i == 1:
+            bars.append(("next", v, "next", "1"))
+        elif i == n:
+            bars.append(("goal", tgt, S.get("label") or "rung", str(i)))
+        else:
+            bars.append(("todo", v, "", str(i)))
+
+    cells = []
+    for cls, v, lab, num in bars:
+        title = f"{_btc(v)} · {_eur_of(v, px)}"
+        if num:
+            title = f"trade {num} — {title}"
+        cells.append(
+            f'<div class="tk-st {cls}" style="--h:{h(v):.1f}%" title="{title}">'
+            f'<i></i>{f"<span>{lab}</span>" if lab else ""}</div>')
+
+    when = f' · {_date_label(S["date"])}' if S.get("date") else ""
+    left = S.get("days_left")
+    dtxt = (f"{left} days left" if left is not None and left >= 0
+            else "overdue" if left is not None else "no date")
+
+    return f"""
+  <section class="tk-panel tk-stp" aria-label="The next trade">
+    <header class="tk-h">
+      <h2>The next trade</h2>
+      <span class="tk-badge">{S['steps']} trades to {S.get('label') or 'the rung'}{when}
+        · {dtxt}</span>
+    </header>
+
+    <div class="tk-stp-top">
+      <div class="tk-stp-big">
+        <b>+{_eur(S['gain_eur'], 0)}</b>
+        <span class="tk-lab">next trade · +{S['per_step_pct']:.1f}%</span>
+      </div>
+      <div class="tk-nums tk-stp-nums">
+        <div><span class="tk-lab">was</span><b>{_eur(S['prev_eur'], 0)}</b>
+             <span class="tk-eu">{_btc(S['prev_btc'])}</span></div>
+        <div><span class="tk-lab">now</span><b>{_eur(S['cur_eur'], 0)}</b>
+             <span class="tk-eu">{_btc(S['cur_btc'])}</span></div>
+        <div><span class="tk-lab">next</span><b class="tk-hit">{_eur(S['next_eur'], 0)}</b>
+             <span class="tk-eu">{_btc(S['next_btc'])}</span></div>
+        <div><span class="tk-lab">{S.get('label') or 'rung'}</span>
+             <b>{_eur(S['target_eur'], 0)}</b>
+             <span class="tk-eu">{_btc(S['target_btc'])}</span></div>
+      </div>
+    </div>
+
+    <div class="tk-stair" role="img"
+         aria-label="Stack in euros now, and the {S['steps']} trades between it
+         and {S.get('label') or 'the rung'}, each compounding {S['per_step_pct']:.1f} percent.">
+      <span class="tk-goalline"><i></i><em>{S.get('label') or 'rung'} {_eur(S['target_eur'], 0)}</em></span>
+      {"".join(cells)}
+    </div>
+
+    <p class="tk-sub">Clearing {S.get('label') or 'the rung'} means growing the stack
+       <b>{S['total_pct']:.0f}%</b>. Split across the <b>{S['steps']}</b> trades your
+       measured rate ({S['trades_per_day']}/day) expects in {dtxt}, each one needs
+       <b>+{S['per_step_pct']:.1f}%</b> — <b>{_eur(S['gain_eur'], 2)}</b> on the next one.
+       Stack euros at {_eur(px)}/₿, which is what the rung is measured in — not
+       account equity.</p>
+  </section>
+"""
+
+
 # ─── the ladder, and the editor for it ───────────────────────────────────────
 
 def _ladder_rows(ms: list[dict], rung: dict, px) -> str:
@@ -559,6 +659,46 @@ _CSS = """<style>
 .tk-read{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-left:auto;
   min-height:14px;text-align:right}
 
+/* the step ladder */
+.tk-stp-top{display:flex;align-items:stretch;gap:var(--s5);flex-wrap:wrap;
+  margin-bottom:var(--s5)}
+.tk-stp-big{display:flex;flex-direction:column;flex:0 0 auto;min-width:150px}
+.tk-stp-big b{font-family:var(--mono);font-size:46px;font-weight:800;line-height:.92;
+  color:var(--long);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.tk-stp-big .tk-lab{margin-top:var(--s2)}
+.tk-stp-nums{margin:0;flex:1 1 320px;align-items:center;gap:var(--s3) var(--s5);
+  padding-left:var(--s5);border-left:1px solid var(--line)}
+.tk-nums b.tk-hit{color:var(--long)}
+
+/* the staircase: one bar per expected trade between here and the rung */
+.tk-stair{position:relative;display:flex;align-items:flex-end;gap:4px;
+  height:190px;padding-top:18px;margin-bottom:var(--s4)}
+.tk-st{flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+  justify-content:flex-end;align-items:center;height:100%;position:relative}
+.tk-st>i{display:block;width:100%;height:var(--h);border-radius:3px 3px 0 0;
+  background:var(--panel3);border:1px solid var(--line2);border-bottom:0}
+.tk-st>span{position:absolute;bottom:-15px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.06em;color:var(--dim);white-space:nowrap}
+.tk-st.was>i{background:var(--panel2);border-color:var(--line)}
+.tk-st.now>i{background:var(--accent-d);border-color:var(--accent)}
+.tk-st.next>i{background:var(--long);border-color:var(--long);box-shadow:var(--glow-g)}
+.tk-st.next>span{color:var(--long);font-weight:700}
+.tk-st.goal>i{background:var(--panel3);border-color:var(--accent)}
+.tk-st.goal>span{color:var(--accent)}
+.tk-stair{padding-bottom:16px}
+.tk-goalline{position:absolute;left:0;right:0;top:16px;pointer-events:none}
+.tk-goalline>i{display:block;border-top:1px dashed var(--accent);opacity:.55}
+.tk-goalline>em{position:absolute;right:0;top:-14px;font-style:normal;background:var(--panel);padding-left:6px;
+  font-family:var(--mono);font-size:9.5px;color:var(--accent)}
+@media (max-width:620px){
+  .tk-stp-big{flex:1 1 100%;min-width:0}
+  .tk-stp-big b{font-size:38px}
+  .tk-stp-nums{flex-basis:100%;padding-left:0;padding-top:var(--s4);
+    border-left:0;border-top:1px solid var(--line)}
+  .tk-stair{height:150px;gap:2px}
+  .tk-st>span{font-size:8px}
+}
+
 /* fan — the library paints into a canvas, so the container carries the size
    and nothing here can reach the series. Series colours are read from the
    design tokens in JS instead, which keeps theme.py the single source. */
@@ -809,7 +949,6 @@ def parts() -> dict:
        · EUR at {_eur(px)}/₿ {stale}</p>
   </section>
 
-{_adherence(T['adherence'])}
   <section class="tk-panel" aria-label="Projection band">
     <header class="tk-h">
       <h2>Where you should be</h2>
@@ -844,6 +983,7 @@ def parts() -> dict:
        can't move the line.</p>
     {ruin}
   </section>
+{_steps(T['step'])}
 
 
   <details class="tk-panel tk-det" aria-label="Remaining rungs">
@@ -858,6 +998,7 @@ def parts() -> dict:
     {_editor(ms, px)}
   </details>
 
+{_adherence(T['adherence'])}
   <details class="tk-panel tk-det" aria-label="Daily score">
     <summary><span class="tk-sum-h">The last {T['window_days']} days</span>
       <span class="tk-streak"><b>{S['current']}</b> day streak

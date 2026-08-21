@@ -245,6 +245,95 @@ def _streaks(days: list[dict]) -> dict:
     return {"current": cur, "best": best}
 
 
+# ─── the step plan ───────────────────────────────────────────────────────────
+
+def step_plan(today: date = None) -> dict:
+    """The rung, divided by the number of trades left to reach it.
+
+    The hero says "0.0093 of 0.0149, 62%". True, and useless at the moment of a
+    trade: nobody sizes an entry against a percentage of a milestone. This turns
+    the same gap into the only number that can actually be acted on — what the
+    NEXT trade has to make.
+
+    Everything is in STACK euros, not account equity. The rung is a BTC target
+    and the stack is what gets measured against it, so a step expressed in
+    account terms would be answering a different question than the one the
+    hero above it asks.
+
+    The divisor is expected TRADES, not days: `days_left x trades_per_day` from
+    the measured rate. A per-day figure quietly assumes you trade every day, and
+    the ledger says otherwise.
+    """
+    today = today or date.today()
+    from .plan import hero as _hero, ladder as _l
+    try:
+        H = _hero()
+        L = _l()
+    except Exception:
+        return {"ok": False}
+
+    nxt = H.get("next") or {}
+    cur_btc, tgt_btc = H.get("stack_btc"), nxt.get("btc")
+    if not cur_btc or not tgt_btc or tgt_btc <= cur_btc:
+        return {"ok": False}
+
+    from .database import get_lens_config
+    try:
+        px = float(get_lens_config().get("btc_price_eur") or 0) or None
+    except Exception:
+        px = None
+
+    days_left = None
+    if nxt.get("date"):
+        try:
+            days_left = (date.fromisoformat(str(nxt["date"])[:10]) - today).days
+        except ValueError:
+            days_left = None
+
+    try:
+        from .cone import near as _near
+        tpd = (_near(7) or {}).get("trades_per_day") or 0.0
+    except Exception:
+        tpd = 0.0
+
+    # No date, no rate, or the rung is already overdue: fall back to one step so
+    # the section still answers "what does the next trade need to make" rather
+    # than disappearing exactly when the plan is in trouble.
+    steps = 1
+    if days_left and days_left > 0 and tpd > 0:
+        steps = max(1, round(days_left * tpd))
+
+    growth = tgt_btc / cur_btc
+    per_step = growth ** (1.0 / steps) - 1.0
+    nxt_btc = cur_btc * (1.0 + per_step)
+
+    # where the stack was before the snapshot it is on now
+    prev_btc = None
+    c = _conn()
+    row = c.execute("SELECT btc_total FROM stack_snapshot WHERE date < "
+                    "(SELECT MAX(date) FROM stack_snapshot) ORDER BY date DESC "
+                    "LIMIT 1").fetchone()
+    c.close()
+    if row is not None:
+        prev_btc = row[0]
+
+    eur = (lambda b: None if (b is None or not px) else round(b * px, 2))
+    return {
+        "ok": True, "px": px,
+        "label": nxt.get("label"), "date": nxt.get("date"),
+        "days_left": days_left, "steps": steps,
+        "trades_per_day": round(tpd, 2),
+        "per_step_pct": round(per_step * 100, 2),
+        "total_pct": round((growth - 1) * 100, 1),
+        "prev_btc": prev_btc, "cur_btc": cur_btc,
+        "next_btc": nxt_btc, "target_btc": tgt_btc,
+        "prev_eur": eur(prev_btc), "cur_eur": eur(cur_btc),
+        "next_eur": eur(nxt_btc), "target_eur": eur(tgt_btc),
+        "gain_eur": (None if not px else round((nxt_btc - cur_btc) * px, 2)),
+        "gain_btc": nxt_btc - cur_btc,
+    }
+
+
 def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
     """The whole /hedge-track payload: next rung, the cone, the scored window."""
     today = today or date.today()
@@ -349,6 +438,7 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
             "stale": H.get("stack_stale"), "age_days": H.get("stack_age_days"),
         },
         "adherence": adherence_pair(today),
+        "step": step_plan(today),
         "cone": C,
         "near": NEAR,
         "actual": actual,
