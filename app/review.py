@@ -559,7 +559,7 @@ def equity_timing(book: str = None, era: str = "current") -> dict:  # book=None 
             "cum_pnl": equity[-1]["cum"] if equity else 0.0}
 
 
-SUPPORTED_TFS = ("5m", "15m", "1h", "4h", "1d")
+SUPPORTED_TFS = ("1m", "5m", "15m", "1h", "4h", "1d")
 _TF_SYMBOL = "BTC/USDT:USDT"
 _TF_EXCHANGE = "bybit"
 
@@ -567,11 +567,10 @@ _TF_EXCHANGE = "bybit"
 def auto_timeframe(entry_ts: int, exit_ts: int | None) -> str:
     """Duration-based default, his own suggested rule: the timeframe that
     would have actually been on screen while the trade was open, not a
-    fixed 1h for a 10-minute scalp and a fixed 1h for a 3-day swing.
-    1m is deliberately not offered — never cached, would mean a slow live
-    fetch on every short-trade page load (see the SUPPORTED_TFS docstring
-    below for the full reasoning)."""
+    fixed 1h for a 10-minute scalp and a fixed 1h for a 3-day swing."""
     dur = (exit_ts or entry_ts) - entry_ts
+    if dur <= 1800:
+        return "1m"
     if dur <= 6 * 3600:
         return "5m"
     if dur <= 24 * 3600:
@@ -585,23 +584,45 @@ def auto_timeframe(entry_ts: int, exit_ts: int | None) -> str:
 
 def _tf_window(timeframe: str, entry_ts: int, exit_ts: int | None,
               bars_before: int = 100, bars_after: int = 30) -> tuple:
-    """Top up the cache for `timeframe` (cheap — cache already reaches back
-    to Dec 2023 for every SUPPORTED_TFS entry, so this only ever fetches the
-    stale tail, not a full history) then pull just the window around the
-    trade. Returns (time[], open[], high[], low[], close[]).
+    """5m/15m/1h/4h/1d: top up the rolling cache (cheap — it already reaches
+    back to Dec 2023, so this only ever fetches the stale tail) then pull
+    just the window around the trade. 1m is never cached as a rolling
+    series (would mean caching years of 1-minute bars for a page most
+    trades don't need it on) — instead it's fetched as a single bounded
+    request for exactly this trade's window via backtest_engine.fetch_window,
+    then written into the same table so revisiting the same trade is instant.
 
-    5m/15m only exist under bybit:BTC/USDT:USDT (checked live — binance
-    only has 1h cached). 1h/4h/1d exist under both binance and bybit;
-    bybit is used throughout for consistency across every timeframe.
+    5m/15m/1m only exist under bybit:BTC/USDT:USDT (checked live — binance
+    only has 1h cached). 1h/4h/1d exist under both; bybit is used
+    throughout for consistency across every timeframe.
+
+    Returns (time[], open[], high[], low[], close[]).
     """
-    from .backtest_engine import load_ohlcv, _tf_ms
+    from .backtest_engine import load_ohlcv, fetch_window, _tf_ms
     if timeframe not in SUPPORTED_TFS:
         raise ValueError(f"timeframe must be one of {SUPPORTED_TFS}")
-    load_ohlcv(symbol=_TF_SYMBOL, timeframe=timeframe, exchange_id=_TF_EXCHANGE, months=30)
-
     tf_sec = _tf_ms(timeframe) // 1000
     start_ms = (entry_ts - bars_before * tf_sec) * 1000
     end_ms = ((exit_ts or entry_ts) + bars_after * tf_sec) * 1000
+    cache_symbol = f"{_TF_EXCHANGE}:{_TF_SYMBOL}"
+
+    if timeframe == "1m":
+        conn = sqlite3.connect(DB_PATH)
+        have = conn.execute(
+            "SELECT COUNT(*) FROM ohlcv_cache WHERE symbol=? AND timeframe=? AND ts>=? AND ts<=?",
+            (cache_symbol, timeframe, start_ms, end_ms)).fetchone()[0]
+        expected = (end_ms - start_ms) // (tf_sec * 1000)
+        if have < expected * 0.9:   # under 90% covered — fetch, don't trust a partial cache
+            bars = fetch_window(_TF_SYMBOL, timeframe, start_ms, end_ms, _TF_EXCHANGE)
+            if bars:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO ohlcv_cache VALUES (?,?,?,?,?,?,?,?)",
+                    [(cache_symbol, timeframe, b[0], b[1], b[2], b[3], b[4], b[5]) for b in bars])
+                conn.commit()
+        conn.close()
+    else:
+        load_ohlcv(symbol=_TF_SYMBOL, timeframe=timeframe, exchange_id=_TF_EXCHANGE, months=30)
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""

@@ -66,6 +66,38 @@ def _fetch_from_exchange(symbol: str, timeframe: str, since_ms: int,
     return all_bars
 
 
+def fetch_window(symbol: str, timeframe: str, since_ms: int, until_ms: int,
+                 exchange_id: str = "bybit") -> list:
+    """One bounded fetch for a specific historical window. Unlike
+    _fetch_from_exchange (which always walks forward to 'now' — fine for
+    warming a rolling cache, ruinous for 1m where 'now' could be years of
+    bars away), this stops at `until_ms`. A trade from a year ago on 1m
+    is one fast request (~150 bars, well under the 1000-bar API limit),
+    not a backfill of everything since."""
+    if exchange_id == "binance":
+        exchange = ccxt.binance({"enableRateLimit": True})
+    else:
+        exchange = ccxt.bybit({"enableRateLimit": True})
+    bars: list = []
+    cur = since_ms
+    while cur < until_ms:
+        try:
+            chunk = exchange.fetch_ohlcv(symbol, timeframe, since=cur, limit=1000)
+        except Exception as e:
+            print(f"[backtest_engine] fetch_window error: {e}")
+            break
+        if not chunk:
+            break
+        bars.extend(chunk)
+        last_ts = chunk[-1][0]
+        if last_ts <= cur:
+            break
+        cur = last_ts + 1
+        if last_ts >= until_ms:
+            break
+    return [b for b in bars if b[0] <= until_ms]
+
+
 def _tf_ms(timeframe: str) -> int:
     mapping = {"1m": 60_000, "5m": 300_000, "15m": 900_000,
                "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
