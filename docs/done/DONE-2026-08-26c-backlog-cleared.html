@@ -45,20 +45,27 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 </style></head>
 <body><main>
 <h1>LENS — Next session</h1>
+<p><a href="DONE-2026-08-26c-backlog-cleared.html">Open as HTML</a></p>
 <p><a href="NEXT_SESSION.html">Open as HTML</a></p>
-<p><em>Written 2026-08-26. Previous list archived at <code>docs/done/DONE-2026-08-26c-backlog-cleared.md</code> — Track&#x27;s prop twin, the prop eval pass-probability, and three carried-over bugs are all closed. Every item below is unstarted, checked against the code or the database, not carried forward on faith.</em></p>
+<p><em>Archived 2026-08-26 — §1 (Track twin) is shipped as <code>/prop-track</code>, §2 (prop eval feasibility) is answered live on <code>/prop-survival#projection</code>, and the three bug items in &quot;carried over&quot; are fixed. See CHANGELOG 2026-08-26c. Only genuinely unstarted items carry forward into the current NEXT_SESSION.md.</em></p>
 <hr>
-<h2>🔴 A decision, not a build: the prop eval</h2>
-<p><code>/prop-survival#projection</code> now shows both numbers live: <strong>32.5% pass on backtest, 0% measured on the 8 real trades taken so far</strong> (12.5% WR, 0.99R — n too small to be a verdict, but the direction agrees with every earlier finding this month). This isn&#x27;t a coding task. It&#x27;s the &quot;deliberate finish-or-close&quot; call flagged back on 2026-08-05 and never made. Worth raising next session, not building around.</p>
+<h2>🔴 1 · Give Track a prop twin — SHIPPED</h2>
+<p>Built <code>app/prop_track_page.py</code> + <code>/prop-track</code>, reusing <code>prop_ledger_data()</code> entirely — no new computation. <code>NAV_PROP</code> gained Track between Goal and Position. <code>tests/test_nav_parity.py</code> converted to <code>test_nav_parity()</code> so pytest collects it (was a standalone <code>main()</code>, silently never run).</p>
+<p>Original scope, for the record: <code>tests/test_nav_parity.py</code> failed: <code>hedge pages with no prop twin: [&#x27;Track&#x27;]</code>.</p>
 <hr>
-<h2>1 · Sweep <code>--faint</code> as body text across the app</h2>
-<p>Six <code>theme.py</code> misuses were fixed 2026-08-26. The same bug — a 2.26–2.47:1 decoration token used as readable text — exists in roughly 30 other files (labels, table headers, footnotes): <code>analytics_page.py</code>, <code>geometry_page.py</code>, <code>fit_page.py</code>, <code>prop_goal.py</code>, <code>prop_ledger.py</code>, <code>site.py</code>, and more. Same fix each time (<code>--faint</code> → <code>--dim</code>), but it touches nearly every page, so it wants its own pass and a visual check, not a blind find-and-replace.</p>
+<h2>2 · The prop evaluation, cold — ANSWERED</h2>
+<p><strong>Backtest cone: 32.5% pass</strong> for the live $10k TURBO config (median 15 trades / 19 days to target if it passes). <strong>Measured from the real ledger: 0% pass on n=8 trades</strong> (12.5% WR, 0.99R) — flagged as too small a sample to be a verdict, but consistent with the known finding that the strategies haven&#x27;t reproduced their backtest edge on real fills yet.</p>
+<p>The backtest cone (<code>prop_goal.cone()</code>) already existed and was already live at <code>/prop-survival#projection</code> and <code>/prop-goal</code>. What was actually stale was the &quot;measured&quot; caveat: a hand-typed &quot;1.5%, 2026-07-09&quot; string from <code>research/eval_mc.py</code>, run once with a hardcoded 10%/3% target/floor that didn&#x27;t even match TURBO&#x27;s real 9%/3%. Fixed by parameterizing <code>eval_mc.run()</code> and adding <code>prop_goal.measured_pass_pct()</code>, which recomputes live from <code>_measured_geometry()</code> on every call — the number can&#x27;t go stale again the way the hardcoded one did.</p>
+<p>Original scope, for the record: the question is not &quot;how do I pass&quot; but &quot;what does passing require, and how likely is that?&quot; — modelled against the same measured distribution the cone uses, not against hope.</p>
 <hr>
-<h2>Carried over — verified 2026-08-22</h2>
+<h2>Carried over — verified 2026-08-22, three items closed 2026-08-26</h2>
 <ul>
 <li><strong>Stack snapshot is 12 days old</strong> (<code>2026-08-09</code>). Everything on Track measures from it. <code>daily_snapshots</code> already runs daily and holds the <em>account balance</em> automatically — the stack is the other number (total BTC, including what is not on the exchange) and only a human can supply it. Wire a weekly ntfy nudge; the <code>btc_balance</code> column in <code>daily_snapshots</code> exists and is unused, so part of it may be derivable.</li>
+<li>~~<code>Log as open trade</code> writes rows nothing ever closes~~ <strong>FIXED 2026-08-26</strong> — button deleted, root cause was duplicating two things that already worked.</li>
 <li><strong>Partial exits leave no trace.</strong> The trim works; the record does not. <code>_build_trades</code> aggregates fills into one open→close row.</li>
+<li>~~<code>Trade.edit_order</code> is unwired~~ <strong>FIXED 2026-08-26</strong> — the SDK call already existed, wired via <code>execute.edit_order()</code> + <code>POST /api/orders/edit</code>.</li>
 <li><strong><code>.env</code> has five unparseable lines</strong> — 2, 5, 6, 31, 42. dotenv skips silently.</li>
+<li>~~Six <code>--faint</code>-as-body-text rules in <code>theme.py</code>~~ <strong>FIXED 2026-08-26</strong> — the six documented plus one same-file miss now use <code>--dim</code>. ~30 other files still misuse <code>--faint</code> the same way — a much bigger sweep, flagged not started.</li>
 <li><strong>A <code>post-commit</code> hook to draft CHANGELOG entries.</strong> There is no automation and never was. Draft from commits since the last dated section and leave them to be sharpened — auto-appending subject lines produces a second <code>git log</code>, and what makes the file worth reading is the <em>why</em>.</li>
 <li><strong><code>tests/test_measured</code></strong> fails on a full run, passes alone — earlier tests seed the shared database.</li>
 </ul>
@@ -68,5 +75,5 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 <li><strong>Past 150 ₿: 6% nominal, 4% withdrawn, 2% real.</strong> The steady state after the north star. Wealthfolio holds the real retirement plan — <strong>€23,496/mo</strong>, FI at €13.82M ≈ 55 ₿, FAT FIRE €20.74M ≈ 83 ₿ — which is where the 150 ₿ north star comes from. LENS&#x27;s <code>burn_monthly_eur</code> of €6,250 is the <em>current</em> burn and deliberately not the retirement figure; do not &quot;correct&quot; it.</li>
 <li><strong>The €250k/BTC assumption</strong> currently lives in prose only. It belongs in <code>goal_plan</code> beside the numbers that depend on it.</li>
 </ul>
-<footer>Twin of <code>NEXT_SESSION.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+<footer>Twin of <code>DONE-2026-08-26c-backlog-cleared.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
 </main></body></html>

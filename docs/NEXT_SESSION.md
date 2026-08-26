@@ -3,40 +3,33 @@
 [Open as HTML](NEXT_SESSION.html)
 
 *Written 2026-08-26. Previous list archived at
-`docs/done/DONE-2026-08-26b-monthly-review-shipped.md` — the monthly review
-(old §1) is shipped as `/review`. Every item below is unstarted, checked
-against the code or the database, not carried forward on faith.*
+`docs/done/DONE-2026-08-26c-backlog-cleared.md` — Track's prop twin, the
+prop eval pass-probability, and three carried-over bugs are all closed.
+Every item below is unstarted, checked against the code or the database,
+not carried forward on faith.*
 
 ---
 
-## 🔴 1 · Give Track a prop twin
+## 🔴 A decision, not a build: the prop eval
 
-**This is the whole next session unless you say otherwise.**
-
-`tests/test_nav_parity.py` fails: `hedge pages with no prop twin: ['Track']`.
-
-Two fixes, and the second matters more:
-
-1. Build `/prop-track` — the prop book has a goal, a ladder and a horizon too,
-   and the evaluation has never had the surface the hedge book got.
-2. **Make the failure visible.** The file is a standalone `main()`, so pytest
-   collects nothing from it and reports the suite green while the check fails.
-   Every "52 passed" logged this month was true and misleading at once. A
-   check nothing runs is not a check.
+`/prop-survival#projection` now shows both numbers live: **32.5% pass on
+backtest, 0% measured on the 8 real trades taken so far** (12.5% WR,
+0.99R — n too small to be a verdict, but the direction agrees with every
+earlier finding this month). This isn't a coding task. It's the
+"deliberate finish-or-close" call flagged back on 2026-08-05 and never
+made. Worth raising next session, not building around.
 
 ---
 
-## 2 · The prop evaluation, cold
+## 1 · Sweep `--faint` as body text across the app
 
-Deferred deliberately to its own session.
-
-The question is not "how do I pass" but **"what does passing require, and how
-likely is that?"** The eval needs roughly **10–12% to cover expenses** — that
-number wants modelling against the same measured distribution the cone uses,
-not against hope. `/prop-survival` and the prop simulator already exist; the
-honest version of this is a pass-probability, and it may come back low.
-
-Worth doing before more time goes into the evaluation, not after.
+Six `theme.py` misuses were fixed 2026-08-26. The same bug — a
+2.26–2.47:1 decoration token used as readable text — exists in roughly 30
+other files (labels, table headers, footnotes): `analytics_page.py`,
+`geometry_page.py`, `fit_page.py`, `prop_goal.py`, `prop_ledger.py`,
+`site.py`, and more. Same fix each time (`--faint` → `--dim`), but it
+touches nearly every page, so it wants its own pass and a visual check,
+not a blind find-and-replace.
 
 ---
 
@@ -48,16 +41,9 @@ Worth doing before more time goes into the evaluation, not after.
   on the exchange) and only a human can supply it. Wire a weekly ntfy nudge; the
   `btc_balance` column in `daily_snapshots` exists and is unused, so part of it
   may be derivable.
-- **`Log as open trade` writes rows nothing ever closes** — three phantom trades
-  poisoned journal matching for weeks. Button still live at
-  `position_page.py:523`.
 - **Partial exits leave no trace.** The trim works; the record does not.
   `_build_trades` aggregates fills into one open→close row.
-- **`Trade.edit_order` is unwired** — zero references in `app/`. Moving a stop
-  means cancel-and-replace.
 - **`.env` has five unparseable lines** — 2, 5, 6, 31, 42. dotenv skips silently.
-- **Six `--faint`-as-body-text rules in `theme.py`** at 2.3:1: `.muted` `.foot`
-  `.badge.expired` `.cond.no` `.tg .sub` `.sect .caret`.
 - **A `post-commit` hook to draft CHANGELOG entries.** There is no automation and
   never was. Draft from commits since the last dated section and leave them to be
   sharpened — auto-appending subject lines produces a second `git log`, and what

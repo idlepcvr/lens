@@ -7,6 +7,40 @@ Dated build history, newest first. Open next-steps live in
 
 ---
 
+## 2026-08-26c
+
+**The rest of the backlog: three bugs, a Track twin, and an honest pass-rate.**
+
+Bugs: `--faint` (2.3:1 contrast) swapped for `--dim` (5.5-6.1:1) on the six
+documented body-text misuses in `theme.py` plus one same-file miss
+(`.mgsec > .mgh`) — ~30 other files use `--faint` the same wrong way,
+flagged not swept. `Log as open trade` deleted from `position_page.py`:
+it duplicated kraken_sync's auto-sync for hedge and duplicated
+`/prop-ledger`'s complete log+close flow for prop — root cause was two
+already-working things, not a missing close button. `Trade.edit_order`
+wired: the kraken-futures SDK already has `edit_order`, it was just never
+called — added `execute.edit_order()`, `POST /api/orders/edit`, an edit
+button on TP/SL rows, verified against real Kraken.
+
+`/prop-track` shipped: NEXT_SESSION's Track twin, built entirely on
+`prop_ledger_data()` (zero new computation) reframed around today. NAV_PROP
+gains Track between Goal and Position. `test_nav_parity.py` converted from
+a standalone `main()` to `test_nav_parity()` so pytest actually collects it.
+
+Pass-probability: the backtest cone (32.5% pass, live TURBO config)
+already existed. What was stale was the "measured" caveat — a hand-typed
+"1.5%, 2026-07-09" string from a script with a hardcoded 10%/3% target/floor
+that didn't match TURBO's real 9%/3%. Parameterized `eval_mc.run()`,
+added `prop_goal.measured_pass_pct()` (recomputes live from the real
+ledger each call), wired into the cone response and its caveat.
+**Today's honest number: 0% measured pass rate on 8 real trades (12.5% WR,
+0.99R) vs 32.5% on backtest** — n=8 is flagged as too small to be a verdict,
+but the direction matches what's already known: the strategies haven't
+reproduced their backtest edge on real fills.
+
+Full suite: 53 passed (up from 52 — nav_parity is now collected), same
+one pre-existing flake (`test_measured`, fails on a full run only).
+
 ## 2026-08-26b
 
 **`/review` shipped — NEXT_SESSION.md's monthly review, item #1.** New
