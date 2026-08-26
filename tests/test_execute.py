@@ -14,6 +14,7 @@ from app import execute
 class _FakeClient:
     single: list = []
     batch: list = []
+    edits: list = []
 
     def create_order(self, **kw):
         _FakeClient.single.append(kw)
@@ -23,9 +24,13 @@ class _FakeClient:
         _FakeClient.batch.append(batchorder_list)
         return {"result": "success", "batchStatus": [{"status": "placed"}]}
 
+    def edit_order(self, **kw):
+        _FakeClient.edits.append(kw)
+        return {"result": "success", "editStatus": {"status": "edited"}}
+
 
 def _patch(cap="1.0"):
-    _FakeClient.single, _FakeClient.batch = [], []
+    _FakeClient.single, _FakeClient.batch, _FakeClient.edits = [], [], []
     execute._client = lambda account="personal": _FakeClient()
     os.environ["LENS_MAX_ORDER_BTC"] = cap
     os.environ["KRAKEN_FUTURES_SANDBOX"] = "1"
@@ -183,6 +188,22 @@ def main():
     assert flat > cap, "with no position the ceiling falls back to balance and is larger"
 
     execute._BAL_CACHE.update({"t": 0.0, "eur": None, "fx": None, "avail": None})
+
+    # 14) edit_order — Trade.edit_order was unwired (NEXT_SESSION.md); moving a
+    #     stop meant cancel-and-replace or the website. Now it's a real call.
+    _patch()
+    r = execute.edit_order("abc123", stop_price=71500)
+    assert r["ok"] is True, r
+    assert _FakeClient.edits[-1] == {"orderId": "abc123", "stopPrice": 71500, "limitPrice": None}, \
+        _FakeClient.edits
+
+    class _RejectEdit(_FakeClient):
+        def edit_order(self, **kw):
+            raise RuntimeError("orderForEditNotFound")
+
+    execute._client = lambda account="personal": _RejectEdit()
+    r = execute.edit_order("gone", stop_price=71500)
+    assert r["ok"] is False and "orderForEditNotFound" in r["error"], r
 
     print("test_execute OK")
 

@@ -519,10 +519,6 @@ def position_page(book: str = "hedge") -> str:
 
   <main class="term-r">
   <div id="err" class="err hide"></div>
-  <div id="logbar" style="display:none;margin:0 0 14px;display:flex;gap:10px;align-items:center">
-    <button type="button" id="logbtn" onclick="logTrade()" style="background:var(--accent);color:var(--bg);border:0;border-radius:7px;padding:9px 18px;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">＋ Log as open trade</button>
-    <span id="logmsg" style="font-size:12px;color:var(--dim)"></span>
-  </div>
   <div id="out"><div class="empty">Enter an entry price to size the trade.</div></div>
   </main>
   </div>
@@ -560,7 +556,7 @@ def position_page(book: str = "hedge") -> str:
 
     script = r"""
 const $=id=>document.getElementById(id);
-let dir='long', book=START_BOOK, CFG=null, deb, HEDGE_BAL=null, LAST=null;
+let dir='long', book=START_BOOK, CFG=null, deb, HEDGE_BAL=null;
 const fP=n=>n==null?'—':Number(n).toLocaleString('en',{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2}); // ponytail: no $/commas so prices paste straight into Kraken
 const fE=n=>n==null?'—':'€'+Number(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fB=n=>n==null?'—':Number(n).toFixed(6)+' ₿';
@@ -648,14 +644,6 @@ function render(g, p, pl, bal, btcE){
            posEur: p.position_size_eur,
            full: p.position_size_btc || 0};
   $('out').innerHTML = tradeBlock() + '<div class="grid">'+out+'</div>';
-  // Carry the PLAN, not just the ticket. Logging used to send entry/size/
-  // leverage only, so trades.tp and trades.sl were NULL on every row ever
-  // written — which meant a review could never ask "did it reach the target you
-  // set", only "did it make money". The levels are already computed right here
-  // for display; they just were not being kept.
-  LAST={book:'hedge',direction:dir,entry:e,size:p.current_trade_size_btc,leverage:lev,
-        tp:(dir==='long'?tpL:tpS), sl:(dir==='long'?slL:slS)};
-  $('logbar').style.display='flex'; $('logmsg').textContent='';
 }
 
 async function ticket(q){
@@ -749,33 +737,6 @@ function renderProp(t, o){
     ])
   + (o ? overrideSec(t, o) : '');
   $('out').innerHTML='<div class="grid">'+out+'</div>';
-  // log the ticket you'd actually place — the override when there is one
-  const k = o || t;
-  // levels() already resolves the override's own stop/target, so `k` carries the
-  // plan actually being placed rather than the strategy default it replaced
-  const kl = levels(k);
-  LAST={book:'prop',direction:dir,entry:k.entry,size:k.size_btc,leverage:k.leverage,
-        tp:(dir==='long'?kl.tpL:kl.tpS), sl:(dir==='long'?kl.slL:kl.slS)};
-  $('logbar').style.display='flex';
-  $('logmsg').textContent = o ? 'logs the OVERRIDE ticket ('+pc(o.stop_pct)+' stop)' : '';
-}
-
-async function logTrade(){
-  if(!LAST||!LAST.entry){ return; }
-  $('logbtn').disabled=true; $('logmsg').textContent='logging…';
-  try{
-    const r=await fetch('/api/trades',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({symbol:'BTC/USD',direction:LAST.direction,entry:LAST.entry,
-        size:Number(LAST.size.toFixed(6)),leverage:LAST.leverage,book:LAST.book,
-        // the plan as it stood at entry, overrides included — this is what the
-        // review later compares reality against
-        tp:LAST.tp!=null?Number(LAST.tp.toFixed(2)):null,
-        sl:LAST.sl!=null?Number(LAST.sl.toFixed(2)):null})});
-    if(!r.ok){ throw new Error((await r.json()).detail||'log failed'); }
-    const t=await r.json();
-    $('logmsg').innerHTML='✓ logged open '+LAST.direction+' #'+t.id+' · <a href="/hedge-journal?trade='+t.id+'" style="color:var(--accent)">journal</a>';
-  }catch(e){ $('logmsg').textContent='✗ '+(e.message||e); }
-  $('logbtn').disabled=false;
 }
 
 // calculator — type 60000*1.02 → Enter/blur → evaluates, then re-sizes
@@ -798,7 +759,6 @@ if(START_BOOK==='prop') setBook('prop');
 // 0.001 has to move these numbers, or the form and the readout are two screens
 // that happen to share a page. Prices don't depend on size; the € figures do,
 // so only those are scaled, and the page says so when they are.
-// NB: `LAST` is already taken — it's the trade-log payload. This is TRADE.
 let TRADE = null;
 
 function tradeBlock(){
@@ -1189,13 +1149,27 @@ async function loadOrders(){
       const name = o.role==='take_profit' ? 'take profit'
                  : o.role==='stop_loss'   ? 'stop loss' : (o.order_type+' '+o.side);
       const px = o.trigger || o.limit;
+      const editable = o.role==='take_profit' || o.role==='stop_loss';
       return `<div class="ord ${cls}"><span class="role">${name}</span>`
         + `<span class="meta">${o.size||''} ${o.reduce_only?'· reduce-only':''}`
         + ` · on ${o.trigger_on||'—'}</span>`
         + `<span class="px">${px?fP(px):'—'}</span>`
+        + (editable ? `<button type="button" onclick="editOne('${o.order_id}','${o.role}',${px||0})">edit</button>` : '')
         + `<button type="button" onclick="cancelOne('${o.order_id}')">cancel</button></div>`;
     }).join('') : '<div class="ordnone">Nothing resting on the exchange.</div>';
   }catch(e){}
+}
+
+async function editOne(id, role, current){
+  const label = role==='take_profit' ? 'take profit' : 'stop loss';
+  const v = prompt('New '+label+' trigger price (was '+(current||'—')+'):', current||'');
+  if(v===null || v==='' || isNaN(parseFloat(v))) return;
+  $('x-msg').textContent='moving '+label+'…';
+  const params = {order_id:id};
+  params[role==='stop_loss' ? 'stop_price' : 'limit_price'] = v;
+  const r = await fetch('/api/orders/edit?'+new URLSearchParams(params), {method:'POST'}).then(r=>r.json());
+  $('x-msg').textContent = r.ok ? '✓ '+label+' moved to '+v : '✗ '+(r.error||'failed');
+  loadOrders(); loadLive();
 }
 
 async function cancelOne(id){

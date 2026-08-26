@@ -389,6 +389,19 @@ def close(direction_of_position: str, size_btc: float, **kw) -> dict:
                    reduce_only=True, order_type="mkt", **kw)
 
 
+def edit_order(order_id: str, *, stop_price: Optional[float] = None,
+               limit_price: Optional[float] = None, account: str = "personal") -> dict:
+    """Move a resting order's trigger/limit in place — the kraken-futures SDK
+    already has this (Trade.edit_order), it was just never called. Moving a
+    stop no longer means cancel it and hope the replace lands before price
+    does."""
+    try:
+        return {"ok": True, "response": _client(account).edit_order(
+            orderId=order_id, stopPrice=stop_price, limitPrice=limit_price)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
 def cancel_all(account: str = "personal") -> dict:
     """Pull every resting order — the panic button for orphaned TP/SL legs."""
     try:

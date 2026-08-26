@@ -1588,6 +1588,20 @@ def orders_cancel(order_id: str, account: str = "personal"):
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
 
 
+@app.post("/api/orders/edit")
+def orders_edit(order_id: str, stop_price: Optional[float] = None,
+                 limit_price: Optional[float] = None, account: str = "personal"):
+    """Move a resting order's trigger in place. NEXT_SESSION.md: `Trade.edit_order`
+    was unwired — the SDK call already existed, moving a stop meant the website
+    or cancel-and-replace. Routed through execute.edit_order so sandbox mode
+    is respected the same way execute()/close() already are."""
+    from . import execute
+    if stop_price is None and limit_price is None:
+        raise HTTPException(status_code=422, detail="stop_price or limit_price required")
+    return execute.edit_order(order_id, stop_price=stop_price, limit_price=limit_price,
+                               account=account)
+
+
 @app.get("/api/market/read")
 def market_read(direction: str = "long"):
     """The briefing shown before he trades against the scanner: RSI, MACD, the
