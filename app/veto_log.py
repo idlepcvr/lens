@@ -67,12 +67,7 @@ def record(direction: str, size_btc: float, *, entry=None, leverage=None,
     return rid
 
 
-def recent(limit: int = 50) -> list[dict]:
-    c = _conn()
-    c.execute(_DDL)
-    rows = c.execute("SELECT * FROM veto_overrides ORDER BY id DESC LIMIT ?",
-                     (limit,)).fetchall()
-    c.close()
+def _parse(rows) -> list[dict]:
     out = []
     for r in rows:
         d = dict(r)
@@ -83,3 +78,25 @@ def recent(limit: int = 50) -> list[dict]:
                 pass
         out.append(d)
     return out
+
+
+def recent(limit: int = 50) -> list[dict]:
+    c = _conn()
+    c.execute(_DDL)
+    rows = c.execute("SELECT * FROM veto_overrides ORDER BY id DESC LIMIT ?",
+                     (limit,)).fetchall()
+    c.close()
+    return _parse(rows)
+
+
+def for_trade(trade_id: int) -> dict | None:
+    """The override record for one trade, if it exists — his typed reason for
+    taking it against the scanner. Exposed via GET /api/veto-overrides before
+    2026-08-27 only as a raw list with no per-trade filter and no page ever
+    rendered it: "that information is lost in transit" (his words, correct)."""
+    c = _conn()
+    c.execute(_DDL)
+    row = c.execute("SELECT * FROM veto_overrides WHERE linked_trade_id = ? "
+                    "ORDER BY id DESC LIMIT 1", (trade_id,)).fetchone()
+    c.close()
+    return _parse([row])[0] if row else None

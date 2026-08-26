@@ -661,6 +661,73 @@ def _link_signal(c, trade_id: int, direction: str, entry: float, opened_at: str)
     return sid
 
 
+_VETO_WINDOW_DAYS = 0.25   # 6h either side — same window as signal linking
+_VETO_ENTRY_TOL   = 0.025  # 2.5%
+
+
+def _link_veto_override(c, trade_id: int, direction: str, entry: float, opened_at: str):
+    """Claim the nearest unclaimed veto_overrides row for this fill — his
+    typed reason for taking a trade against the scanner. The column existed
+    (veto_overrides.linked_trade_id) but nothing ever set it: the record was
+    written at execution time before the resulting trade row existed, and no
+    sync step went back to connect them. 'That information is lost in
+    transit' — it wasn't lost, it was never linked. Mirrors _link_signal's
+    exact matching logic (direction + entry within tolerance + nearest in
+    time), never raises."""
+    if not (direction and entry and opened_at):
+        return None
+    # lazily created by veto_log.py on first override write — a DB that's
+    # never had one (fresh test DB, or simply no overrides yet) won't have
+    # this table, and importing veto_log here would be circular (it imports
+    # _conn from this module). Same DDL, kept in sync by hand.
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS veto_overrides (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts              TEXT    NOT NULL,
+            direction       TEXT,
+            entry           REAL,
+            size_btc        REAL,
+            leverage        REAL,
+            take_profit     REAL,
+            stop_loss       REAL,
+            setup_tag       TEXT,
+            veto_reasons    TEXT,
+            user_reason     TEXT    NOT NULL,
+            context         TEXT,
+            linked_trade_id INTEGER
+        )
+    """)
+    row = c.execute("""
+        SELECT id FROM veto_overrides
+         WHERE linked_trade_id IS NULL AND direction = ?
+           AND julianday(?) - julianday(ts) <= ?
+           AND julianday(ts) - julianday(?) <= ?
+           AND entry > 0 AND ABS(? - entry) / entry < ?
+      ORDER BY ABS(julianday(ts) - julianday(?)) ASC LIMIT 1
+    """, (direction, opened_at, _VETO_WINDOW_DAYS,
+          opened_at, _VETO_WINDOW_DAYS,
+          entry, _VETO_ENTRY_TOL, opened_at)).fetchone()
+    if not row:
+        return None
+    c.execute("UPDATE veto_overrides SET linked_trade_id = ? "
+              "WHERE id = ? AND linked_trade_id IS NULL", (trade_id, row["id"]))
+    return row["id"]
+
+
+def backfill_veto_links() -> int:
+    """One-shot: link every historical override the same way sync now does
+    going forward. Idempotent."""
+    c = _conn()
+    rows = c.execute(
+        "SELECT id, direction, entry, opened_at FROM trades ORDER BY opened_at"
+    ).fetchall()
+    n = sum(bool(_link_veto_override(c, r["id"], r["direction"], r["entry"], r["opened_at"]))
+            for r in rows)
+    c.commit()
+    c.close()
+    return n
+
+
 def backfill_signal_links() -> int:
     """One-shot: link historical fills the same way sync now does. Oldest fill
     first, so when two fills of one order contend for a signal the earlier one
@@ -755,6 +822,8 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
             ))
             _link_signal(c, twin["id"], trade_dict["direction"],
                          trade_dict["entry"], opened_iso)
+            _link_veto_override(c, twin["id"], trade_dict["direction"],
+                                trade_dict["entry"], opened_iso)
             c.commit()
             row = c.execute("SELECT * FROM trades WHERE id = ?", (twin["id"],)).fetchone()
             c.close()
@@ -795,6 +864,8 @@ def upsert_exchange_trade(trade_dict: dict) -> Optional[TradeResponse]:
     ))
     _link_signal(c, cur.lastrowid, trade_dict["direction"], trade_dict["entry"],
                  _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat())
+    _link_veto_override(c, cur.lastrowid, trade_dict["direction"], trade_dict["entry"],
+                        _iso(trade_dict.get("opened_at")) or datetime.utcnow().isoformat())
     c.commit()
     row = c.execute("SELECT * FROM trades WHERE id = ?", (cur.lastrowid,)).fetchone()
     c.close()

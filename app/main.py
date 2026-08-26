@@ -1619,6 +1619,14 @@ def veto_overrides(limit: int = Query(50, ge=1, le=500)):
     return {"overrides": recent(limit)}
 
 
+@app.get("/api/veto-overrides/for-trade")
+def veto_override_for_trade(trade_id: int):
+    """The override record for one trade, if it exists. linked_trade_id was
+    never actually populated before 2026-08-27 — see database._link_veto_override."""
+    from .veto_log import for_trade
+    return {"override": for_trade(trade_id)}
+
+
 @app.get("/api/account/live")
 def account_live():
     """Read-only live balances — no snapshot write. Powers /overview.

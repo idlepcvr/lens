@@ -168,7 +168,17 @@ function renderVerdict(t){{
         <div style="font-size:18px;font-weight:800" class="${{win?'g':'r'}}">${{eur(t.pnl)}}</div>
         <div class="m" style="font-size:11px">${{durOf(t)}} &middot; ${{(t.direction||'').toUpperCase()}}</div>
       </div>
+    </div>
+    <div id="cr-veto"></div>`;
+  fetch('/api/veto-overrides/for-trade?trade_id='+t.id).then(r=>r.json()).then(d=>{{
+    if(!d.override) return;
+    const o=d.override;
+    $('cr-veto').innerHTML=`<div class="sb-wrap" style="margin-bottom:12px;padding:10px 14px;border-left:3px solid var(--accent)">
+      <b style="color:var(--accent)">&#9888; Taken against the scanner</b>
+      ${{o.veto_reasons&&o.veto_reasons.length?` &middot; scanner said: <span class="m">${{o.veto_reasons.join(', ')}}</span>`:''}}
+      <div style="margin-top:5px;font-size:12.5px">${{(o.user_reason||'').replace(/</g,'&lt;')}}</div>
     </div>`;
+  }}).catch(()=>{{}});
 }}
 
 // nearest indicator sample at or before a given unix time
