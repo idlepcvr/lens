@@ -3287,6 +3287,14 @@ def api_review_indicators():
     return get_indicators_1h()
 
 
+@app.get("/chart-review", response_class=HTMLResponse)
+def chart_review_page(trade: Optional[int] = None, book: str = "hedge"):
+    """Full-size chart review, pulled out of the journal modal — no room
+    there for RSI/MACD/levels without squashing every pane unreadable."""
+    from .chart_review_page import render
+    return render(trade, book if book in ("hedge", "prop") else "hedge")
+
+
 @app.get("/api/review/levels")
 def api_review_levels():
     from .review import get_levels_1h
