@@ -154,7 +154,7 @@ const MISTAKES=["chased","early","late","oversized","moved stop","no stop","reve
 const EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
 const GRADES=["A","B","C","D","F"];
 const SETUPS=["S1","S2","S3","S4","S5","NONE"];
-let TRADES=[], CANDLES=[], INDICATORS=null, VISIBLE=[], SEL=null;
+let TRADES=[], CANDLES=[], INDICATORS=null, LEVELS=[], VISIBLE=[], SEL=null;
 const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
@@ -308,11 +308,12 @@ async function loadOpenPositions(){
 async function load(){
   loadOpenPositions();
   GOALLVL=await goalLevels();
-  const [tr,ca,ind]=await Promise.all([fetch('/api/review/trades?book='+BOOK),fetch('/api/review/ohlcv'),fetch('/api/review/indicators')]);
+  const [tr,ca,ind,lv]=await Promise.all([fetch('/api/review/trades?book='+BOOK),fetch('/api/review/ohlcv'),fetch('/api/review/indicators'),fetch('/api/review/levels')]);
   TRADES=(await tr.json()).filter(t=>t.pnl!=null);
   computeAutoGrades();
   try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
   try{INDICATORS=await ind.json();}catch(e){INDICATORS=null;}
+  try{LEVELS=await lv.json();}catch(e){LEVELS=[];}
   const tagsel=$('f-tag'); [...new Set(TRADES.map(t=>t.setup_tag).filter(Boolean))].sort().forEach(tg=>{
     const o=document.createElement('option'); o.value=o.textContent=tg; tagsel.appendChild(o);});
   // deep-link: /journal?setup=S1 (from /edge) — exact tag if it exists, else prefix match (VETO family)
@@ -574,6 +575,19 @@ function openTrade(id){
       bmChart.addLineSeries({color:'#465064',lineWidth:1,lineStyle:L.Dotted,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.bb_lower));
     }
     const range=t.ts_entry?{from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}:null;
+    // resistance-becomes-support / mirror — app/levels.py, detection only,
+    // not yet tested for edge (see research/ — untested territory as of
+    // 2026-08-27). Only the confirmed flips inside this trade's visible
+    // window, closest-to-entry first, capped so the chart stays readable.
+    if(range && LEVELS.length && t.entry){
+      const near=LEVELS.filter(f=>f.confirm_time>=range.from&&f.confirm_time<=range.to)
+        .sort((a,b)=>Math.abs(a.level-t.entry)-Math.abs(b.level-t.entry)).slice(0,6);
+      near.forEach(f=>{
+        const isR2S=f.kind==='r2s';
+        s.createPriceLine({price:f.level,color:isR2S?'#1fd98999':'#ff546899',lineWidth:1,
+          lineStyle:L.Dashed,axisLabelVisible:true,title:isR2S?'R→S':'S→R'});
+      });
+    }
     setTimeout(()=>{if(!bmChart)return;bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});if(range)bmChart.timeScale().setVisibleRange(range);},40);
 
     // RSI(14) and MACD(12,26,9) panes — own price scale each, same time

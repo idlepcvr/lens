@@ -3287,6 +3287,12 @@ def api_review_indicators():
     return get_indicators_1h()
 
 
+@app.get("/api/review/levels")
+def api_review_levels():
+    from .review import get_levels_1h
+    return get_levels_1h()
+
+
 @app.get("/api/stats/trades")
 def api_stats_trades():
     """Realized stats from closed trades — feeds Monte Carlo + projection seeding."""

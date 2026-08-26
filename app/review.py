@@ -572,6 +572,31 @@ def get_ohlcv_1h() -> list:
     return [{"time": r[0]//1000, "open": r[1], "high": r[2], "low": r[3], "close": r[4]} for r in rows]
 
 
+def get_levels_1h() -> list:
+    """Resistance-becomes-support / support-becomes-resistance, over the same
+    1h candles everything else on this page reads. Detection only — see
+    app/levels.py's docstring; not yet tested for edge, just drawn.
+    """
+    from .levels import level_flips
+    conn = sqlite3.connect(DB_PATH)
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT ts, high, low, close FROM ohlcv_cache
+        WHERE symbol='binance:BTC/USDT' AND timeframe='1h' AND ts >= ?
+        ORDER BY ts
+    """, (APR25_MS,))
+    rows = cur.fetchall()
+    conn.close()
+    time   = [r[0] // 1000 for r in rows]
+    highs  = [r[1] for r in rows]
+    lows   = [r[2] for r in rows]
+    closes = [r[3] for r in rows]
+    flips = level_flips(highs, lows, closes)
+    return [{"level": f["level"], "kind": f["kind"],
+             "pivot_time": time[f["pivot_i"]], "confirm_time": time[f["confirm_i"]]}
+            for f in flips]
+
+
 def get_indicators_1h() -> dict:
     """SMA 50/100/200, Bollinger(20,2) and MACD(12,26,9), aligned to
     get_ohlcv_1h()'s exact row set — same query, so `time[i]` in one response
