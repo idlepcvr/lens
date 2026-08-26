@@ -164,11 +164,15 @@ def _row_eur(v: float) -> str:
 def _combo_rows(combos: dict, month: str, done: set[str]) -> str:
     if not combos:
         return f'<tr><td colspan="6" class="m">no veto combo cleared n≥{MIN_COMBO_N} this month</td></tr>'
+    from urllib.parse import quote
     out = []
     for combo, s in combos.items():
         badge = '<span class="badge approved">reviewed</span>' if combo in done else ""
+        tag_url = quote(f"VETO:{combo}", safe="")
         out.append(
-            f"<tr><td class=\"mono\">{html.escape(combo)}</td><td>{s['n']}</td>"
+            f"<tr><td class=\"mono\"><a href=\"/hedge-journal?setup={tag_url}\" "
+            f"style=\"color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--dim)\" "
+            f"title=\"see the actual trades behind this combo\">{html.escape(combo)}</a></td><td>{s['n']}</td>"
             f"{_row_eur(s['total'])}{_row_eur(s['avg'])}<td class=\"m\">{s['win']:.1f}%</td>"
             f"<td>{badge}"
             f'<button class="btn ghost" style="padding:3px 8px;font-size:11px" '
