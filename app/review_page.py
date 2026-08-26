@@ -182,9 +182,10 @@ def _verdict_rows(rows: list[dict]) -> str:
     out = []
     for r in rows[:30]:
         out.append(
-            f"<tr><td class=\"m\">{r['ts'][:10]}</td><td>{r['month']}</td>"
+            f"<tr><td class=\"m\" style=\"white-space:nowrap\">{r['ts'][:10]}</td>"
+            f"<td style=\"white-space:nowrap\">{r['month']}</td>"
             f"<td class=\"mono\">{html.escape(r['combo'])}</td>"
-            f"<td><span class=\"badge approved\">{r['verdict']}</span></td>"
+            f"<td style=\"white-space:nowrap\"><span class=\"badge approved\">{r['verdict']}</span></td>"
             f"<td class=\"m\">{html.escape(r['reason'])}</td></tr>")
     return "".join(out)
 

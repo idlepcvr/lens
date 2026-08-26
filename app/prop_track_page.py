@@ -50,6 +50,19 @@ def render() -> str:
 
     today_cls = "g" if d["today_pnl"] >= 0 else "r"
     daily_room = d["daily_limit_usd"] - max(-d["today_pnl"], 0)
+    over = d["passed"] or d["failed"]   # the run is decided — no more "away"/"left"
+
+    if over:
+        target_row = (f"{_eur(d['to_target_usd'])} short when it ended"
+                      if d["to_target_usd"] > 0 else
+                      f"cleared by {_eur(-d['to_target_usd'])}")
+        floor_row = (f"held with {_eur(d['to_floor_usd'])} to spare"
+                    if d["to_floor_usd"] >= 0 else
+                    f"breached by {_eur(-d['to_floor_usd'])}")
+    else:
+        target_row = f"{_eur(d['to_target_usd'])} away &middot; {d['progress_pct']:.1f}% of the way there"
+        floor_row = f"{_eur(d['to_floor_usd'])} of room left"
+    dd_row = f"drawdown reached {d['cur_dd_pct']:.1f}% of {d['dd_limit_pct']}% max"
 
     body = f"""
 <div class="help-body" style="margin-bottom:12px">
@@ -63,17 +76,17 @@ question — is the whole basket still on pace under the cone.</p>
 </div>
 
 <div class="sb-wrap" style="margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 4px 10px">
+<span class="m">{d['eval']} &middot; {_eur(d['account'])} account &middot; day {days}</span>
+<span class="badge {cls}">{verdict}</span>
+</div>
 <table class="sb">
-<tr><th colspan="2">{d['eval']} &middot; {_eur(d['account'])} account &middot; day {days}
-<span class="badge {cls}" style="float:right">{verdict}</span></th></tr>
 <tr><td>Live equity</td><td class="mono">{_eur(d['live_equity'])}
 {f" (+{_eur(d['open_upnl'])} open)" if d['open_upnl'] else ''}</td></tr>
 <tr><td>Today's P&amp;L</td><td class="{today_cls} mono">{_eur(d['today_pnl'])}
-&middot; {_eur(max(daily_room,0))} of daily room left</td></tr>
-<tr><td>To target</td><td class="mono">{_eur(d['to_target_usd'])} away
-&middot; {d['progress_pct']:.1f}% of the way there</td></tr>
-<tr><td>To floor</td><td class="mono">{_eur(d['to_floor_usd'])} of room
-&middot; current drawdown {d['cur_dd_pct']:.1f}% of {d['dd_limit_pct']}% max</td></tr>
+{f" &middot; {_eur(max(daily_room,0))} of daily room left" if not over else ''}</td></tr>
+<tr><td>Target</td><td class="mono">{target_row}</td></tr>
+<tr><td>Floor</td><td class="mono">{floor_row} &middot; {dd_row}</td></tr>
 </table>
 </div>
 
