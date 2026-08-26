@@ -120,8 +120,8 @@ guarding.
   no keys and no money — the cheap way to prove the loop before it holds a real
   credential.
 
-Open items live in [`NEXT_SESSION.md`](NEXT_SESSION.md); shipped history in
-[`CHANGELOG.md`](CHANGELOG.md). The v1 build plan is archived at
+Open items live in [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md); shipped history in
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md). The v1 build plan is archived at
 [`docs/DONE-2026-08-22-lens-plan-v1.md`](docs/DONE-2026-08-22-lens-plan-v1.md).
 
 ## Running it

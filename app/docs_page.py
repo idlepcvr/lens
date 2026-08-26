@@ -24,10 +24,10 @@ from .theme import shell
 
 DOCS = [
     ("readme",    "README",    "README.md",     "what it is, how to run it"),
-    ("next",      "Next",      "NEXT_SESSION.md",  "open items, verified each session"),
-    ("changelog", "Changelog", "CHANGELOG.md",  "what shipped, and what broke"),
-    ("product",   "Product",   "PRODUCT.md",    "who it's for, what it's for"),
-    ("brand",     "Brand",     "BRAND.md",      "how it should look and sound"),
+    ("next",      "Next",      "docs/NEXT_SESSION.md",  "open items, verified each session"),
+    ("changelog", "Changelog", "docs/CHANGELOG.md",  "what shipped, and what broke"),
+    ("product",   "Product",   "docs/PRODUCT.md",    "who it's for, what it's for"),
+    ("brand",     "Brand",     "docs/BRAND.md",      "how it should look and sound"),
 ]
 BY_KEY = {k: (label, fn, blurb) for k, label, fn, blurb in DOCS}
 
