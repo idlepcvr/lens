@@ -1103,6 +1103,15 @@ def api_review_verdict(req: ReviewVerdict):
     return {"ok": True}
 
 
+@app.get("/api/review/combo-reasons")
+def api_review_combo_reasons(combo: str):
+    """His own typed override reasoning for every trade tagged with this
+    exact veto combo, across the whole book — the context a verdict should
+    be informed by, not typed blind."""
+    from .review_page import combo_reasons
+    return {"reasons": combo_reasons(combo)}
+
+
 @app.post("/api/review/notify")
 def api_review_notify():
     """Cron hits this on the 1st — ntfy for last month, same topic as everything else."""

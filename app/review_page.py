@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import calendar
 import html
+import json
 from datetime import date, datetime, timezone
 
 from .database import _conn
@@ -90,6 +91,37 @@ def _stat(pnls: list[float]) -> dict:
         "avg": (sum(pnls) / n) if n else 0.0,
         "win": (sum(1 for p in pnls if p > 0) / n * 100) if n else 0.0,
     }
+
+
+def combo_reasons(combo: str) -> list[dict]:
+    """His own typed reasoning, from every trade tagged with this exact
+    combo that was also a recorded override — across the whole book, not
+    just one month, since the combo itself is a lifetime pattern (this is
+    what override_miner.py tests against). "The verdict shouldn't be typed
+    blind — it should show what I actually said" (his words). Most combos
+    will come back empty: veto_overrides only exists from 2026-08-21
+    onward (execution went live then), so anything tagged before that has
+    no linked reasoning to show, honestly, not silently.
+    """
+    from .veto_log import _DDL as VETO_DDL
+    c = _conn()
+    c.execute(VETO_DDL)
+    rows = c.execute("""
+        SELECT vo.ts, vo.user_reason, vo.veto_reasons, t.id AS trade_id, t.pnl
+          FROM veto_overrides vo JOIN trades t ON t.id = vo.linked_trade_id
+         WHERE t.setup_tag = ?
+      ORDER BY vo.ts DESC
+    """, (f"VETO:{combo}",)).fetchall()
+    c.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["veto_reasons"] = json.loads(d["veto_reasons"] or "null")
+        except (TypeError, ValueError):
+            pass
+        out.append(d)
+    return out
 
 
 def split(month: str) -> dict:
@@ -238,6 +270,7 @@ gets recorded here with a date and a reason, the way a plan amendment does.</p>
 
 <div class="sb-wrap" style="margin-bottom:12px">
 <h4 style="margin:0 0 8px">Record a verdict</h4>
+<div id="rv-reasons"></div>
 <div class="tg" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
   <label>combo<br><input id="rv-combo" class="mono" style="width:260px" placeholder="click 'record verdict' above, or type one"></label>
   <label>call<br>
@@ -263,9 +296,28 @@ gets recorded here with a date and a reason, the way a plan amendment does.</p>
 """
     script = f"""
 const MONTH = {month!r};
-function reviewCombo(combo) {{
+async function reviewCombo(combo) {{
   document.getElementById('rv-combo').value = combo;
   document.getElementById('rv-combo').scrollIntoView({{behavior:'smooth', block:'center'}});
+  const box = document.getElementById('rv-reasons');
+  box.innerHTML = '<div class="m">loading your reasoning on this combo…</div>';
+  try {{
+    const d = await fetch('/api/review/combo-reasons?combo=' + encodeURIComponent(combo)).then(r => r.json());
+    const rows = d.reasons || [];
+    if (!rows.length) {{
+      box.innerHTML = '<div class="m" style="margin-bottom:8px">No linked override reasoning for this combo '
+        + '— veto_overrides only exists from 2026-08-21 onward, so trades tagged before that have none. '
+        + 'Verdict below is on the numbers alone.</div>';
+      return;
+    }}
+    box.innerHTML = '<div style="margin-bottom:8px"><b>What you actually said, taking these trades:</b>' + rows.map(r =>
+      `<div class="sb-wrap" style="margin-top:6px;padding:8px 10px">`
+      + `<div class="m" style="font-size:11px">#${{r.trade_id}} · ${{r.ts.slice(0,16).replace('T',' ')}} · `
+      + `<span class="${{r.pnl>=0?'g':'r'}}">${{r.pnl>=0?'+':''}}€${{Number(r.pnl).toFixed(2)}}</span></div>`
+      + `<div style="font-size:12.5px;margin-top:3px">${{(r.user_reason||'').replace(/</g,'&lt;')}}</div>`
+      + `</div>`
+    ).join('') + '</div>';
+  }} catch(e) {{ box.innerHTML = ''; }}
 }}
 async function submitVerdict() {{
   const combo = document.getElementById('rv-combo').value.trim();
