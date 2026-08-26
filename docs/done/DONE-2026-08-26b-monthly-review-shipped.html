@@ -45,19 +45,35 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 </style></head>
 <body><main>
 <h1>LENS — Next session</h1>
+<p><a href="DONE-2026-08-26b-monthly-review-shipped.html">Open as HTML</a></p>
 <p><a href="NEXT_SESSION.html">Open as HTML</a></p>
-<p><em>Written 2026-08-26. Previous list archived at <code>docs/done/DONE-2026-08-26b-monthly-review-shipped.md</code> — the monthly review (old §1) is shipped as <code>/review</code>. Every item below is unstarted, checked against the code or the database, not carried forward on faith.</em></p>
+<p><em>Archived 2026-08-26 — §1 below is now shipped: <code>/review</code> (see CHANGELOG 2026-08-26b). Kept as-is for the record; §2 and §3 carried forward unchanged into the current NEXT_SESSION.md.</em></p>
 <hr>
-<h2>🔴 1 · Give Track a prop twin</h2>
-<p><strong>This is the whole next session unless you say otherwise.</strong></p>
+<h2>🔴 1 · A monthly review that actually exists — SHIPPED</h2>
+<p><strong>Built:</strong> <code>app/review_page.py</code> + <code>/review</code> route. A month&#x27;s closed trades grouped live by what the scanner said at entry (setup fired / nothing / VETO), a per-VETO-combo breakdown at n≥5, a <code>review_verdicts</code> table (keep/tune/retire + reason, min 10 chars) written via <code>POST /api/review/verdict</code>, and <code>POST /api/review/notify</code> firing from cron <code>0 8 1 * *</code> — same local-curl pattern as the other jobs, same ntfy topic. First real verdict recorded: <code>slope_against</code> kept as VETO (p=0.44, not significant).</p>
+<p>Original scope, for the record:</p>
+<p>There is no surface and no ritual for reviewing the book. Consequences, both already visible:</p>
+<ul>
+<li><strong>511 of 528 hedge trades have <code>followed_plan IS NULL</code></strong> — 3.2% reviewed. The discipline score is measuring silence.</li>
+<li>The setup-tag split (scanner-fired trades +€3,853 vs VETO trades −€5,944) sat in a column that has been populated the whole time and nobody looked.</li>
+</ul>
+<p>What to build, in rough order of value:</p>
+<ul>
+<li>A <strong>monthly review page</strong> — the month&#x27;s trades grouped by <code>setup_tag</code>, with that split computed live rather than by hand in sqlite.</li>
+<li>A cadence that fires: cron → ntfy on the 1st, same topic as everything else.</li>
+<li>Somewhere to record the verdict, so a tuned or retired veto has a date and a reason the way a plan amendment does.</li>
+</ul>
+<p>The gates need tuning against evidence, not memory. A monthly pass is where that happens.</p>
+<hr>
+<h2>2 · Give Track a prop twin</h2>
 <p><code>tests/test_nav_parity.py</code> fails: <code>hedge pages with no prop twin: [&#x27;Track&#x27;]</code>.</p>
 <p>Two fixes, and the second matters more:</p>
 <ol>
 <li>Build <code>/prop-track</code> — the prop book has a goal, a ladder and a horizon too, and the evaluation has never had the surface the hedge book got.</li>
-<li><strong>Make the failure visible.</strong> The file is a standalone <code>main()</code>, so pytest collects nothing from it and reports the suite green while the check fails. Every &quot;52 passed&quot; logged this month was true and misleading at once. A check nothing runs is not a check.</li>
+<li><strong>Make the failure visible.</strong> The file is a standalone <code>main()</code>, so pytest collects nothing from it and reports the suite green while the check fails. Every &quot;52 passed&quot; logged on 2026-08-22 was true and misleading at once. A check nothing runs is not a check.</li>
 </ol>
 <hr>
-<h2>2 · The prop evaluation, cold</h2>
+<h2>3 · The prop evaluation, cold</h2>
 <p>Deferred deliberately to its own session.</p>
 <p>The question is not &quot;how do I pass&quot; but <strong>&quot;what does passing require, and how likely is that?&quot;</strong> The eval needs roughly <strong>10–12% to cover expenses</strong> — that number wants modelling against the same measured distribution the cone uses, not against hope. <code>/prop-survival</code> and the prop simulator already exist; the honest version of this is a pass-probability, and it may come back low.</p>
 <p>Worth doing before more time goes into the evaluation, not after.</p>
@@ -79,5 +95,5 @@ footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
 <li><strong>Past 150 ₿: 6% nominal, 4% withdrawn, 2% real.</strong> The steady state after the north star. Wealthfolio holds the real retirement plan — <strong>€23,496/mo</strong>, FI at €13.82M ≈ 55 ₿, FAT FIRE €20.74M ≈ 83 ₿ — which is where the 150 ₿ north star comes from. LENS&#x27;s <code>burn_monthly_eur</code> of €6,250 is the <em>current</em> burn and deliberately not the retirement figure; do not &quot;correct&quot; it.</li>
 <li><strong>The €250k/BTC assumption</strong> currently lives in prose only. It belongs in <code>goal_plan</code> beside the numbers that depend on it.</li>
 </ul>
-<footer>Twin of <code>NEXT_SESSION.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+<footer>Twin of <code>DONE-2026-08-26b-monthly-review-shipped.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
 </main></body></html>

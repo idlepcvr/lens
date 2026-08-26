@@ -1078,6 +1078,38 @@ def evidence_page():
     ], meta="what survived testing", intro=intro)
 
 
+class ReviewVerdict(BaseModel):
+    month:   str
+    combo:   str
+    verdict: str
+    reason:  str
+
+
+@app.get("/review", response_class=HTMLResponse)
+def review_route(month: Optional[str] = None):
+    """NEXT_SESSION.md #1: the month's trades grouped by setup_tag, computed
+    live, plus a place to record a keep/tune/retire verdict on a veto combo."""
+    from .review_page import render
+    return render(month)
+
+
+@app.post("/api/review/verdict")
+def api_review_verdict(req: ReviewVerdict):
+    from . import review_page
+    try:
+        review_page.record_verdict(req.month, req.combo, req.verdict, req.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"ok": True}
+
+
+@app.post("/api/review/notify")
+def api_review_notify():
+    """Cron hits this on the 1st — ntfy for last month, same topic as everything else."""
+    from . import review_page
+    return {"sent": review_page.notify_monthly()}
+
+
 @app.get("/philosophy", response_class=HTMLResponse)
 def philosophy_page():
     """The public site's third page — worldview and the model he was wrong about.

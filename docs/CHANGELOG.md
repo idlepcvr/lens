@@ -7,6 +7,23 @@ Dated build history, newest first. Open next-steps live in
 
 ---
 
+## 2026-08-26b
+
+**`/review` shipped — NEXT_SESSION.md's monthly review, item #1.** New
+`app/review_page.py`: a month's closed trades grouped live by what the
+scanner said at entry (setup fired / nothing / VETO), plus a per-VETO-combo
+breakdown (n≥5) so the split that used to be computed by hand in sqlite is
+now read off the page. A `review_verdicts` table (append-only, same pattern
+as `veto_log.py`) records a keep/tune/retire call on a combo with a date and
+a reason — the way a plan amendment does — via `POST /api/review/verdict`
+(422 under a 10-char reason). `POST /api/review/notify` sends the ntfy
+nudge; cron fires it `0 8 1 * *`, same local-curl pattern as the other jobs.
+Nav: `/review` joins `NAV_NEUTRAL` between Geometry and Money. First real
+verdict recorded live: `slope_against` kept as VETO (p=0.44, not
+significant — see the override-miner finding above). Full suite: 52 passed,
+1 pre-existing flake (`test_measured`, fails on a full run only — documented
+in NEXT_SESSION's carried-over list, not from this change).
+
 ## 2026-08-26
 
 **Root cleaned up: BRAND/CHANGELOG/PRODUCT/NEXT_SESSION (md+html) moved into

@@ -1,17 +1,50 @@
 # LENS — Next session
 
+[Open as HTML](DONE-2026-08-26b-monthly-review-shipped.html)
+
 [Open as HTML](NEXT_SESSION.html)
 
-*Written 2026-08-26. Previous list archived at
-`docs/done/DONE-2026-08-26b-monthly-review-shipped.md` — the monthly review
-(old §1) is shipped as `/review`. Every item below is unstarted, checked
-against the code or the database, not carried forward on faith.*
+*Archived 2026-08-26 — §1 below is now shipped: `/review` (see CHANGELOG
+2026-08-26b). Kept as-is for the record; §2 and §3 carried forward
+unchanged into the current NEXT_SESSION.md.*
 
 ---
 
-## 🔴 1 · Give Track a prop twin
+## 🔴 1 · A monthly review that actually exists — SHIPPED
 
-**This is the whole next session unless you say otherwise.**
+**Built:** `app/review_page.py` + `/review` route. A month's closed trades
+grouped live by what the scanner said at entry (setup fired / nothing /
+VETO), a per-VETO-combo breakdown at n≥5, a `review_verdicts` table
+(keep/tune/retire + reason, min 10 chars) written via
+`POST /api/review/verdict`, and `POST /api/review/notify` firing from cron
+`0 8 1 * *` — same local-curl pattern as the other jobs, same ntfy topic.
+First real verdict recorded: `slope_against` kept as VETO (p=0.44, not
+significant).
+
+Original scope, for the record:
+
+There is no surface and no ritual for reviewing the book. Consequences, both
+already visible:
+
+- **511 of 528 hedge trades have `followed_plan IS NULL`** — 3.2% reviewed. The
+  discipline score is measuring silence.
+- The setup-tag split (scanner-fired trades +€3,853 vs VETO trades −€5,944)
+  sat in a column that has been populated the whole time and nobody looked.
+
+What to build, in rough order of value:
+
+- A **monthly review page** — the month's trades grouped by `setup_tag`, with
+  that split computed live rather than by hand in sqlite.
+- A cadence that fires: cron → ntfy on the 1st, same topic as everything else.
+- Somewhere to record the verdict, so a tuned or retired veto has a date and a
+  reason the way a plan amendment does.
+
+The gates need tuning against evidence, not memory. A monthly pass is where
+that happens.
+
+---
+
+## 2 · Give Track a prop twin
 
 `tests/test_nav_parity.py` fails: `hedge pages with no prop twin: ['Track']`.
 
@@ -21,12 +54,12 @@ Two fixes, and the second matters more:
    and the evaluation has never had the surface the hedge book got.
 2. **Make the failure visible.** The file is a standalone `main()`, so pytest
    collects nothing from it and reports the suite green while the check fails.
-   Every "52 passed" logged this month was true and misleading at once. A
+   Every "52 passed" logged on 2026-08-22 was true and misleading at once. A
    check nothing runs is not a check.
 
 ---
 
-## 2 · The prop evaluation, cold
+## 3 · The prop evaluation, cold
 
 Deferred deliberately to its own session.
 
