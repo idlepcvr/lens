@@ -3,7 +3,7 @@
 [Open as HTML](NEXT_SESSION.html)
 
 *Written 2026-08-26. Previous list archived at
-`docs/DONE-2026-08-26-override-miner-no-survivor.md` — the override-miner
+`docs/done/DONE-2026-08-26-override-miner-no-survivor.md` — the override-miner
 question (§1) is answered: no. Every item below is unstarted, checked against
 the code or the database, not carried forward on faith.*
 

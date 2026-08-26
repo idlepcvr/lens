@@ -18,7 +18,7 @@
 
 *Revised 2026-07-31 — one priority only. Supersedes the 2026-07-25 spec, whose
 public-exposure alarm was wrong (see below). Prior spec archived at
-`docs/DONE-2026-07-24-short-gap-discipline-holes.md`.*
+`docs/done/DONE-2026-07-24-short-gap-discipline-holes.md`.*
 
 ---
 

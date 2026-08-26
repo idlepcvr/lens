@@ -10,7 +10,8 @@ Dated build history, newest first. Open next-steps live in
 ## 2026-08-26
 
 **Root cleaned up: BRAND/CHANGELOG/PRODUCT/NEXT_SESSION (md+html) moved into
-`docs/`**, joining the DONE-* history already there. README stays at repo
+`docs/`**, joining the DONE-* history already there (now under
+`docs/done/`). README stays at repo
 root. `app/docs_page.py` and README's two internal links updated to match;
 `/manual` verified live on all five docs post-restart. Dead root `lens.db`
 (the 0-byte stray the `.gitignore` already called out) deleted — `data/lens.db`
@@ -22,7 +23,7 @@ testing.** Answers NEXT_SESSION.md §1. Every combo with n≥15 run through the
 clears p<0.05, let alone the Bonferroni bar. `slope_against` — the candidate
 flagged as most credible on 2026-08-22 — comes back p=0.44, positive only
 3 of 8 months. Result archived at
-`docs/DONE-2026-08-26-override-miner-no-survivor.md`; NEXT_SESSION.md
+`docs/done/DONE-2026-08-26-override-miner-no-survivor.md`; NEXT_SESSION.md
 rewritten with the monthly review (old §2) now first.
 
 ## 2026-08-22

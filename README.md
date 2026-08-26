@@ -122,7 +122,7 @@ guarding.
 
 Open items live in [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md); shipped history in
 [`docs/CHANGELOG.md`](docs/CHANGELOG.md). The v1 build plan is archived at
-[`docs/DONE-2026-08-22-lens-plan-v1.md`](docs/DONE-2026-08-22-lens-plan-v1.md).
+[`docs/done/DONE-2026-08-22-lens-plan-v1.md`](docs/done/DONE-2026-08-22-lens-plan-v1.md).
 
 ## Running it
 

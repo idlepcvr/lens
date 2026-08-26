@@ -12,7 +12,7 @@
 
 *Written 2026-07-24 from evidence gathered that day. The previous spec
 (DAILY_BREAK trailing/pyramiding, ✅ built, ❌ NO-GO) is archived at
-`docs/DONE-2026-07-24-daily-break-trailing-pyramiding.md`. Items are ordered by measured cost, not by effort.*
+`docs/done/DONE-2026-07-24-daily-break-trailing-pyramiding.md`. Items are ordered by measured cost, not by effort.*
 
 ---
 
