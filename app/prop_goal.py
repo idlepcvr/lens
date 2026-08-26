@@ -13,7 +13,8 @@ the same eval walls as /prop and /survival), so this page can never disagree wit
 them. Two honest caveats are rendered on the page itself:
 
   1. The cone is drawn on BACKTEST geometry. The measured edge from the live
-     ledger is worse (see research/eval_mc.py, 2026-07-09). Both numbers are shown.
+     ledger is worse — `measured_pass_pct()` below recomputes it live from
+     research/eval_mc.py's barrier-touch model each call. Both numbers are shown.
   2. Widening the basket buys trades/month, not edge. It shortens the median time
      to target AND lowers the pass-rate. The page prices both sides.
 """
@@ -34,6 +35,31 @@ DAYS_PER_MONTH = 30.44
 
 def _basket() -> list:
     return [n for n, _ in prop_tradeable()]
+
+
+def measured_pass_pct(rule: dict, risk_pct: float) -> dict | None:
+    """Barrier-touch pass-rate from what actually happened, not the backtest.
+
+    research/eval_mc.py was a one-off run 2026-07-09 with hand-typed WR/R and
+    a hardcoded 10%/3% target/floor that didn't even match this eval's real
+    9%/3% (TURBO). Recomputed live here so it can never go stale the way the
+    hardcoded "1.5%" it replaced did — same script, called with today's
+    ledger and this eval's actual walls.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "research"))
+    import eval_mc
+
+    m = _measured_geometry()
+    if not m:
+        return None
+    wr, rr, n = m["win_rate"], m["rr"], m["n"]
+    r = eval_mc.run(wr, rr, risk_pct / 100, fee_R=0.0,
+                     trailing=(rule["max_dd_type"] == "trailing"),
+                     target_pct=rule["profit_target_pct"], dd_pct=rule["max_dd_pct"])
+    return {"pass_pct": round(r["pass"] * 100, 1), "n": n,
+            "win_rate": round(wr * 100, 1), "rr": round(rr, 2)}
 
 
 def cone(basket: list = None, paths: int = PATHS, seed: int = 42) -> dict:
@@ -118,6 +144,7 @@ def cone(basket: list = None, paths: int = PATHS, seed: int = 42) -> dict:
         "expected_cost_per_pass": round(fee / (pass_pct / 100), 2) if pass_pct > 0 and fee else None,
         "band": band,
         "paths": paths,
+        "measured": measured_pass_pct(rule, risk),
     }
 
 
@@ -530,11 +557,17 @@ function render(d){
     + pil('Signals / wk', d.signals_per_week, d.trades_per_month+'/mo · '+d.basket.length+' strategies · '+(d.expected_cost_per_pass?('$'+money(d.expected_cost_per_pass)+'/pass'):'—'),'b');
   drawCone(d);
   renderMilestones(d);
+  const meas = d.measured;
+  const measLine = meas
+    ? `<b>${meas.pass_pct}%</b>, not ${d.pass_pct}% — computed live from your actual `
+      + `${meas.n} closed prop trades (${meas.win_rate}% WR, ${meas.rr}R). `
+      + (meas.n < 30 ? `<b class="a">n=${meas.n} is a small sample — treat this as a direction, not a verdict.</b> ` : '')
+      + `The strategies have not yet reproduced their backtest on real fills.`
+    : `not yet computable — no closed prop trades on this eval to measure.`;
   $('caveat').innerHTML = `<div class="warn">
     <b>Read this before trusting the cone.</b> It is drawn on <b>backtest</b> geometry.
-    The measured edge from your live ledger (2026-07-09 Monte Carlo) put the pass-rate at
-    <b>1.5%</b>, not ${d.pass_pct}% — the strategies have not yet reproduced their backtest
-    on real fills. Second: widening the basket buys <b>trades per month, not edge</b>. It pulls
+    The measured edge from your live ledger puts the pass-rate at ${measLine}
+    Second: widening the basket buys <b>trades per month, not edge</b>. It pulls
     the median date closer and pushes the pass-rate down. Faster is not cheaper.
   </div>`;
 }

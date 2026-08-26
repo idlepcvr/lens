@@ -3087,6 +3087,15 @@ def prop_goal_page():
 
 
 
+@app.get("/prop-track", response_class=HTMLResponse)
+def prop_track_page():
+    """/hedge-track's missing prop twin (test_nav_parity.py). The daily read
+    on the eval — target/floor/today's wall — built on prop_ledger_data(),
+    which already computes all of it."""
+    from .prop_track_page import render
+    return render()
+
+
 @app.get("/api/prop/goal")
 def api_prop_goal():
     """Time-to-target cone for the active basket under the live eval walls."""

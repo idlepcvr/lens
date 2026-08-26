@@ -28,7 +28,7 @@ EXPECTED = {
 }
 
 
-def main():
+def test_nav_parity():
     prop = dict((lbl, href) for href, lbl in NAV_PROP)
     hedge = dict((lbl, href) for href, lbl in NAV_HEDGE)
 
@@ -86,4 +86,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    test_nav_parity()

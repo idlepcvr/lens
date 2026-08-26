@@ -45,6 +45,7 @@ NAV_PROP = [
     ("/prop-desk", "Desk"),
     ("/prop-plan", "Plan"),
     ("/prop-goal", "Goal"),
+    ("/prop-track", "Track"),
     ("/prop-position", "Position"),
     ("/prop-calendar", "Calendar"),
     ("/prop-journal", "Journal"),
