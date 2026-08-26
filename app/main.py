@@ -3281,6 +3281,12 @@ def api_review_ohlcv():
     return get_ohlcv_1h()
 
 
+@app.get("/api/review/indicators")
+def api_review_indicators():
+    from .review import get_indicators_1h
+    return get_indicators_1h()
+
+
 @app.get("/api/stats/trades")
 def api_stats_trades():
     """Realized stats from closed trades — feeds Monte Carlo + projection seeding."""

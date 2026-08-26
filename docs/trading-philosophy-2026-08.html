@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LENS // Trading philosophy — source: DataDash &quot;Trading Tips&quot; playlist</title>
+<style>
+:root{--bg:#06080c;--panel:#0b0f16;--panel2:#10151e;--line:#192232;--line2:#28344a;
+      --ink:#e8eef8;--dim:#828ea6;--long:#1fd989;--short:#ff5468;--amber:#f6ad3c;
+      --accent:#5b9dff;
+      --mono:'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+     font-size:14px;line-height:1.7;padding:40px 20px}
+main{max-width:82ch;margin:0 auto}
+h1{font-size:25px;letter-spacing:-.01em;margin:0 0 22px;line-height:1.25}
+h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+   margin:38px 0 13px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:26px 0 9px;color:var(--ink)}
+h4{font-size:13px;margin:20px 0 7px;color:var(--dim)}
+p{margin:0 0 13px}
+ul,ol{margin:0 0 13px;padding-left:22px}
+li{margin-bottom:7px}
+li>ul,li>ol{margin:7px 0 0}
+strong{color:var(--ink);font-weight:700}
+em{color:var(--dim);font-style:italic}
+a{color:var(--accent)}
+code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+     padding:1px 5px;font-size:12.5px;color:var(--accent);word-break:break-word}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;margin:0 0 15px}
+pre code{background:none;border:0;padding:0;color:var(--ink);font-size:12.5px}
+blockquote{margin:0 0 14px;padding:2px 0 2px 15px;border-left:1px solid var(--line2);
+           color:var(--dim)}
+hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.tw{overflow-x:auto;margin:0 0 16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+   color:var(--dim);padding:0 14px 8px 0;border-bottom:1px solid var(--line);
+   white-space:nowrap}
+td{padding:8px 14px 8px 0;border-bottom:1px solid var(--line);
+   color:var(--ink);vertical-align:top}
+tr:last-child td{border-bottom:none}
+footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);
+       color:var(--dim);font-size:11.5px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><main>
+<h1>Trading philosophy — source: DataDash &quot;Trading Tips&quot; playlist</h1>
+<p><a href="trading-philosophy-2026-08.html">Open as HTML</a></p>
+<p>Extracted 2026-08-27 from 18 of 20 videos in the playlist (auto-captions pulled and cleaned; #17 &quot;How To Use The RSI&quot; and #19 &quot;How To Use The MACD&quot; have no captions available anywhere — see <strong>Gaps</strong> below, these are exactly the two most relevant to what you described). Channel: DataDash / Nicolas Merton, videos dated September–October 2017. Quoted/paraphrased close to source; nothing invented.</p>
+<p><strong>Read this first:</strong> the playlist is 2017-era retail technical analysis — price levels, moving averages, candlestick patterns, Bollinger mean reversion, and a lot of trader-psychology philosophy. <strong>RSI/MACD divergence — price making a new high/low while the oscillator doesn&#x27;t — is never mentioned once in the 18 available videos.</strong> If divergence is the core of your setup, it either lives in the two missing videos or it&#x27;s something you layered on yourself later. Don&#x27;t assume it&#x27;s in here; ask yourself directly (see Gaps).</p>
+<hr>
+<h2>1. Core setups, as taught</h2>
+<p><strong>Moving averages — the SMA 50/100/200 stack (daily), same logic on the hourly for day trading (50h/100h/200h).</strong> This is the closest thing to a central framework in the whole series:</p>
+<ul>
+<li>Price holding above the 50-day = &quot;confidence in the market,&quot; bullish continuation.</li>
+<li>A pullback that breaks the 50 but holds the 100 = normal correction, not a trend change.</li>
+<li>A break down through the 100 to the 200-day = &quot;full-scale pullback mode,&quot; real fear, deeper reversal likely.</li>
+<li>The bigger the gap between the 50/100 cluster and the 200, the more confidence in the trend.</li>
+</ul>
+<p><strong>The 21-day MA as a momentum/exuberance gauge</strong>, distinct from the 50/100/200 stack — used on fast-moving names specifically: if price holds above the 21-day even through a sharp run, that&#x27;s read as a strong continuation signal (&quot;a serious sign of optimism… exuberant nature&quot;).</p>
+<p><strong>The 9-day MA for scaling out of winners</strong> — not a support level, a profit-taking trigger: sell a partial position (his own habit: 40–50% off the first break) every time price closes below the 9-day on a fast mover; if it reclaims the 9-day, the rule re-arms for the next leg. Explicitly crypto-specific (&quot;stocks don&#x27;t move this fast&quot;); on stocks he&#x27;d use the 50-day for the same job.</p>
+<p><strong>Bollinger Bands (20 SMA basis).</strong> Two uses:</p>
+<ol>
+<li><strong>Squeeze → expect a move.</strong> Bands narrowing after a volatile period signals lower volatility, and lower volatility is read as &quot;loading&quot; for the next move — direction unconfirmed until it breaks.</li>
+<li><strong>Mean reversion.</strong> ~98% of price action stays inside the bands; multiple closes outside them = overextended, expect reversion. Explicitly paired with wedges — a Bollinger squeeze and a price wedge are described as the same phenomenon seen two ways.</li>
+</ol>
+<p><strong>MACD — only ever described in passing</strong> (inside the day-trading video, #05), never its own lesson here: &quot;blue line crosses over the orange line&quot; = bullish; opposite = bearish. No divergence, no histogram detail, no specific settings mentioned. Treat this as under-documented until you fill the gap.</p>
+<p><strong>RSI — only ever described in passing</strong>, same video: &quot;overbought/oversold&quot; zones used as one of three same-direction confirmations (with Bollinger squeeze + MACD cross) before taking a bearish day-trade. No specific thresholds given anywhere in the 18 videos.</p>
+<p><strong>Chart patterns:</strong></p>
+<ul>
+<li><strong>Wedges</strong> — coiling price action, drawn as two converging trendlines. A <strong>descending wedge</strong> (support falling slower than resistance) is read bullish — &quot;oversold, ready for a breakout.&quot; An <strong>ascending wedge</strong> (resistance flat/falling slower while support rises fast) is read bearish — &quot;too fast a run-up, resistance too strong.&quot; A symmetric wedge is direction-neutral until it breaks.</li>
+<li><strong>Bullish/bearish engulfing candle</strong> — a 2-candle pattern: the second candle&#x27;s range must fully contain the first candle&#x27;s range <em>and</em> close beyond it. Bullish version flagged as common before uptrends.</li>
+<li><strong>Hammer / bearish hammer reversal</strong> — small body, long wick opposite the reversal direction, short wick on the confirming side. Multiple hammers clustering at a level treated as a stronger signal than one alone.</li>
+<li><strong>Head and shoulders</strong> — mentioned once, standard reversal read, no specific rules beyond &quot;look for the shape.&quot;</li>
+<li><strong>Topping pattern</strong> — a candle whose wick is 2–3x its real body in the direction of the prior move; read as failed follow-through / exhaustion.</li>
+</ul>
+<p><strong>Fibonacci retracement</strong> — drawn top (older high) to bottom (more recent low). Used specifically to <strong>stage partial sell orders on the way back up</strong>: a portion off just before 38.2%, another just before 50%, another just before 61.8% — never all at one level, and always placed <em>a little before</em> the exact level (&quot;less greedy than the other guy&quot;). A break clean through all three levels is read as high odds of continuing to the prior high.</p>
+<p><strong>Volume</strong> — a cluster of same-size buy orders repeating at one price level (visible order-by-order on the tape, not just the volume bar) is read as one or a few large holders accumulating a position; trade idea: enter near that zone, stop just below it, target the prior high — low risk because the accumulator has an incentive to defend that price. Also: volume must be checked against a real exchange, not a market-maker-inflated one.</p>
+<p><strong>&quot;Big even numbers&quot;</strong> — round price levels (e.g. $3,000, $5,000, round satoshi levels) act as psychological support/resistance because retail orders cluster there; a repeated rule: place a sell a little <em>before</em> a big even number, not at it, and re-enter above it if price clears through.</p>
+<p><strong>&quot;Previous resistance becomes support&quot;</strong> (and the mirror on the way down) — the single most repeated line in the entire series, appearing in nearly every video regardless of topic. Treated as close to a first principle.</p>
+<p><strong>Order book reading</strong> — used only as a trader&#x27;s tool (not for long-term holds): estimate how much volume is needed to clear through to a target price, and place sells just ahead of a visible sell-wall cluster rather than behind it.</p>
+<p><strong>Market cycle psychology</strong> (Wall Street Cheat Sheet framework: disbelief → hope → optimism → belief → thrill → euphoria → complacency → anxiety → denial → panic → capitulation → anger → depression) — used for macro position sizing and when to de-risk into altcoins vs. hold Bitcoin, not for individual trade entries.</p>
+<hr>
+<h2>2. Multi-timeframe logic, as taught</h2>
+<p>Thinner than you might expect — the series never lays out a formal &quot;confirm on X, trigger on Y&quot; framework. What is explicit:</p>
+<ul>
+<li><strong>Always start on the daily chart</strong> to read &quot;the general tone of the market&quot; before looking at anything shorter — described as a deliberate discipline against jumping straight to the 5/15-minute chart.</li>
+<li>The **same MA-stack logic (50/100/200) is applied identically on the hourly** for day trading — it&#x27;s the same rule re-applied on a faster clock, not a different rule.</li>
+<li>No explicit rule for &quot;timeframe A confirms, timeframe B triggers&quot; beyond that daily-first habit. If your actual practice uses a real higher-timeframe-confirms / lower-timeframe-triggers structure, that&#x27;s either from the two missing videos or something you built on top of this later.</li>
+</ul>
+<hr>
+<h2>3. What&#x27;s genuinely new vs. already tested and dead in LENS</h2>
+<p>LENS&#x27;s <code>research/edge_miner.py</code> already mined <code>rsi_zone</code> (dip/neutral/ momentum via RSI bands), <code>slope_1h</code> (EMA21 1h slope, i.e. a single-MA trend filter), <code>vol</code> (ATR regime), <code>ext_4h</code> (distance from 4H EMA21), <code>trend_aligned</code>, <code>bar_aligned</code>, <code>session</code>, <code>weekday</code>, <code>streak</code> — combinations of these across 1–3 conditions, and a much broader 20k-permutation search elsewhere found <strong>zero robust survivors</strong>. The one edge that did survive permutation testing lifetime was non-VETO shorts at R:R 1 — not a generic indicator combo.</p>
+<p>So: <strong>a single RSI zone, and a single EMA slope, are already tried and dead.</strong> What is genuinely untested in LENS:</p>
+<ul>
+<li><strong>RSI/MACD divergence specifically</strong> — price vs. oscillator disagreement, not just an RSI level or a MACD cross. This playlist doesn&#x27;t define it (see Gaps), so it needs your own definition before it can be built.</li>
+<li><strong>The real 50/100/200 MA STACK as a joint condition</strong> — not one EMA slope, but &quot;price above 50 AND 50 above 100 AND 100 above 200&quot; (or the inverse) as a single trend-regime filter, exactly as taught.</li>
+<li><strong>Bollinger squeeze + wedge as a joint setup</strong> — band-width contraction paired with a converging price wedge, tested as one condition, not as two separate ones.</li>
+<li><strong>Chart pattern detection</strong> — engulfing candles, hammers, wedges. None of this exists as computed logic anywhere in the codebase yet.</li>
+<li><strong>Fibonacci retracement zones</strong> as entry/exit levels off a defined swing.</li>
+<li><strong>The 9-day-MA partial-exit rule</strong> — this one is structurally different from anything in LENS: it&#x27;s an <em>exit/scaling</em> rule, not an entry filter, and LENS&#x27;s discipline model currently has no such staged-exit concept.</li>
+</ul>
+<hr>
+<h2>4. Gaps</h2>
+<ul>
+<li><strong>#17 (RSI) and #19 (MACD) have no transcript anywhere</strong> — YouTube has no auto-captions and none were ever manually added, and these are the two most directly relevant to what you described (oscillation, divergence, MACD/RSI as your main tools). Everything above about RSI and MACD comes from one passing mention in the day-trading video, not from either dedicated lesson.</li>
+<li><strong>Recommendation:</strong> give me 3–5 sentences on your actual RSI/MACD rules — specifically the divergence setup (bullish/bearish, regular/hidden?, which timeframe, confirmed by what) and any specific thresholds you use (RSI 30/70? something else?). That closes the one real hole in this document, and it&#x27;s the piece that isn&#x27;t recoverable from the source material at all.</li>
+</ul>
+<hr>
+<h2>5. Recommended next step</h2>
+<p>Don&#x27;t build the chart overlay or the divergence detector yet — define divergence precisely first (from your manual notes above), then add it as ONE new feature to <code>edge_miner.py</code>&#x27;s <code>FEATURES</code> dict (e.g. <code>rsi_divergence: [None, &quot;bullish&quot;, &quot;bearish&quot;]</code>) and the 50/100/200 stack as another (<code>ma_stack: [&quot;bull&quot;, &quot;bear&quot;, &quot;mixed&quot;]</code>), and run them through the <strong>same gates already built and proven</strong> — <code>research/perm_test.py</code> / <code>research/filter_significance.py</code>&#x27;s permutation-bootstrap, split-half, and the Bonferroni correction used in <code>research/override_miner.py</code>. If either survives on your real trade history, <em>then</em> it earns a visual overlay on the journal chart and a place in the scanner. Build the visual last, not first — the codebase&#x27;s whole track record this year is generic indicator ideas looking convincing and then failing that gate.</p>
+<footer>Twin of <code>trading-philosophy-2026-08.md</code> — edit the Markdown, then run <code>python3 tools/md2html.py</code>.</footer>
+</main></body></html>

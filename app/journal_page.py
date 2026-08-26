@@ -71,7 +71,10 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 .bm-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .bm-t{font-size:16px;font-weight:700;font-family:var(--mono)}
 .bm-x{font-size:18px;color:var(--dim);background:none;border:none;cursor:pointer}
-#bm-chart{height:44vh;min-height:240px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
+#bm-chart{height:34vh;min-height:200px;border:1px solid var(--line);border-radius:8px 8px 0 0;border-bottom:0}
+#bm-rsi,#bm-macd{height:9vh;min-height:64px;border:1px solid var(--line);border-top:1px dashed var(--line2)}
+#bm-macd{border-radius:0 0 8px 8px;margin-bottom:12px}
+.bm-ind-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border:1px solid var(--line);border-top:0;border-bottom:0;background:var(--panel)}
 .bm-cols{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:6px}
 .bm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;align-content:start}
 .bm-fld .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
@@ -91,7 +94,7 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 
 @media(max-width:640px){
   .bm-cols{grid-template-columns:1fr}.bm-grid{grid-template-columns:repeat(2,1fr)}
-  .refl{grid-template-columns:1fr}.bm{width:96vw;padding:14px}#bm-chart{height:36vh}
+  .refl{grid-template-columns:1fr}.bm{width:96vw;padding:14px}#bm-chart{height:28vh}#bm-rsi,#bm-macd{height:8vh}
 }
 /* live open positions — detailed cards */
 .op-wrap{margin-bottom:16px}
@@ -151,7 +154,7 @@ const MISTAKES=["chased","early","late","oversized","moved stop","no stop","reve
 const EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
 const GRADES=["A","B","C","D","F"];
 const SETUPS=["S1","S2","S3","S4","S5","NONE"];
-let TRADES=[], CANDLES=[], VISIBLE=[], SEL=null;
+let TRADES=[], CANDLES=[], INDICATORS=null, VISIBLE=[], SEL=null;
 const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
@@ -305,10 +308,11 @@ async function loadOpenPositions(){
 async function load(){
   loadOpenPositions();
   GOALLVL=await goalLevels();
-  const [tr,ca]=await Promise.all([fetch('/api/review/trades?book='+BOOK),fetch('/api/review/ohlcv')]);
+  const [tr,ca,ind]=await Promise.all([fetch('/api/review/trades?book='+BOOK),fetch('/api/review/ohlcv'),fetch('/api/review/indicators')]);
   TRADES=(await tr.json()).filter(t=>t.pnl!=null);
   computeAutoGrades();
   try{CANDLES=await ca.json();}catch(e){CANDLES=[];}
+  try{INDICATORS=await ind.json();}catch(e){INDICATORS=null;}
   const tagsel=$('f-tag'); [...new Set(TRADES.map(t=>t.setup_tag).filter(Boolean))].sort().forEach(tg=>{
     const o=document.createElement('option'); o.value=o.textContent=tg; tagsel.appendChild(o);});
   // deep-link: /journal?setup=S1 (from /edge) — exact tag if it exists, else prefix match (VETO family)
@@ -476,7 +480,7 @@ async function saveTag(id,val){
 }
 
 // ── big modal ────────────────────────────────────────────────────────────────
-let bmChart=null;
+let bmChart=null, rsiChart=null, macdChart=null;
 function openTrade(id){
   const t=TRADES.find(x=>x.id===id); if(!t)return; SEL=t;
   const isL=t.direction==='long', win=t.pnl>=0;
@@ -503,6 +507,8 @@ function openTrade(id){
       <span class="dim" style="font-size:11px;font-weight:400"> · ${(t.opened_at||'').slice(0,16).replace('T',' ')}${t.closed_at?' → '+(t.closed_at||'').slice(11,16):''}</span></div>
       <button class="bm-x" id="mx">✕</button></div>
     <div id="bm-chart"></div>
+    <div class="bm-ind-lbl">RSI(14)</div><div id="bm-rsi"></div>
+    <div class="bm-ind-lbl">MACD(12,26,9)</div><div id="bm-macd"></div>
     <div class="bm-cols">
       <div class="bm-grid">
         ${fld('Entry $',inp('f-entry',t.entry))}${fld('Exit $',inp('f-exit',t.exit))}
@@ -540,7 +546,7 @@ function openTrade(id){
     <textarea id="bm-notes" placeholder="notes…">${t.notes||''}</textarea>
     <div><button class="bm-save" id="msave">💾 Save review</button></div>
   </div></div>`;
-  const close=()=>{if(bmChart){try{bmChart.remove();}catch(e){}bmChart=null;}$('modal').innerHTML='';document.onkeydown=null;if(location.search.includes('trade='))history.replaceState(null,'','/hedge-journal');};
+  const close=()=>{[bmChart,rsiChart,macdChart].forEach(c=>{if(c){try{c.remove();}catch(e){}}});bmChart=rsiChart=macdChart=null;$('modal').innerHTML='';document.onkeydown=null;if(location.search.includes('trade='))history.replaceState(null,'','/hedge-journal');};
   $('mbg').onclick=e=>{if(e.target.id==='mbg')close();}; $('mx').onclick=close;
   document.onkeydown=e=>{if(e.key==='Escape')close();};
   // chart
@@ -556,7 +562,48 @@ function openTrade(id){
     const ms=[]; if(t.ts_entry)ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
     if(t.ts_exit)ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
     s.setMarkers(ms);
-    setTimeout(()=>{if(!bmChart)return;bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});if(t.ts_entry)bmChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600});},40);
+    // SMA 50/100/200 + Bollinger(20,2), from docs/trading-philosophy-2026-08.md's
+    // trend-confidence stack — overlaid on the same price scale as the candles.
+    const toLine=(times,vals)=>{const o=[];for(let i=0;i<times.length;i++)if(vals[i]!=null)o.push({time:times[i],value:vals[i]});return o;};
+    if(INDICATORS){
+      const it=INDICATORS.time;
+      bmChart.addLineSeries({color:'#f6ad3c',lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.sma50));
+      bmChart.addLineSeries({color:'#5b9dff',lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.sma100));
+      bmChart.addLineSeries({color:'#ff5468',lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.sma200));
+      bmChart.addLineSeries({color:'#465064',lineWidth:1,lineStyle:L.Dotted,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.bb_upper));
+      bmChart.addLineSeries({color:'#465064',lineWidth:1,lineStyle:L.Dotted,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.bb_lower));
+    }
+    const range=t.ts_entry?{from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}:null;
+    setTimeout(()=>{if(!bmChart)return;bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});if(range)bmChart.timeScale().setVisibleRange(range);},40);
+
+    // RSI(14) and MACD(12,26,9) panes — own price scale each, same time
+    // window as the price chart above. ponytail: initial range only, no
+    // cross-chart pan/crosshair sync — add subscribeVisibleTimeRangeChange
+    // if scrolling one out of step with the others turns out to matter.
+    if(INDICATORS){
+      const it=INDICATORS.time, dark={background:{color:'#06080c'},textColor:'#465064'},
+            grid={vertLines:{color:'#192232'},horzLines:{color:'#192232'}},
+            ts={borderColor:'#192232',timeVisible:true,secondsVisible:false,visible:false};
+      const rEl=$('bm-rsi');
+      rsiChart=LightweightCharts.createChart(rEl,{layout:dark,grid,rightPriceScale:{borderColor:'#192232'},timeScale:ts});
+      const rSeries=rsiChart.addLineSeries({color:'#5b9dff',lineWidth:1,priceLineVisible:false,lastValueVisible:true});
+      rSeries.setData(toLine(it,INDICATORS.rsi14));
+      rSeries.createPriceLine({price:70,color:'#ff5468',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:false});
+      rSeries.createPriceLine({price:30,color:'#1fd989',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:false});
+
+      const mEl=$('bm-macd');
+      macdChart=LightweightCharts.createChart(mEl,{layout:dark,grid,rightPriceScale:{borderColor:'#192232'},timeScale:{...ts,visible:true}});
+      const hSeries=macdChart.addHistogramSeries({priceLineVisible:false,lastValueVisible:false});
+      hSeries.setData(INDICATORS.macd_hist.map((v,i)=>v==null?null:{time:it[i],value:v,color:v>=0?'#1fd98966':'#ff546866'}).filter(Boolean));
+      macdChart.addLineSeries({color:'#5b9dff',lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.macd_line));
+      macdChart.addLineSeries({color:'#f6ad3c',lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(toLine(it,INDICATORS.macd_signal));
+
+      setTimeout(()=>{
+        if(rsiChart)rsiChart.applyOptions({width:rEl.clientWidth,height:rEl.clientHeight});
+        if(macdChart)macdChart.applyOptions({width:mEl.clientWidth,height:mEl.clientHeight});
+        if(range){if(rsiChart)rsiChart.timeScale().setVisibleRange(range);if(macdChart)macdChart.timeScale().setVisibleRange(range);}
+      },40);
+    }
   }
   // pick rows
   const pv=s=>s==='null'?null:s==='true'?true:s==='false'?false:s;

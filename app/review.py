@@ -46,6 +46,43 @@ def _rsi(closes: list, period: int = 14) -> list:
     return result
 
 
+def _sma(closes: list, period: int) -> list:
+    result, window_sum = [None] * len(closes), 0.0
+    for i, v in enumerate(closes):
+        window_sum += v
+        if i >= period:
+            window_sum -= closes[i - period]
+        if i >= period - 1:
+            result[i] = window_sum / period
+    return result
+
+
+def _bollinger(closes: list, period: int = 20, mult: float = 2.0) -> dict:
+    mid = _sma(closes, period)
+    upper, lower = [None] * len(closes), [None] * len(closes)
+    for i in range(len(closes)):
+        if mid[i] is None:
+            continue
+        window = closes[i - period + 1:i + 1]
+        var = sum((c - mid[i]) ** 2 for c in window) / period
+        sd = var ** 0.5
+        upper[i], lower[i] = mid[i] + mult * sd, mid[i] - mult * sd
+    return {"mid": mid, "upper": upper, "lower": lower}
+
+
+def _macd(closes: list, fast: int = 12, slow: int = 26, signal: int = 9) -> dict:
+    ema_f, ema_s = _ema(closes, fast), _ema(closes, slow)
+    line = [None if (a is None or b is None) else a - b for a, b in zip(ema_f, ema_s)]
+    # signal is an EMA of the line itself — _ema needs a value at every index it
+    # touches, so feed it 0.0 where the line isn't warmed up yet and mask after
+    filler = [v if v is not None else 0.0 for v in line]
+    sig_raw = _ema(filler, signal)
+    first_valid = next((i for i, v in enumerate(line) if v is not None), len(line))
+    sig = [None if i < first_valid + signal - 1 else v for i, v in enumerate(sig_raw)]
+    hist = [None if (a is None or b is None) else a - b for a, b in zip(line, sig)]
+    return {"line": line, "signal": sig, "hist": hist}
+
+
 def _bar_idx(ts_arr: list, target_ms: int):
     i = bisect.bisect_right(ts_arr, target_ms) - 1
     return i if i >= 0 else None
@@ -533,6 +570,40 @@ def get_ohlcv_1h() -> list:
     rows = cur.fetchall()
     conn.close()
     return [{"time": r[0]//1000, "open": r[1], "high": r[2], "low": r[3], "close": r[4]} for r in rows]
+
+
+def get_indicators_1h() -> dict:
+    """SMA 50/100/200, Bollinger(20,2) and MACD(12,26,9), aligned to
+    get_ohlcv_1h()'s exact row set — same query, so `time[i]` in one response
+    is `time[i]` in the other with no re-matching needed on the client.
+
+    From docs/trading-philosophy-2026-08.md: SMA 50/100/200 is the trend-
+    confidence stack (above 50 = confident, breaks to 100 = normal pullback,
+    breaks to 200 = real fear) — that's why these three periods, not a
+    generic EMA. RSI already exists client-side nowhere on this page; it's
+    added here anyway since /prop-desk's market_read.py computes the same
+    RSI(14) and this keeps the two readings from ever being able to diverge.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT ts, close FROM ohlcv_cache
+        WHERE symbol='binance:BTC/USDT' AND timeframe='1h' AND ts >= ?
+        ORDER BY ts
+    """, (APR25_MS,))
+    rows = cur.fetchall()
+    conn.close()
+    time   = [r[0] // 1000 for r in rows]
+    closes = [r[1] for r in rows]
+    bb = _bollinger(closes, 20, 2.0)
+    macd = _macd(closes, 12, 26, 9)
+    return {
+        "time": time,
+        "sma50": _sma(closes, 50), "sma100": _sma(closes, 100), "sma200": _sma(closes, 200),
+        "bb_upper": bb["upper"], "bb_mid": bb["mid"], "bb_lower": bb["lower"],
+        "rsi14": _rsi(closes, 14),
+        "macd_line": macd["line"], "macd_signal": macd["signal"], "macd_hist": macd["hist"],
+    }
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
