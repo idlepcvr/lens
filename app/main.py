@@ -3301,6 +3301,29 @@ def api_review_levels():
     return get_levels_1h()
 
 
+@app.get("/api/review/window")
+def api_review_window(tf: str, entry: int, exit: Optional[int] = None):
+    """Multi-timeframe chart data windowed to one trade — 100 bars before
+    entry, 30 after exit. 5m/15m/1h/4h/1d only; 1m is never cached anywhere
+    (checked directly) so isn't offered — it would mean a slow live fetch
+    on every short-trade page load."""
+    from . import review
+    try:
+        return {
+            "ohlcv": review.get_ohlcv_window(tf, entry, exit),
+            "indicators": review.get_indicators_window(tf, entry, exit),
+            "levels": review.get_levels_window(tf, entry, exit),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/review/auto-timeframe")
+def api_review_auto_timeframe(entry: int, exit: Optional[int] = None):
+    from .review import auto_timeframe
+    return {"timeframe": auto_timeframe(entry, exit)}
+
+
 @app.get("/api/stats/trades")
 def api_stats_trades():
     """Realized stats from closed trades — feeds Monte Carlo + projection seeding."""

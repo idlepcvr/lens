@@ -559,6 +559,95 @@ def equity_timing(book: str = None, era: str = "current") -> dict:  # book=None 
             "cum_pnl": equity[-1]["cum"] if equity else 0.0}
 
 
+SUPPORTED_TFS = ("5m", "15m", "1h", "4h", "1d")
+_TF_SYMBOL = "BTC/USDT:USDT"
+_TF_EXCHANGE = "bybit"
+
+
+def auto_timeframe(entry_ts: int, exit_ts: int | None) -> str:
+    """Duration-based default, his own suggested rule: the timeframe that
+    would have actually been on screen while the trade was open, not a
+    fixed 1h for a 10-minute scalp and a fixed 1h for a 3-day swing.
+    1m is deliberately not offered — never cached, would mean a slow live
+    fetch on every short-trade page load (see the SUPPORTED_TFS docstring
+    below for the full reasoning)."""
+    dur = (exit_ts or entry_ts) - entry_ts
+    if dur <= 6 * 3600:
+        return "5m"
+    if dur <= 24 * 3600:
+        return "15m"
+    if dur <= 7 * 86400:
+        return "1h"
+    if dur <= 30 * 86400:
+        return "4h"
+    return "1d"
+
+
+def _tf_window(timeframe: str, entry_ts: int, exit_ts: int | None,
+              bars_before: int = 100, bars_after: int = 30) -> tuple:
+    """Top up the cache for `timeframe` (cheap — cache already reaches back
+    to Dec 2023 for every SUPPORTED_TFS entry, so this only ever fetches the
+    stale tail, not a full history) then pull just the window around the
+    trade. Returns (time[], open[], high[], low[], close[]).
+
+    5m/15m only exist under bybit:BTC/USDT:USDT (checked live — binance
+    only has 1h cached). 1h/4h/1d exist under both binance and bybit;
+    bybit is used throughout for consistency across every timeframe.
+    """
+    from .backtest_engine import load_ohlcv, _tf_ms
+    if timeframe not in SUPPORTED_TFS:
+        raise ValueError(f"timeframe must be one of {SUPPORTED_TFS}")
+    load_ohlcv(symbol=_TF_SYMBOL, timeframe=timeframe, exchange_id=_TF_EXCHANGE, months=30)
+
+    tf_sec = _tf_ms(timeframe) // 1000
+    start_ms = (entry_ts - bars_before * tf_sec) * 1000
+    end_ms = ((exit_ts or entry_ts) + bars_after * tf_sec) * 1000
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ts, open, high, low, close FROM ohlcv_cache
+        WHERE symbol=? AND timeframe=? AND ts >= ? AND ts <= ?
+        ORDER BY ts
+    """, (f"{_TF_EXCHANGE}:{_TF_SYMBOL}", timeframe, start_ms, end_ms))
+    rows = cur.fetchall()
+    conn.close()
+    time   = [r[0] // 1000 for r in rows]
+    opens  = [r[1] for r in rows]
+    highs  = [r[2] for r in rows]
+    lows   = [r[3] for r in rows]
+    closes = [r[4] for r in rows]
+    return time, opens, highs, lows, closes
+
+
+def get_ohlcv_window(timeframe: str, entry_ts: int, exit_ts: int | None) -> list:
+    time, opens, highs, lows, closes = _tf_window(timeframe, entry_ts, exit_ts)
+    return [{"time": t, "open": o, "high": h, "low": l, "close": c}
+            for t, o, h, l, c in zip(time, opens, highs, lows, closes)]
+
+
+def get_indicators_window(timeframe: str, entry_ts: int, exit_ts: int | None) -> dict:
+    time, opens, highs, lows, closes = _tf_window(timeframe, entry_ts, exit_ts)
+    bb = _bollinger(closes, 20, 2.0)
+    macd = _macd(closes, 12, 26, 9)
+    return {
+        "time": time,
+        "sma50": _sma(closes, 50), "sma100": _sma(closes, 100), "sma200": _sma(closes, 200),
+        "bb_upper": bb["upper"], "bb_mid": bb["mid"], "bb_lower": bb["lower"],
+        "rsi14": _rsi(closes, 14),
+        "macd_line": macd["line"], "macd_signal": macd["signal"], "macd_hist": macd["hist"],
+    }
+
+
+def get_levels_window(timeframe: str, entry_ts: int, exit_ts: int | None) -> list:
+    from .levels import level_flips
+    time, opens, highs, lows, closes = _tf_window(timeframe, entry_ts, exit_ts,
+                                                    bars_before=300, bars_after=30)
+    flips = level_flips(highs, lows, closes)
+    return [{"level": f["level"], "kind": f["kind"],
+             "pivot_time": time[f["pivot_i"]], "confirm_time": time[f["confirm_i"]]}
+            for f in flips]
+
+
 def get_ohlcv_1h() -> list:
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
