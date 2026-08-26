@@ -2,96 +2,39 @@
 
 [Open as HTML](NEXT_SESSION.html)
 
-*Written 2026-08-22. Previous list archived at
-`docs/DONE-2026-08-22-track-rebuild-phased-ladder.md`. Every item checked against
+*Written 2026-08-26. Previous list archived at
+`docs/DONE-2026-08-26-override-miner-no-survivor.md` — the override-miner
+question (§1) is answered: no. Every item below is unstarted, checked against
 the code or the database, not carried forward on faith.*
 
 ---
 
-## 🔴 1 · Point the miner at the overrides
+## 🔴 1 · A monthly review that actually exists
 
-**This is the whole next session. Everything else here can wait.**
-
-### What was found on 2026-08-22
-
-Splitting the hedge book by `setup_tag` — what the scanner saw at the moment each
-trade was opened:
-
-| scanner said | trades | total | avg/trade | win rate |
-|---|---|---|---|---|
-| **a setup fired** | 93 | **+€3,853** | **+€41.43** | **57.0%** |
-| nothing | 97 | −€2,440 | −€25.16 | 35.1% |
-| **VETO — do not take** | 337 | **−€5,944** | −€17.64 | 35.3% |
-
-**The system's edge is strongly positive.** The aggregate is negative only
-because 434 of 527 trades were taken outside it. Any earlier note in this repo
-claiming "the measured edge is negative, you need 5R" was reading one number
-across three populations — it is wrong and this table supersedes it.
-
-### Where the overrides split
-
-| veto combination | n | total | avg | win% |
-|---|---|---|---|---|
-| `rsi_neutral,fvg_entry` | 13 | +€1,329 | +€102.22 | 30.8% |
-| `slope_against` | 23 | +€265 | +€11.53 | 47.8% |
-| `rsi_neutral` | 57 | −€13 | −€0.23 | 38.6% |
-| `slope_against,sweep_fade,pd_raid_fade` | 46 | −€1,925 | −€41.84 | 32.6% |
-| `ny_pm_kz` | 14 | −€1,434 | −€102.40 | 35.7% |
-| `slope_against,pd_raid_fade` | 15 | −€1,753 | −€116.89 | 20.0% |
-
-⚠️ **`rsi_neutral,fvg_entry` does not survive inspection.** Two trades
-(2026-02-23 +€792, 2026-02-28 +€1,030, both shorts, five days apart) carry the
-whole result. The other eleven total **−€493**. It is one good week, not a setup.
-11 of the 13 were shorts and all three longs lost.
-
-`slope_against` alone is the more credible candidate *because* it is
-unspectacular — 23 trades, no single trade carrying it, win rate near coin-flip
-with a positive tail.
-
-### The job
-
-Point `research/edge_miner.py` at the **override population specifically** and
-run it through the gates that already exist — `perm_test.py`,
-`filter_significance.py`, the sweep and leave-one-month-out. The question is
-narrow and has a yes/no answer:
-
-> Does any veto combination survive permutation testing when overridden?
-
-**This is not "build more strategies."** That is the job that cannot be started.
-This is a script run against data already on disk, and it returns either a name
-or a no. The machinery was built in early August — see the commits *"Find the one
-edge that survives all four gates"* and *"Robustness: the non-VETO short filter
-survives permutation, sweep and LOMO"*. It has never been aimed here.
-
-Anything that survives becomes a named setup, which turns an override into a
-signal — and the override stops being a rule-break.
-
----
-
-## 2 · A monthly review that actually exists
+**This is the whole next session unless you say otherwise.**
 
 There is no surface and no ritual for reviewing the book. Consequences, both
 already visible:
 
 - **511 of 528 hedge trades have `followed_plan IS NULL`** — 3.2% reviewed. The
   discipline score is measuring silence.
-- The finding in §1 sat in a column that has been populated the whole time and
-  nobody looked.
+- The setup-tag split (scanner-fired trades +€3,853 vs VETO trades −€5,944)
+  sat in a column that has been populated the whole time and nobody looked.
 
 What to build, in rough order of value:
 
-- A **monthly review page** — the month's trades grouped by `setup_tag`, with the
-  §1 table computed live rather than by hand in sqlite.
+- A **monthly review page** — the month's trades grouped by `setup_tag`, with
+  that split computed live rather than by hand in sqlite.
 - A cadence that fires: cron → ntfy on the 1st, same topic as everything else.
 - Somewhere to record the verdict, so a tuned or retired veto has a date and a
   reason the way a plan amendment does.
 
-The gates need tuning against evidence, not memory. A monthly pass is where that
-happens.
+The gates need tuning against evidence, not memory. A monthly pass is where
+that happens.
 
 ---
 
-## 3 · Give Track a prop twin
+## 2 · Give Track a prop twin
 
 `tests/test_nav_parity.py` fails: `hedge pages with no prop twin: ['Track']`.
 
@@ -106,15 +49,15 @@ Two fixes, and the second matters more:
 
 ---
 
-## 4 · The prop evaluation, cold
+## 3 · The prop evaluation, cold
 
-Deferred deliberately to its own session, ~next week.
+Deferred deliberately to its own session.
 
 The question is not "how do I pass" but **"what does passing require, and how
 likely is that?"** The eval needs roughly **10–12% to cover expenses** — that
-number wants modelling against the same measured distribution the cone uses, not
-against hope. `/prop-survival` and the prop simulator already exist; the honest
-version of this is a pass-probability, and it may come back low.
+number wants modelling against the same measured distribution the cone uses,
+not against hope. `/prop-survival` and the prop simulator already exist; the
+honest version of this is a pass-probability, and it may come back low.
 
 Worth doing before more time goes into the evaluation, not after.
 
