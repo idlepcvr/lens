@@ -58,6 +58,7 @@ def render(trade_id: int | None, book: str = "hedge") -> str:
 </div>
 
 <div id="cr-verdict"></div>
+<div id="cr-critique"></div>
 
 <div id="cr-wrap" style="position:relative">
   <div id="cr-chart" style="height:56vh;min-height:320px;border:1px solid var(--line);border-radius:8px 8px 0 0;border-bottom:0;position:relative"></div>
@@ -192,8 +193,70 @@ function sampleAt(ts){{
   let lo=0,hi=arr.length-1,idx=-1;
   while(lo<=hi){{const mid=(lo+hi)>>1; if(arr[mid]<=ts){{idx=mid;lo=mid+1;}}else hi=mid-1;}}
   if(idx<0)return null;
-  return {{rsi:ind.rsi14[idx], macd:ind.macd_line[idx],
-          sma50:ind.sma50[idx], sma100:ind.sma100[idx], sma200:ind.sma200[idx]}};
+  return {{rsi:ind.rsi14[idx], macd:ind.macd_line[idx], macd_sig:ind.macd_signal[idx],
+          sma50:ind.sma50[idx], sma100:ind.sma100[idx], sma200:ind.sma200[idx],
+          bb_up:ind.bb_upper[idx], bb_lo:ind.bb_lower[idx]}};
+}}
+
+// ── automated context/critique — "what could we have looked at" instead of
+// a blank reflection box. Deterministic, from indicators/levels already
+// fetched for this trade (no LLM call, no extra request). One read per
+// point (entry/exit): RSI zone, MACD cross state, SMA trend stack, Bollinger
+// position, nearest support/resistance flip — then a confluence count so
+// "was this a good entry" has a number behind it, not just a feeling.
+function nearestLevel(price){{
+  if(!WIN||!WIN.levels||!WIN.levels.length||!price) return null;
+  let best=null,bd=Infinity;
+  WIN.levels.forEach(f=>{{const d=Math.abs(f.level-price)/price; if(d<bd){{bd=d;best=f;}}}});
+  return best?{{...best,dist:bd}}:null;
+}}
+function readPoint(price,s,dir){{
+  if(!s) return {{bits:[],score:null}};
+  const bits=[], L=dir==='long';
+  const rsiZone=s.rsi==null?null:s.rsi>=70?'overbought':s.rsi<=30?'oversold':'neutral';
+  if(s.rsi!=null) bits.push(`RSI ${{s.rsi.toFixed(0)}} (${{rsiZone}})`);
+  const rsiOk = s.rsi==null?null: L? s.rsi<70 : s.rsi>30;   // not already exhausted your way
+  const macdBull = s.macd!=null && s.macd_sig!=null ? s.macd>s.macd_sig : null;
+  if(macdBull!=null) bits.push(`MACD ${{macdBull?'bullish':'bearish'}} (line ${{s.macd.toFixed(0)}} vs signal ${{s.macd_sig.toFixed(0)}})`);
+  const macdOk = macdBull==null?null: L?macdBull:!macdBull;
+  const stackBull = s.sma50!=null&&s.sma100!=null&&s.sma200!=null ? (s.sma50>s.sma100&&s.sma100>s.sma200) : null;
+  const stackBear = s.sma50!=null&&s.sma100!=null&&s.sma200!=null ? (s.sma50<s.sma100&&s.sma100<s.sma200) : null;
+  if(stackBull!=null) bits.push(`SMA stack ${{stackBull?'bullish':stackBear?'bearish':'mixed'}}`);
+  const stackOk = stackBull==null?null: L?stackBull:stackBear;
+  let bbBit=null;
+  if(s.bb_up!=null&&price!=null){{
+    bbBit = price>s.bb_up?'above upper Bollinger band (extended)':price<s.bb_lo?'below lower Bollinger band (extended)':'inside Bollinger bands';
+    bits.push(bbBit);
+  }}
+  const lvl=nearestLevel(price);
+  let lvlOk=null;
+  if(lvl){{
+    const dir2=lvl.kind==='r2s'?'flipped support':'flipped resistance';
+    bits.push(`nearest level ${{lvl.level.toFixed(0)}} (${{dir2}}, ${{(lvl.dist*100).toFixed(2)}}% away)`);
+    // a flipped-support level below you (long) or flipped-resistance above you (short) is in your favour
+    if(lvl.dist<0.01) lvlOk = L ? lvl.kind==='r2s' : lvl.kind==='s2r';
+  }}
+  const flags=[rsiOk,macdOk,stackOk,lvlOk].filter(x=>x!=null);
+  const score = flags.length ? flags.filter(Boolean).length+'/'+flags.length : null;
+  return {{bits,score}};
+}}
+function autoCritique(t){{
+  if(!t.ts_entry) return '';
+  const en=readPoint(t.entry,sampleAt(t.ts_entry),t.direction);
+  const ex=t.ts_exit?readPoint(t.exit,sampleAt(t.ts_exit),t.direction):null;
+  const fillNote = t.fill_count>2 ? `<div class="m" style="margin-top:6px">Built across ${{t.fill_count}} fills — scaled in/out, not one clean entry/exit.</div>` : '';
+  const entryLine = en.bits.length
+    ? `<div><b>Entry context</b>${{en.score?` &middot; <span style="color:${{en.score.split('/')[0]===en.score.split('/')[1]?'var(--long)':en.score[0]==='0'?'var(--short)':'var(--amber)'}}">${{en.score}} aligned</span>`:''}}</div>
+       <div class="m" style="margin:3px 0 8px">${{en.bits.join(' &middot; ')}}</div>`
+    : '<div class="m">No indicator data at entry time.</div>';
+  const exitLine = ex && ex.bits.length
+    ? `<div><b>Exit context</b>${{ex.score?` &middot; <span style="color:${{ex.score.split('/')[0]===ex.score.split('/')[1]?'var(--long)':ex.score[0]==='0'?'var(--short)':'var(--amber)'}}">${{ex.score}} still aligned</span>`:''}}</div>
+       <div class="m" style="margin:3px 0 0">${{ex.bits.join(' &middot; ')}}</div>`
+    : '';
+  return `<div class="sb-wrap" style="margin-bottom:12px;padding:12px 16px">
+    <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Automated — computed from this trade's own chart, not typed by you</div>
+    ${{entryLine}}${{exitLine}}${{fillNote}}
+  </div>`;
 }}
 const pf=v=>v==null?'&mdash;':v.toFixed(1);
 const dpct=(price,ma)=>ma==null?'&mdash;':(((price-ma)/ma*100).toFixed(2)+'%');
@@ -346,6 +409,7 @@ async function render(){{
     WIN=await fetch('/api/review/window?tf='+TF+'&entry='+t.ts_entry+(t.ts_exit?'&exit='+t.ts_exit:'')).then(r=>r.json());
   }}catch(e){{WIN=null;}}
   fillReadout(t);   // after WIN loads — sampleAt() reads WIN.indicators
+  $('cr-critique').innerHTML=autoCritique(t);   // same reason — needs WIN.levels too
   if(!window.LightweightCharts || !WIN || !WIN.ohlcv || !WIN.ohlcv.length)return;
   const CANDLES=WIN.ohlcv, INDICATORS=WIN.indicators, LEVELS=WIN.levels, tfSec=TF_SEC[TF];
   const L=LightweightCharts.LineStyle;

@@ -136,7 +136,6 @@ BODY = """
 <div id="open-pos"></div>
 <div class="cal-topbar">
   <button id="cal-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
-  <span class="dim" style="font-size:11px">deeper: <a class="ac" id="cal-link-analytics" href="#">expectancy/MFE·MAE/hourly →</a> · <a class="ac" id="cal-link-edge" href="#">setup win-rates →</a></span>
   <div id="cal-setupf"></div>
 </div>
 <div class="cal-wrap">
@@ -155,8 +154,6 @@ const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
 const BOOK=__BOOK__, RBOOK=BOOK.replace('*','');   // review APIs take 'prop', trades API takes 'prop*'
 let TRADES=[], ALL_TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[], CONE=null, SETUPFILTER=null;
 const $=id=>document.getElementById(id);
-document.getElementById('cal-link-analytics').href='/'+RBOOK+'-analytics';
-document.getElementById('cal-link-edge').href='/'+RBOOK+'-edge#past';
 const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const toLocal=s=>{if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');
