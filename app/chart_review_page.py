@@ -240,6 +240,32 @@ function readPoint(price,s,dir){{
   const score = flags.length ? flags.filter(Boolean).length+'/'+flags.length : null;
   return {{bits,score}};
 }}
+// ── the quantitative read: this exact setup's real, closed-trade EV — the
+// number that actually says "is this profitable," not a chart reading.
+// Same grouping/verdict as edge_page.py's #past table, run against TRADES
+// (already loaded for this book) so it needs no extra request either.
+function edgeFamily(tag){{
+  if(!tag) return '(untagged)';
+  if(tag.startsWith('VETO:')) return 'VETO';
+  if(tag.includes('|VETO:')) return tag.split('|')[0]+' (vetoed)';
+  return tag;
+}}
+function edgeVerdict(n,wr,exp){{
+  if(n<8)               return ['THIN','var(--dim)'];
+  if(exp<=0)            return ['CUT','var(--short)'];
+  if(exp>=10&&n>=12&&wr>=45) return ['SIZE-UP','var(--long)'];
+  return ['KEEP','var(--amber)'];
+}}
+function edgeLine(t){{
+  const fam=edgeFamily(t.setup_tag);
+  const rows=TRADES.filter(x=>edgeFamily(x.setup_tag)===fam);
+  const n=rows.length, wins=rows.filter(x=>(x.pnl||0)>0).length, total=rows.reduce((s,x)=>s+(x.pnl||0),0);
+  const wr=n?wins/n*100:0, exp=n?total/n:0;
+  const [vl,vc]=edgeVerdict(n,wr,exp);
+  return `<div style="font-size:15px;margin-bottom:10px"><b>${{fam}}</b> &middot; ${{n}} trades &middot; ${{wr.toFixed(0)}}% WR &middot; `+
+    `<span style="color:${{exp>=0?'var(--long)':'var(--short)'}}">${{exp>=0?'+':''}}${{exp.toFixed(0)}}&euro; EV/trade</span> &middot; `+
+    `<b style="color:${{vc}}">${{vl}}</b></div>`;
+}}
 function autoCritique(t){{
   if(!t.ts_entry) return '';
   const en=readPoint(t.entry,sampleAt(t.ts_entry),t.direction);
@@ -254,7 +280,9 @@ function autoCritique(t){{
        <div class="m" style="margin:3px 0 0">${{ex.bits.join(' &middot; ')}}</div>`
     : '';
   return `<div class="sb-wrap" style="margin-bottom:12px;padding:12px 16px">
-    <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Automated — computed from this trade's own chart, not typed by you</div>
+    <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">This setup's real edge &middot; every closed trade tagged the same way</div>
+    ${{edgeLine(t)}}
+    <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;border-top:1px solid var(--line);padding-top:10px">Chart context at this trade's entry/exit &middot; secondary to the number above</div>
     ${{entryLine}}${{exitLine}}${{fillNote}}
   </div>`;
 }}
