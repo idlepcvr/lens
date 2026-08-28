@@ -53,3 +53,4 @@ data/backups/
 
 # git worktrees live here — never part of the repo itself
 .claude/worktrees/
+tmp/
