@@ -2775,7 +2775,8 @@ def overview_page():
 LEGACY_ROUTES = {
     "/overview-hedge": "/hedge-overview", "/dashboard": "/hedge-plan",
     "/goal": "/hedge-goal", "/desk": "/hedge-desk", "/signals": "/hedge-signals",
-    "/journal": "/hedge-journal", "/calendar": "/hedge-calendar",
+    "/journal": "/hedge-journal", "/calendar": "/hedge-journal",
+    "/hedge-calendar": "/hedge-journal", "/prop-calendar": "/prop-journal",
     "/analytics": "/hedge-analytics", "/position": "/hedge-position",
     "/edge": "/hedge-edge",
     # prop, renamed the same day so both books read alike
@@ -2862,7 +2863,12 @@ def sitemap_route():
 
 @app.get("/hedge-journal", response_class=HTMLResponse)
 def journal_page(book: str = "hedge"):
-    from .journal_page import render
+    # 2026-08-28: this is now calendar_page.py's render — calendar + journal
+    # were two pages doing the same job (browse trades, click one to review)
+    # with an unexplained filter row. Merged into one; calendar's month view
+    # replaces the filter row as the way you narrow down what you're looking
+    # at. journal_page.py is retired (?trade=/?setup= deep-links preserved).
+    from .calendar_page import render
     return render(book)
 
 
@@ -2892,19 +2898,16 @@ def edge_page(book: str = "hedge"):
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
-
-
-@app.get("/hedge-calendar", response_class=HTMLResponse)
-def calendar_page(book: str = "hedge"):
-    from .calendar_page import render
-    return render(book)
+# /hedge-calendar + /prop-calendar deleted the same way, 2026-08-28 — merged
+# into /hedge-journal + /prop-journal (see journal_page() above). Redirects
+# below keep any bookmark or stale href working.
 
 
 # ── Prop twins: same render, book hard-locked to prop, own URL + nav entry.
 # Not clones — one render each, so hedge and prop can never drift. See theme.NAV_PROP.
 @app.get("/prop-journal", response_class=HTMLResponse)
 def prop_journal_page():
-    from .journal_page import render
+    from .calendar_page import render
     return render("prop")
 
 
@@ -2925,12 +2928,6 @@ def prop_edge_page():
     from .edge_page import render_page
     css, body, script = _backtest_fragment()
     return render_page(bt_css=css, bt_body=body, bt_script=script, book="prop")
-
-
-@app.get("/prop-calendar", response_class=HTMLResponse)
-def prop_calendar_page():
-    from .calendar_page import render
-    return render("prop")
 
 
 @app.get("/prop", response_class=HTMLResponse)

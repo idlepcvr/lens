@@ -962,7 +962,6 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/hedge-plan">Dashboard</a>
     <a href="/hedge-desk">Desk</a>
     <a href="/hedge-signals">Signals</a>
-    <a href="/hedge-calendar">Calendar</a>
     <a href="/hedge-analytics">Analytics</a>
     <a href="/hedge-journal" class="cur">Journal</a>
     <a href="/hedge-edge">Edge</a>

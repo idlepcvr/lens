@@ -21,7 +21,6 @@ EXPECTED = {
     "Position": "/prop-position",
     "Desk": "/prop-desk",
     "Signals": "/prop-signals",
-    "Calendar": "/prop-calendar",
     "Analytics": "/prop-analytics",
     "Journal": "/prop-journal",
     "Edge": "/prop-edge",
@@ -66,7 +65,6 @@ def test_nav_parity():
     assert page_mode("/prop-journal") == "prop"
     assert page_mode("/hedge-journal") == "hedge"
     assert page_mode("/prop-analytics") == "prop"
-    assert page_mode("/prop-calendar") == "prop"
     assert page_mode("/prop-edge") == "prop"
     assert page_mode("/prop-desk") == "prop"
     assert page_mode("/hedge-plan") == "hedge"

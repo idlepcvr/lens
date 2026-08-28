@@ -30,8 +30,7 @@ import re
 #   /hedge-goal       →   /prop-goal              own page
 #   /hedge-desk       →   /prop-desk              own page
 #   /hedge-signals    →   /prop-signals           own page
-#   /hedge-journal    →   /prop-journal           shared render, book="prop" locked
-#   /hedge-calendar   →   /prop-calendar          shared render, book="prop" locked
+#   /hedge-journal    →   /prop-journal           shared render (calendar_page.py), book="prop" locked
 #   /hedge-analytics  →   /prop-analytics         shared render, book="prop" locked
 #   /hedge-position   →   /prop-position          shared render, book="prop" locked
 #   /hedge-edge       →   /prop-edge              shared render, book="prop" locked
@@ -47,7 +46,6 @@ NAV_PROP = [
     ("/prop-goal", "Goal"),
     ("/prop-track", "Track"),
     ("/prop-position", "Position"),
-    ("/prop-calendar", "Calendar"),
     ("/prop-journal", "Journal"),
     ("/prop-analytics", "Analytics"),
     ("/prop-edge", "Edge"),
@@ -59,10 +57,12 @@ NAV_PROP = [
     # (page_mode defaults to prop) — they lost a chip, not a home.
 ]
 # Order specified by Lucky, 2026-07-25 — his flow, not a derived one:
-# overview → signals → desk → plan → goal → position → calendar → journal →
-# analytics → edge. Every entry is a top-bar chip (HEDGE_MAIN below is the full
-# set), because the previous 5-chip bar pushed half the book into a "more"
+# overview → signals → desk → plan → goal → position → journal → analytics →
+# edge. Every entry is a top-bar chip (HEDGE_MAIN below is the full set),
+# because the previous 5-chip bar pushed half the book into a "more"
 # footer: "the nav bar here is too small, it's too little".
+# Calendar dropped 2026-08-28 — merged into Journal (same page now, calendar
+# on top). Two nav entries pointing at the same job was itself the complaint.
 NAV_HEDGE = [
     ("/hedge-overview", "Overview"),
     ("/hedge-signals", "Signals"),
@@ -71,7 +71,6 @@ NAV_HEDGE = [
     ("/hedge-goal", "Goal"),
     ("/hedge-track", "Track"),
     ("/hedge-position", "Position"),
-    ("/hedge-calendar", "Calendar"),
     ("/hedge-journal", "Journal"),
     ("/hedge-analytics", "Analytics"),
     ("/hedge-edge", "Edge"),

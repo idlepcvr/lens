@@ -88,7 +88,33 @@ _CSS = """
   color:var(--bg);font-size:12px;font-weight:700}
 .cal-acts .full{padding:9px 14px;border-radius:6px;border:1px solid var(--line);cursor:pointer;background:transparent;
   color:var(--dim);font-size:12px;text-decoration:none;display:flex;align-items:center}
-#cal-chart{height:300px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
+#cal-chart{height:300px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;position:relative}
+/* live open positions — ported from journal_page.py so the calendar covers
+   what the flat journal table used to (this page replaced it) */
+.op-wrap{margin-bottom:16px}
+.op-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.op-hd b{font-size:11px;letter-spacing:.04em;color:var(--ink)}
+.op-hd .live{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--long);border:1px solid var(--long);border-radius:4px;padding:1px 5px}
+.opcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.opcard{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.opcard.long{border-left:3px solid var(--long)}.opcard.short{border-left:3px solid var(--short)}
+.opcard .top{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.opcard .ven{font-size:8.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim)}
+.opcard .mkt{font-size:13.5px;font-weight:700;color:var(--ink);font-family:var(--mono)}
+.opcard .sd{font-size:10.5px;font-weight:700;font-family:var(--mono)}
+.opcard .body{padding:7px 12px 11px}
+.oprow{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:2.5px 0;font-size:11.5px;align-items:baseline}
+.oprow .l{color:var(--dim)}.oprow .v{font-family:var(--mono);color:var(--ink);text-align:right}
+.oprow .v small{color:var(--dim);font-size:10px}
+.opsec{font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin:9px 0 3px;border-top:1px solid var(--line);padding-top:8px}
+.opcard .g{color:var(--long)}.opcard .r{color:var(--short)}.opcard .dim{color:var(--dim)}
+.ophero{padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.ophero .bigpnl{font-size:24px;font-weight:800;font-family:var(--mono);letter-spacing:-.02em}
+.ophero.g .bigpnl{color:var(--long)}.ophero.r .bigpnl{color:var(--short)}
+.ophero .subpnl{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+.cal-topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.cal-setup-pill{font-family:var(--mono);font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:3px 10px 3px 12px;display:flex;align-items:center;gap:6px}
+.cal-setup-pill button{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0}
 @media(max-width:600px){
   /* portrait: stack the day panel under the calendar, and make the P&L legible
      on the colored heatmap cells (was colored-on-colored → blended in) */
@@ -107,6 +133,11 @@ _CSS = """
 
 BODY = """
 <div class="cal-sub">Monthly hedge-book heatmap · hover a day, click to pin · click a trade to review</div>
+<div id="open-pos"></div>
+<div class="cal-topbar">
+  <button id="cal-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
+  <div id="cal-setupf"></div>
+</div>
 <div class="cal-wrap">
   <div class="cal-main">
     <div class="cal-pills" id="pills"></div>
@@ -120,18 +151,153 @@ BODY = """
 
 SCRIPT = r"""
 const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
-let TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[], CONE=null;
+const BOOK=__BOOK__, RBOOK=BOOK.replace('*','');   // review APIs take 'prop', trades API takes 'prop*'
+let TRADES=[], ALL_TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[], CONE=null, SETUPFILTER=null;
 const $=id=>document.getElementById(id);
 const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const toLocal=s=>{if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 
+// ── open positions + Kraken sync — ported from journal_page.py (the flat
+// filtered table this page replaced) so nothing that lived there is lost ──
+async function goalLevels(){
+  try{
+    const cfg=await fetch('/api/config').then(r=>r.json());
+    const g=await fetch('/api/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json());
+    if(g&&g.underlying_win_pct!=null) return {tp:g.underlying_win_pct/100, sl:g.underlying_loss_pct/100, rr:g.actual_rr};
+  }catch(e){}
+  return null;
+}
+async function loadOpenPositions(){
+  const el=$('open-pos');
+  if(RBOOK==='prop'){ el.innerHTML='<div class="sub" style="font-size:11px;color:var(--dim)">Open prop positions live on <a href="/prop-ledger" class="ac">/prop-ledger</a> — the eval account has no readable API.</div>'; return; }
+  try{
+    const [d,lvl,logged,live]=await Promise.all([
+      fetch('/api/positions/live').then(r=>r.json()), goalLevels(),
+      fetch('/api/review/trades?book='+RBOOK).then(r=>r.json()).catch(()=>[]),
+      fetch('/api/orders/live').then(r=>r.json()).catch(()=>({orders:[]}))]);
+    const liveOrders={};
+    ((live&&live.orders)||[]).filter(o=>o.account==='personal').forEach(o=>{
+      if(o.role==='take_profit'||o.role==='stop_loss') liveOrders[o.role]=o; });
+    const loggedPlans={}, planStale=[], nowMs=Date.now(), PLAN_MAX_AGE_DAYS=7, PLAN_ENTRY_TOL=0.05;
+    (logged||[]).filter(t=>t.is_open&&t.tp!=null&&t.sl!=null)
+      .sort((a,b)=>(a.ts_entry||0)-(b.ts_entry||0))
+      .forEach(t=>{
+        const ageDays=t.ts_entry?(nowMs-new Date(t.ts_entry).getTime())/864e5:999;
+        if(ageDays>PLAN_MAX_AGE_DAYS){ planStale.push({...t,ageDays}); return; }
+        loggedPlans[t.direction]={tp:t.tp,sl:t.sl,id:t.id,entry:t.entry,ageDays};
+      });
+    const ps=d.positions||[];
+    if(!ps.length){ el.innerHTML=''; return; }
+    const usd=(v,d=2)=>v==null?'—':'$'+Number(v).toLocaleString('en',{maximumFractionDigits:d});
+    const eu=(v)=>v==null?'—':(v<0?'-':'')+'€'+Math.abs(v).toLocaleString('en',{maximumFractionDigits:2});
+    const sUsd=(v)=>v==null?'—':(v>=0?'+':'-')+'$'+Math.abs(v).toLocaleString('en',{maximumFractionDigits:2});
+    const pc=(v)=>v==null?'—':(v>=0?'+':'')+Number(v).toFixed(2)+'%';
+    const row=(l,v,c)=>`<div class="oprow"><span class="l">${l}</span><span class="v ${c||''}">${v}</span></div>`;
+    const cards=ps.map(p=>{
+      const isL=p.direction==='long', up=p.upnl_usd||0;
+      let plan='';
+      const lt=liveOrders.take_profit, ls=liveOrders.stop_loss;
+      let liveSec='';
+      if(lt||ls){
+        const lp=(o)=>o?(o.trigger||o.limit):null;
+        const dist=(v)=>v==null?'':` <small>${((v-p.entry)/p.entry*100).toFixed(2)}%</small>`;
+        liveSec=`<div class="opsec">Working on the exchange <small style="color:var(--dim)">(these are the orders that will fire)</small></div>`
+          +row('Take profit', lt?usd(lp(lt),1)+dist(lp(lt)):'none resting', lt?'g':'dim')
+          +row('Stop loss',   ls?usd(lp(ls),1)+dist(lp(ls)):'none resting', ls?'r':'dim')
+          +row('Triggers on', (lt||ls) ? ((lt||ls).trigger_on||'—') : '—','dim');
+      }
+      let own = loggedPlans[p.direction] || null;
+      if(own && p.entry && own.entry && Math.abs(own.entry-p.entry)/p.entry > PLAN_ENTRY_TOL) own = null;
+      if(own && own.tp!=null && own.sl!=null){
+        const tp=own.tp, sl=own.sl;
+        const upP=Math.abs(tp-p.entry)/p.entry, dnP=Math.abs(p.entry-sl)/p.entry;
+        const win=(p.cost_usd||0)*upP, loss=(p.cost_usd||0)*dnP;
+        plan=`<div class="opsec">Plan — this trade</div>`
+          +row('Take profit',`${usd(tp,1)} <small>+${(upP*100).toFixed(2)}%</small>`,'g')
+          +row('Stop loss',`${usd(sl,1)} <small>-${(dnP*100).toFixed(2)}%</small>`,'r')
+          +row('Expected win',`${sUsd(win)} <small>${pc(upP*100)}</small>`,'g')
+          +row('Expected loss',`${sUsd(-loss)} <small>${pc(-dnP*100)}</small>`,'r')
+          +row('R:R',(upP/dnP).toFixed(2),'dim');
+      } else if(lvl){
+        const tp=isL?p.entry*(1+lvl.tp):p.entry*(1-lvl.tp);
+        const sl=isL?p.entry*(1-lvl.sl):p.entry*(1+lvl.sl);
+        const win=(p.cost_usd||0)*lvl.tp, loss=(p.cost_usd||0)*lvl.sl;
+        plan=`<div class="opsec">Plan — from Goal <small style="color:var(--dim)">(no per-trade plan logged)</small></div>`
+          +row('Take profit',`${usd(tp,1)} <small>+${(lvl.tp*100).toFixed(1)}%</small>`,'g')
+          +row('Stop loss',`${usd(sl,1)} <small>-${(lvl.sl*100).toFixed(1)}%</small>`,'r')
+          +row('Expected win',`${sUsd(win)} <small>${pc(lvl.tp*100)}</small>`,'g')
+          +row('Expected loss',`${sUsd(-loss)} <small>${pc(-lvl.sl*100)}</small>`,'r')
+          +row('R:R',lvl.rr!=null?lvl.rr.toFixed(2):(lvl.tp/lvl.sl).toFixed(2),'dim');
+      } else { plan=`<div class="opsec">Plan</div>`+row('levels','set Goal config to see plan','dim'); }
+      if(planStale.length){
+        plan += row('Ignored', planStale.map(t=>`#${t.id} (${Math.round(t.ageDays)}d open)`).join(', ')
+          + ' <small>hand-logged trades still marked open — close them or they keep claiming plans</small>','a');
+      }
+      if(lt||ls){
+        const planTp = own&&own.tp!=null ? own.tp : (lvl? (isL?p.entry*(1+lvl.tp):p.entry*(1-lvl.tp)) : null);
+        const planSl = own&&own.sl!=null ? own.sl : (lvl? (isL?p.entry*(1-lvl.sl):p.entry*(1+lvl.sl)) : null);
+        const gaps=[];
+        const g=(label,live,plan)=>{ if(live==null||plan==null) return;
+          const d=live-plan; if(Math.abs(d)/plan>0.001) gaps.push(`${label} ${d>0?'+':''}${d.toFixed(0)}`); };
+        g('TP', lt?(lt.trigger||lt.limit):null, planTp);
+        g('SL', ls?(ls.trigger||ls.limit):null, planSl);
+        if(gaps.length) plan += row('Live vs plan', gaps.join(' · ')+' <small>USD</small>','a');
+      }
+      plan = liveSec + plan;
+      const upe=p.upnl_eur||0;
+      return `<div class="opcard ${isL?'long':'short'}">
+        <div class="top"><div><div class="ven">${p.venue}</div><div class="mkt">${p.symbol}</div></div>
+          <div class="sd ${isL?'g':'r'}">${isL?'▲ LONG':'▼ SHORT'} · ${p.leverage}×</div></div>
+        <div class="ophero ${up>=0?'g':'r'}">
+          <div class="bigpnl">${(upe>=0?'+':'-')+'€'+Math.abs(upe).toLocaleString('en',{maximumFractionDigits:2})}</div>
+          <div class="subpnl">${sUsd(up)} · ${pc(p.upnl_pct)} · RoE ${pc(p.roe_pct)}</div>
+        </div>
+        <div class="body">
+          ${row('Entry → last',`${usd(p.entry,1)} → ${usd(p.mark,1)} <small>${pc(p.move_pct)}</small>`,(p.move_pct||0)>=0?'g':'r')}
+          ${row('Size',`${p.size} ₿ <small>${usd(p.quote_qty)} · ${eu(p.value_eur)}</small>`)}
+          ${row('Margin',`${usd(p.margin_usd)} <small>${eu(p.margin_eur)}</small>`)}
+          ${row('Est. liquidation',usd(p.liquidation),'r')}
+          ${row('Funding',p.funding!=null?p.funding.toFixed(4):'—','dim')}
+          ${plan}
+        </div></div>`;
+    }).join('');
+    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/hedge-position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
+  }catch(e){ el.innerHTML=''; }
+}
+async function syncKraken(){
+  const b=$('cal-sync'); b.disabled=true; const t=b.textContent; b.textContent='⟳ syncing…';
+  try{
+    await fetch('/api/sync/kraken',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    for(let i=0;i<25;i++){ await new Promise(r=>setTimeout(r,1500));
+      const s=await fetch('/api/sync/kraken/result?account=personal').then(r=>r.json());
+      if(s.running===false){ b.textContent=s.imported!=null?('✓ +'+s.imported):'✓ done'; await load(); loadOpenPositions(); break; }
+    }
+  }catch(e){ b.textContent='✗ failed'; }
+  setTimeout(()=>{ b.textContent=t; b.disabled=false; },2500);
+}
+function renderSetupFilter(){
+  $('cal-setupf').innerHTML=SETUPFILTER
+    ? `<div class="cal-setup-pill">setup: ${SETUPFILTER}<button id="cal-setupf-x">✕</button></div>` : '';
+  const x=$('cal-setupf-x'); if(x) x.onclick=()=>{SETUPFILTER=null;history.replaceState(null,'',location.pathname);applySetupFilter();};
+}
+// deep-link from /edge's setup scoreboard — exact tag if it exists in the
+// data, else a prefix match (the VETO: family groups by combo, not exact tag)
+function applySetupFilter(){
+  TRADES = SETUPFILTER
+    ? ALL_TRADES.filter(t=>(t.setup_tag||'')===SETUPFILTER || (t.setup_tag||'').startsWith(SETUPFILTER))
+    : ALL_TRADES;
+  if(TRADES.length){ MONTH=TRADES.reduce((a,b)=>a.closed_at>b.closed_at?a:b).closed_at.slice(0,7); }
+  renderSetupFilter();
+  render();
+}
+
 async function load(){
+  loadOpenPositions();
   // /api/trades = full trade incl review fields + is_open + ISO dates (primary).
   // /api/review/trades = indicator context at entry (bar/4H trend/RSI/move) — merged
   // in by id so the modal matches the /review page's richness.
-  const BOOK=__BOOK__, RBOOK=BOOK.replace('*','');   // review APIs take 'prop', trades API takes 'prop*'
   const [tr,er,ca,co]=await Promise.all([fetch('/api/trades?limit=2000&book='+encodeURIComponent(BOOK)),
     fetch('/api/review/trades?book='+RBOOK),fetch('/api/review/ohlcv'),
     fetch('/api/cone/status').catch(()=>null)]);
@@ -142,10 +308,16 @@ async function load(){
     bar_dir:t.bar_dir, bar_aligned:t.bar_aligned, trend_4h:t.trend_4h,
     trend_aligned:t.trend_aligned, ctx_rsi:t.rsi, rsi_zone:t.rsi_zone, move_pct:t.move_pct,
     ts_entry:t.ts_entry, ts_exit:t.ts_exit});
-  TRADES=(j.trades||[]).filter(t=>!t.is_open && t.pnl!=null && t.closed_at)
+  ALL_TRADES=(j.trades||[]).filter(t=>!t.is_open && t.pnl!=null && t.closed_at)
                        .map(t=>Object.assign(t,ctx[t.id]||{}));
-  if(TRADES.length){ MONTH=TRADES.reduce((a,b)=>a.closed_at>b.closed_at?a:b).closed_at.slice(0,7); }
-  render();
+  const qs=new URLSearchParams(location.search);
+  SETUPFILTER=qs.get('setup')||null;
+  applySetupFilter();
+  const qt=qs.get('trade');
+  if(qt){
+    const t=ALL_TRADES.find(x=>String(x.id)===String(qt));
+    if(t){ MONTH=t.closed_at.slice(0,7); SELDAY=t.closed_at.slice(0,10); render(); openModal(+qt); }
+  }
 }
 function dayMap(){
   const m={};
@@ -224,6 +396,30 @@ function renderSide(){
   $('side').querySelectorAll('.cal-trow').forEach(el=>el.onclick=()=>openModal(+el.dataset.id));
 }
 
+// ported from journal_page.py / chart_review_page.py — same vertical-line
+// treatment everywhere a trade's chart shows up
+function vMarker(container, chart, time, label, color, tfSec, slot){
+  const line=document.createElement('div');
+  line.style.cssText=`position:absolute;top:0;bottom:0;width:1px;background:${color};pointer-events:none;z-index:5`;
+  const lbl=document.createElement('div');
+  lbl.style.cssText=`position:absolute;top:2px;font-size:9px;font-family:var(--mono);color:${color};background:#06080ccc;padding:1px 4px;border-radius:3px;white-space:nowrap;pointer-events:none;z-index:6;transform:translateX(3px)`;
+  lbl.textContent=label;
+  container.appendChild(line); container.appendChild(lbl);
+  container._vmX=container._vmX||{};
+  const snapped=Math.floor(time/tfSec)*tfSec;
+  let tries=0;
+  function reposition(){
+    const x=chart.timeScale().timeToCoordinate(snapped);
+    if(x===null){ line.style.display=lbl.style.display='none'; if(tries++<20) setTimeout(reposition,100); return; }
+    line.style.display=lbl.style.display='block';
+    line.style.left=x+'px'; lbl.style.left=x+'px';
+    container._vmX[slot]=x;
+    const other=Object.keys(container._vmX).filter(k=>k!==slot).map(k=>container._vmX[k]);
+    lbl.style.top=(other.some(ox=>Math.abs(ox-x)<130)&&slot==='exit'?16:2)+'px';
+  }
+  reposition();
+  chart.timeScale().subscribeVisibleTimeRangeChange(reposition);
+}
 function openModal(id){
   const t=TRADES.find(x=>x.id===id); if(!t) return;
   const isL=t.direction==='long', win=t.pnl>=0;
@@ -253,6 +449,7 @@ function openModal(id){
     </div><button class="cal-m-x" id="mx">✕</button></div>
 
     <div id="cal-chart"></div>
+    <div id="cal-veto"></div>
 
     <div class="cal-sec">Breakdown · editable</div>
     <div class="cal-m-grid">
@@ -294,9 +491,18 @@ function openModal(id){
 
     <div class="cal-acts">
       <button class="save" id="msave">💾 Save review</button>
-      <a class="full" href="/hedge-journal">Journal →</a>
+      <a class="full" href="/chart-review?trade=${id}&book=${RBOOK}">Full chart — SMA/Bollinger/RSI/MACD/levels →</a>
     </div>
   </div></div>`;
+  $('cal-veto').innerHTML='';
+  fetch('/api/veto-overrides/for-trade?trade_id='+id).then(r=>r.json()).then(d=>{
+    if(!d.override) return;
+    const o=d.override;
+    $('cal-veto').innerHTML=`<div class="cal-sec">Taken against the scanner</div>
+      <div style="font-size:12px;border-left:3px solid var(--accent);padding:6px 10px">
+      ${o.veto_reasons&&o.veto_reasons.length?`scanner said: <span class="dim">${o.veto_reasons.join(', ')}</span><br>`:''}
+      ${(o.user_reason||'').replace(/</g,'&lt;')}</div>`;
+  }).catch(()=>{});
 
   let calChart=null;
   const close=()=>{if(calChart){try{calChart.remove();}catch(e){}calChart=null;}$('modal').innerHTML='';document.onkeydown=null;};
@@ -354,30 +560,32 @@ function openModal(id){
     try{
       const r=await fetch('/api/trades/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const u=await r.json();
-      const idx=TRADES.findIndex(x=>x.id===id); if(idx>=0)TRADES[idx]={...TRADES[idx],...u};
+      [TRADES,ALL_TRADES].forEach(arr=>{const idx=arr.findIndex(x=>x.id===id); if(idx>=0)arr[idx]={...arr[idx],...u};});
       close(); render();
     }catch(e){console.error(e);$('msave').textContent='Error — retry';$('msave').disabled=false;}
   };
 
-  // price chart of the trade (ENTRY/EXIT lines, TP/SL dotted, E/X markers)
+  // price chart of the trade — vertical entry/exit lines (matches
+  // /chart-review and the journal popup), TP/SL dotted and unlabeled
   const chartEl=$('cal-chart');
   if(chartEl && window.LightweightCharts && CANDLES.length){
-    calChart=LightweightCharts.createChart(chartEl,{layout:{background:{color:'#06080c'},textColor:'#465064'},
+    calChart=LightweightCharts.createChart(chartEl,{layout:{background:{color:'#06080c'},textColor:'#465064',attributionLogo:false},
       grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},
       rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
-    const s=calChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'});
+    const s=calChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468',lastValueVisible:false});
     s.setData(CANDLES);
     const L=LightweightCharts.LineStyle, ec=isL?'#1fd989':'#ff5468';
-    if(t.entry) s.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
-    if(t.exit)  s.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
-    if(t.tp)    s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'});
-    if(t.sl)    s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'});
-    const ms=[];
-    if(t.ts_entry) ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
-    if(t.ts_exit)  ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
-    s.setMarkers(ms);
-    setTimeout(()=>{ if(!calChart)return; calChart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
-      if(t.ts_entry) calChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}); },40);
+    if(t.tp) s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
+    if(t.sl) s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
+    setTimeout(()=>{
+      if(!calChart)return;
+      calChart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
+      if(t.ts_entry) calChart.timeScale().setVisibleRange({from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600});
+      setTimeout(()=>{
+        if(t.ts_entry) vMarker(chartEl,calChart,t.ts_entry,'ENTRY '+t.entry.toFixed(0)+' · '+new Date(t.ts_entry*1000).toISOString().slice(11,16),ec,3600,'entry');
+        if(t.ts_exit)  vMarker(chartEl,calChart,t.ts_exit,'EXIT '+t.exit.toFixed(0)+' · '+new Date(t.ts_exit*1000).toISOString().slice(11,16),isL?'#ff5468':'#1fd989',3600,'exit');
+      },80);
+    },40);
   }
 }
 load();
@@ -398,10 +606,10 @@ def render(book: str = "hedge") -> str:
     other = "prop" if book == "hedge" else "hedge"
     body = BODY.replace(
         "Monthly hedge-book heatmap",
-        f'{sub} · <a href="{"/prop-calendar" if book == "hedge" else "/hedge-calendar"}" class="ac">'
+        f'{sub} · <a href="{"/prop-journal" if book == "hedge" else "/hedge-journal"}" class="ac">'
         f'switch to {other}</a> ·')
     return shell(
-        "/prop-calendar" if book == "prop" else "/hedge-calendar", "Calendar", body,
+        "/prop-journal" if book == "prop" else "/hedge-journal", "Journal", body,
         script=(SCRIPT
                 .replace("__MISTAKES__", _json.dumps(MISTAKES))
                 .replace("__EMOTIONS__", _json.dumps(EMOTIONS))
