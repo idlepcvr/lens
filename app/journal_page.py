@@ -566,13 +566,17 @@ async function openTrade(id){
   // page's job (/chart-review), reachable from the link above.
   const el=$('bm-chart');
   if(window.LightweightCharts && CANDLES.length){
-    bmChart=LightweightCharts.createChart(el,{layout:{background:{color:'#06080c'},textColor:'#465064'},grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
-    const s=bmChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'});
+    bmChart=LightweightCharts.createChart(el,{layout:{background:{color:'#06080c'},textColor:'#465064',attributionLogo:false},grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
+    const s=bmChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468',lastValueVisible:false});
     s.setData(CANDLES); const L=LightweightCharts.LineStyle, ec=isL?'#1fd989':'#ff5468';
+    // labels only on entry/exit — tp/sl axis labels used to stack right on
+    // top of them whenever the prices sat close together (this is a small
+    // preview, not the place for 4 crowded price boxes); tp/sl still drawn
+    // as dotted lines, and the exact numbers are in the fields table below
     if(t.entry)s.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
     if(t.exit)s.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
-    if(t.tp)s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'});
-    if(t.sl)s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'});
+    if(t.tp)s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
+    if(t.sl)s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
     const ms=[]; if(t.ts_entry)ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
     if(t.ts_exit)ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
     s.setMarkers(ms);

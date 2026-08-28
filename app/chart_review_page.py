@@ -360,7 +360,7 @@ async function render(){{
     rightPriceScale:{{borderColor:'#192232',mode:LOGSCALE?1:0}},
     timeScale:{{borderColor:'#192232',timeVisible:true,secondsVisible:false}}}});
   charts.push(pChart);
-  const cs=pChart.addCandlestickSeries({{upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'}});
+  const cs=pChart.addCandlestickSeries({{upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468',lastValueVisible:false}});
   cs.setData(CANDLES);
   if(t.tp)cs.createPriceLine({{price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'TP'}});
   if(t.sl)cs.createPriceLine({{price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'}});
