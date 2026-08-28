@@ -473,17 +473,13 @@ def footer_html(current_path: str) -> str:
         href, "cur" if href == current_path else "", label)
 
     book = [link(h, l) for h, l in items if h not in main]
-    # /sitemap is a top-bar chip now (and the ☰); listing it here too made it
-    # the only page reachable three ways from the same screen.
-    tools = [link(h, l) for h, l in NAV_NEUTRAL if h != "/sitemap"]
-    if not book and not tools:
+    # NAV_NEUTRAL (About/Evidence/Geometry/Manual/Style/Health…) dropped from
+    # the footer 2026-08-29 — "I haven't looked at this once." Pages aren't
+    # deleted (real content, some of it personal) — reachable via /sitemap,
+    # just not stamped on every single screen any more.
+    if not book:
         return ""
-    out = '<footer class="navftr">'
-    if book:
-        out += '<span class="ftl">more</span>' + "".join(book)
-    if tools:
-        out += '<span class="ftl ftl2">system</span>' + "".join(tools)
-    return out + "</footer>"
+    return '<footer class="navftr"><span class="ftl">more</span>' + "".join(book) + "</footer>"
 
 
 def _booked(path: str, label: str) -> str:
