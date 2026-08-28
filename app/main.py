@@ -122,8 +122,16 @@ async def not_found(request, exc):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """The front door: what this is, in plain English, for someone who has never
-    traded anything. No numbers, no jargon, nothing for sale."""
+    # Used to be explain_page.py — a front door written for a stranger who's
+    # never traded ("no numbers, no jargon, nothing for sale"). 2026-08-29:
+    # "I'm not going to be showing this to anybody" — that audience doesn't
+    # exist, so root should land on the actual dashboard, not a pitch.
+    # /explain still exists at its own URL if that page is ever wanted again.
+    return RedirectResponse("/hedge-plan", status_code=302)
+
+
+@app.get("/explain", response_class=HTMLResponse, include_in_schema=False)
+def explain():
     from .explain_page import render
     return render()
 
