@@ -132,8 +132,6 @@ _CSS = """
 """
 
 BODY = """
-<div class="cal-sub">Monthly hedge-book heatmap · hover a day, click to pin · click a trade to review</div>
-<div id="open-pos"></div>
 <div class="cal-topbar">
   <button id="cal-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
   <div id="cal-setupf"></div>
@@ -146,6 +144,7 @@ BODY = """
   </div>
   <div class="cal-side" id="side"></div>
 </div>
+<div id="open-pos"></div>
 <div id="modal"></div>
 """
 
@@ -624,23 +623,18 @@ load();
 
 import json as _json
 
-# book → (query value sent to the APIs, sub-title). 'prop*' spans every attempt,
+# book → query value sent to the APIs. 'prop*' spans every eval attempt,
 # because one eval is often 7 trades long and a heatmap of 7 cells says nothing.
-_BOOKS = {
-    "hedge": ("hedge", "Monthly hedge-book heatmap"),
-    "prop":  ("prop*", "Monthly prop heatmap · all eval attempts, live + archived"),
-}
+_BOOKS = {"hedge": "hedge", "prop": "prop*"}
 
 
 def render(book: str = "hedge") -> str:
-    q, sub = _BOOKS.get(book, _BOOKS["hedge"])
-    other = "prop" if book == "hedge" else "hedge"
-    body = BODY.replace(
-        "Monthly hedge-book heatmap",
-        f'{sub} · <a href="{"/prop-journal" if book == "hedge" else "/hedge-journal"}" class="ac">'
-        f'switch to {other}</a> ·')
+    q = _BOOKS.get(book, _BOOKS["hedge"])
+    # No subtitle line any more — "hover/click/switch to prop" instructions
+    # nobody needed after the first visit, and "switch to prop" duplicated
+    # the HEDGE/PROP pill already at the top of every page.
     return shell(
-        "/prop-journal" if book == "prop" else "/hedge-journal", "Journal", body,
+        "/prop-journal" if book == "prop" else "/hedge-journal", "Journal", BODY,
         script=(SCRIPT
                 .replace("__MISTAKES__", _json.dumps(MISTAKES))
                 .replace("__EMOTIONS__", _json.dumps(EMOTIONS))
