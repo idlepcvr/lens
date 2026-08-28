@@ -71,7 +71,7 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 .bm-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .bm-t{font-size:16px;font-weight:700;font-family:var(--mono)}
 .bm-x{font-size:18px;color:var(--dim);background:none;border:none;cursor:pointer}
-#bm-chart{height:44vh;min-height:240px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
+#bm-chart{height:44vh;min-height:240px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;position:relative}
 .bm-cols{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:6px}
 .bm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;align-content:start}
 .bm-fld .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
@@ -480,6 +480,34 @@ async function saveTag(id,val){
 // "I still do want the mini pop-up... I didn't say to get rid of it."
 // /chart-review is the deep dive (multi-timeframe, full indicator panes);
 // this stays the fast in-place editor, same underlying data as that page.
+// ported from chart_review_page.py — same vertical-line treatment, so the
+// popup and the full page read as the same visual language instead of the
+// popup's old arrow+letter markers looking like a different, lesser chart
+function vMarker(container, chart, time, label, color, tfSec, slot){
+  const line=document.createElement('div');
+  line.style.cssText=`position:absolute;top:0;bottom:0;width:1px;background:${color};pointer-events:none;z-index:5`;
+  const lbl=document.createElement('div');
+  lbl.style.cssText=`position:absolute;top:2px;font-size:9px;font-family:var(--mono);color:${color};background:#06080ccc;padding:1px 4px;border-radius:3px;white-space:nowrap;pointer-events:none;z-index:6;transform:translateX(3px)`;
+  lbl.textContent=label;
+  container.appendChild(line); container.appendChild(lbl);
+  container._vmX=container._vmX||{};
+  const snapped=Math.floor(time/tfSec)*tfSec;
+  let tries=0;
+  function reposition(){
+    const x=chart.timeScale().timeToCoordinate(snapped);
+    if(x===null){ line.style.display=lbl.style.display='none'; if(tries++<20) setTimeout(reposition,100); return; }
+    line.style.display=lbl.style.display='block';
+    line.style.left=x+'px'; lbl.style.left=x+'px';
+    // a short trade can land entry/exit on the same bar of a coarse
+    // preview timeframe — stagger this label below the other one's if
+    // they'd otherwise sit at the identical pixel
+    container._vmX[slot]=x;
+    const other=Object.keys(container._vmX).filter(k=>k!==slot).map(k=>container._vmX[k]);
+    lbl.style.top=(other.some(ox=>Math.abs(ox-x)<45)&&slot==='exit'?16:2)+'px';
+  }
+  reposition();
+  chart.timeScale().subscribeVisibleTimeRangeChange(reposition);
+}
 let bmChart=null;
 async function openTrade(id){
   const t=TRADES.find(x=>x.id===id); if(!t)return; SEL=t;
@@ -569,19 +597,22 @@ async function openTrade(id){
     bmChart=LightweightCharts.createChart(el,{layout:{background:{color:'#06080c'},textColor:'#465064',attributionLogo:false},grid:{vertLines:{color:'#192232'},horzLines:{color:'#192232'}},rightPriceScale:{borderColor:'#192232'},timeScale:{borderColor:'#192232',timeVisible:true,secondsVisible:false}});
     const s=bmChart.addCandlestickSeries({upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468',lastValueVisible:false});
     s.setData(CANDLES); const L=LightweightCharts.LineStyle, ec=isL?'#1fd989':'#ff5468';
-    // labels only on entry/exit — tp/sl axis labels used to stack right on
-    // top of them whenever the prices sat close together (this is a small
-    // preview, not the place for 4 crowded price boxes); tp/sl still drawn
-    // as dotted lines, and the exact numbers are in the fields table below
-    if(t.entry)s.createPriceLine({price:t.entry,color:ec,lineWidth:1,lineStyle:L.Solid,axisLabelVisible:true,title:'ENTRY'});
-    if(t.exit)s.createPriceLine({price:t.exit,color:'#828ea6',lineWidth:1,lineStyle:L.Dashed,axisLabelVisible:true,title:'EXIT'});
+    // entry/exit get the vertical-line + price/time label treatment below
+    // (matches /chart-review) instead of axis price-line boxes — those
+    // used to stack on top of TP/SL whenever prices sat close together;
+    // TP/SL stay as dotted lines, exact numbers are in the fields below
     if(t.tp)s.createPriceLine({price:t.tp,color:'#1fd989',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
     if(t.sl)s.createPriceLine({price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:false});
-    const ms=[]; if(t.ts_entry)ms.push({time:t.ts_entry,position:isL?'belowBar':'aboveBar',color:ec,shape:isL?'arrowUp':'arrowDown',text:'E',size:1.5});
-    if(t.ts_exit)ms.push({time:t.ts_exit,position:isL?'aboveBar':'belowBar',color:isL?'#ff5468':'#1fd989',shape:isL?'arrowDown':'arrowUp',text:'X',size:1.5});
-    s.setMarkers(ms);
     const range=t.ts_entry?{from:t.ts_entry-48*3600,to:(t.ts_exit||t.ts_entry)+24*3600}:null;
-    setTimeout(()=>{if(!bmChart)return;bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});if(range)bmChart.timeScale().setVisibleRange(range);},40);
+    setTimeout(()=>{
+      if(!bmChart)return;
+      bmChart.applyOptions({width:el.clientWidth,height:el.clientHeight});
+      if(range)bmChart.timeScale().setVisibleRange(range);
+      setTimeout(()=>{
+        if(t.ts_entry)vMarker(el,bmChart,t.ts_entry,'ENTRY '+t.entry.toFixed(0)+' · '+new Date(t.ts_entry*1000).toISOString().slice(11,16),ec,3600,'entry');
+        if(t.ts_exit)vMarker(el,bmChart,t.ts_exit,'EXIT '+t.exit.toFixed(0)+' · '+new Date(t.ts_exit*1000).toISOString().slice(11,16),isL?'#ff5468':'#1fd989',3600,'exit');
+      },80);
+    },40);
   }
   // pick rows
   const pv=s=>s==='null'?null:s==='true'?true:s==='false'?false:s;
