@@ -53,6 +53,8 @@ def render(trade_id: int | None, book: str = "hedge") -> str:
     <option value="hedge">hedge</option>
     <option value="prop">prop</option>
   </select>
+  <button class="btn ghost" id="cr-fit" title="reset zoom to fit the trade">&#8862; Fit</button>
+  <button class="btn ghost" id="cr-log" title="toggle logarithmic price scale">Log</button>
 </div>
 
 <div id="cr-verdict"></div>
@@ -82,7 +84,7 @@ const TF_SEC={{'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}};
 const MISTAKES=["chased","early","late","oversized","moved stop","no stop","revenge","FOMO","overheld","cut early","no setup"];
 const EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
 const GRADES=["A","B","C","D","F"];
-let TRADES=[], WIN=null, CUR=null, TF=null, MANUAL_TF=false, GOALLVL=null, ST=null;
+let TRADES=[], WIN=null, CUR=null, TF=null, MANUAL_TF=false, GOALLVL=null, ST=null, LOGSCALE=false;
 const $=id=>document.getElementById(id);
 
 async function boot(){{
@@ -95,6 +97,8 @@ async function boot(){{
   $('cr-tf').onchange=async()=>{{MANUAL_TF=true;TF=$('cr-tf').value;await render();}};
   $('cr-prev').onclick=()=>step(-1);
   $('cr-next').onclick=()=>step(1);
+  $('cr-fit').onclick=()=>charts.forEach(c=>c.timeScale().fitContent());
+  $('cr-log').onclick=()=>{{LOGSCALE=!LOGSCALE;$('cr-log').classList.toggle('on',LOGSCALE);render();}};
 }}
 
 async function goalLevels(){{
@@ -345,14 +349,16 @@ async function render(){{
   if(!window.LightweightCharts || !WIN || !WIN.ohlcv || !WIN.ohlcv.length)return;
   const CANDLES=WIN.ohlcv, INDICATORS=WIN.indicators, LEVELS=WIN.levels, tfSec=TF_SEC[TF];
   const L=LightweightCharts.LineStyle;
-  const dark={{background:{{color:'#06080c'}},textColor:'#465064'}},
+  const dark={{background:{{color:'#06080c'}},textColor:'#465064',attributionLogo:false}},
         grid={{vertLines:{{color:'#192232'}},horzLines:{{color:'#192232'}}}};
   const ENTRY_COLOR='#5b9dff';   // always neutral — direction is already in the title
   const EXIT_COLOR=t.pnl>=0?'#1fd989':'#ff5468';   // win/loss, the thing that matters
 
   // price
   const pEl=$('cr-chart');
-  const pChart=LightweightCharts.createChart(pEl,{{layout:dark,grid,rightPriceScale:{{borderColor:'#192232'}},timeScale:{{borderColor:'#192232',timeVisible:true,secondsVisible:false}}}});
+  const pChart=LightweightCharts.createChart(pEl,{{layout:dark,grid,
+    rightPriceScale:{{borderColor:'#192232',mode:LOGSCALE?1:0}},
+    timeScale:{{borderColor:'#192232',timeVisible:true,secondsVisible:false}}}});
   charts.push(pChart);
   const cs=pChart.addCandlestickSeries({{upColor:'#1fd989',downColor:'#ff5468',borderUpColor:'#1fd989',borderDownColor:'#ff5468',wickUpColor:'#1fd989',wickDownColor:'#ff5468'}});
   cs.setData(CANDLES);
@@ -360,19 +366,31 @@ async function render(){{
   if(t.sl)cs.createPriceLine({{price:t.sl,color:'#ff5468',lineWidth:1,lineStyle:L.Dotted,axisLabelVisible:true,title:'SL'}});
   if(INDICATORS){{
     const it=INDICATORS.time;
-    pChart.addLineSeries({{color:'#f6ad3c',lineWidth:1,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,INDICATORS.sma50));
-    pChart.addLineSeries({{color:'#5b9dff',lineWidth:1,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,INDICATORS.sma100));
-    pChart.addLineSeries({{color:'#ff5468',lineWidth:1,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,INDICATORS.sma200));
+    // an SMA with <40% coverage of this window (e.g. SMA200 on a short
+    // trade) still starts abruptly mid-chart — dim it so that reads as
+    // "fading in from insufficient history" instead of a broken line
+    const cov=vals=>vals.filter(v=>v!=null).length/vals.length;
+    const smaLine=(vals,color)=>pChart.addLineSeries({{color:cov(vals)<0.4?color+'55':color,lineWidth:1,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,vals));
+    smaLine(INDICATORS.sma50,'#f6ad3c');
+    smaLine(INDICATORS.sma100,'#5b9dff');
+    smaLine(INDICATORS.sma200,'#ff5468');
     pChart.addLineSeries({{color:'#465064',lineWidth:1,lineStyle:L.Dotted,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,INDICATORS.bb_upper));
     pChart.addLineSeries({{color:'#465064',lineWidth:1,lineStyle:L.Dotted,priceLineVisible:false,lastValueVisible:false}}).setData(toLine(it,INDICATORS.bb_lower));
   }}
   if(LEVELS && LEVELS.length){{
-    LEVELS.sort((a,b)=>Math.abs(a.level-t.entry)-Math.abs(b.level-t.entry)).slice(0,8)
-      .forEach(f=>{{
-        const isR2S=f.kind==='r2s';
-        cs.createPriceLine({{price:f.level,color:isR2S?'#1fd98999':'#ff546899',lineWidth:1,
-          lineStyle:L.Dashed,axisLabelVisible:true,title:isR2S?'R\\u2192S':'S\\u2192R'}});
-      }});
+    // dedupe near-identical levels (flips that clustered within 0.3%) before
+    // picking nearest — otherwise 3 near-duplicates eat all 4 label slots
+    const kept=[];
+    LEVELS.sort((a,b)=>Math.abs(a.level-t.entry)-Math.abs(b.level-t.entry)).forEach(f=>{{
+      if(!kept.some(k=>Math.abs(k.level-f.level)/f.level<0.003)) kept.push(f);
+    }});
+    // only 4 labels ever draw (2 nearest each side) — the rest still mark
+    // the level but stay label-free so they don't stack on the price axis
+    kept.slice(0,12).forEach((f,i)=>{{
+      const isR2S=f.kind==='r2s', showLabel=i<4;
+      cs.createPriceLine({{price:f.level,color:isR2S?'#1fd98999':'#ff546899',lineWidth:1,
+        lineStyle:L.Dashed,axisLabelVisible:showLabel,title:showLabel?(isR2S?'R\\u2192S':'S\\u2192R'):''}});
+    }});
   }}
 
   // RSI
@@ -422,6 +440,7 @@ function eur(v){{return (v>=0?'+':'\\u2212')+'\\u20ac'+Math.abs(v).toFixed(2);}}
 boot();
 """
     css = """<style>
+#cr-log.on{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:700}
 .cr-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border:1px solid var(--line);border-top:0;border-bottom:0;background:var(--panel)}
 .bm-cols{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:6px}
 .bm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 14px;align-content:start}
