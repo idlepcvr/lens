@@ -136,6 +136,7 @@ BODY = """
 <div id="open-pos"></div>
 <div class="cal-topbar">
   <button id="cal-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
+  <span class="dim" style="font-size:11px">deeper: <a class="ac" id="cal-link-analytics" href="#">expectancy/MFE·MAE/hourly →</a> · <a class="ac" id="cal-link-edge" href="#">setup win-rates →</a></span>
   <div id="cal-setupf"></div>
 </div>
 <div class="cal-wrap">
@@ -154,6 +155,8 @@ const MISTAKES=__MISTAKES__, EMOTIONS=__EMOTIONS__, GRADES=__GRADES__;
 const BOOK=__BOOK__, RBOOK=BOOK.replace('*','');   // review APIs take 'prop', trades API takes 'prop*'
 let TRADES=[], ALL_TRADES=[], MONTH='', SELDAY=null, HOVDAY=null, CANDLES=[], CONE=null, SETUPFILTER=null;
 const $=id=>document.getElementById(id);
+document.getElementById('cal-link-analytics').href='/'+RBOOK+'-analytics';
+document.getElementById('cal-link-edge').href='/'+RBOOK+'-edge#past';
 const eur=(v,d=2)=>(v<0?'-':'')+'€'+Math.abs(v||0).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const num=(v,d=2)=>v==null||v===''?'':Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
 const toLocal=s=>{if(!s)return'';const d=new Date(s);if(isNaN(d))return'';const p=n=>String(n).padStart(2,'0');
@@ -420,6 +423,35 @@ function vMarker(container, chart, time, label, color, tfSec, slot){
   reposition();
   chart.timeScale().subscribeVisibleTimeRangeChange(reposition);
 }
+// ported from edge_page.py's #past table — same grouping/verdict logic, so
+// "how has this setup actually paid" is one glance from the trade you're
+// looking at, not a separate page you have to remember exists
+function edgeFamily(tag){
+  if(!tag) return '(untagged)';
+  if(tag.startsWith('VETO:')) return 'VETO';
+  if(tag.includes('|VETO:')) return tag.split('|')[0]+' (vetoed)';
+  return tag;
+}
+function edgeVerdict(n,wr,exp){
+  if(n<8)               return ['THIN','var(--dim)'];
+  if(exp<=0)            return ['CUT','var(--short)'];
+  if(exp>=10&&n>=12&&wr>=45) return ['SIZE-UP','var(--long)'];
+  return ['KEEP','var(--amber)'];
+}
+function renderSetupStats(t){
+  const fam=edgeFamily(t.setup_tag);
+  const rows=ALL_TRADES.filter(x=>x.pnl!=null && edgeFamily(x.setup_tag)===fam);
+  const n=rows.length, wins=rows.filter(x=>(x.pnl||0)>0).length, total=rows.reduce((s,x)=>s+(x.pnl||0),0);
+  const wr=n?wins/n*100:0, exp=n?total/n:0;
+  const [vl,vc]=edgeVerdict(n,wr,exp);
+  $('cal-setupstats').innerHTML=`<div class="cal-sec">This setup — ${fam}</div>
+    <div style="font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span>${n} trades</span><span>${wr.toFixed(0)}% WR</span>
+      <span style="color:${exp>=0?'var(--long)':'var(--short)'}">${exp>=0?'+':''}${exp.toFixed(0)}€ avg</span>
+      <b style="color:${vc}">${vl}</b>
+      <a href="/${RBOOK}-edge#past" style="color:var(--accent);text-decoration:none;font-size:11px">full breakdown →</a>
+    </div>`;
+}
 function openModal(id){
   const t=TRADES.find(x=>x.id===id); if(!t) return;
   const isL=t.direction==='long', win=t.pnl>=0;
@@ -450,6 +482,7 @@ function openModal(id){
 
     <div id="cal-chart"></div>
     <div id="cal-veto"></div>
+    <div id="cal-setupstats"></div>
 
     <div class="cal-sec">Breakdown · editable</div>
     <div class="cal-m-grid">
@@ -494,6 +527,7 @@ function openModal(id){
       <a class="full" href="/chart-review?trade=${id}&book=${RBOOK}">Full chart — SMA/Bollinger/RSI/MACD/levels →</a>
     </div>
   </div></div>`;
+  renderSetupStats(t);
   $('cal-veto').innerHTML='';
   fetch('/api/veto-overrides/for-trade?trade_id='+id).then(r=>r.json()).then(d=>{
     if(!d.override) return;
