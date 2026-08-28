@@ -121,13 +121,12 @@ table.jr thead th.sd::after{content:' ▼';font-size:7px;color:var(--accent)}
 
 BODY = """
 <div class="jr-bar">
+  <div class="jseg" data-k="range"><b>Range</b><button data-v="1w">1W</button><button data-v="1m" class="on">1M</button><button data-v="3m">3M</button><button data-v="ytd">YTD</button><button data-v="1y">1Y</button><button data-v="all">All</button></div>
   <select id="f-tag" onchange="applyF()"><option value="">All setups</option><option value="__none__">Untagged</option></select>
   <div class="jseg" data-k="dir"><b>Dir</b><button data-v="" class="on">All</button><button data-v="long">Long</button><button data-v="short">Short</button></div>
   <div class="jseg" data-k="result"><b>Res</b><button data-v="" class="on">All</button><button data-v="win">Win</button><button data-v="loss">Loss</button></div>
-  <div class="jseg" data-k="rsi"><b>RSI</b><button data-v="" class="on">All</button><button data-v="dip">Dip</button><button data-v="momentum">Mom</button><button data-v="neutral">Neut</button></div>
   <div class="jseg" data-k="book"><b>Book</b><button data-v="" class="on">All</button><button data-v="hedge">Hedge</button><button data-v="prop">Prop</button></div>
-  <div class="jseg" data-k="match"><b>Match</b><button data-v="" class="on">All</button><button data-v="1">⇄ Merged</button></div>
-  <div class="jseg" data-k="rev"><b>Review</b><button data-v="" class="on">All</button><button data-v="manual">✍️ Mine</button><button data-v="auto">🤖 Auto</button></div>
+  <button id="jr-more-btn" onclick="toggleMore()" style="padding:3px 9px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">More filters ▾</button>
   <div class="jr-spacer"></div>
   <div class="colpick" id="colpick">
     <button id="jr-cols" onclick="toggleCols(event)" style="padding:4px 11px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⚙ Columns</button>
@@ -135,6 +134,11 @@ BODY = """
   </div>
   <button id="jr-sync" onclick="syncKraken()" style="padding:4px 11px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:11px;border-radius:5px;cursor:pointer;font-family:var(--mono)">⟳ Sync Kraken</button>
   <div class="jr-stat" id="jr-stat">—</div>
+</div>
+<div class="jr-bar" id="jr-more" style="display:none">
+  <div class="jseg" data-k="rsi"><b>RSI</b><button data-v="" class="on">All</button><button data-v="dip">Dip</button><button data-v="momentum">Mom</button><button data-v="neutral">Neut</button></div>
+  <div class="jseg" data-k="match"><b>Match</b><button data-v="" class="on">All</button><button data-v="1" title="manually-logged trades reconciled with their actual exchange fill">⇄ Reconciled</button></div>
+  <div class="jseg" data-k="rev"><b>Review</b><button data-v="" class="on">All</button><button data-v="manual">✍️ Mine</button><button data-v="auto">🤖 Auto</button></div>
 </div>
 <div id="open-pos"></div>
 <div class="jr-wrap">
@@ -152,7 +156,22 @@ const EMOTIONS=["calm","FOMO","tilt","fear","greed","bored"];
 const GRADES=["A","B","C","D","F"];
 const SETUPS=["S1","S2","S3","S4","S5","NONE"];
 let TRADES=[], CANDLES=[], VISIBLE=[], SEL=null;
-const F={dir:'',result:'',rsi:'',book:'',match:'',rev:''};
+const F={dir:'',result:'',rsi:'',book:'',match:'',rev:'',range:'1m'};
+function toggleMore(){
+  const on=$('jr-more').style.display==='none';
+  $('jr-more').style.display=on?'flex':'none';
+  $('jr-more-btn').textContent='More filters '+(on?'▴':'▾');
+}
+// cutoff (unix seconds) for each range preset — null means no lower bound
+function rangeFrom(preset){
+  const now=new Date(), d=new Date(now);
+  if(preset==='1w'){ d.setDate(d.getDate()-7); return d.getTime()/1000; }
+  if(preset==='1m'){ return new Date(now.getFullYear(),now.getMonth(),1).getTime()/1000; }
+  if(preset==='3m'){ d.setDate(d.getDate()-90); return d.getTime()/1000; }
+  if(preset==='ytd'){ return new Date(now.getFullYear(),0,1).getTime()/1000; }
+  if(preset==='1y'){ d.setDate(d.getDate()-365); return d.getTime()/1000; }
+  return null; // 'all'
+}
 let SORT={k:'opened_at',dir:-1}, GOALLVL=null, TAGPREFIX=null;
 let LOGGED_PLANS={};   // entry price -> {tp,sl,id} for open trades logged from /position
 let LIVE_ORDERS={};    // role -> the resting order actually on the exchange
@@ -323,8 +342,9 @@ async function load(){
   if(q && TRADES.some(t=>String(t.id)===String(q))) openTrade(parseInt(q));
 }
 function applyF(){
-  const tag=$('f-tag').value;
+  const tag=$('f-tag').value, from=rangeFrom(F.range);
   VISIBLE=TRADES.filter(t=>{
+    if(from!=null && t.ts_entry && t.ts_entry<from) return false;
     if(F.dir && t.direction!==F.dir) return false;
     const tg=t.setup_tag||'';
     if(tag==='__none__' && tg) return false;
