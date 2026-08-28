@@ -955,17 +955,17 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
   <div class="logo">LEN<span class="s">S</span> <span class="pg">Journal</span></div>
   <div class="modesw">
     <a href="/prop">◎ PROP</a>
-    <a href="/hedge-plan" class="on">▤ HEDGE</a>
+    <a href="/plan" class="on">▤ HEDGE</a>
     <a href="/" class="home">⌂</a>
   </div>
   <nav class="topnav">
-    <a href="/hedge-plan">Dashboard</a>
-    <a href="/hedge-desk">Desk</a>
-    <a href="/hedge-signals">Signals</a>
-    <a href="/hedge-analytics">Analytics</a>
-    <a href="/hedge-journal" class="cur">Journal</a>
-    <a href="/hedge-edge">Edge</a>
-    <a href="/hedge-goal">Goal</a>
+    <a href="/plan">Dashboard</a>
+    <a href="/desk">Desk</a>
+    <a href="/signals">Signals</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/journal" class="cur">Journal</a>
+    <a href="/edge">Edge</a>
+    <a href="/goal">Goal</a>
   </nav>
   <div class="topbar-right">
     <button class="tb-btn" onclick="openLogModal()">+ Log Trade</button>

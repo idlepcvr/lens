@@ -447,7 +447,7 @@ _CSS = r"""<style>
 BODY = r"""
 <div class="pg">
   <h1>Prop Goal</h1>
-  <div class="sub">Time-to-target for the live eval, resampled from the basket's real backtested trades against the same walls as <a href="/prop-survival#survival" class="ac">Survival</a>. <span class="dim">Hedge twin: <a href="/hedge-goal" class="ac">/goal</a>.</span></div>
+  <div class="sub">Time-to-target for the live eval, resampled from the basket's real backtested trades against the same walls as <a href="/prop-survival#survival" class="ac">Survival</a>. <span class="dim">Hedge twin: <a href="/goal" class="ac">/goal</a>.</span></div>
   <div class="pg-main">
     <aside class="pg-side">
       <div class="side-card"><div class="side-h">The plan · locked eval rules</div><div id="plan"><div class="skeleton">…</div></div></div>

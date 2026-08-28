@@ -262,7 +262,7 @@ async function loadOpenPositions(){
           ${plan}
         </div></div>`;
     }).join('');
-    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/hedge-position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
+    el.innerHTML=`<div class="op-wrap"><div class="op-hd"><b>Open positions</b><span class="live">● live</span><span class="dim" style="font-size:10px">live from Kraken · drops into the log once closed</span><span style="flex:1"></span><a href="/position" style="font-size:10px;color:var(--accent);text-decoration:none;font-family:var(--mono)">Position calculator →</a></div><div class="opcards">${cards}</div></div>`;
   }catch(e){ el.innerHTML=''; }
 }
 async function syncKraken(){
@@ -445,7 +445,7 @@ function renderSetupStats(t){
       <span>${n} trades</span><span>${wr.toFixed(0)}% WR</span>
       <span style="color:${exp>=0?'var(--long)':'var(--short)'}">${exp>=0?'+':''}${exp.toFixed(0)}€ avg</span>
       <b style="color:${vc}">${vl}</b>
-      <a href="/${RBOOK}-edge#past" style="color:var(--accent);text-decoration:none;font-size:11px">full breakdown →</a>
+      <a href="${RBOOK==='prop'?'/prop-edge':'/edge'}#past" style="color:var(--accent);text-decoration:none;font-size:11px">full breakdown →</a>
     </div>`;
 }
 function openModal(id){
@@ -634,7 +634,7 @@ def render(book: str = "hedge") -> str:
     # nobody needed after the first visit, and "switch to prop" duplicated
     # the HEDGE/PROP pill already at the top of every page.
     return shell(
-        "/prop-journal" if book == "prop" else "/hedge-journal", "Journal", BODY,
+        "/prop-journal" if book == "prop" else "/journal", "Journal", BODY,
         script=(SCRIPT
                 .replace("__MISTAKES__", _json.dumps(MISTAKES))
                 .replace("__EMOTIONS__", _json.dumps(EMOTIONS))

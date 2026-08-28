@@ -1,4 +1,4 @@
-"""LENS /prop-track — the daily read on the eval, /hedge-track's missing twin.
+"""LENS /prop-track — the daily read on the eval, /track's missing twin.
 
 /prop-goal is the monthly question (goal_page.render("prop") — is the basket
 still on pace for the target, under the cone). This is the daily one: how far

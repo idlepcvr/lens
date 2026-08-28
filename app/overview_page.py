@@ -78,7 +78,7 @@ _CSS = r"""<style>
 # book -> (route, nav label, page title)
 _META = {
     "prop":  ("/prop-overview",       "Overview", "Overview — PROP"),
-    "hedge": ("/hedge-overview", "Overview", "Overview — HEDGE"),
+    "hedge": ("/overview", "Overview", "Overview — HEDGE"),
 }
 
 
@@ -99,7 +99,7 @@ def render(book: str = "hedge") -> str:
 
   <div class="support">
     <section>
-      <h2>Performance<span class="hint" id="perf-hint"></span><a class="h2go" href="{'/prop-ledger' if book == 'prop' else '/hedge-analytics'}">{'ledger' if book == 'prop' else 'analytics'} →</a></h2>
+      <h2>Performance<span class="hint" id="perf-hint"></span><a class="h2go" href="{'/prop-ledger' if book == 'prop' else '/analytics'}">{'ledger' if book == 'prop' else 'analytics'} →</a></h2>
       <div class="grid" id="perf"></div>
     </section>
     <section>
@@ -175,7 +175,7 @@ function heroHedge(a){
     <div class="hmain">
       <div class="hlbl">Live equity · futures wallet</div>
       <div class="heq">€${money(a.total_eur)}</div>
-      <div class="hsub">unrealised <b class="${u>0?'g':(u<0?'r':'dim')}">${signed(u)}€</b><br><a href="/hedge-journal" style="color:inherit">open positions →</a>${partial}</div>
+      <div class="hsub">unrealised <b class="${u>0?'g':(u<0?'r':'dim')}">${signed(u)}€</b><br><a href="/journal" style="color:inherit">open positions →</a>${partial}</div>
     </div>
     <div class="hstats">
       <div class="hstat"><div class="k">Available margin</div><div class="v">${a.available_margin!=null?'€'+money(a.available_margin):'—'}</div><div class="n">free to deploy</div></div>

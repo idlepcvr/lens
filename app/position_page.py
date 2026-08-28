@@ -382,7 +382,7 @@ def position_page(book: str = "hedge") -> str:
            'Override risk %, R:R or leverage below for a per-trade what-if; the saved plan is untouched.'
            if book == "prop" else
            'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
-           '<a href="/hedge-plan" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
+           '<a href="/plan" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
     body = r"""
 <div class="pz">
   <h1>Position</h1>
@@ -1246,7 +1246,7 @@ async function loadLive(){
     # On the prop page there's no hedge sizing — lock the book and hide the
     # hedge-only inputs (BTC € price, win-rate override). Balance (eval $) and the
     # risk/R:R/leverage-cap overrides stay: per-trade what-ifs against the plan.
-    path = "/prop-position" if book == "prop" else "/hedge-position"
+    path = "/prop-position" if book == "prop" else "/position"
     head = _CSS + _XCSS + ("<style>#book-preset-row,#f-btc,#f-wr{display:none!important}</style>"
                    if book == "prop" else "")
     return shell(path, "Position", body, script=script, head_extra=head, meta="size the trade")

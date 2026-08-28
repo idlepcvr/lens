@@ -281,5 +281,5 @@ _GEO_JS = (f"const GEO={{sl:{_SL},tp:{_TP},"
            f"fee_t:{FRICTION_PCT / 100:g},"
            f"fee_m:{FRICTION_LADDER['maker both sides'] / 100:g}}};\n")
 
-DESK_HTML = shell("/hedge-desk", "Desk", BODY, script=_GEO_JS + SCRIPT, right=RIGHT,
+DESK_HTML = shell("/desk", "Desk", BODY, script=_GEO_JS + SCRIPT, right=RIGHT,
                   meta="can I enter?")

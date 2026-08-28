@@ -25,15 +25,15 @@ import re
 # and the label match, so you can read the address bar instead of decoding it
 # (Lucky, 2026-08-03: "I can barely understand what's built half the time").
 #   hedge                 prop                    render
-#   /hedge-overview   →   /prop-overview          own page
-#   /hedge-plan       →   /prop-plan              own page
-#   /hedge-goal       →   /prop-goal              own page
-#   /hedge-desk       →   /prop-desk              own page
-#   /hedge-signals    →   /prop-signals           own page
-#   /hedge-journal    →   /prop-journal           shared render (calendar_page.py), book="prop" locked
-#   /hedge-analytics  →   /prop-analytics         shared render, book="prop" locked
-#   /hedge-position   →   /prop-position          shared render, book="prop" locked
-#   /hedge-edge       →   /prop-edge              shared render, book="prop" locked
+#   /overview   →   /prop-overview          own page
+#   /plan       →   /prop-plan              own page
+#   /goal       →   /prop-goal              own page
+#   /desk       →   /prop-desk              own page
+#   /signals    →   /prop-signals           own page
+#   /journal    →   /prop-journal           shared render (calendar_page.py), book="prop" locked
+#   /analytics  →   /prop-analytics         shared render, book="prop" locked
+#   /position   →   /prop-position          shared render, book="prop" locked
+#   /edge       →   /prop-edge              shared render, book="prop" locked
 # LEGACY_ROUTES in main.py 301s the old bare paths (/goal, /dashboard…) here, so
 # old bookmarks and any href missed by the rename keep working.
 # Same order as NAV_HEDGE — test_nav_parity enforces it, so the two modes stay
@@ -63,17 +63,23 @@ NAV_PROP = [
 # footer: "the nav bar here is too small, it's too little".
 # Calendar dropped 2026-08-28 — merged into Journal (same page now, calendar
 # on top). Two nav entries pointing at the same job was itself the complaint.
+# No "hedge-" prefix, unlike prop — 2026-08-29: "I want to keep the hedge
+# completely separate from the prop... I want to remove the prefix of hedge
+# for everything... even if it's using the same engine I feel like the front
+# end should be completely different to isolate them." Hedge is the default/
+# primary identity of the site; prop is the isolated satellite, so it keeps
+# marking itself. See LEGACY_ROUTES in main.py for the old /hedge-* 301s.
 NAV_HEDGE = [
-    ("/hedge-overview", "Overview"),
-    ("/hedge-signals", "Signals"),
-    ("/hedge-desk", "Desk"),
-    ("/hedge-plan", "Plan"),
-    ("/hedge-goal", "Goal"),
-    ("/hedge-track", "Track"),
-    ("/hedge-position", "Position"),
-    ("/hedge-journal", "Journal"),
-    ("/hedge-analytics", "Analytics"),
-    ("/hedge-edge", "Edge"),
+    ("/overview", "Overview"),
+    ("/signals", "Signals"),
+    ("/desk", "Desk"),
+    ("/plan", "Plan"),
+    ("/goal", "Goal"),
+    ("/track", "Track"),
+    ("/position", "Position"),
+    ("/journal", "Journal"),
+    ("/analytics", "Analytics"),
+    ("/edge", "Edge"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.
@@ -91,7 +97,7 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 # glossary, now a tab of /manual. /about joined 2026-08-04 — the page for a
 # reader who can judge the work, as distinct from "/" which is for someone who
 # just wants to know he's okay.
-NAV_NEUTRAL = [("/about", "About"), ("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/review", "Review"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+NAV_NEUTRAL = [("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/review", "Review"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 # Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
 _PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
@@ -450,7 +456,7 @@ def nav_html(current_path: str) -> str:
     sw = (
         '<div class="modesw">'
         '<a href="/prop-overview" class="%s">◎ PROP</a>'
-        '<a href="/hedge-overview" class="%s">▤ HEDGE</a>'
+        '<a href="/overview" class="%s">▤ HEDGE</a>'
         '<a href="/sitemap" class="home">☰</a>'
         '<a href="/" class="home">⌂</a>'
         '</div>'

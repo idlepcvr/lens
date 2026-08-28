@@ -278,7 +278,7 @@ SCRIPT = r"""
       return '<div class="fit-opt"><div class="l">'+t[0]+'</div><div class="n">'+t[1]+'</div></div>'; }).join('')+'</div>' : '';
     var envh='';
     if(o && Object.keys(env).length){
-      var goalHref=(PROP?'/prop-goal':'/hedge-goal')+'?win_rate='+o.wr.toFixed(4)+'&rr_ratio='+o.rr.toFixed(2)
+      var goalHref=(PROP?'/prop-goal':'/goal')+'?win_rate='+o.wr.toFixed(4)+'&rr_ratio='+o.rr.toFixed(2)
         +'&trades_per_week='+o.freq+'&leverage='+o.lev
         +'&start_balance='+g.start_balance+'&target_balance='+g.target_balance+'&target_date='+g.target_date;
       envh='<div class="fit-env"><b>The envelope:</b> every feasible cell has WR '+pct(env.wr.min)+'–'+pct(env.wr.max)+

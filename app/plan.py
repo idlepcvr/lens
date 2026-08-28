@@ -491,7 +491,7 @@ def geometry(limit: int = 12) -> dict:
     book's blended one, and the surviving cell's. Neither can answer "what would
     my win rate be at a 1% stop", because a win rate belongs to a (trader,
     geometry) pair, not to the trader. research/entry_geometry.py sweeps the
-    grid; this serves the ranked cells so /hedge-goal can load one on evidence
+    grid; this serves the ranked cells so /goal can load one on evidence
     instead of a typed guess.
 
     `expected_by_chance` travels with them deliberately. The grid is a search,

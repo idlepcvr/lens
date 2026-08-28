@@ -1,6 +1,6 @@
-"""LENS /hedge-track — the next rung, the band, and the day you're having.
+"""LENS /track — the next rung, the band, and the day you're having.
 
-/hedge-goal answers "is the whole plan still reachable?" — twelve rungs, scenario
+/goal answers "is the whole plan still reachable?" — twelve rungs, scenario
 ladders, coverage. That is a monthly question and it reads like one. This page
 answers the daily one: what is the NEXT rung, am I inside the band that gets me
 there, and did today count.
@@ -40,7 +40,7 @@ BANDS = ("p10", "p25", "p50", "p75", "p90")
 
 
 def _px() -> float | None:
-    """BTC price in EUR from lens_config — the same number /hedge-goal edits.
+    """BTC price in EUR from lens_config — the same number /goal edits.
 
     ponytail: stored, not fetched. It avoids a network call on every render and
     there is already a field that maintains it; the page prints the rate next to
@@ -774,5 +774,5 @@ def render() -> str:
     # The library is a blocking <script> in <head> so it is defined by the time
     # the page script runs. Vendored locally — see main.charts_js.
     head = '<script src="/assets/lightweight-charts.js"></script>' + p["css"]
-    return shell("/hedge-track", "Track", p["body"], head_extra=head,
+    return shell("/track", "Track", p["body"], head_extra=head,
                  script=p["script"], meta="am I on pace?")

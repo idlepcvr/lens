@@ -201,7 +201,7 @@ function historyRow(s, grp){
     <div class="kv"><span class="k">decided</span><span class="v">${fmtTs(s.decided_at)}${g?(' · '+g+' later'):''}</span></div>
     <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
     ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}
-    ${s.linked_trade_id?`<div class="kv"><span class="k">trade</span><span class="v"><a href="/hedge-journal?trade=${s.linked_trade_id}" style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation()">#${s.linked_trade_id}${s.pnl_eur!=null?` · ${s.pnl_eur>=0?'+':''}€${s.pnl_eur}`:''} — open in journal →</a></span></div>`:''}`;
+    ${s.linked_trade_id?`<div class="kv"><span class="k">trade</span><span class="v"><a href="/journal?trade=${s.linked_trade_id}" style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation()">#${s.linked_trade_id}${s.pnl_eur!=null?` · ${s.pnl_eur>=0?'+':''}€${s.pnl_eur}`:''} — open in journal →</a></span></div>`:''}`;
   return `<tr class="hrow"${grpAttr} onclick="toggleRow('${id}')" style="cursor:pointer">
     <td>${grp?'&nbsp;&nbsp;↳ ':''}${s.trigger_type||'?'}</td>
     <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>
@@ -351,5 +351,5 @@ def render() -> str:
         ledger = {"rules": {}, "combos": {}}   # a dead stat never blanks the page
     preamble = (f"const VETO_LABELS={json.dumps(VETO_LABELS)};\n"
                 f"const VETO_LEDGER={json.dumps(ledger)};\n")
-    return shell("/hedge-signals", "Signals", BODY, script=preamble + SCRIPT,
+    return shell("/signals", "Signals", BODY, script=preamble + SCRIPT,
                  meta="approve / reject")

@@ -197,7 +197,7 @@ def goals_page():
       <a class="eng" href="/regime"><div class="t">Regime</div><div class="d">is now a regime where the hero wins?</div><div class="u">open →</div></a>
       <a class="eng" href="/evidence"><div class="t">Evidence</div><div class="d">what survived testing, and what didn't</div><div class="u">open →</div></a>
       <a class="eng" href="/geometry"><div class="t">Geometry</div><div class="d">where the stop and target come from</div><div class="u">open →</div></a>
-      <a class="eng" href="/hedge-edge#board"><div class="t">Strategy</div><div class="d">WR {m['win_rate_pct']:.0f}% · {m['r_multiple']}R · expectancy {m['expectancy_r']}R</div><div class="u">on hedge edge →</div></a>
+      <a class="eng" href="/edge#board"><div class="t">Strategy</div><div class="d">WR {m['win_rate_pct']:.0f}% · {m['r_multiple']}R · expectancy {m['expectancy_r']}R</div><div class="u">on hedge edge →</div></a>
     </div>
   </div>
 </div>"""

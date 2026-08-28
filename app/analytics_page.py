@@ -69,7 +69,7 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .cone-bar .badge.plan{color:var(--amber)}
 .cone-bar .sp{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
 
-/* review surfaces (moved off /hedge-track) */
+/* review surfaces (moved off /track) */
 .rq-top{display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;margin-bottom:11px}
 .rq-rate{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
 .rq-rate b{font-family:var(--mono);font-size:34px;font-weight:800;line-height:1;
@@ -479,7 +479,7 @@ function renderSections(E,A,X){
 }
 """
 
-# ─── review surfaces, moved off /hedge-track 2026-08-21 ──────────────────────
+# ─── review surfaces, moved off /track 2026-08-21 ──────────────────────
 # Both answer "how have I been behaving", which is a review question. Track is
 # read before an entry — the rung, the band, the next step — and these were
 # sitting in front of that. They belong on the page you open when you want to
@@ -635,12 +635,12 @@ def render(book: str = "hedge") -> str:
     — the current eval alone is /prop-ledger."""
     book = "prop" if book == "prop" else "hedge"
     other = "prop" if book == "hedge" else "hedge"
-    path = "/prop-analytics" if book == "prop" else "/hedge-analytics"
+    path = "/prop-analytics" if book == "prop" else "/analytics"
     eval_cone = ('' if book != "prop"
                  else ' · <a href="/prop-survival#projection" class="ac">eval projection cone →</a>')
     body = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
             f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
-            f'<a href="{"/hedge-analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
+            f'<a href="{"/analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
             f'switch to {other}</a>{eval_cone}</div>') + BODY
     if book == "hedge":
         body += review_sections()

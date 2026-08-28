@@ -59,15 +59,16 @@ def test_nav_parity():
     assert not both, (f"prop and hedge share bare path(s) {both} — every prop page "
                       f"must have its own /prop-* URL, not a ?book= toggle")
 
-    # 5) page_mode: each prop URL is prop, each hedge URL is hedge
+    # 5) page_mode: each prop URL is prop, each hedge URL is hedge (hedge is
+    # bare — no prefix — since 2026-08-29; prop keeps marking itself)
     assert page_mode("/prop-position") == "prop"
-    assert page_mode("/hedge-position") == "hedge"
+    assert page_mode("/position") == "hedge"
     assert page_mode("/prop-journal") == "prop"
-    assert page_mode("/hedge-journal") == "hedge"
+    assert page_mode("/journal") == "hedge"
     assert page_mode("/prop-analytics") == "prop"
     assert page_mode("/prop-edge") == "prop"
     assert page_mode("/prop-desk") == "prop"
-    assert page_mode("/hedge-plan") == "hedge"
+    assert page_mode("/plan") == "hedge"
 
     # 6) neutral pages are owned by neither nav
     neutral = {h for h, _ in NAV_NEUTRAL}

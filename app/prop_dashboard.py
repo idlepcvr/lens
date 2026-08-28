@@ -154,7 +154,7 @@ def dashboard_page() -> str:
   <h1>Prop Dashboard</h1>
   <div class="sub">Scoped to the prop book — <b>${acct:,.0f}</b> {cfg['eval_name']} at {cfg['risk']}% risk.
     Counters are the <b>current eval</b>; performance spans <b>every attempt</b>.
-    The hedge twin is <a href="/hedge-plan" class="ac">/dashboard</a>.</div>
+    The hedge twin is <a href="/plan" class="ac">/plan</a>.</div>
 
   {scores}
 

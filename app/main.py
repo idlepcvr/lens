@@ -122,21 +122,13 @@ async def not_found(request, exc):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    # Used to be explain_page.py — a front door written for a stranger who's
-    # never traded ("no numbers, no jargon, nothing for sale"). 2026-08-29:
-    # "I'm not going to be showing this to anybody" — that audience doesn't
-    # exist, so root should land on the actual dashboard, not a pitch.
-    # /explain still exists at its own URL if that page is ever wanted again.
-    return RedirectResponse("/hedge-plan", status_code=302)
+    # explain_page.py (the stranger-facing pitch, briefly moved to /explain
+    # earlier tonight) is deleted outright now — "I don't need it anymore,
+    # they're too pretentious." Root lands straight on the dashboard.
+    return RedirectResponse("/plan", status_code=302)
 
 
-@app.get("/explain", response_class=HTMLResponse, include_in_schema=False)
-def explain():
-    from .explain_page import render
-    return render()
-
-
-@app.get("/hedge-plan", response_class=HTMLResponse)
+@app.get("/plan", response_class=HTMLResponse)
 def landing():
     # Scoped to the hedge book. This counted EVERY book, so its trade count was
     # hedge + every prop attempt, and prop signals landed in the hedge queue —
@@ -243,9 +235,9 @@ def landing():
 
     body = f"""
 <div class="strip">
-  <a class="sc" href="/hedge-journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
-  <a class="sc" href="/hedge-signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
-  <a class="sc {'pend' if pending else ''}" href="/hedge-desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
+  <a class="sc" href="/journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
+  <a class="sc" href="/signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
+  <a class="sc {'pend' if pending else ''}" href="/desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
 </div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this dashboard</span><span class="line"></span></div>
@@ -254,7 +246,7 @@ def landing():
 <h4>the only inputs are the parameters</h4>Start €, target €, target date, win rate, R:R, leverage, trades/week, drawdown limits. Every field is a calculator — type <code>300*0.1</code> and hit <b>↵</b> to get <code>30</code>. <b>Apply</b> saves them as your defaults; <b>Reload</b> pulls the last saved set.
 <h4>the four hero cards</h4>Each answers one goal question and passes or fails: <b>On time?</b> = does your edge reach the target inside the window (projected arrival vs deadline). <b>Edge / trade</b> = is per-trade EV at least what the goal needs (green only when it clears the bar). <b class="r">Risk of ruin</b> = odds of hitting the drawdown wall before the goal. <b>Risk sizing</b> = used risk vs the Kelly/DD optimal. Detail (Actual R, geometric drift) is in the cards below.
 <h4>the metric cards</h4>Break the model down: time-to-goal, required growth rates, the per-trade EV model, Kelly sizing, account impact per win/loss, risk analytics (Sharpe, profit factor, ruin), €-growth projections, and a BTC / Monte-Carlo band (P05 / P50 / P95 outcomes).
-<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/hedge-desk">Desk</a> (can I enter now?) and <a href="/hedge-goal">Goal</a> (equity curve + projection over time).
+<h4>read-only math</h4>LENS computes — it does not trade. Pair this with <a href="/desk">Desk</a> (can I enter now?) and <a href="/goal">Goal</a> (equity curve + projection over time).
 </div></div>
 
 <div class="main">
@@ -632,7 +624,7 @@ ATR_MULT.addEventListener("input", () => {{ clearTimeout(volDeb); volDeb = setTi
 refreshVol();
 """ + HERO_JS
 
-    return shell("/hedge-plan", "Plan", body, script=script, head_extra=css, meta="goal model")
+    return shell("/plan", "Plan", body, script=script, head_extra=css, meta="goal model")
 
 
 @app.get("/health")
@@ -1018,13 +1010,13 @@ def api_signal_link():
     return {"linked": backfill_signal_links()}
 
 
-@app.get("/hedge-goal", response_class=HTMLResponse)
+@app.get("/goal", response_class=HTMLResponse)
 def goal_page():
     from .goal_page import render
     return render()
 
 
-@app.get("/hedge-track", response_class=HTMLResponse)
+@app.get("/track", response_class=HTMLResponse)
 def track_page():
     from .track_page import render
     return render()
@@ -1132,20 +1124,6 @@ def philosophy_page():
     """The public site's third page — worldview and the model he was wrong about.
     Split from /about so that page stays short enough to read in one sitting."""
     from .philosophy_page import render
-    return render()
-
-
-@app.get("/about", response_class=HTMLResponse)
-def about_page():
-    """The page for a reader who can judge the work — a friend, not a partner.
-
-    "/" is for someone who already cares about him and wants to know he's okay.
-    /evidence is the argument. This is the introduction: what this is, where it
-    sits in his wider thesis, and what has failed. Deliberately keeps the
-    glossary/robustness/short/target routes DEAD — they were consolidated on
-    2026-08-03 and resurrecting them here would undo that on merge.
-    """
-    from .about_page import render
     return render()
 
 
@@ -1847,7 +1825,7 @@ def expire_stale(older_than_minutes: int = Query(30, ge=1, le=10080)):
 
 # ─── Signals / Conviction page ───────────────────────────────────────────────
 
-@app.get("/hedge-signals", response_class=HTMLResponse)
+@app.get("/signals", response_class=HTMLResponse)
 def signals_page_new():
     """Responsive signals queue built on the shared design system."""
     from .signals_page import render
@@ -1940,7 +1918,7 @@ canvas{width:100%;height:200px;display:block}
 <h4>the metrics that matter</h4><b class="g">Win rate</b> ≥48% = goal-grade. <b>Profit factor</b> ≥1.5 (gross win ÷ gross loss). <b class="a">Avg R</b> ≥3.5 — the real lever. <b class="r">Max DD</b> &lt;40% survivable, and <b>max consecutive losses</b> = your risk-of-ruin reality check.
 <h4>the risk-adjusted trio (plain English)</h4><b>Sharpe</b> = return per unit of <i>bumpiness</i> — how much reward you got for how wildly the equity swung. ≥1 is solid, higher is smoother. <b>Sortino</b> = the same idea but only counts the <i>downside</i> swings (it doesn't punish you for big <i>up</i> moves — fairer for high-R strategies). <b>Calmar</b> = annual return ÷ worst drawdown — "how much did I make for the deepest hole I sat in." Use them to compare two strategies with similar returns: the higher trio = the same money with less pain.
 <h4>equity curve + trade log</h4>The curve is account €over the window; the log lists every entry/exit with PnL% and hold time. Look for <b>smooth-ish</b> growth, not one lucky spike.
-<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/hedge-journal">Journal</a>.
+<h4>historical, not live</h4>Past fills on past candles — assumptions, not promises. Compare against your real results in <a href="/journal">Journal</a>.
 </div></div>
 
 <div class="row">
@@ -2296,7 +2274,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 
 function toGoal(wrPct, rr, freq) {{
   var q = 'win_rate=' + (wrPct/100).toFixed(4) + '&rr_ratio=' + rr + '&trades_per_week=' + freq;
-  window.open('/hedge-goal?' + q, '_blank');
+  window.open('/goal?' + q, '_blank');
 }}
 
 function runCustomSweep() {{
@@ -2424,7 +2402,7 @@ function renderResults(d) {{
   var gR = gp.rr || (gp.stop_pct ? (gp.tp_pct / gp.stop_pct) : m.avg_r) || 3;
   var gLink = document.getElementById('result-goal');
   if (m.win_rate != null) {{
-    gLink.href = '/hedge-goal?win_rate=' + (m.win_rate/100).toFixed(4) + '&rr_ratio=' +
+    gLink.href = '/goal?win_rate=' + (m.win_rate/100).toFixed(4) + '&rr_ratio=' +
                  (+gR).toFixed(2) + '&trades_per_week=' + (m.trades_per_week||1);
     gLink.target = '_blank'; gLink.style.display = '';
   }} else {{ gLink.style.display = 'none'; }}
@@ -2777,23 +2755,25 @@ def overview_page():
     return render("prop")
 
 
-# Hedge pages were renamed to a /hedge-* namespace on 2026-08-03 so the URL matches
-# the nav chip and mirrors /prop-*. Old bare paths 301 to the new ones — bookmarks,
-# the phone's home-screen shortcuts and any stale href keep working.
+# Hedge pages were renamed to a /hedge-* namespace on 2026-08-03 so the URL matched
+# the nav chip and mirrored /prop-*, then renamed BACK to bare on 2026-08-29 — "I
+# want to keep the hedge completely separate from the prop... remove the prefix of
+# hedge for everything." Hedge is the site's default/primary identity now; prop is
+# the isolated satellite and keeps marking itself. Both renames' old paths 301 here
+# — bookmarks, the phone's home-screen shortcuts and any stale href keep working.
 LEGACY_ROUTES = {
-    "/overview-hedge": "/hedge-overview", "/dashboard": "/hedge-plan",
-    "/goal": "/hedge-goal", "/desk": "/hedge-desk", "/signals": "/hedge-signals",
-    "/journal": "/hedge-journal", "/calendar": "/hedge-journal",
-    "/hedge-calendar": "/hedge-journal", "/prop-calendar": "/prop-journal",
-    "/analytics": "/hedge-analytics", "/position": "/hedge-position",
-    "/edge": "/hedge-edge",
-    # prop, renamed the same day so both books read alike
-    "/overview": "/prop-overview", "/prop-dashboard": "/prop-plan",
+    "/overview-hedge": "/overview", "/dashboard": "/plan",
+    "/hedge-overview": "/overview", "/hedge-plan": "/plan",
+    "/hedge-goal": "/goal", "/hedge-desk": "/desk", "/hedge-signals": "/signals",
+    "/hedge-journal": "/journal", "/hedge-analytics": "/analytics",
+    "/hedge-position": "/position", "/hedge-edge": "/edge", "/hedge-track": "/track",
+    "/calendar": "/journal", "/hedge-calendar": "/journal", "/prop-calendar": "/prop-journal",
+    "/prop-dashboard": "/prop-plan",
     # Older shims, folded in here from four hand-written handlers. They were
     # identical 301s that each forgot include_in_schema=False, so /sitemap
     # listed them as if they were pages — two of them under "Engines".
-    "/backtest": "/hedge-edge#backtest",
-    "/strategy": "/hedge-edge#board", "/strategy-hedge": "/hedge-edge#board",
+    "/backtest": "/edge#backtest",
+    "/strategy": "/edge#board", "/strategy-hedge": "/edge#board",
     # The survival group: five pages that shared prop_metrics() and one question.
     "/rules": "/prop-survival#rules", "/risk": "/prop-survival#risk",
     "/survival": "/prop-survival#survival", "/equity": "/prop-survival#equity",
@@ -2809,15 +2789,15 @@ LEGACY_ROUTES = {
     "/short": "/evidence#verdict",
     "/robustness": "/evidence#luck",
     "/research": "/evidence#notebook",
-    # 2026-08-21: /today merged into /hedge-track. Both opened on the next rung;
+    # 2026-08-21: /today merged into /track. Both opened on the next rung;
     # /today's unique half was the signal-adherence count, which now lives there
     # as "Did the book follow the engine?" — scoped to the hedge book on the way
     # in, which /today never was.
-    "/today": "/hedge-track",
+    "/today": "/track",
 }
 def _legacy_redirect(new: str):
     # A factory, not a loop closure: closing over the loop variable would send
-    # every legacy path to /hedge-edge. `request` must be annotated or FastAPI
+    # every legacy path to /edge. `request` must be annotated or FastAPI
     # reads it as a query param and 422s.
     def go(request: Request):
         q = request.url.query
@@ -2837,14 +2817,14 @@ for _old, _new in LEGACY_ROUTES.items():
     app.get(_old, include_in_schema=False)(_legacy_redirect(_new))
 
 
-@app.get("/hedge-overview", response_class=HTMLResponse)
+@app.get("/overview", response_class=HTMLResponse)
 def overview_page_hedge():
     """Hedge-book snapshot — live Kraken account, performance, market."""
     from .overview_page import render
     return render("hedge")
 
 
-@app.get("/hedge-position", response_class=HTMLResponse)
+@app.get("/position", response_class=HTMLResponse)
 def position_page_route(book: str = "hedge"):
     """Entry + direction → SL/TP/liq levels and size in ₿/€ (uses /api/position).
     Shared page: `book` preselects its Hedge|Prop tab and keeps that mode's nav."""
@@ -2869,7 +2849,7 @@ def sitemap_route():
     return render(paths)
 
 
-@app.get("/hedge-journal", response_class=HTMLResponse)
+@app.get("/journal", response_class=HTMLResponse)
 def journal_page(book: str = "hedge"):
     # 2026-08-28: this is now calendar_page.py's render — calendar + journal
     # were two pages doing the same job (browse trades, click one to review)
@@ -2880,7 +2860,7 @@ def journal_page(book: str = "hedge"):
     return render(book)
 
 
-@app.get("/hedge-analytics", response_class=HTMLResponse)
+@app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(book: str = "hedge"):
     from .analytics_page import render
     return render(book)
@@ -2898,7 +2878,7 @@ def api_money(refresh: bool = Query(False)):
     return money_data(refresh=refresh)
 
 
-@app.get("/hedge-edge", response_class=HTMLResponse)
+@app.get("/edge", response_class=HTMLResponse)
 def edge_page(book: str = "hedge"):
     from .edge_page import render_page
     css, body, script = _backtest_fragment()
@@ -2906,8 +2886,8 @@ def edge_page(book: str = "hedge"):
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
-# /hedge-calendar + /prop-calendar deleted the same way, 2026-08-28 — merged
-# into /hedge-journal + /prop-journal (see journal_page() above). Redirects
+# /journal + /prop-calendar deleted the same way, 2026-08-28 — merged
+# into /journal + /prop-journal (see journal_page() above). Redirects
 # below keep any bookmark or stale href working.
 
 
@@ -3111,7 +3091,7 @@ def prop_goal_page():
 
 @app.get("/prop-track", response_class=HTMLResponse)
 def prop_track_page():
-    """/hedge-track's missing prop twin (test_nav_parity.py). The daily read
+    """/track's missing prop twin (test_nav_parity.py). The daily read
     on the eval — target/floor/today's wall — built on prop_ledger_data(),
     which already computes all of it."""
     from .prop_track_page import render
@@ -3354,7 +3334,7 @@ def api_stats_trades():
 
 # ─── LENS_EDGE_v3 setup engine (see strategies/LENS_EDGE_v3_ICT/FINDINGS.md) ──
 
-@app.get("/hedge-desk", response_class=HTMLResponse)
+@app.get("/desk", response_class=HTMLResponse)
 def desk_page():
     from .desk import DESK_HTML
     return DESK_HTML

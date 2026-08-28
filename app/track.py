@@ -29,7 +29,7 @@ from .plan import LENS_BOOK
 WEIGHTS = {"discipline": 4, "plan": 3, "band": 2, "decision": 1}
 MAX_POINTS = sum(WEIGHTS.values())
 WINDOW_DAYS = 30
-NEAR_DAYS = 14        # horizon of the day-stepped band on /hedge-track
+NEAR_DAYS = 14        # horizon of the day-stepped band on /track
 
 # Percentile position -> share of the band weight. Above the median pays more
 # than below it, and under P10 pays nothing: that is the band saying you are
@@ -154,7 +154,7 @@ def band_position(cum: float, band: dict | None) -> tuple[int | None, float]:
 # trade obeyed its own plan, adherence asks whether a signal existed at all.
 #
 # The trade side is scoped to LENS_BOOK. /today was not, so its fill and orphan
-# counts included every prop attempt — the same bug main.py fixed for /hedge-plan.
+# counts included every prop attempt — the same bug main.py fixed for /plan.
 # `signals` has no book column (the engine fires once, not per book), so `fired`
 # is genuinely cross-book and the page says so rather than implying a hedge-only
 # denominator.
@@ -351,7 +351,7 @@ def step_plan(today: date = None) -> dict:
 
 
 def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
-    """The whole /hedge-track payload: next rung, the cone, the scored window."""
+    """The whole /track payload: next rung, the cone, the scored window."""
     today = today or date.today()
     window = _window(days, today)
     since = window[0]

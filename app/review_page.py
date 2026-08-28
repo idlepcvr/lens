@@ -202,7 +202,7 @@ def _combo_rows(combos: dict, month: str, done: set[str]) -> str:
         badge = '<span class="badge approved">reviewed</span>' if combo in done else ""
         tag_url = quote(f"VETO:{combo}", safe="")
         out.append(
-            f"<tr><td class=\"mono\"><a href=\"/hedge-journal?setup={tag_url}\" "
+            f"<tr><td class=\"mono\"><a href=\"/journal?setup={tag_url}\" "
             f"style=\"color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--dim)\" "
             f"title=\"see the actual trades behind this combo\">{html.escape(combo)}</a></td><td>{s['n']}</td>"
             f"{_row_eur(s['total'])}{_row_eur(s['avg'])}<td class=\"m\">{s['win']:.1f}%</td>"

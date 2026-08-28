@@ -207,7 +207,7 @@ function render(all, hedge){
   html += secHead('xover', `hedge signals · eval-sized × ${hedge.length}`)
     + `<div class="sec-body" id="s-xover">`
     + `<div class="sub" style="font-size:11px;color:var(--dim);margin:0 0 8px">The hedge book's alerts with the <b style="color:var(--ink)">prop ticket</b> applied (fixed risk on the eval account, legal leverage). `
-    + `⚠ <b style="color:var(--amber)">Sizing only</b> — these setups have no backtest against the eval walls, so they are unpriced: the pass-rate on <a href="/prop-goal" class="ac">Goal</a> doesn't include them. Decide them on <a href="/hedge-signals" class="ac">/signals</a>; if you take one on the eval, log the fill here.</div>`
+    + `⚠ <b style="color:var(--amber)">Sizing only</b> — these setups have no backtest against the eval walls, so they are unpriced: the pass-rate on <a href="/prop-goal" class="ac">Goal</a> doesn't include them. Decide them on <a href="/signals" class="ac">/signals</a>; if you take one on the eval, log the fill here.</div>`
     + (hedge.length
         ? `<div class="sb-wrap"><table class="sb"><tr><th>setup</th><th>dir</th><th>status</th><th>conv</th><th>when</th></tr>`+hedge.map(hedgeRow).join('')+`</table></div>`
         : `<div class="panel dim" style="text-align:center;color:var(--dim)">no recent hedge signals</div>`)
