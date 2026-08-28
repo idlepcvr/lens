@@ -27,7 +27,7 @@ _CSS = """
 .cal-pill.cur{color:var(--bg);background:var(--accent);border-color:var(--accent);font-weight:700}
 .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
 .cal-dow span{text-align:center;font-size:10px;color:var(--dim);font-weight:600}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-cell{aspect-ratio:1;border-radius:6px;border:1px solid var(--line);display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:4px;cursor:default}
 .cal-cell.has{cursor:pointer}
