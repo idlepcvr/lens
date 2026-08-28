@@ -1119,14 +1119,6 @@ def api_review_notify():
     return {"sent": review_page.notify_monthly()}
 
 
-@app.get("/philosophy", response_class=HTMLResponse)
-def philosophy_page():
-    """The public site's third page — worldview and the model he was wrong about.
-    Split from /about so that page stays short enough to read in one sitting."""
-    from .philosophy_page import render
-    return render()
-
-
 @app.get("/geometry", response_class=HTMLResponse)
 def geometry_page():
     """One calculation, both directions. /geometry derived what a configuration
