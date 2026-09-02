@@ -296,13 +296,6 @@ def step_plan(today: date = None) -> dict:
     except Exception:
         tpd = 0.0
 
-    # No date, no rate, or the rung is already overdue: fall back to one step so
-    # the section still answers "what does the next trade need to make" rather
-    # than disappearing exactly when the plan is in trouble.
-    steps = 1
-    if days_left and days_left > 0 and tpd > 0:
-        steps = max(1, round(days_left * tpd))
-
     # The phase the stack is in right now, and the rate the plan says it should
     # compound at. Before v8 the rates lived only in prose inside the amendment
     # reason, so no page could say which phase you were in — only how far from
@@ -317,6 +310,26 @@ def step_plan(today: date = None) -> dict:
         phase = None
 
     growth = tgt_btc / cur_btc
+    projected = False
+
+    # Rung date passed (or never had one): the original date was interpolated
+    # against an assumption that's now stale. Rather than collapse to "1 trade
+    # must do the whole climb" (a number nobody can act on), re-project days_left
+    # from the plan's own phase rate — the same %/mo the ladder was built from —
+    # so overdue still answers "how many days, at the rate the plan expects."
+    import math
+    rate = (phase or {}).get("rate_monthly")
+    if (days_left is None or days_left <= 0) and rate and rate > 0:
+        months_needed = math.log(growth) / math.log(1.0 + rate)
+        days_left = max(1, round(months_needed * 30.44))
+        projected = True
+
+    # No date, no rate to project from, or truly dateless: fall back to one
+    # step so the section still answers "what does the next trade need to
+    # make" rather than disappearing exactly when the plan is in trouble.
+    steps = 1
+    if days_left and days_left > 0 and tpd > 0:
+        steps = max(1, round(days_left * tpd))
     per_step = growth ** (1.0 / steps) - 1.0
     nxt_btc = cur_btc * (1.0 + per_step)
 
@@ -337,7 +350,8 @@ def step_plan(today: date = None) -> dict:
         "phase_rate": (phase or {}).get("rate_monthly"),
         "phase_to": (phase or {}).get("to_btc"),
         "label": nxt.get("label"), "date": nxt.get("date"),
-        "days_left": days_left, "steps": steps,
+        "days_left": days_left, "steps": steps, "projected": projected,
+        "eta_date": (today + timedelta(days=days_left)).isoformat() if projected else None,
         "trades_per_day": round(tpd, 2),
         "per_step_pct": round(per_step * 100, 2),
         "total_pct": round((growth - 1) * 100, 1),

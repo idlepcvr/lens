@@ -150,8 +150,11 @@ def _steps(S: dict) -> str:
                      if rate else f'<b class="tk-phase">{S["phase"]}</b> · ')
     when = f' · {_date_label(S["date"])}' if S.get("date") else ""
     left = S.get("days_left")
-    dtxt = (f"{left} days left" if left is not None and left >= 0
-            else "overdue" if left is not None else "no date")
+    if S.get("projected"):
+        dtxt = f"overdue · {left}d at plan rate → {_date_label(S['eta_date'])}"
+    else:
+        dtxt = (f"{left} days left" if left is not None and left >= 0
+                else "overdue" if left is not None else "no date")
 
     return f"""
   <details class="tk-panel tk-det tk-stp" id="s-steps" aria-label="Next steps" open>
