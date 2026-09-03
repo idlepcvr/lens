@@ -108,6 +108,45 @@ def _steps(S: dict) -> str:
     if not tgt:
         return ""
 
+    phase_txt = ""
+    if S.get("phase"):
+        rate = S.get("phase_rate")
+        phase_txt = (f'<b class="tk-phase">{S["phase"]}</b> · '
+                     f'{rate * 100:.0f}%/mo to {_btc(S["phase_to"])} · '
+                     if rate else f'<b class="tk-phase">{S["phase"]}</b> · ')
+    when = f' · {_date_label(S["date"])}' if S.get("date") else ""
+
+    if S.get("projected"):
+        # Overdue: there is no next-trade quota to hit — the RUNG missed its
+        # date, not the next trade. A fictitious "+2.2% needed" invented by
+        # dividing the gap into equal steps is worse than no number; show the
+        # rate that's actually being kept (trades/week) and where it lands.
+        per_wk = round(S["trades_per_day"] * 7, 1)
+        dtxt = f"overdue · at {per_wk}/wk → {_date_label(S['eta_date'])}"
+        return f"""
+  <details class="tk-panel tk-det tk-stp" id="s-steps" aria-label="Next steps" open>
+    <summary><span class="tk-sum-h">Next steps</span>
+      <span class="tk-badge">{phase_txt}{S.get('label') or 'the rung'} missed{when} · {dtxt}</span></summary>
+
+    <div class="tk-nums tk-stp-nums">
+      <div><span class="tk-lab">now</span><b>{_eur(S['cur_eur'], 0)}</b>
+           <span class="tk-eu">{_btc(S['cur_btc'])}</span></div>
+      <div><span class="tk-lab">{S.get('label') or 'rung'}</span>
+           <b>{_eur(S['target_eur'], 0)}</b>
+           <span class="tk-eu">{_btc(S['target_btc'])}</span></div>
+      <div><span class="tk-lab">gap</span><b>{S['total_pct']:.0f}%</b></div>
+    </div>
+
+    <p class="tk-sub">{S.get('label') or 'The rung'} was due{when} and wasn't
+       hit — that's the plan running behind, not the next trade. No per-trade
+       target: at your kept rate of <b>{per_wk}/wk</b>, closing the
+       <b>{S['total_pct']:.0f}%</b> gap to this rung projects to
+       <b>{_date_label(S['eta_date'])}</b>, assuming the
+       {S.get('phase') or "phase"}'s {S['phase_rate']*100:.0f}%/mo holds.
+       Stack euros at {_eur(px)}/₿.</p>
+  </details>
+"""
+
     floor = S.get("prev_btc")
     if floor is None or floor >= S["cur_btc"]:
         floor = S["cur_btc"] * 0.55
@@ -142,19 +181,9 @@ def _steps(S: dict) -> str:
             f'<div class="tk-st {cls}" style="--h:{h(v):.1f}%" title="{title}">'
             f'<i></i>{f"<span>{lab}</span>" if lab else ""}</div>')
 
-    phase_txt = ""
-    if S.get("phase"):
-        rate = S.get("phase_rate")
-        phase_txt = (f'<b class="tk-phase">{S["phase"]}</b> · '
-                     f'{rate * 100:.0f}%/mo to {_btc(S["phase_to"])} · '
-                     if rate else f'<b class="tk-phase">{S["phase"]}</b> · ')
-    when = f' · {_date_label(S["date"])}' if S.get("date") else ""
     left = S.get("days_left")
-    if S.get("projected"):
-        dtxt = f"overdue · {left}d at plan rate → {_date_label(S['eta_date'])}"
-    else:
-        dtxt = (f"{left} days left" if left is not None and left >= 0
-                else "overdue" if left is not None else "no date")
+    dtxt = (f"{left} days left" if left is not None and left >= 0
+            else "overdue" if left is not None else "no date")
 
     return f"""
   <details class="tk-panel tk-det tk-stp" id="s-steps" aria-label="Next steps" open>
