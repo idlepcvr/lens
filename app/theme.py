@@ -483,9 +483,63 @@ def footer_html(current_path: str) -> str:
     # the footer 2026-08-29 — "I haven't looked at this once." Pages aren't
     # deleted (real content, some of it personal) — reachable via /sitemap,
     # just not stamped on every single screen any more.
-    if not book:
+    #
+    # That left `book` empty on every page, so from 2026-08-29 to 2026-09-03
+    # this function returned "" everywhere and the site had no footer at all.
+    # It now always renders, but carries FRESHNESS rather than more links:
+    # every ₿→€ figure on every page is derived from the stored price and the
+    # last stack snapshot, and a stale one of either is wrong silently. The
+    # links that remain are the three that are useful from anywhere.
+    more = ('<span class="ftl">more</span>' + "".join(book)) if book else ""
+    stamp = _freshness_html()
+    other = ('<a href="/overview">▤ hedge</a>' if mode == "prop"
+             else '<a href="/prop-overview">◎ prop</a>')
+    return ('<footer class="navftr">' + more +
+            '<span class="ftmeta">' + stamp + '</span>'
+            '<span class="ftlinks">' + other +
+            '<a href="/sitemap">sitemap</a><a href="/health">health</a></span>'
+            '</footer>')
+
+
+def _freshness_html() -> str:
+    """BTC price + how old it and the stack snapshot are.
+
+    Cheap on purpose — two indexed reads — because it runs on every page render.
+    Never raises: a footer that can blank a page is worse than one that omits a
+    number, so any failure degrades to the wordmark alone.
+    """
+    from datetime import date, datetime
+
+    def _age(iso: str, dateonly: bool = False):
+        try:
+            d = (date.fromisoformat(iso[:10]) if dateonly
+                 else datetime.fromisoformat(iso).date())
+            n = (date.today() - d).days
+            return "today" if n <= 0 else ("1d" if n == 1 else f"{n}d")
+        except Exception:
+            return None
+
+    try:
+        from .database import _conn, get_lens_config
+        from .plan import STALE_DAYS
+        g = get_lens_config() or {}
+        px = g.get("btc_price_eur")
+        px_age = _age(g.get("updated_at") or "")
+        c = _conn()
+        row = c.execute("SELECT date, btc_total FROM stack_snapshot "
+                        "ORDER BY date DESC LIMIT 1").fetchone()
+        c.close()
+        out = []
+        if px:
+            out.append(f'₿ €{float(px):,.0f}' + (f' · {px_age}' if px_age else ''))
+        if row:
+            n = (date.today() - date.fromisoformat(row["date"][:10])).days
+            cls = ' class="stale"' if n > STALE_DAYS else ""
+            out.append(f'<span{cls}>stack {row["btc_total"]:.4f} ₿ · '
+                       f'{_age(row["date"], True)} old</span>')
+        return " · ".join(out)
+    except Exception:
         return ""
-    return '<footer class="navftr"><span class="ftl">more</span>' + "".join(book) + "</footer>"
 
 
 def _booked(path: str, label: str) -> str:
@@ -637,6 +691,13 @@ def shell(current_path: str, page_label: str, body: str, *,
         "footer.navftr a{color:var(--dim);font-size:11.5px;text-decoration:none}"
         "footer.navftr a:hover{color:var(--ink)}"
         "footer.navftr a.cur{color:var(--accent)}"
+        # freshness on the left, links pushed right; both wrap together on a
+        # phone rather than the links stranding on their own line
+        "footer.navftr .ftmeta{font-family:var(--mono);font-size:10.5px;"
+        "color:var(--faint);letter-spacing:.02em}"
+        "footer.navftr .ftmeta .stale{color:var(--amber)}"
+        "footer.navftr .ftlinks{margin-left:auto;display:flex;gap:14px}"
+        "@media(max-width:560px){footer.navftr .ftlinks{margin-left:0}}"
         "</style>"
         + head_extra +
         "</head><body><div class=\"app\">"
