@@ -34,6 +34,7 @@ import statistics
 from datetime import date, datetime, timedelta, timezone
 
 from .database import _conn
+from .plan import LENS_BOOK
 
 PATHS = 2000          # Monte-Carlo paths; P10/P90 are stable to ~1% at this count
 MIN_N = 30            # below this, history is noise — use plan params and badge it
@@ -46,10 +47,19 @@ WORDS = ("OFF-PLAN", "BEHIND", "ON", "AHEAD")
 # ─── inputs ──────────────────────────────────────────────────────────────────
 
 def _trades() -> list[dict]:
+    """Closed trades on the hedge book only.
+
+    The book filter was missing until 2026-09-03, so every prop evaluation
+    trade landed in the projection the personal account is measured against —
+    15 of them, −€452, mixed into a band that is quoted as "am I on pace".
+    The balances this is compared against (daily_snapshots) were always the
+    hedge account alone, so the two sides did not describe the same book.
+    """
     c = _conn()
     rows = c.execute(
         "SELECT pnl, closed_at FROM trades "
-        "WHERE closed_at IS NOT NULL AND pnl IS NOT NULL ORDER BY closed_at"
+        "WHERE book = ? AND closed_at IS NOT NULL AND pnl IS NOT NULL "
+        "ORDER BY closed_at", (LENS_BOOK,)
     ).fetchall()
     c.close()
     return [{"pnl": r["pnl"], "d": r["closed_at"][:10]} for r in rows]

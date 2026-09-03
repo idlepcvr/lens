@@ -107,9 +107,11 @@ def _cum_by_day(window: list[str]) -> dict:
             running += daily[i][1]
             i += 1
         out[day] = round(running, 2)
-    # days before the window still have to be summed in, or every day reads 0
-    lead = sum(p for d, p in daily if d < window[0]) if window else 0.0
-    return {d: round(v + lead, 2) for d, v in out.items()}
+    # No lead term: the while loop above starts at i=0 and consumes every daily
+    # row with d <= day, so days before the window are ALREADY in `running`.
+    # Adding them again double-counted the whole pre-window history — which is
+    # what the offset in track() was silently cancelling out.
+    return out
 
 
 def _ts(d: str) -> int:
@@ -408,24 +410,17 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
     # Without it the fan is a forecast nobody can check; with it, the gap between
     # plan and reality is the whole picture.
     #
-    # The two series must share a baseline or the comparison is meaningless, and
-    # they do NOT share one by default: cone._trades() has no book filter, so its
-    # cumulative includes prop trades, while everything here is book='hedge'. So
-    # anchor to the cone's own starting value and carry the shape from there.
-    # ponytail: an offset, not a reconciliation — fix the filter in cone.py and
-    # this constant goes to zero on its own. Deliberately not fixed here: four
-    # pages quote the status word that filter feeds.
-    actual, offset = [], 0.0
+    # Both series are now the same book on the same axis, so they need no
+    # reconciliation: cone._trades() filters to LENS_BOOK (fixed 2026-09-03) and
+    # _cum_by_day no longer double-counts its pre-window history. The offset that
+    # used to sit here was cancelling those two bugs against each other.
+    actual = []
     if C.get("anchor"):
         a = date.fromisoformat(C["anchor"])
         span = _window((today - a).days + 1, today) if today >= a else []
         acum = _cum_by_day(span) if span else {}
         if span:
-            offset = (C.get("anchor_cum") or 0.0) - acum[span[0]]
-            actual = [{"t": _ts(d), "cum": round(acum[d] + offset, 2)} for d in span]
-
-    # the band is scored on the same shifted axis, or every day reads as under P10
-    cums = {d: round(v + offset, 2) for d, v in cums.items()}
+            actual = [{"t": _ts(d), "cum": acum[d]} for d in span]
 
     scored = []
     for d in window:
