@@ -452,8 +452,23 @@ def track(days: int = WINDOW_DAYS, today: date = None) -> dict:
     if nxt.get("date"):
         days_left = (date.fromisoformat(nxt["date"]) - today).days
 
+    # Where today actually sits inside the band. score_day already worked this
+    # out to award the band points — it just never left this module, so the page
+    # drew a cone with no way to read "am I ahead or behind" off it.
+    tb = scored[-1] if scored else {}
+    tband, tcum = tb.get("band") or {}, tb.get("cum")
+    p50 = tband.get("p50")
+    pace = {
+        "pct": tb.get("band_pct"),          # percentile floor cleared, None = under P10
+        "cum": tcum, "p50": p50,
+        "vs_p50": (round(tcum - p50, 2)
+                   if (tcum is not None and p50 is not None) else None),
+        "bands": tband or None,
+    }
+
     earned = sum(d["points"] for d in scored)
     return {
+        "pace": pace,
         "today": today.isoformat(),
         "window_days": days,
         "days": scored,

@@ -101,6 +101,40 @@ def _date_label(iso: str, year: bool = False) -> str:
 # shows that in one look; a paragraph makes you do the arithmetic that the
 # staircase already did.
 
+def _pace(P: dict, C: dict) -> str:
+    """Ahead or behind, said in words, plus what the band actually is.
+
+    The cone was drawn with no key: five shaded percentiles and a line through
+    them, and no statement anywhere of which side of it you're on. The band
+    points were always scored (score_day awards on exactly this), the answer
+    just never left track.py.
+    """
+    if not P or P.get("vs_p50") is None:
+        return ('<p class="tk-sub tk-pace">No band today — the projection is anchored '
+                'monthly, so the first days of a window have nothing to compare against.</p>')
+
+    v, pct = P["vs_p50"], P.get("pct")
+    slice_txt = {75: "P75–P90 (top quarter)", 50: "P50–P75 (upper half)",
+                 25: "P25–P50 (lower half)", 10: "P10–P25 (bottom quarter)"}.get(
+                     pct, "under P10 (outside the band)")
+    ahead = v >= 0
+    word = "AHEAD of" if ahead else "BEHIND"
+    cls = "ok" if ahead else ("warn" if pct is not None else "bad")
+
+    return f"""
+    <div class="tk-pace {cls}">
+      <b>{word} the median path</b> — realised P&amp;L is
+      <b>{_eur(abs(v), 0)} {'above' if ahead else 'below'} P50</b>, sitting in {slice_txt}.
+    </div>
+    <p class="tk-sub tk-pacenote"><b>What the band is:</b> {C.get('paths', 0):,} simulated
+       futures, each one resampled from your {C.get('n', 0)} real closed trades
+       ({C.get('badge') or 'no sample'}) — not a forecast, a spread of what this
+       ledger has actually been capable of. <b>P50</b> is the middle path: half the
+       simulations land above it, half below. <b>P90/P10</b> are the outer edges —
+       a good and a bad run, not a ceiling or a floor. The solid line is what
+       really happened; where it sits between them is whether you're on track.</p>"""
+
+
 def _steps(S: dict) -> str:
     if not S.get("ok"):
         return ""
@@ -425,7 +459,7 @@ _JS = r"""
       } else if(range==="next"){
         ts.setVisibleRange({from:pts[0].t-NEAR_DAYS*86400, to:pts[pts.length-1].t});
       } else {
-        var d=(range==="90"?90:30)*86400;
+        var d=(parseInt(range,10)||30)*86400;
         ts.setVisibleRange({from:now-d, to:Math.min(pts[pts.length-1].t, now+d/3)});
       }
     }catch(e){ ts.fitContent(); }
@@ -518,6 +552,12 @@ _CSS = """<style>
 .tk-bar>span{display:block;height:100%;background:var(--accent);border-radius:999px;
   transition:width .24s cubic-bezier(.22,1,.36,1)}
 .tk-sub{font-size:12px;line-height:1.55;color:var(--dim);margin:9px 0 0;max-width:74ch}
+.tk-pace{margin:11px 0 0;padding:10px 13px;border-radius:9px;font-size:12.5px;
+  color:var(--ink);background:var(--panel);border:1px solid var(--line);border-left-width:3px}
+.tk-pace.ok{border-left-color:var(--long)}
+.tk-pace.warn{border-left-color:var(--amber)}
+.tk-pace.bad{border-left-color:var(--short)}
+.tk-pacenote{margin-top:7px}
 .tk-sub b{color:var(--ink);font-family:var(--mono)}
 .tk-stale{color:var(--amber);margin-left:6px}
 .tk-warn{font-size:12px;line-height:1.55;color:var(--amber);margin:12px 0 0;max-width:74ch}
@@ -758,10 +798,12 @@ def parts() -> dict:
       <span class="tk-badge">{C.get('badge') or 'no sample'}</span></summary>
     <div class="tk-ctl" role="group" aria-label="Chart controls">
       <span class="tk-seg" role="group" aria-label="Time range">
-        <button type="button" data-range="next" class="on">Next {NEAR_DAYS} days</button>
+        <button type="button" data-range="next" class="on">Next {NEAR_DAYS}d</button>
         <button type="button" data-range="rung">To the rung</button>
-        <button type="button" data-range="90">90d</button>
-        <button type="button" data-range="30">30d</button>
+        <button type="button" data-range="7">1W</button>
+        <button type="button" data-range="30">1M</button>
+        <button type="button" data-range="90">3M</button>
+        <button type="button" data-range="365">1Y</button>
       </span>
       <span class="tk-seg" role="group" aria-label="What to plot">
         <button type="button" data-mode="bal" class="on">Balance €</button>
@@ -773,6 +815,7 @@ def parts() -> dict:
     <div class="tk-fanwrap"><div id="fan" class="tk-fan" role="img"
       aria-label="Projection band with the realised line drawn through it.
       Drag to pan, scroll to zoom."></div></div>
+    {_pace(T.get('pace') or {}, C)}
     <p class="tk-hint">Drag to pan · scroll to zoom · hover a day for its band
        <button type="button" class="tk-btn tk-fitbtn" id="fan-fit">Reset view</button>
        <span class="tk-credit">chart: TradingView Lightweight Charts (Apache-2.0), served locally</span></p>
