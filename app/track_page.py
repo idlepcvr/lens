@@ -119,7 +119,9 @@ def _pace(P: dict, C: dict) -> str:
                      pct, "under P10 (outside the band)")
     ahead = v >= 0
     word = "AHEAD of" if ahead else "BEHIND"
-    cls = "ok" if ahead else ("warn" if pct is not None else "bad")
+    # pct 0 means "under P10" — a real, bad reading. Only None means no band,
+    # and band_position() is explicit that the two must never render alike.
+    cls = "ok" if ahead else ("bad" if not pct else "warn")
 
     return f"""
     <div class="tk-pace {cls}">
