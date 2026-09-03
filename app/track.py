@@ -290,9 +290,19 @@ def step_plan(today: date = None) -> dict:
         except ValueError:
             days_left = None
 
+    # cone.near()'s rate is a lifetime average (all closed trades ÷ weeks since
+    # the very first one) — deliberately long-run for the Monte-Carlo band, but
+    # wrong here: 543 trades since April 2025 reads as 7.5/wk when the last 30
+    # days ran at half that. Use a recent window instead, so "how many trades
+    # until the rung" reflects the pace actually being kept now.
     try:
-        from .cone import near as _near
-        tpd = (_near(7) or {}).get("trades_per_day") or 0.0
+        since = (today - timedelta(days=WINDOW_DAYS)).isoformat()
+        c = _conn()
+        n_recent = c.execute(
+            "SELECT COUNT(*) FROM trades WHERE book = ? AND opened_at >= ?",
+            (LENS_BOOK, since)).fetchone()[0]
+        c.close()
+        tpd = n_recent / WINDOW_DAYS
     except Exception:
         tpd = 0.0
 
