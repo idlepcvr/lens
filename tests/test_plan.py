@@ -5,11 +5,28 @@
 import os, tempfile
 from datetime import date
 
+import pytest
+
 import _bootstrap  # noqa: F401  — repo root onto sys.path + cwd
 from app import database
 
-database.DB_PATH = os.path.join(tempfile.mkdtemp(), "test_plan.db")
+_DB = os.path.join(tempfile.mkdtemp(), "test_plan.db")
+database.DB_PATH = _DB
 database.init_db()
+
+
+@pytest.fixture(autouse=True)
+def _own_db():
+    """Re-point DB_PATH per test instead of trusting import order.
+
+    Several files in this suite are scripts rather than test functions
+    (test_signal_link.py, test_excursion.py): pytest still imports them during
+    collection, their whole body runs, and they reassign database.DB_PATH to
+    their own temp DB. Collection finishes before any test does, so whichever
+    imported last owned the database by the time these tests ran — which is why
+    test_measured saw 9 foreign trades where it had inserted none.
+    """
+    database.DB_PATH = _DB
 
 from app import plan  # noqa: E402  (must import after DB_PATH is redirected)
 
