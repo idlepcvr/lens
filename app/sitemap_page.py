@@ -1,10 +1,10 @@
-"""LENS /sitemap — every page in one place, grouped by book.
+"""LENS /sitemap — every page in one place.
 
 Built from the live route table (passed in) cross-referenced against the nav
-lists, so it auto-includes pages that aren't in any nav (the orphans).
+list, so it auto-includes pages that aren't in the nav (the orphans).
 """
 
-from .theme import shell, NAV_PROP, NAV_HEDGE
+from .theme import shell, NAV_HEDGE
 
 _CSS = r"""<style>
 .sm{max-width:1000px;margin:0 auto;padding:6px 14px 60px}
@@ -26,34 +26,25 @@ def _label(path: str, labels: dict) -> str:
 
 
 def render(paths: list[str]) -> str:
-    labels = {**dict(NAV_PROP), **dict(NAV_HEDGE)}
+    labels = dict(NAV_HEDGE)
     hedge = {h for h, _ in NAV_HEDGE}
-    prop = {h for h, _ in NAV_PROP}
 
-    # Pages with no nav chip on purpose: they're engine cards on /prop-plan
-    # (see NAV_PROP in theme.py — they lost a chip, not a home). Listing them
-    # under "Other" made deliberate design look like clutter.
-    ENGINES = {
-        "/prop-survival", "/regime", "/prop-ledger", "/prop-income", "/prop",
-    }
+    # Pages with no nav chip on purpose (engine cards, not chips).
+    ENGINES = {"/regime"}
 
     groups: dict[str, list[str]] = {
-        "Shared": [], "Hedge": [], "Prop": [], "Engines": [], "Reference": []
+        "Hedge": [], "Engines": [], "Reference": []
     }
     for p in paths:
-        if p in hedge and p in prop:
-            groups["Shared"].append(p)
-        elif p in hedge:
+        if p in hedge:
             groups["Hedge"].append(p)
-        elif p in prop:
-            groups["Prop"].append(p)
         elif p in ENGINES:
             groups["Engines"].append(p)
         else:
             groups["Reference"].append(p)
 
     cards = []
-    for title in ("Hedge", "Prop", "Shared", "Engines", "Reference"):
+    for title in ("Hedge", "Engines", "Reference"):
         items = sorted(groups[title], key=lambda p: _label(p, labels).lower())
         if not items:
             continue
@@ -66,7 +57,7 @@ def render(paths: list[str]) -> str:
     body = f"""
 <div class="sm">
   <h1>Sitemap</h1>
-  <div class="sub">Every page in LENS. Hedge &amp; Prop each have their own nav; this is the full map.</div>
+  <div class="sub">Every page in LENS.</div>
   <div class="grid">{''.join(cards)}</div>
 </div>"""
     return shell("/sitemap", "Sitemap", body, head_extra=_CSS, meta="all pages")

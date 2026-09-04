@@ -1,12 +1,16 @@
-"""LENS — Market Regime (PROP analytic).
+"""LENS — Market Regime.
 
 Ported from PRISM's quant.py: classify each BTC day into BULL / SIDEWAYS / BEAR
 with K-Means(k=3) on (14d rolling return, 14d rolling vol) — pure Python, no
 sklearn. Daily OHLCV from Bybit public API.
 
-The PROP-specific layer on top: bucket the hero strategy's historical trades by
-the regime on their entry day → win-rate per regime. Answers the real question
-for the eval — "is right now a regime where ASIAN_RSI_DIP_v1 actually wins?"
+Was labelled a PROP analytic: a hero_by_regime() layer on top bucketed the
+prop hero strategy's historical trades by regime → win-rate per regime,
+answering "is right now a regime where ASIAN_RSI_DIP_v1 actually wins?" That
+layer imported app.prop_eval, so it went with the 2026-09-05 hedge/prop split
+— prop_eval.py is deleted and there's no hedge equivalent of a single "hero"
+strategy to bucket (hedge trades are discretionary, not one coded strategy).
+detect_regimes() itself was always book-agnostic BTC classification and stays.
 """
 
 import math
@@ -197,35 +201,6 @@ def detect_regimes(limit: int = 1000) -> dict:
     }
 
 
-def hero_by_regime(by_date: dict, strategy: str = "ASIAN_RSI_DIP_v1",
-                   eval_name: str = "BREAKOUT_1STEP_TURBO", months: int = 30) -> dict:
-    """Bucket the hero strategy's historical trades by the regime on their entry
-    day. Win/loss is the sign of pnl_pct (sizing-independent). Returns per-regime
-    {n, wins, wr_pct}. This is the prop-relevant tailoring of the regime view."""
-    # Imported here to avoid a circular import at module load.
-    from app.prop_eval import _cached_trade_log, EVALS
-    from app.backtest_engine import STRATEGIES
-
-    out = {r: {"n": 0, "wins": 0, "wr_pct": None} for r in ("BULL", "SIDEWAYS", "BEAR")}
-    if strategy not in STRATEGIES or eval_name not in EVALS or not by_date:
-        return out
-    try:
-        trades = _cached_trade_log(strategy, EVALS[eval_name], 0.5, months)
-    except Exception:
-        return out
-    for t in trades:
-        d = t["eval_day"].strftime("%Y-%m-%d")
-        reg = by_date.get(d)
-        if reg in out:
-            out[reg]["n"] += 1
-            if t["pnl_pct"] > 0:
-                out[reg]["wins"] += 1
-    for r, v in out.items():
-        if v["n"]:
-            v["wr_pct"] = round(100 * v["wins"] / v["n"], 1)
-    return out
-
-
 _PAYLOAD_TTL_S = 300
 _payload_cache: tuple[float, dict] | None = None
 
@@ -249,7 +224,6 @@ def regime_payload() -> dict:
         return _payload_cache[1]
 
     reg = detect_regimes()
-    reg["hero_by_regime"] = hero_by_regime(reg.get("by_date", {}))
     reg.pop("by_date", None)   # internal only — don't ship the full map
     _payload_cache = (now, reg)
     return reg

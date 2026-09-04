@@ -1,8 +1,9 @@
-"""LENS — /regime PROP analytic page (server-rendered).
+"""LENS — /regime page (server-rendered).
 
-Market regime (BULL/SIDEWAYS/BEAR) + the prop-relevant layer: the hero
-strategy's win-rate per regime, so you can judge whether *now* is a regime
-where ASIAN_RSI_DIP_v1 actually wins before starting the eval. See app/regime.py.
+Market regime (BULL/SIDEWAYS/BEAR), pure BTC classification. Was labelled a
+PROP analytic — a "hero strategy win-rate per regime" layer sat on top,
+answering whether *now* was a regime where the prop hero strategy actually
+won. That layer went with the 2026-09-05 hedge/prop split (see app/regime.py).
 """
 
 from .theme import shell
@@ -49,27 +50,7 @@ def render(p: dict) -> str:
     cur = p.get("current_regime", "UNKNOWN")
     cur_cls = _CLS.get(cur, "")
     cur_bg = _BG.get(cur, "")
-    hbr = p.get("hero_by_regime", {})
     stats = p.get("regime_stats", {})
-
-    # Hero edge-by-regime cards
-    best_wr, best_reg = -1, None
-    for r in ("BULL", "SIDEWAYS", "BEAR"):
-        wr = hbr.get(r, {}).get("wr_pct")
-        if wr is not None and wr > best_wr:
-            best_wr, best_reg = wr, r
-    cards = ""
-    for r in ("BULL", "SIDEWAYS", "BEAR"):
-        d = hbr.get(r, {})
-        wr = d.get("wr_pct")
-        wr_txt = f"{wr:.1f}%" if wr is not None else "—"
-        is_cur = " cur" if r == cur else ""
-        tag = '<span class="cur-tag">◀ NOW</span>' if r == cur else ""
-        cards += (
-            f'<div class="card{is_cur}"><div class="lbl">{r}{tag}</div>'
-            f'<div class="wr {_CLS[r]}">{wr_txt}</div>'
-            f'<div class="n">hero win-rate · n={d.get("n", 0)} trades</div></div>'
-        )
 
     # 60-day strip
     chips = "".join(
@@ -129,24 +110,10 @@ def render(p: dict) -> str:
     <div class="prose" style="margin-top:12px">Each row: given <strong>today's</strong> regime, the chance of each regime <strong>tomorrow</strong> (rows sum to 100%). The diagonal is <strong>persistence</strong> — how often a regime repeats day-to-day (BTC regimes are sticky, ~85–93%). "Avg run" = how many days that regime usually lasts before it flips.</div>
   </div>"""
 
-    # Verdict
-    cur_wr = hbr.get(cur, {}).get("wr_pct")
-    if cur_wr is not None and best_reg:
-        if cur == best_reg:
-            verdict = (f"Current regime <strong class='{cur_cls}'>{cur}</strong> is the hero's "
-                       f"<strong>best</strong> regime (WR {cur_wr:.1f}%). Favourable window to run the eval.")
-        else:
-            verdict = (f"Current regime <strong class='{cur_cls}'>{cur}</strong>: hero WR "
-                       f"<strong>{cur_wr:.1f}%</strong> vs <strong>{best_wr:.1f}%</strong> in {best_reg}. "
-                       f"Edge is present but below its best — size conservatively (0.5%) and let the regime work.")
-    else:
-        verdict = (f"Current regime <strong class='{cur_cls}'>{cur}</strong>. Thin per-regime sample — "
-                   f"treat the split as directional, not precise.")
-
     body = f"""
 <div class="rg">
   <h1>Market Regime — BTCUSD daily</h1>
-  <div class="sub">K-Means(k=3) on 14-day return + 14-day volatility. The PROP question: is now a regime where the hero wins?</div>
+  <div class="sub">K-Means(k=3) on 14-day return + 14-day volatility.</div>
 
   <div class="panel">
     <h2>Current regime</h2>
@@ -154,16 +121,8 @@ def render(p: dict) -> str:
       <div class="badge {cur_bg}">{cur}</div>
       <div class="meta">14d return <b class="{cur_cls}">{p.get('current_ret14_pct', 0)}%</b> &nbsp;·&nbsp; 14d vol {p.get('current_vol14_pct', 0)}%/day &nbsp;·&nbsp; {p.get('current_date', '')}</div>
     </div>
-    <div class="verdict" style="margin-top:16px">{verdict}</div>
   </div>
 {persist_panel}
-  <div class="panel">
-    <h2>Hero edge by regime — ASIAN_RSI_DIP_v1 (30mo backtest)</h2>
-    <div class="grid3">{cards}</div>
-    <div class="prose" style="margin-top:14px">Win-rate of the hero's historical trades bucketed by the regime on their entry day.
-      The eval needs ~40%+ WR to clear; <strong>BULL is materially kinder</strong> than BEAR. Small per-regime samples — directional, not gospel.</div>
-  </div>
-
   <div class="panel">
     <h2>Last 60 days</h2>
     <div class="strip">{chips}</div>

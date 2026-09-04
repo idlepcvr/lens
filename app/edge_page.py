@@ -89,6 +89,79 @@ fetch('/api/review/trades').then(r=>r.json()).then(render).catch(e=>{
 """
 
 
+# _board/_r_cols/_BOARD_CSS were in prop_views.py (a leftover from when it was
+# the only backtest-board page) despite rendering BOTH boards on /edge — moved
+# here on the 2026-09-05 hedge/prop split, deleting prop_views.py would have
+# taken the hedge board's renderer down with it. Purely a rendering helper:
+# it just filters `results` by `mode` ("hedge" | "prop") and ranks a table —
+# "prop" here labels the 4H/1H Asian-dip strategy FAMILY in the backtest
+# candidate set, not the (now-deleted) prop-eval account tracking, so the
+# HEDGE/PROP board toggle stays; it's two strategy families, not two books.
+_BOARD_CSS = r"""<style>
+.pv .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
+.pv table{width:100%;border-collapse:collapse;font-size:13px}
+.pv th,.pv td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+.pv th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.pv td{font-family:var(--mono)}
+.pv tr.hl{background:var(--panel2)}
+.pv .green{color:var(--long)} .pv .red{color:var(--short)}
+.pv .prose{color:var(--dim);font-size:13.5px;line-height:1.65}
+.pv .prose strong{color:var(--ink)}
+</style>"""
+
+
+def _r_cols(rows, r_levels):
+    """Cells for each R level: net R, green if profitable. The 'let winners run'
+    sweep made visible — you can read straight across which R each one wins at."""
+    by_r = {row["r"]: row for row in rows}
+    out = ""
+    for R in r_levels:
+        row = by_r.get(R)
+        if not row:
+            out += "<td>·</td>"
+            continue
+        cls = "green" if row["net"] > 0 else "red"
+        out += (f'<td class="{cls}" title="WR {row["wr"]}%">'
+                f'{row["net"]:+.2f}</td>')
+    return out
+
+
+def _board(results, mode, r_levels):
+    ranked = sorted([o for o in results if o["mode"] == mode and not o["thin"]],
+                    key=lambda x: x["rank"])
+    thin = [o for o in results if o["mode"] == mode and o["thin"]]
+    rcols_head = "".join(f"<th>{R:g}R</th>" for R in r_levels)
+    body_rows = ""
+    for o in ranked:
+        hl = " class=\"hl\"" if o["top3"] else ""
+        star = " ★" if o["top3"] else ""
+        best = (f'<span class="green">{o["best_net"]:+.2f}R</span> @ {o["best_r"]:g}R'
+                if o["best_net"] and o["best_net"] > 0
+                else f'<span class="red">{o["best_net"]:+.2f}R</span>')
+        body_rows += (
+            f"<tr{hl}><td>{o['rank']}{star}</td>"
+            f"<td>{o['name']}</td>"
+            f"<td>{o['dir']}</td>"
+            f"<td>{o['n']}</td>"
+            f"<td>{o['sl']:.2f}%</td>"
+            f"{_r_cols(o['rows'], r_levels)}"
+            f"<td>{best}</td>"
+            f"<td><b>{o['score']:.2f}</b></td></tr>")
+    thin_note = ""
+    if thin:
+        thin_note = ('<div class="prose" style="margin-top:8px">thin (n&lt;40, not ranked): '
+                     + ", ".join(f"{o['name']} (n={o['n']})" for o in thin) + "</div>")
+    return f"""
+  <div class="panel">
+    <div style="overflow-x:auto"><table>
+      <tr><th>#</th><th>strategy</th><th>dir</th><th>n</th><th>stop</th>
+          {rcols_head}<th>best</th><th>score</th></tr>
+      {body_rows}
+    </table></div>
+    {thin_note}
+  </div>"""
+
+
 _MODE_JS = r"""
 (function(){
   const btns=document.querySelectorAll('.ed-mode button');
@@ -109,7 +182,6 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "",
                 book: str = "hedge") -> str:
     """bt_* = the backtest-runner fragment (built in main.py, embedded as #backtest).
     `book` only picks which nav to render — the page shows both boards regardless."""
-    from .prop_views import _board, _CSS as PV_CSS
     from .strategy_eval import load_cache
     from .fit_page import fragment as _fit_fragment
 
@@ -140,7 +212,7 @@ def render_page(bt_css: str = "", bt_body: str = "", bt_script: str = "",
             f'Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>'
             f'</div>'
         )
-        head = _CSS + PV_CSS + fit_css + bt_css
+        head = _CSS + _BOARD_CSS + fit_css + bt_css
         script = SCRIPT + _MODE_JS + fit_script + bt_script
     else:
         board = ('<div class="ed-h" id="board">Simulated — the rules replayed</div>'

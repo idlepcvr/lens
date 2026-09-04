@@ -1,17 +1,18 @@
-"""LENS /overview — one read-only snapshot for BOTH books.
+"""LENS /overview — one read-only snapshot of the hedge book.
 
-Three blocks (toggle hedge ↔ prop in the page):
-  • Live account   — equity / available margin / unrealised PnL
-                     (hedge = live Kraken; prop = manual eval ledger vs walls)
-  • Performance    — closed-trade stats for that book (review_analytics)
+Three blocks:
+  • Live account   — equity / available margin / unrealised PnL (live Kraken)
+  • Performance    — closed-trade stats (review_analytics)
   • Market         — BTC price, ATR(14d), today's range, noise floor
 
 Performance + Market are computed server-side (DB only, fast). The live Kraken
 pull is async client-side via /api/account/live so the page never blocks on it.
+
+Was a hedge↔prop toggle in one payload until the 2026-09-05 hedge/prop split;
+the prop block (fed by prop_ledger_data) is gone with the prop book.
 """
 
 from .review import review_analytics
-from .prop_ledger import prop_ledger_data
 from .volatility import fetch_volatility
 
 
@@ -39,23 +40,9 @@ def market_snapshot() -> dict:
 
 
 def overview_data() -> dict:
-    """Both books in one payload — the page toggles between them client-side.
-    Live Kraken equity is fetched separately (async) for the hedge block."""
-    prop = prop_ledger_data()
+    """The hedge book's snapshot. Live Kraken equity is fetched separately
+    (async, client-side) for the hero block."""
     return {
         "market": market_snapshot(),
         "hedge": {"performance": review_analytics(book="hedge")},
-        "prop": {
-            "performance": review_analytics(book="prop"),
-            "live": {
-                "equity":       prop["equity"],
-                "account":      prop["account"],
-                "to_target":    prop["to_target_usd"],
-                "to_floor":     prop["to_floor_usd"],
-                "target":       prop["target"],
-                "floor":        prop["floor"],
-                "cur_dd_pct":   prop["cur_dd_pct"],
-                "today_pnl":    prop["today_pnl"],
-            },
-        },
     }

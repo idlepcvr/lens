@@ -316,6 +316,17 @@ def coverage() -> dict:
         else:
             break
 
+    # TODO(lens-hedge-split, 2026-09-05): this still reads the PROP eval account
+    # via the shared DB (get_prop_eval/prop_eval_state) — lens-prop, not lens,
+    # now owns that concept. It's not broken (database.py stays, and this call
+    # is try/except-wrapped, so a missing/stale row degrades to acct=0 rather
+    # than crashing), but keeping "does the funded account cover burn" on the
+    # hedge Plan page is a real product call, not a code-organization one: the
+    # eval's own future is itself an open decision (see NEXT_SESSION.md, "A
+    # decision, not a build: the prop eval") so deciding to strip this
+    # permanently felt premature. Left as the thin cross-book read NEXT_SESSION
+    # explicitly allowed — revisit once the eval finish-or-close call is made.
+    #
     # The honest bar: what the funded account must return monthly to cover burn.
     # Same-currency assumption (EUR burn vs the eval account's units) — a ~1.08
     # EURUSD would move this ~8%, which never changes the verdict here.

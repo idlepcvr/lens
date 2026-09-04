@@ -17,45 +17,12 @@ import re
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Nav — one list drives every page's nav bar. Add a page here once.
-# PROP mirrors HEDGE one-for-one, in the same order, so the two modes are learnable
-# as one layout. Every prop page has its OWN URL (a /prop-* twin) — no ?book= toggle.
-# The twin routes call the same render() with book="prop" hard-locked, so hedge and
-# prop share one codebase and can never drift, but read as fully separate pages.
-# Every URL says which book it belongs to and what the chip is called — the route
-# and the label match, so you can read the address bar instead of decoding it
-# (Lucky, 2026-08-03: "I can barely understand what's built half the time").
-#   hedge                 prop                    render
-#   /overview   →   /prop-overview          own page
-#   /plan       →   /prop-plan              own page
-#   /goal       →   /prop-goal              own page
-#   /desk       →   /prop-desk              own page
-#   /signals    →   /prop-signals           own page
-#   /journal    →   /prop-journal           shared render (calendar_page.py), book="prop" locked
-#   /analytics  →   /prop-analytics         shared render, book="prop" locked
-#   /position   →   /prop-position          shared render, book="prop" locked
-#   /edge       →   /prop-edge              shared render, book="prop" locked
+# LENS was hedge+prop in one app until the 2026-09-05 split: prop's own nav
+# (NAV_PROP), its /prop-* routes and the PROP/HEDGE mode switch moved out —
+# lens-prop is now a separate fork with its own copy of this file. LENS keeps
+# the hedge book only; this file has one nav, not two.
 # LEGACY_ROUTES in main.py 301s the old bare paths (/goal, /dashboard…) here, so
-# old bookmarks and any href missed by the rename keep working.
-# Same order as NAV_HEDGE — test_nav_parity enforces it, so the two modes stay
-# muscle-memory compatible. Both bars are now the same ten chips, nothing else.
-NAV_PROP = [
-    ("/prop-overview", "Overview"),
-    ("/prop-signals", "Signals"),
-    ("/prop-desk", "Desk"),
-    ("/prop-plan", "Plan"),
-    ("/prop-goal", "Goal"),
-    ("/prop-track", "Track"),
-    ("/prop-position", "Position"),
-    ("/prop-journal", "Journal"),
-    ("/prop-analytics", "Analytics"),
-    ("/prop-edge", "Edge"),
-    # Cone / Engines / Ledger / Income used to hang off the end of this list,
-    # which made the prop bar four chips longer than hedge and broke the mirror.
-    # They're now engine cards in the "engines" block on /prop-plan, alongside
-    # Strategy / Risk / Survival / Rules / Equity / Regime, which never had a
-    # nav entry either. Every one of those pages still renders with the prop nav
-    # (page_mode defaults to prop) — they lost a chip, not a home.
-]
+# old bookmarks and any href missed by a rename keep working.
 # Order specified by Lucky, 2026-07-25 — his flow, not a derived one:
 # overview → signals → desk → plan → goal → position → journal → analytics →
 # edge. Every entry is a top-bar chip (HEDGE_MAIN below is the full set),
@@ -88,7 +55,6 @@ NAV_HEDGE = [
 # up top. The bar already wraps (.nav flex-wrap at >=1080px) and scrolls
 # horizontally below that, so a longer list costs layout nothing.
 HEDGE_MAIN = {h for h, _ in NAV_HEDGE}
-PROP_MAIN  = {h for h, _ in NAV_PROP}
 
 # Mode-neutral pages appended to every footer (also: ☰ in the top bar → /sitemap).
 # /glossary is pure reference with no book — neutral, so neither nav owns it.
@@ -99,37 +65,20 @@ PROP_MAIN  = {h for h, _ in NAV_PROP}
 # just wants to know he's okay.
 NAV_NEUTRAL = [("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/review", "Review"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
-# Home ("/") is the neutral mode chooser; /style defaults to the PROP nav.
-_PAGE_MODE = {h: "prop" for h, _ in NAV_PROP}
-_PAGE_MODE.update({h: "hedge" for h, _ in NAV_HEDGE})
+_PAGE_MODE = {h: "hedge" for h, _ in NAV_HEDGE}
 
 
 def page_book(path: str) -> str | None:
-    """'prop' | 'hedge' | None — which BOOK a page belongs to, or None if it
-    belongs to neither (glossary, system, health…).
-
-    Distinct from page_mode() on purpose: page_mode defaults unknown paths to
-    'prop' so the nav always has something to draw, which is right for chrome
-    and wrong for labelling. Prefixing /glossary with "PROP —" would be a lie.
-    """
-    if "book=prop" in path:
-        return "prop"
-    if "book=hedge" in path:
-        return "hedge"
+    """'hedge' | None — which BOOK a page belongs to, or None if it belongs to
+    neither (glossary, system, health…). One book now; kept as a lookup (not a
+    constant) so a page not in NAV_HEDGE still reads as unbooked."""
     return _PAGE_MODE.get(path.split("?")[0])
 
 
 def page_mode(path: str) -> str:
-    """Which mode a page lives in (defaults to prop for neutral pages).
-
-    A shared page (/position, /edge, /journal…) belongs to whichever mode you
-    arrived from, so `?book=` on the path wins over the static table. Without this
-    a prop user clicking "Position" would be dumped into the hedge nav."""
-    if "book=prop" in path:
-        return "prop"
-    if "book=hedge" in path:
-        return "hedge"
-    return _PAGE_MODE.get(path, "prop")
+    """Every page is 'hedge' now — one book, one nav. Kept as a function (not a
+    constant) so call sites from the hedge/prop era didn't all need rewriting."""
+    return "hedge"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Brand mark — a scope/aperture iris (LENS = optics; concentric reads as a
@@ -440,41 +389,33 @@ a{color:var(--accent);text-decoration:none}
 
 
 def nav_html(current_path: str) -> str:
-    """Mode-aware nav: a PROP|HEDGE switch, then only the current mode's chips.
-    Switching modes just navigates to that mode's home — stateless, no cookie."""
-    mode = page_mode(current_path)
-    items = NAV_PROP if mode == "prop" else NAV_HEDGE
-    main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
+    """The nav bar: a home/sitemap chip pair, then the hedge chips.
+    Was a PROP|HEDGE mode switch before the 2026-09-05 split; one book now."""
     out = []
-    for href, label in items:
-        if href not in main:
+    for href, label in NAV_HEDGE:
+        if href not in HEDGE_MAIN:
             continue
         cur = " cur" if href == current_path else ""
         out.append('<a href="%s" class="%s">%s</a>' % (href, cur.strip(), label))
-    # No Sitemap chip: the ☰ in the mode switch below is already the sitemap
-    # button, on every page. Two entries to one page on the same screen.
     sw = (
         '<div class="modesw">'
-        '<a href="/prop-overview" class="%s">◎ PROP</a>'
-        '<a href="/overview" class="%s">▤ HEDGE</a>'
         '<a href="/sitemap" class="home">☰</a>'
         '<a href="/" class="home">⌂</a>'
         '</div>'
-    ) % ("on" if mode == "prop" else "", "on" if mode == "hedge" else "")
+    )
     return sw + '<nav class="nav">' + "".join(out) + "</nav>"
 
 
 def footer_html(current_path: str) -> str:
-    """Secondary pages for the current mode, in two labelled groups.
+    """Secondary (non-top-bar) pages, in one labelled group.
 
     Previously one undifferentiated run of 14 links: the five remaining TRADING
     pages (Journal, Analytics, Plan, Goal, Edge) sat next to nine utility pages
     (Style, Sitemap, Health, Manual, Audit…) with nothing to tell them apart, so
     finding Edge meant reading the whole strip. The split is purely visual —
     every page stays exactly as reachable as it was."""
-    mode = page_mode(current_path)
-    items = NAV_PROP if mode == "prop" else NAV_HEDGE
-    main = PROP_MAIN if mode == "prop" else HEDGE_MAIN
+    items = NAV_HEDGE
+    main = HEDGE_MAIN
     link = lambda href, label: '<a href="%s" class="%s">%s</a>' % (
         href, "cur" if href == current_path else "", label)
 
@@ -543,7 +484,7 @@ def _freshness_html() -> str:
 
 
 def _booked(path: str, label: str) -> str:
-    """"HEDGE — Overview" / "PROP — Overview"; neutral pages keep a bare label.
+    """"HEDGE — Overview"; neutral pages keep a bare label.
 
     Applied centrally rather than at ~25 call sites: every page already passes
     its own label to shell(), so one place decides how a book is announced and
