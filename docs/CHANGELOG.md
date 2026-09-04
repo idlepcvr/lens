@@ -7,6 +7,67 @@ Dated build history, newest first. Open next-steps live in
 
 ---
 
+## 2026-09-04
+
+**Track told the truth for the first time, and the hedge/prop split started.**
+
+Four straight bugs in what `/track` was reporting as "on pace":
+
+- Overdue rungs collapsed to `steps=1` and printed a fictitious "+61% next
+  trade" quota. Now retires the missed rung outright (no dates move, no
+  invented per-trade target) rather than pretending a single trade closes
+  the whole gap.
+- `cone.near()`'s trade rate is a **lifetime** average (543 trades ÷ 72
+  weeks since April 2025 → 7.5/wk) — right for the Monte-Carlo drift, wrong
+  for "what pace am I keeping now." `step_plan()` now counts a 30-day
+  window directly (5.4/wk).
+- `cone._trades()` had no book filter: 15 prop evaluation trades (−€452)
+  sat inside the hedge projection the personal account is measured
+  against. Filtered to `LENS_BOOK`. 543 → 529 trades.
+- `track._cum_by_day()` double-counted all pre-window P&L — a `lead` term
+  added history the running total had already summed. Read −€8,575 where
+  the truth was −€4,288, exactly 2×. The offset hack in `track()` existed
+  only to cancel this against the missing book filter above; with both
+  fixed it computes to 0.0 and is gone.
+
+Net effect on the reading: **−€294 below P50, outside the band** became
+**−€95 below P50, inside P25–P50, status ON**. The prop trades were
+pushing the hedge book out of its own band.
+
+Also: the pace line itself didn't exist before today — `/track` drew a
+five-band cone with no statement of which side of it you're on. Added an
+ahead/behind headline plus a plain-English explainer of what P10/P50/P90
+actually are. Real time-range buttons (1W/1M/3M/1Y) replaced two that
+silently did the same thing.
+
+**The site had no footer** since 2026-08-29 — `footer_html()` returned `""`
+on every page once the neutral-page links were dropped from it, and
+nothing was added back. It now always renders, carrying BTC-price age and
+stack-snapshot age instead of a link farm — the two numbers every EUR
+figure on every page is silently derived from. Currently reads the stack
+snapshot as several weeks stale; updating it is the first open item below.
+
+`tests/test_plan.py::test_measured` had failed on every full-suite run
+this session (`assert 9 == 0`, passing standalone). Cause:
+`test_signal_link.py` and `test_excursion.py` are scripts, not test
+functions — pytest imports them during collection and their body runs,
+reassigning the global `database.DB_PATH`. Whichever imported last owned
+the database. Fixed on the victim with an autouse fixture rather than the
+polluters, since their asserts running at import *is* their coverage.
+Suite: 54 passed, 0 failed — first clean run all session.
+
+**Hedge/prop split — started, not finished.** `~/lens-prop` forked from
+`lens` at `5d37f7d` (own git history from here: `idlepcvr/lens-prop`), own
+systemd service (`lens-prop.service`, port 8766), own start/stop scripts.
+Both services verified to survive independent restart. `lens-prop`'s
+`KRAKEN_FUTURES_SANDBOX` forced to `1` — it's still a byte-for-byte copy
+carrying `execute.py` and the same live Kraken keys as `lens`, so two
+processes able to place real orders on one account is not acceptable until
+the code is actually cut apart. See `NEXT_SESSION.md` for the concrete
+plan; the wiring above is the easy half, the code split is the real work.
+
+---
+
 ## 2026-08-26c
 
 **The rest of the backlog: three bugs, a Track twin, and an honest pass-rate.**

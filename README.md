@@ -23,9 +23,27 @@ box.
 
 ![Home](docs/home.png)
 
-## Two books, one front door
+## Splitting into two apps (started 2026-09-04, not finished)
 
-Each has its own nav, ledger and maths:
+**This repo is HEDGE going forward** — discretionary own-money trading on
+the mined edge, no further deposits, holding to 2028-12-31. PROP (the
+Kraken evaluation, meant to fund lifestyle spend once passed) is splitting
+out to its own repo and service: **`~/lens-prop`**,
+[`idlepcvr/lens-prop`](https://github.com/idlepcvr/lens-prop), port
+`8766`, `lens-prop.service`.
+
+Both apps currently still contain the full old codebase — only the
+deployment wiring (repo, service, port) is split so far; the code itself
+hasn't been cut apart yet. `lens-prop`'s live-trading is forced to sandbox
+(`KRAKEN_FUTURES_SANDBOX=1`) until it is, since right now it's a live copy
+of this app's execution path pointed at the same real Kraken keys. See
+`docs/NEXT_SESSION.md` for the concrete steps left.
+
+The section below describes the OLD one-app, two-book layout — still
+accurate for what's currently running in this codebase, stale as a
+description of where it's going:
+
+Each book has its own nav, ledger and maths:
 
 - **HEDGE** — discretionary own-money trading on the mined edge
   (`LENS_EDGE_v3`: five momentum-continuation setups + seven vetoes, mined
