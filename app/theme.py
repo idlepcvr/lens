@@ -433,11 +433,9 @@ def footer_html(current_path: str) -> str:
     # links that remain are the three that are useful from anywhere.
     more = ('<span class="ftl">more</span>' + "".join(book)) if book else ""
     stamp = _freshness_html()
-    other = ('<a href="/overview">▤ hedge</a>' if mode == "prop"
-             else '<a href="/prop-overview">◎ prop</a>')
     return ('<footer class="navftr">' + more +
             '<span class="ftmeta">' + stamp + '</span>'
-            '<span class="ftlinks">' + other +
+            '<span class="ftlinks">'
             '<a href="/sitemap">sitemap</a><a href="/health">health</a></span>'
             '</footer>')
 
