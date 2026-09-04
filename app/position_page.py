@@ -1236,16 +1236,27 @@ async function loadLive(){
   }catch(e){}
 })();
 """
-    from .prop_views import prop_config
-    from .prop_eval import EVALS
-    cfg = prop_config()
-    prop_def = {"account": cfg["account"], "risk": round(cfg["risk"] / 100, 4),
-                "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
+    # TODO(lens-hedge-split, 2026-09-05): this whole file still carries the full
+    # Hedge/Prop tab-switcher (the #book-preset-row buttons above, setBook(),
+    # calcProp() and the "Position sizing · PROP" section further down) even
+    # though /prop-position is gone and `book` is only ever called with "hedge"
+    # now. Whether to rip that UI out entirely, or leave it inert behind the
+    # book=="prop" guard below, is a real product call (does the sizing ticket
+    # ever want a "what would this look like on the funded account" tab again,
+    # given lens-prop exists as its own app?) — not something to guess at while
+    # stripping prop. Left inert rather than deleted: the import below used to
+    # run unconditionally (prop_views/prop_eval are now-deleted modules), which
+    # would 500 /position outright, so it's now gated on a book value that
+    # normal navigation can never produce.
+    if book == "prop":
+        from .prop_views import prop_config
+        from .prop_eval import EVALS
+        cfg = prop_config()
+        prop_def = {"account": cfg["account"], "risk": round(cfg["risk"] / 100, 4),
+                    "leverage": EVALS[cfg["eval_name"]]["max_leverage"]}
+    else:
+        prop_def = {"account": 0, "risk": 0, "leverage": 1}
     script = f"const PROP={json.dumps(prop_def)};\nconst START_BOOK=\"{book}\";\n" + script
-    # /prop-position keeps the PROP nav + preselects the Prop tab (see theme.NAV_PROP).
-    # On the prop page there's no hedge sizing — lock the book and hide the
-    # hedge-only inputs (BTC € price, win-rate override). Balance (eval $) and the
-    # risk/R:R/leverage-cap overrides stay: per-trade what-ifs against the plan.
     path = "/prop-position" if book == "prop" else "/position"
     head = _CSS + _XCSS + ("<style>#book-preset-row,#f-btc,#f-wr{display:none!important}</style>"
                    if book == "prop" else "")

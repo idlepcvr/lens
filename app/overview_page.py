@@ -1,8 +1,9 @@
-"""/overview (prop) and /overview-hedge — one read-only snapshot per book.
+"""/overview — one read-only snapshot of the hedge book.
 
-A hero band carries the one number that matters (eval equity vs floor/target
-walls for prop; live wallet equity + unrealised for hedge), then Performance
-and Market sit below as supporting context. See overview.py for the data."""
+A hero band carries the one number that matters (live wallet equity +
+unrealised), then Performance and Market sit below as supporting context.
+See overview.py for the data. Was hedge+prop with a book toggle until the
+2026-09-05 hedge/prop split; render() only ever takes book="hedge" now."""
 
 import json
 
@@ -75,20 +76,10 @@ _CSS = r"""<style>
 </style>"""
 
 
-# book -> (route, nav label, page title)
-_META = {
-    "prop":  ("/prop-overview",       "Overview", "Overview — PROP"),
-    "hedge": ("/overview", "Overview", "Overview — HEDGE"),
-}
-
-
 def render(book: str = "hedge") -> str:
-    path, label, title = _META[book]
+    path, label, title = "/overview", "Overview", "Overview — HEDGE"
     data = overview_data()
-    blurb = ("Eval account vs the floor and target walls — plus closed-trade "
-             "performance and current market. Read-only; LENS never trades it."
-             if book == "prop" else
-             "Your live futures wallet — equity, open risk, performance and "
+    blurb = ("Your live futures wallet — equity, open risk, performance and "
              "current market. Read-only; LENS never trades it.")
     body = f"""
 <div class="ov">
@@ -99,7 +90,7 @@ def render(book: str = "hedge") -> str:
 
   <div class="support">
     <section>
-      <h2>Performance<span class="hint" id="perf-hint"></span><a class="h2go" href="{'/prop-ledger' if book == 'prop' else '/analytics'}">{'ledger' if book == 'prop' else 'analytics'} →</a></h2>
+      <h2>Performance<span class="hint" id="perf-hint"></span><a class="h2go" href="/analytics">analytics →</a></h2>
       <div class="grid" id="perf"></div>
     </section>
     <section>
@@ -112,11 +103,10 @@ def render(book: str = "hedge") -> str:
     script = r"""
 const DATA = __DATA__;
 const $=id=>document.getElementById(id);
-let book='__BOOK__', liveCache=null;
+let book='hedge', liveCache=null;
 const money=(n,d=0)=>n==null?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d});
 const signed=(n,d=0)=>n==null?'—':(n>=0?'+':'−')+money(Math.abs(n),d);
 const card=(lbl,val,note,cls)=>`<div class="card ${cls||''}"><div class="lbl">${lbl}</div><div class="val">${val}</div><div class="note">${note||''}</div></div>`;
-const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
 
 function renderMarket(){
   const m=DATA.market||{};
@@ -142,31 +132,6 @@ function renderPerf(){
     + card('Avg duration', p.avg_dur_h!=null?p.avg_dur_h+'h':'—', 'per trade', 'b');
 }
 
-function heroProp(){
-  const l=DATA.prop.live;
-  const lo=l.floor, hi=l.target, rng=Math.max(hi-lo,1);
-  const pct=x=>clamp((x-lo)/rng*100,0,100);
-  const up=l.equity>=l.account, cls=up?'g':'r';
-  $('hero').className='hero';
-  $('hero').innerHTML = `
-    <div class="hmain">
-      <div class="hlbl">Eval equity</div>
-      <div class="heq">$${money(l.equity)}</div>
-      <div class="hsub">start <b class="dim">$${money(l.account)}</b> · drawdown <b class="${l.cur_dd_pct>0?'r':'dim'}">−${l.cur_dd_pct}%</b><br>today <b class="${l.today_pnl>=0?'g':'r'}">${signed(l.today_pnl)}$</b></div>
-    </div>
-    <div class="hmeter">
-      <div class="mtrack">
-        <div class="mfill ${cls}" style="width:${pct(l.equity)}%"></div>
-        <div class="mstart" style="left:${pct(l.account)}%"></div>
-        <div class="mnow ${cls}" style="left:${pct(l.equity)}%"></div>
-      </div>
-      <div class="mends">
-        <span class="floor"><span class="cap">▼ Floor $${money(l.floor)}</span><span class="d">${l.to_floor>=0?'$'+money(l.to_floor)+' of room':'breached'}</span></span>
-        <span class="target"><span class="cap">Target $${money(l.target)} ▲</span><span class="d">$${money(l.to_target)} to pass</span></span>
-      </div>
-    </div>`;
-}
-
 function heroHedge(a){
   const u=a.unrealized_pnl||0;
   const partial=a.kraken_personal&&a.kraken_personal.error?' · partial':'';
@@ -185,7 +150,6 @@ function heroHedge(a){
 }
 
 function renderHero(){
-  if(book==='prop'){ heroProp(); return; }
   if(liveCache){ heroHedge(liveCache); return; }
   $('hero').className='hskel';
   $('hero').textContent='loading live account…';
@@ -195,5 +159,5 @@ function renderHero(){
 
 renderMarket(); renderHero(); renderPerf();
 """
-    script = script.replace("__DATA__", json.dumps(data)).replace("__BOOK__", book)
+    script = script.replace("__DATA__", json.dumps(data))
     return shell(path, label, body, script=script, head_extra=_CSS, meta="snapshot")
