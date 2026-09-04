@@ -21,7 +21,6 @@ Routes:
 """
 
 import re
-import threading
 import time
 from datetime import date, datetime
 from functools import lru_cache
@@ -75,28 +74,6 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
-    _warm_caches()
-
-
-def _warm_caches():
-    """Replay the basket's trade logs once, in the background, at boot.
-
-    The prop pages are pure functions of a frozen backtest, so they're memoised
-    (_TL_CACHE) — but *someone* has to pay for the first replay, and until this
-    existed that someone was whoever clicked Plan first after a deploy: 7s of
-    staring at a dead nav. Now the cache is warm before the landing page is.
-
-    Daemon thread: a failure here must never stop the app booting, and a slow
-    warm must never delay it — the pages still compute on demand if this loses
-    the race. ponytail: no scheduler, no lock. Worst case is a duplicate replay.
-    """
-    def warm():
-        try:
-            from .prop_goal import cone
-            cone()
-        except Exception as e:                       # a cold cache is not fatal
-            print(f"[warm] skipped: {e}")
-    threading.Thread(target=warm, daemon=True, name="warm-caches").start()
 
 
 @app.exception_handler(404)
@@ -675,66 +652,6 @@ def api_position(req: PositionRequest):
         )
     except CalcError as e:
         raise HTTPException(status_code=422, detail=str(e))
-
-
-_PROP_MOVES_CACHE: dict = {}
-
-def _prop_moves() -> tuple:
-    """(avg_win_pct, avg_loss_pct_abs, win_rate_pct) for the prop hero strategy.
-    Cached per-process — a backtest, so don't recompute on every keystroke.
-    ponytail: process-lifetime cache; add a TTL if the strategy stats drift."""
-    if "v" not in _PROP_MOVES_CACHE:
-        from .prop_views import prop_metrics
-        m = prop_metrics()
-        _PROP_MOVES_CACHE["v"] = (m.get("avg_win_pct") or 0.0,
-                                  abs(m.get("avg_loss_pct") or 0.0),
-                                  m.get("win_rate_pct") or 0.0)
-    return _PROP_MOVES_CACHE["v"]
-
-
-@app.get("/api/prop/position")
-def api_prop_position(entry: float, direction: str = "long",
-                      risk: Optional[float] = Query(None, gt=0, le=10, description="risk %/trade override"),
-                      rr: Optional[float] = Query(None, gt=0, le=20, description="target R override (rescales TP)"),
-                      lev: Optional[float] = Query(None, gt=0, le=10, description="leverage to trade at"),
-                      stop: Optional[float] = Query(None, gt=0, le=20, description="stop distance % override — the only lever on travel distance"),
-                      balance: Optional[float] = Query(None, gt=0, description="eval balance $ override")):
-    """Prop-rule sizing for a manual entry: risk RISK% of the eval ÷ stop.
-
-    `stop` is the dial on TRAVEL DISTANCE. Risk is fixed, so notional = risk$ /
-    stop% — halve the stop and the position doubles, which halves the price move
-    needed for the same $. The target moves with it (the strategy's R is held
-    unless `rr` says otherwise), and the tighter stop demands more leverage:
-    min_leverage = risk% / stop%, so the firm's 5x cap floors the stop at
-    risk%/5. Past that the size is cut and `actual_risk_pct` drops below plan.
-    `lev` is only the leverage you'll set on the venue — it moves margin and the
-    liq price, never the risk, the size or the levels (see prop_ticket).
-
-    Stop/target otherwise come from the prop hero strategy's measured average
-    move, then run through prop_ticket (same math as the signal ticket and the
-    eval ledger). Every override is per-trade — the saved plan is untouched."""
-    from .prop_scan import prop_ticket
-    from .prop_ledger import prop_ledger_data
-    from .prop_views import prop_config
-    win_pct, loss_pct, wr = _prop_moves()
-    if not loss_pct:
-        raise HTTPException(status_code=422, detail="prop strategy stats unavailable")
-    r_target = rr or (win_pct / loss_pct)   # hold the strategy's own R unless overridden
-    if stop:
-        loss_pct = stop                     # tighter stop → bigger size → shorter travel
-    if rr or stop:
-        win_pct = loss_pct * r_target
-    # size off the CURRENT eval equity (realized ledger), not the nominal start
-    nominal = prop_config()["account"]
-    equity = balance or prop_ledger_data().get("equity") or nominal
-    long_ = direction == "long"
-    stop   = entry * (1 - loss_pct / 100) if long_ else entry * (1 + loss_pct / 100)
-    target = entry * (1 + win_pct / 100)  if long_ else entry * (1 - win_pct / 100)
-    t = prop_ticket(entry, stop, target, long_, account=equity, risk=risk, lev=lev)
-    t.update(entry=entry, stop=round(stop, 1), target=round(target, 1),
-             win_rate_pct=round(wr, 1), direction=direction,
-             account_nominal=nominal)
-    return t
 
 
 # ─── Trades ───────────────────────────────────────────────────────────────────
@@ -1403,53 +1320,17 @@ def api_excursion():
     return excursion.summary()
 
 
-def _seed_prop_goal_config() -> dict:
-    """First-run defaults for the prop goal config (lens_config row 2): the live
-    eval's walls + the active basket's backtest geometry. After seeding it's a
-    normal editable config — Apply/Reload on /prop-goal work exactly like hedge."""
-    import datetime as _dt
-    from .prop_views import prop_config
-    from .prop_eval import EVALS
-    pc = prop_config()
-    rule = EVALS[pc["eval_name"]]
-    acct, risk = pc["account"], pc["risk"]
-    seed = {
-        "start_balance": acct,
-        "target_balance": round(acct * (1 + rule["profit_target_pct"] / 100), 2),
-        "target_date": (_dt.date.today() + _dt.timedelta(days=45)).isoformat(),
-        "max_drawdown_allowed": rule["max_dd_pct"] / 100.0,
-        "losses_allowed": max(1, int((rule["max_dd_pct"] / 100.0) / (risk / 100.0))),
-        "leverage": rule["max_leverage"],
-        "fractional_kelly": 0.25, "execution_fill_factor": 1.0, "slippage_pct": 0.0,
-        "btc_growth_monthly": 0.0,
-        "win_rate": 0.5, "rr_ratio": 3.0, "trades_per_week": 2.0,   # overwritten below when geometry exists
-    }
-    try:
-        from .prop_goal import _basket_geometry
-        geo = _basket_geometry()
-        if geo:
-            seed["win_rate"] = round(geo["win_rate"], 4)
-            seed["rr_ratio"] = round(geo["rr"], 2)
-            seed["trades_per_week"] = round(geo["trades_per_month"] / 4.345, 2)
-    except Exception:
-        pass
-    return upsert_lens_config(seed, row_id=2)
-
-
 @app.get("/api/config")
-def get_config(book: str = "hedge"):
-    if book == "prop":
-        return get_lens_config(2) or _seed_prop_goal_config()
+def get_config():
     return get_lens_config()
 
 
 @app.patch("/api/config")
-def patch_config(data: ConfigUpdate, book: str = "hedge"):
-    row_id = 2 if book == "prop" else 1
+def patch_config(data: ConfigUpdate):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if not updates:
-        return get_lens_config(row_id)
-    return upsert_lens_config(updates, row_id=row_id)
+        return get_lens_config()
+    return upsert_lens_config(updates)
 
 
 # ─── Balance snapshot (all accounts → daily_snapshots) ───────────────────────
@@ -2657,45 +2538,11 @@ class FitRequest(BaseModel):
 
 
 @app.get("/api/fit/defaults")
-def api_fit_defaults(book: str = "hedge"):
+def api_fit_defaults():
     """Prefill payload for the Fit form: goal params + the historical weekly trade
-    frequency (the trades/week axis ceiling). `book='prop'` swaps the hedge BTC-stack
-    goal for the EVAL goal — start=eval account, target=+profit_target%, floor=-max_dd%,
-    horizon=45d, and btc_growth=0 (an eval account is USD, it doesn't ride BTC)."""
+    frequency (the trades/week axis ceiling)."""
     from app.fit_sweep import historical_freq_per_week
     cfg = get_lens_config()
-    if book == "prop":
-        import datetime
-        from app.prop_views import prop_config
-        from app.prop_eval import EVALS
-        pc = prop_config()
-        rule = EVALS[pc["eval_name"]]
-        acct, risk = pc["account"], pc["risk"]
-        cfg = {**cfg,
-               "start_balance": acct,
-               "target_balance": round(acct * (1 + rule["profit_target_pct"] / 100), 2),
-               "target_date": (datetime.date.today() + datetime.timedelta(days=45)).isoformat(),
-               "max_drawdown_allowed": rule["max_dd_pct"] / 100.0,
-               "losses_allowed": max(1, int((rule["max_dd_pct"] / 100.0) / (risk / 100.0))),
-               "leverage": rule["max_leverage"],
-               # eval reality: limit fills (no slip, full size), ¼-Kelly advisory,
-               # a USD account that doesn't ride BTC, and risk FIXED by the plan
-               "execution_fill_factor": 1.0,
-               "slippage_pct": 0.0,
-               "fractional_kelly": 0.25,
-               "btc_price_eur": None,
-               "btc_growth_monthly": 0.0,
-               "risk_per_trade": risk / 100.0}
-        # freq ceiling = the BASKET's real cadence, not the hedge ledger's
-        freq = historical_freq_per_week()
-        try:
-            from app.prop_goal import _basket_geometry
-            geo = _basket_geometry()
-            if geo:
-                freq = round(geo["trades_per_month"] / 4.345, 2)
-        except Exception:
-            pass
-        return {"config": cfg, "freq_per_week": freq}
     return {"config": cfg, "freq_per_week": historical_freq_per_week()}
 
 
@@ -2740,13 +2587,6 @@ def api_backtest_strategies():
 
 # ─── Trade Review ─────────────────────────────────────────────────────────────
 
-@app.get("/prop-overview", response_class=HTMLResponse)
-def overview_page():
-    """Prop-book snapshot — eval ledger, performance, market."""
-    from .overview_page import render
-    return render("prop")
-
-
 # Hedge pages were renamed to a /hedge-* namespace on 2026-08-03 so the URL matched
 # the nav chip and mirrored /prop-*, then renamed BACK to bare on 2026-08-29 — "I
 # want to keep the hedge completely separate from the prop... remove the prefix of
@@ -2759,18 +2599,12 @@ LEGACY_ROUTES = {
     "/hedge-goal": "/goal", "/hedge-desk": "/desk", "/hedge-signals": "/signals",
     "/hedge-journal": "/journal", "/hedge-analytics": "/analytics",
     "/hedge-position": "/position", "/hedge-edge": "/edge", "/hedge-track": "/track",
-    "/calendar": "/journal", "/hedge-calendar": "/journal", "/prop-calendar": "/prop-journal",
-    "/prop-dashboard": "/prop-plan",
+    "/calendar": "/journal", "/hedge-calendar": "/journal",
     # Older shims, folded in here from four hand-written handlers. They were
     # identical 301s that each forgot include_in_schema=False, so /sitemap
     # listed them as if they were pages — two of them under "Engines".
     "/backtest": "/edge#backtest",
     "/strategy": "/edge#board", "/strategy-hedge": "/edge#board",
-    # The survival group: five pages that shared prop_metrics() and one question.
-    "/rules": "/prop-survival#rules", "/risk": "/prop-survival#risk",
-    "/survival": "/prop-survival#survival", "/equity": "/prop-survival#equity",
-    "/prop-cone": "/prop-survival#projection",
-    "/prop-goal-old": "/prop-survival#projection",
     # 2026-08-03 merges. Reading material is one page with tabs; the audit is
     # one July artifact, not two; geometry/target are one calculation run in
     # both directions; short/robustness/research are conclusion, evidence and
@@ -2878,377 +2712,19 @@ def edge_page(book: str = "hedge"):
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.
-# /journal + /prop-calendar deleted the same way, 2026-08-28 — merged
-# into /journal + /prop-journal (see journal_page() above). Redirects
-# below keep any bookmark or stale href working.
-
-
-# ── Prop twins: same render, book hard-locked to prop, own URL + nav entry.
-# Not clones — one render each, so hedge and prop can never drift. See theme.NAV_PROP.
-@app.get("/prop-journal", response_class=HTMLResponse)
-def prop_journal_page():
-    from .calendar_page import render
-    return render("prop")
-
-
-@app.get("/prop-analytics", response_class=HTMLResponse)
-def prop_analytics_page():
-    from .analytics_page import render
-    return render("prop")
-
-
-@app.get("/prop-position", response_class=HTMLResponse)
-def prop_position_page():
-    from .position_page import position_page
-    return position_page("prop")
-
-
-@app.get("/prop-edge", response_class=HTMLResponse)
-def prop_edge_page():
-    from .edge_page import render_page
-    css, body, script = _backtest_fragment()
-    return render_page(bt_css=css, bt_body=body, bt_script=script, book="prop")
-
-
-@app.get("/prop", response_class=HTMLResponse)
-def prop_page():
-    from .prop_views import goals_page
-    return goals_page()
-
-
-# Both boards + the backtest runner live on /edge now (one page, three tenses).
-@app.get("/prop-survival", response_class=HTMLResponse)
-def prop_survival_page():
-    """How big do I bet, and will I survive the walls — one page.
-
-    Was five routes: /rules, /risk, /survival, /equity and /prop-cone. They
-    read the same prop_metrics() and answered one question between them, so
-    reading any one of them alone told you a fifth of the answer. Ordered as
-    the question is actually asked: the walls, then the bet size, then what a
-    losing streak does to it, then the same thing simulated two ways.
-
-    The two simulations are deliberately both here. /equity draws paths from
-    the typed WR and R:R — "what if"; the cone bootstraps your ACTUAL realised
-    P&L — "what the book says". Side by side the gap between them is legible,
-    which on separate pages it never was.
-    """
-    from .prop_goal import parts as cone
-    from .prop_views import (equity_page_parts, risk_page_parts,
-                             rules_page_parts, survival_page_parts)
-    from .theme import merged
-    from .tldr import opener
-    intro = opener(
-        "What this page is",
-        "The prop firm gives you a funded account with two tripwires: lose 3% in "
-        "one day, or drop 3% below the starting balance at any point, and the "
-        "account is gone. This page answers one question — how big can each bet "
-        "be so that a normal run of losses doesn't hit those tripwires before the "
-        "strategy has a chance to work.",
-        ["<b>The walls</b> — the exact rules that end the account, and the ones "
-         "that turn out not to matter.",
-         "<b>Bet size</b> — how much per trade, and why it's that number.",
-         "<b>Loss streaks</b> — how many losses in a row you can take before "
-         "you're out, and how likely that streak is.",
-         "<b>Both simulations</b> — the same account run thousands of times. One "
-         "uses your typed win rate, the other uses your <b>real past trades</b>. "
-         "When they disagree, the second one is the honest one."],
-        "whether passing the eval gets you to 50 ₿. Passing pays a share of "
-        "profits on a €10,000 account — the scoreboard above is what that has to "
-        "produce monthly just to cover the burn.")
-    return merged("/prop-survival", "Survival", [
-        {"id": "rules", "label": "The walls", "heading": False, **rules_page_parts()},
-        {"id": "risk", "label": "Bet size", "heading": False, **risk_page_parts()},
-        {"id": "survival", "label": "Loss streaks", "heading": False, **survival_page_parts()},
-        {"id": "equity", "label": "Simulated · from typed WR", "heading": False, **equity_page_parts()},
-        {"id": "projection", "label": "Simulated · from real trades", "heading": False, **cone()},
-    ], meta="will I survive the walls?", intro=intro)
+# /journal deleted the same way, 2026-08-28 — merged into /journal (see
+# journal_page() above). Redirects below keep any bookmark or stale href working.
 
 
 @app.get("/regime", response_class=HTMLResponse)
 def regime_page():
-    """PROP analytic: market regime + hero win-rate per regime."""
+    """Market regime — BTC classified BULL/SIDEWAYS/BEAR, K-Means(k=3) on 14d
+    rolling return + vol. Was labelled a PROP analytic (it also bucketed the
+    prop hero strategy's win-rate per regime); that bucketing is gone with the
+    prop book, this is the plain market-regime read."""
     from .regime import regime_payload
     from .regime_page import render
     return render(regime_payload())
-
-
-@app.get("/api/prop/regime")
-def api_prop_regime():
-    from .regime import regime_payload
-    return regime_payload()
-
-
-@app.get("/api/prop/configs")
-def api_prop_configs():
-    """Dropdown metadata for the /prop AUTO mode."""
-    from .prop_eval import list_configs
-    return list_configs()
-
-
-@app.get("/api/prop/eval")
-def api_prop_eval(strategy: str = "ASIAN_RSI_DIP_v1",
-                  eval: str = "BREAKOUT_1STEP_CLASSIC",
-                  account: float = 5000.0, risk: float = 2.0,
-                  open_equity: bool = True, paths: int = 3000):
-    """Live open-equity numbers for one config — the page's source of truth."""
-    from .prop_eval import eval_summary
-    return eval_summary(strategy, eval, account, risk, paths=paths,
-                        open_equity=open_equity)
-
-
-@app.get("/api/prop/desk")
-def api_prop_desk():
-    """Live ENTER / STAND DOWN read for the prop hero on the latest closed 4H bar."""
-    from .prop_desk import prop_desk_state
-    return prop_desk_state()
-
-
-@app.get("/prop-desk", response_class=HTMLResponse)
-def prop_desk_page():
-    from .prop_desk import PROP_DESK_HTML
-    return PROP_DESK_HTML
-
-
-@app.get("/api/prop/ledger")
-def api_prop_ledger():
-    """Realised prop-book trades as an equity ledger vs the eval walls."""
-    from .prop_ledger import prop_ledger_data
-    return prop_ledger_data()
-
-
-@app.post("/api/prop/trades")
-def api_prop_trade(trade: TradeCreate):
-    """Log a trade onto the prop book (forces book='prop'). Blocked once the eval
-    is failed — you can't trade a blown book; close/edit existing trades or start a
-    new eval. Guard uses the realised (latched) verdict, no live feed needed."""
-    from .prop_ledger import prop_ledger_data
-    if prop_ledger_data(live=False)["failed"]:
-        raise HTTPException(status_code=409,
-            detail="This eval is failed — start a new eval to log fresh trades.")
-    trade.book = "prop"
-    return create_trade(trade)
-
-
-class PropEvalParams(BaseModel):
-    account: float
-    risk: float
-    eval_name: str
-    fee: float = 0.0
-
-
-@app.get("/api/prop/config")
-def api_prop_config():
-    """Active eval params + the available plans (for the new-eval form)."""
-    from .prop_views import prop_config
-    from .prop_eval import EVALS
-    plans = {k: {"daily_loss_pct": v["daily_loss_pct"], "max_dd_pct": v["max_dd_pct"],
-                 "profit_target_pct": v["profit_target_pct"], "max_leverage": v["max_leverage"]}
-             for k, v in EVALS.items()}
-    return {"config": prop_config(), "plans": plans}
-
-
-@app.post("/api/prop/new-eval")
-def api_prop_new_eval(params: PropEvalParams):
-    """Start a new eval: archive the current run (book='prop' → dated archive) AND
-    save the new account/risk/plan so every prop page resets to it. History kept."""
-    from .database import archive_prop_trades, set_prop_eval
-    from .prop_views import prop_config
-    from .prop_eval import EVALS
-    if params.eval_name not in EVALS:
-        raise HTTPException(status_code=422, detail=f"unknown plan {params.eval_name}")
-    archived = archive_prop_trades(meta=prop_config())   # stamp the run's params before re-tag
-    cfg = set_prop_eval(params.account, params.risk, params.eval_name, params.fee)
-    return {"archived": archived, "config": cfg}
-
-
-class PropBasket(BaseModel):
-    basket: list[str]
-
-
-@app.get("/prop-plan", response_class=HTMLResponse)
-def prop_dashboard_page():
-    from .prop_dashboard import dashboard_page
-    return dashboard_page()
-
-
-@app.get("/prop-goal", response_class=HTMLResponse)
-def prop_goal_page():
-    """Exact clone of the hedge /goal (same page, same panels), fed the prop
-    config row + prop measured stats. The MC cone/checks page → /prop-cone."""
-    from .goal_page import render
-    return render("prop")
-
-
-
-
-@app.get("/prop-track", response_class=HTMLResponse)
-def prop_track_page():
-    """/track's missing prop twin (test_nav_parity.py). The daily read
-    on the eval — target/floor/today's wall — built on prop_ledger_data(),
-    which already computes all of it."""
-    from .prop_track_page import render
-    return render()
-
-
-@app.get("/api/prop/goal")
-def api_prop_goal():
-    """Time-to-target cone for the active basket under the live eval walls."""
-    from .prop_goal import cone
-    return cone()
-
-
-@app.get("/api/prop/goal/model")
-def api_prop_goal_model():
-    """The /prop-goal metrics panel: the hedge goal engine fed the eval's FIXED
-    risk and 3% floor, so `risk_of_ruin` becomes P(touching the floor)."""
-    from .prop_goal import model
-    return model()
-
-
-@app.get("/api/prop/baskets")
-def api_prop_baskets():
-    """Candidate baskets scored on speed vs survival, so the trade-off is visible
-    before it's chosen."""
-    from .prop_goal import basket_options
-    from .prop_views import prop_config
-    return {"options": basket_options(), "fee": prop_config().get("fee") or 0.0}
-
-
-@app.post("/api/prop/basket")
-def api_prop_set_basket(p: PropBasket):
-    """Swap which strategies the scanner may fire. Not a new eval — the running
-    account/risk/fee are untouched."""
-    from .database import set_prop_basket
-    from .backtest_engine import STRATEGIES
-    unknown = [n for n in p.basket if n not in STRATEGIES]
-    if unknown:
-        raise HTTPException(status_code=422, detail=f"not backtest strategies: {unknown}")
-    if not p.basket:
-        raise HTTPException(status_code=422, detail="basket cannot be empty")
-    return {"config": set_prop_basket(p.basket)}
-
-
-@app.get("/api/prop/archives")
-def api_prop_archives():
-    """Past eval attempts + lifetime fee spend (archived runs plus the live one —
-    the active eval's fee is already paid, so it counts against the tally)."""
-    from .prop_ledger import archive_summaries
-    from .prop_views import prop_config
-    archives = archive_summaries()
-    active_fee = prop_config().get("fee") or 0.0
-    return {
-        "archives": archives,
-        "attempts": len(archives) + 1,
-        "spent": round(sum(a["fee"] for a in archives) + active_fee, 2),
-        "active_fee": round(active_fee, 2),
-    }
-
-
-@app.get("/api/prop/positions/open")
-def api_prop_open_positions():
-    """Logged OPEN prop-book trades (no exit yet), marked to the live BTC market.
-    Breakout's eval account has no readable API, so we mark your logged fill to
-    public Kraken price + funding — same card shape as /api/positions/live, but
-    USD money (the eval account is USD)."""
-    from .database import get_trades
-    opens = [t for t in get_trades(limit=5000, book="prop") if t.pnl is None]
-    if not opens:
-        return {"positions": []}
-    mk = {"mark": None, "funding": None}
-    try:
-        key, secret = kraken_sync.get_api_keys("personal")
-        mk = kraken_sync.fetch_market_btc(key, secret)
-    except Exception:
-        pass
-    mark, funding = mk.get("mark"), mk.get("funding")
-    out = []
-    for t in opens:
-        entry = float(t.entry or 0); size = abs(float(t.size or 0))
-        if not entry or not size:
-            continue
-        is_short = (t.direction == "short")
-        lev = float(t.leverage or 1.0) or 1.0
-        m = float(mark) if mark else entry
-        notional = size * m
-        cost = size * entry
-        margin = notional / lev if lev else notional
-        upnl = (m - entry) * size * (-1 if is_short else 1)
-        upnl_pct = (upnl / cost * 100) if cost else None
-        roe = (upnl / margin * 100) if margin else None
-        move_pct = ((m - entry) / entry * 100) * (-1 if is_short else 1)
-        # ponytail: liq estimate off the logged leverage (entry ± 1/lev), not the
-        # eval's true wallet margin — same approximation the live card uses.
-        liq = entry * (1 + 1 / lev) if is_short else entry * (1 - 1 / lev)
-        out.append({
-            "id": t.id, "venue": "Kraken Prop (Breakout)", "symbol": "BTC/USD:USD",
-            "direction": "short" if is_short else "long", "leverage": round(lev, 2),
-            "entry": round(entry, 2), "mark": round(m, 2), "move_pct": round(move_pct, 3),
-            "size": round(size, 6), "quote_qty": round(notional, 2), "cost_usd": round(cost, 2),
-            "margin_usd": round(margin, 2), "upnl_usd": round(upnl, 2),
-            "upnl_pct": round(upnl_pct, 2) if upnl_pct is not None else None,
-            "roe_pct": round(roe, 2) if roe is not None else None,
-            "liquidation": round(liq, 2),
-            "funding": round(funding, 6) if funding is not None else None,
-            "live": mark is not None,
-        })
-    return {"positions": out}
-
-
-@app.get("/api/prop/signals")
-def api_prop_signals(limit: int = Query(300, ge=1, le=2000)):
-    """Every prop signal (all prop-* strategies the scanner fired), each with the
-    prop-legal ticket. Scoped by the `prop-` signal_id prefix, not by strategy, so
-    the whole tradeable basket surfaces — not just the hero."""
-    from .prop_scan import prop_ticket
-    sigs = get_signals(id_prefix="prop-", limit=limit)
-    for sg in sigs:
-        try:
-            if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
-                sg["ticket"] = prop_ticket(
-                    sg["entry_price"], sg["stop_price"], sg["target_price"],
-                    sg["direction"] == "long")
-        except Exception:
-            pass
-    return {"signals": sigs}
-
-
-@app.get("/api/prop/signals/hedge")
-def api_prop_signals_hedge(limit: int = Query(20, ge=1, le=100)):
-    """Recent HEDGE-book signals, re-sized to the eval account — the display-level
-    crossover: if the hedge fires, this shows what taking the same levels on the
-    eval would look like at the firm's fixed risk. Sizing only — these strategies
-    are NOT in the eval backtest, so nothing here feeds the pass-rate math (the
-    priced hybrid was rejected 2026-07-11 and stays rejected)."""
-    from .prop_scan import prop_ticket
-    sigs = [s for s in get_signals(limit=limit * 4)
-            if not (s.get("signal_id") or "").startswith("prop-")][:limit]
-    for sg in sigs:
-        try:
-            if sg.get("entry_price") and sg.get("stop_price") and sg.get("target_price"):
-                sg["ticket"] = prop_ticket(
-                    sg["entry_price"], sg["stop_price"], sg["target_price"],
-                    sg["direction"] == "long")
-        except Exception:
-            pass
-    return {"signals": sigs}
-
-
-@app.get("/prop-signals", response_class=HTMLResponse)
-def prop_signals_page():
-    from .prop_signals_page import render
-    return render()
-
-
-@app.get("/prop-ledger", response_class=HTMLResponse)
-def prop_ledger_page():
-    from .prop_ledger import ledger_page
-    return ledger_page()
-
-
-@app.get("/prop-income", response_class=HTMLResponse)
-def prop_income_page():
-    from .prop_income import income_page
-    return income_page()
 
 
 @app.get("/api/review/trades")
