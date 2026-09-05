@@ -133,6 +133,16 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .vz-funnel .txt{position:absolute;inset:0;display:flex;align-items:center;padding:0 9px;
   font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);z-index:2}
 @media(max-width:560px){ .vz-card.sp2{grid-column:span 1} .vz-hrow{grid-template-columns:44px 1fr 54px} }
+/* Market Regime header row: NOW + Persistence, explicit two-column grid
+   rather than the shared vz-row's auto-fit — auto-fit's computed column
+   count depends on container width and can leave an odd number of tracks,
+   orphaning the next card (e.g. BEAR below) onto its own row. Two fixed
+   columns always split evenly and never orphan. */
+.rg-top{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.rg-top>.vz-card:only-child{grid-column:1/-1}
+/* BULL/SIDEWAYS/BEAR: three equal cards in their own row, same reasoning. */
+.rg-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:480px){ .rg-top{grid-template-columns:1fr} }
 
 /* review surfaces (moved off /track) — untouched by the 2026-09 visual
    redesign above; these already communicate mostly through bars/dots. */
@@ -175,7 +185,7 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 /* The score table has five columns and two of them are numeric pairs, which is
    wider than a phone. It used to just overflow its panel — the numbers ran out
    past the border. It scrolls inside its own box now instead. */
-.rq-tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px}
+.rq-tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px;min-width:0}
 .rq-tab{width:100%;min-width:440px;border-collapse:collapse;font-size:12px}
 .rq-tab th{font-family:var(--mono);font-size:9px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--dim);text-align:left;font-weight:400;
@@ -189,6 +199,14 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .rq-tot{color:var(--ink);font-weight:700}
 .rq-tab th:nth-child(4),.rq-tab th:nth-child(5){text-align:right}
 @media(max-width:620px){ .rq-rate b{font-size:28px} }
+/* regime transition matrix (Persistence card, market-regime section) — fixed
+   proportional columns so real content (percentages up to 3 digits) never
+   runs past the card's right edge. .rq-tw's overflow-x:auto above stays as
+   a safety net for anything narrower than this was designed for. */
+.rq-tab.rg-mtx{table-layout:fixed;min-width:0}
+.rq-tab.rg-mtx th,.rq-tab.rg-mtx td{white-space:normal;padding-right:4px}
+.rq-tab.rg-mtx th:first-child,.rq-tab.rg-mtx td:first-child{width:32%}
+.rq-tab.rg-mtx th:not(:first-child),.rq-tab.rg-mtx td:not(:first-child){width:17%;text-align:right}
 </style>
 """
 
@@ -831,12 +849,14 @@ def regime_section() -> str:
 
         badge = f' <span class="vz-badge" style="color:{run_col}">{run_word}</span>' if run_word else ""
         persist_card = (
-            f'<div class="vz-card sp2"><div class="vz-lbl">Persistence{badge}</div>'
+            '<div class="vz-card">'
+            '<div class="vz-lbl" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;'
+            f'white-space:normal;overflow:visible;text-overflow:clip">Persistence{badge}</div>'
             f'<div class="vz-cap">{cur_run}d in <b style="color:{cur_col}">{cur}</b>'
             + (f' vs a typical {cur_avg}d stretch' if cur_avg else '')
             + f' &middot; tomorrow: {next_txt}</div>'
-            f'<div class="rq-tw"><table class="rq-tab" style="margin-top:8px">'
-            f'<tr><th>From ↓ / To →</th><th>BULL</th><th>SIDEWAYS</th><th>BEAR</th><th>Avg run</th></tr>'
+            f'<div class="rq-tw"><table class="rq-tab rg-mtx" style="margin-top:8px">'
+            f'<tr><th>From / To</th><th>BULL</th><th>SIDE</th><th>BEAR</th><th>Run</th></tr>'
             f'{mrows}</table></div></div>'
         )
 
@@ -844,13 +864,14 @@ def regime_section() -> str:
         '<div class="an-sec">'
         '<div class="an-h">Market Regime <span style="color:var(--faint);text-transform:none;'
         'font-weight:400">— BTCUSD daily, K-Means(k=3) on 14d return + vol</span></div>'
-        '<div class="vz-row">'
-        f'<div class="vz-card sp2"><div class="vz-lbl">Now</div>'
+        '<div class="rg-top">'
+        f'<div class="vz-card"><div class="vz-lbl">Now</div>'
         f'<div class="vz-hero" style="color:{cur_col};font-size:28px">{cur}</div>'
         f'<div class="vz-cap">14d return <span style="color:{cur_col}">{p.get("current_ret14_pct", 0)}%</span> '
         f'&middot; 14d vol {p.get("current_vol14_pct", 0)}%/day &middot; {p.get("current_date", "")}</div></div>'
-        f'{persist_card}{stat_cards}'
+        f'{persist_card}'
         '</div>'
+        f'<div class="rg-stats">{stat_cards}</div>'
         f'<div class="rg-strip">{chips}</div>'
         '<div class="vz-cap" style="margin-top:4px">'
         '<span class="g">■</span> BULL &nbsp; <span class="a">■</span> SIDEWAYS &nbsp; '
