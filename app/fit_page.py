@@ -1,8 +1,9 @@
-"""/edge #fit — the Fit section fragment (form + optimal card + heatmap).
+"""/analytics Research → Fit — the Fit section fragment (form + optimal card +
+heatmap). Was "/edge #fit" until the 2026-09-05 /edge→/analytics merge.
 
 Stage A: sweep the strategy-shape parameters against a fixed goal and show the
-region that can hit it. Returns (css, body, script) embedded into /edge by
-edge_page.render_page, a fourth tense alongside past / board / backtest.
+region that can hit it. Returns (css, body, script) embedded into /analytics
+by analytics_page._research_section, alongside past / board / backtest.
 
 The server does the maths (app/fit_sweep.py). This is presentation: range form,
 a /goal-style verdict card carrying THE optimal parameter set + the feasible
@@ -58,14 +59,18 @@ CSS = r"""<style>
 .rbadge.TIGHT{color:var(--amber);border:1px solid var(--amber)}
 .rbadge.STARVED{color:var(--short);border:1px solid var(--short)}
 
-/* your-strategy vs envelope comparison */
-.fit-cmp{width:100%;border-collapse:collapse;margin-top:12px;font-size:11.5px}
-.fit-cmp caption{caption-side:top;text-align:left;font-size:12px;color:var(--dim);padding:11px 0 3px}
-.fit-cmp caption .dim{color:var(--faint)}
-.fit-cmp th{text-align:right;color:var(--faint);font-weight:600;padding:5px 9px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:8.5px;letter-spacing:.06em}
-.fit-cmp th:first-child,.fit-cmp td:first-child{text-align:left}
-.fit-cmp td{text-align:right;padding:5px 9px;border-bottom:1px solid var(--line);font-family:var(--mono);color:var(--ink)}
-.fit-cmp td.st{text-align:center} .fit-cmp .dim{color:var(--faint)}
+/* your-strategy vs envelope comparison — a band (required range) + marker
+   (measured value), same track vocabulary as /analytics's vz-track/hrow,
+   replacing the old checkmark table. */
+.fit-cmp-wrap{margin-top:12px}
+.fit-cmp-cap{font-size:12px;color:var(--dim);margin-bottom:9px}
+.fit-cmp-cap .dim{color:var(--faint)}
+.fit-band-row{display:grid;grid-template-columns:110px 1fr 64px;align-items:center;gap:9px;margin-bottom:6px}
+.fit-band-row .lbl{font-size:10.5px;color:var(--dim);text-align:right;white-space:nowrap}
+.fit-band-track{position:relative;height:13px;background:var(--bg);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.fit-band-track .band{position:absolute;top:0;bottom:0;background:var(--accent);opacity:.28}
+.fit-band-track .mark{position:absolute;top:-2px;bottom:-2px;width:2px}
+.fit-band-row .val{font-family:var(--mono);font-size:10.5px;text-align:right}
 
 /* heatmap — reuses the .hm grammar from the backtest fragment */
 .fit-hm-head{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
@@ -91,9 +96,6 @@ CSS = r"""<style>
 
 
 BODY = r"""
-<div class="ed-h" id="fit">Fit — what shape must the strategy be?</div>
-<div class="ed-hs">No strategies here, on purpose. Fix the goal (start → target by date) and sweep the sizing &amp; cadence space; the feasible region is where the goal closes <b style="color:var(--ink)">in time, inside Kelly, at ruin ≤ 1%</b>. Whatever you trade next has to land in it.</div>
-
 <details class="fit-help"><summary>❔ how to read this</summary><div class="body">
 This is the inverse of the builder below. The builder searches <b>entry conditions</b> and reports what win rate / frequency they produced. Here those are <b>inputs you sweep</b> — because a win rate is an <i>output</i> of a strategy, not a dial. Each cell asks the goal model one question: at this leverage, cadence, win rate, R:R and stop floor, does the account reach the target by the date, and does the risk it forces stay under the Kelly/drawdown cap? <b class="g">Feasible</b> cells clear both; the <b>envelope</b> is their outer bounds — the shape any real strategy must have to hit this goal, and the table under it sits <b>your own measured trades</b> next to those bounds so you can see if what you actually trade lives inside the island. <b class="r">In-sample and model-only</b>: this says what edge you'd <i>need</i>, not that such an edge exists — that's the next step (filtering the real search by this envelope).
 </div></details>
@@ -289,31 +291,45 @@ SCRIPT = r"""
     } else if(o){
       envh='<div class="fit-env">No feasible envelope — nothing in the swept space both reaches the goal in time and stays inside Kelly. The tiles above are the <b>nearest miss</b>. Push the date, cut the target, or loosen the risk caps.</div>';
     }
-    // your real, measured strategy sat next to the envelope — only meaningful when
-    // a feasible island exists to compare against.
+    // your real, measured strategy sat next to the envelope — a band (the
+    // required range) with a marker (where you actually sit), same fill/
+    // diverging-track vocabulary as the heatmap and the rest of the app,
+    // instead of a checkmark table. Only meaningful when a feasible island
+    // exists to compare against.
     var m=DATA.measured, cmph='';
     if(o && Object.keys(env).length && m){
       var fails=0;
-      var band=function(v,lo,hi){ return v!=null && v>=lo-1e-9 && v<=hi+1e-9; };
-      var rows=[
-        ['Win rate',          pct(env.wr.min)+'–'+pct(env.wr.max),                     m.wr!=null?pct(m.wr):null,               m.wr!=null?band(m.wr,env.wr.min,env.wr.max):null],
-        ['R : R',             env.rr.min.toFixed(1)+'–'+env.rr.max.toFixed(1),         m.rr!=null?m.rr.toFixed(2):null,         m.rr!=null?band(m.rr,env.rr.min,env.rr.max):null],
-        ['Trades / week',     env.freq.min+'–'+env.freq.max,                           m.freq!=null?(''+m.freq):null,          m.freq!=null?band(m.freq,env.freq.min,env.freq.max):null],
-        ['Risk / trade',      m.kelly_cap_pct!=null?'≤ '+m.kelly_cap_pct.toFixed(2)+'%':'—', m.risk_pct!=null?m.risk_pct.toFixed(2)+'%':null, (m.risk_pct!=null&&m.kelly_cap_pct!=null)?m.risk_pct<=m.kelly_cap_pct+1e-9:null],
-        ['Kelly utilization', '< 100%',                                                m.kelly_util!=null?m.kelly_util.toFixed(0)+'%':null, m.kelly_util!=null?m.kelly_util<100:null]
-      ];
-      var trs=rows.map(function(r){
-        if(r[3]===false) fails++;
-        var your=r[2]==null?'<span class="dim">—</span>':r[2];
-        var st=r[3]===null?'<span class="dim">—</span>':(r[3]?'✅':'❌');
-        return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+your+'</td><td class="st">'+st+'</td></tr>';
-      }).join('');
+      var inBand=function(v,lo,hi){ return v!=null && v>=lo-1e-9 && v<=hi+1e-9; };
+      function row(label,lo,hi,val,fmt,scaleMax,ok){
+        if(ok===false) fails++;
+        var lp=Math.max(0,Math.min(100,lo/scaleMax*100)), hp=Math.max(0,Math.min(100,hi/scaleMax*100));
+        var vp=val!=null?Math.max(0,Math.min(100,val/scaleMax*100)):null;
+        var col=ok===null?'var(--faint)':ok?'var(--long)':'var(--short)';
+        return '<div class="fit-band-row"><span class="lbl">'+label+'</span>'+
+          '<div class="fit-band-track"><div class="band" style="left:'+lp+'%;width:'+Math.max(0,hp-lp)+'%"></div>'+
+          (vp!=null?'<div class="mark" style="left:'+vp+'%;background:'+col+'"></div>':'')+'</div>'+
+          '<span class="val" style="color:'+col+'">'+(val==null?'—':fmt)+'</span></div>';
+      }
+      var wrOk=m.wr!=null?inBand(m.wr,env.wr.min,env.wr.max):null;
+      var rrOk=m.rr!=null?inBand(m.rr,env.rr.min,env.rr.max):null;
+      var freqOk=m.freq!=null?inBand(m.freq,env.freq.min,env.freq.max):null;
+      var riskOk=(m.risk_pct!=null&&m.kelly_cap_pct!=null)?m.risk_pct<=m.kelly_cap_pct+1e-9:null;
+      var kuOk=m.kelly_util!=null?m.kelly_util<100:null;
+      var rows=
+        row('Win rate',100*env.wr.min,100*env.wr.max,m.wr!=null?100*m.wr:null,pct(m.wr),100,wrOk)+
+        row('R : R',env.rr.min,env.rr.max,m.rr,m.rr!=null?m.rr.toFixed(2)+'×':null,
+            Math.max(env.rr.max,m.rr||0)*1.25,rrOk)+
+        row('Trades / week',env.freq.min,env.freq.max,m.freq,m.freq!=null?(''+m.freq):null,
+            Math.max(env.freq.max,m.freq||0)*1.25,freqOk)+
+        row('Risk / trade',0,m.kelly_cap_pct||0,m.risk_pct,m.risk_pct!=null?m.risk_pct.toFixed(2)+'%':null,
+            Math.max(m.kelly_cap_pct||0,m.risk_pct||0)*1.3||1,riskOk)+
+        row('Kelly utilization',0,100,m.kelly_util,m.kelly_util!=null?m.kelly_util.toFixed(0)+'%':null,
+            Math.max(120,m.kelly_util||0*1.2),kuOk);
       var cap=fails===0
         ? 'Your measured strategy is living <b style="color:var(--long)">inside the feasible island</b>.'
         : 'Your measured strategy is <b style="color:var(--short)">outside the island</b> on '+fails+' ax'+(fails>1?'es':'is')+'.';
-      cmph='<table class="fit-cmp"><caption>'+cap+' <span class="dim">n='+m.n+' closed trades</span></caption>'+
-        '<thead><tr><th>Metric</th><th>Required envelope</th><th>Your strategy</th><th>Status</th></tr></thead>'+
-        '<tbody>'+trs+'</tbody></table>';
+      cmph='<div class="fit-cmp-wrap"><div class="fit-cmp-cap">'+cap+' <span class="dim">n='+m.n+' closed trades · band = required envelope, marker = you</span></div>'+
+        rows+'</div>';
     }
     // C4 — the envelope may be populated on paper and starved in the market
     var R=DATA.realism, realh='';
@@ -384,7 +400,7 @@ SCRIPT = r"""
 
 
 def fragment(book: str = "hedge"):
-    """Return (css, body, script) for embedding in /edge. `book` picks the goal the
+    """Return (css, body, script) for embedding in /analytics. `book` picks the goal the
     sweep is constrained by: hedge = the BTC-stack goal, prop = the eval (+target%
     before -DD%). It only changes the prefilled defaults; the sweep math is the same."""
     script = (f'var FIT_BOOK={book!r};\n'.replace("'", '"')) + SCRIPT
