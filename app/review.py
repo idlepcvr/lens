@@ -955,11 +955,11 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
   <div class="logo">LEN<span class="s">S</span> <span class="pg">Journal</span></div>
   <div class="modesw">
     <a href="/prop">◎ PROP</a>
-    <a href="/plan" class="on">▤ HEDGE</a>
+    <a href="/goal" class="on">▤ HEDGE</a>
     <a href="/" class="home">⌂</a>
   </div>
   <nav class="topnav">
-    <a href="/plan">Dashboard</a>
+    <a href="/goal">Dashboard</a>
     <a href="/desk">Desk</a>
     <a href="/signals">Signals</a>
     <a href="/analytics">Analytics</a>

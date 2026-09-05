@@ -382,7 +382,7 @@ def position_page(book: str = "hedge") -> str:
            'Override risk %, R:R or leverage below for a per-trade what-if; the saved plan is untouched.'
            if book == "prop" else
            'Entry → full trade: levels, sizing, risk — long &amp; short. Params from your '
-           '<a href="/plan" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
+           '<a href="/goal" style="color:var(--accent)">config</a>; override per trade or flip the book below.')
     body = r"""
 <div class="pz">
   <h1>Position</h1>
