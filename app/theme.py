@@ -38,6 +38,11 @@ import re
 # calculator, same hero cards, plus the milestone ladder); the two nav
 # entries pointed at the same job, same as the Calendar/Journal merge above.
 # /plan 301s to /goal (see LEGACY_ROUTES in main.py).
+# Edge dropped 2026-09-05 — retrospective ("how did I actually do", Analytics)
+# and prospective ("what could I test next", Edge) read as two dashboards
+# answering the same underlying question, so Edge's four tabs (past/board/
+# backtest/fit) became collapsible sections on /analytics instead of a mode
+# switch. /edge 301s to /analytics (see LEGACY_ROUTES in main.py).
 # No "hedge-" prefix, unlike prop — 2026-08-29: "I want to keep the hedge
 # completely separate from the prop... I want to remove the prefix of hedge
 # for everything... even if it's using the same engine I feel like the front
@@ -52,7 +57,6 @@ NAV_HEDGE = [
     ("/position", "Position"),
     ("/journal", "Journal"),
     ("/analytics", "Analytics"),
-    ("/edge", "Edge"),
 ]
 # Primary chips shown in the top nav; everything else in each mode drops to the
 # footer ("more"). Pages stay reachable either way.

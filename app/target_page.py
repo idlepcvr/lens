@@ -295,7 +295,7 @@ def parts() -> dict:
 
     body = head + floor + body_maps + prop + ledger + (
         '<p class="foot"><a href="/geometry">→ where the geometry comes from</a> · '
-        '<a href="/edge">→ live strategy search</a><br>'
+        '<a href="/analytics#board">→ live strategy search</a><br>'
         '<span class="m">python3 research/barrier_test.py</span> regenerates the '
         'measured floor.</p>')
 

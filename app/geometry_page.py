@@ -442,7 +442,7 @@ def parts() -> dict:
         + stale + verdict + law + ladder + conf + base + fric + frag + avail + ledger +
         '<p class="foot"><a href="/audit">→ what this supersedes</a> · '
         '<a href="/manual?doc=glossary">→ the terms</a> · '
-        '<a href="/edge">→ live strategy ranks</a><br>'
+        '<a href="/analytics#board">→ live strategy ranks</a><br>'
         '<span class="m">python3 -m app.geometry</span> runs the same math with its '
         'assertions, if you want the identities checked rather than asserted.</p>'
     )

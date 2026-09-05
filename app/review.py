@@ -964,7 +964,7 @@ body{font-family:var(--ui);font-size:13px;background:var(--bg);color:var(--t1);-
     <a href="/signals">Signals</a>
     <a href="/analytics">Analytics</a>
     <a href="/journal" class="cur">Journal</a>
-    <a href="/edge">Edge</a>
+    <a href="/analytics#board">Edge</a>
     <a href="/goal">Goal</a>
   </nav>
   <div class="topbar-right">
