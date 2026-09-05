@@ -8,6 +8,14 @@ realized per-setup scoreboard. Pulls the live pending signal from /api/signals
 and lets you TAKE A+ / TAKE / SKIP it from the thumb zone — the decision POSTs
 straight to /api/signals/{id}/decide (same path as the ntfy buttons). Built
 phone-first: a single ~460px column, big glanceable numbers, sticky action bar.
+
+2026-09-05: merged /signals into this page. Desk and Signals were the same
+job — same data, same /api/signals/{id}/decide endpoint — shown two ways:
+cockpit-glance vs list-scan. The cockpit above stays the primary view; a
+"queue & decisions" section below it (queue, blocked, recent decisions) folds
+in everything Signals uniquely had: the full pending queue for when more than
+one signal is live at once, the vetoed/blocked audit trail, and decision
+history. /signals now 301s here (see LEGACY_ROUTES in main.py).
 """
 
 from .theme import shell
@@ -17,6 +25,8 @@ RIGHT = '<div class="live"><span class="dot" id="dot"></span><span id="livetxt">
 
 BODY = r"""
 <div id="body"><div class="skeleton">reading market state…</div></div>
+
+<div id="queue"><div class="skeleton">loading queue…</div></div>
 
 <div class="foot">
   Patterns are mechanical coin-flips alone — realized WRs came from <i>your selection inside
@@ -28,9 +38,9 @@ BODY = r"""
   <div class="actions-inner">
     <div class="act-label" id="actlabel"></div>
     <div class="act-row">
-      <button class="btn skip"  id="b-skip"  onclick="decide('rejected',null)">SKIP<span class="cap">reject</span></button>
-      <button class="btn take"  id="b-take"  onclick="decide('approved',3)">TAKE<span class="cap">conv 3</span></button>
-      <button class="btn aplus" id="b-aplus" onclick="decide('approved',5)">TAKE A+<span class="cap">conv 5</span></button>
+      <button class="btn skip"  id="b-skip"  onclick="deskDecide('rejected',null)">SKIP<span class="cap">reject</span></button>
+      <button class="btn take"  id="b-take"  onclick="deskDecide('approved',3)">TAKE<span class="cap">conv 3</span></button>
+      <button class="btn aplus" id="b-aplus" onclick="deskDecide('approved',5)">TAKE A+<span class="cap">conv 5</span></button>
     </div>
     <div style="margin-top:6px;font-size:11px;color:var(--dim);text-align:center">signals you skipped went on to win 83% (n=30, one_at_a_time) — SKIP only on a veto you can name, not a feeling</div>
   </div>
@@ -65,7 +75,15 @@ function toast(msg, cls){
 function chip(label,val,cls){return `<div class="chip ${cls||''}">${label} <b>${val}</b></div>`;}
 function secHead(id,title){return `<div class="sect" id="h-${id}" onclick="tog('${id}')"><span class="caret">▾</span><span class="ttl">${title}</span><span class="line"></span></div>`;}
 function tog(id){ $('h-'+id).classList.toggle('closed'); $('s-'+id).classList.toggle('closed'); }
-function money(n){return n.toLocaleString(undefined,{maximumFractionDigits:0});}
+function money(n){ return (n==null)?'—':Number(n).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function ago(iso){
+  if(!iso) return '';
+  const t = new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z');
+  const m = Math.round((Date.now()-t.getTime())/60000);
+  if(m<60) return m+'m ago';
+  if(m<1440) return Math.round(m/60)+'h ago';
+  return Math.round(m/1440)+'d ago';
+}
 
 function ticketHTML(dir,v,d){
   if(!v.plan) return '';
@@ -220,25 +238,46 @@ function renderActions(){
 }
 
 let ACTIVE_SIGNAL = null;
-async function decide(status, conviction){
-  if(!ACTIVE_SIGNAL) return;
-  ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=true);
+// shared decide path — sticky action bar (deskDecide, below) and the queue
+// section's per-card buttons both funnel through here, same endpoint the
+// ntfy phone alert also hits.
+async function decide(id, status, conviction){
+  const isActive = ACTIVE_SIGNAL && ACTIVE_SIGNAL.signal_id===id;
+  const card = $('card-'+id);
+  if(isActive) ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=true);
+  if(card) card.querySelectorAll('button').forEach(b=>b.disabled=true);
   const payload = status==='approved'
     ? {status, your_conviction:conviction}
     : {status, rejection_reason:'skipped from desk'};
   try{
-    const r = await fetch(`/api/signals/${ACTIVE_SIGNAL.signal_id}/decide`,{
+    const r = await fetch(`/api/signals/${id}/decide`,{
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
     const j = await r.json();
-    if(!r.ok){ toast(j.detail||'decide failed','err'); ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false); return; }
+    if(!r.ok){
+      toast(j.detail||'decide failed','err');
+      if(isActive) ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false);
+      if(card) card.querySelectorAll('button').forEach(b=>b.disabled=false);
+      return;
+    }
     if(status==='approved') toast(`✓ TAKEN · conviction ${conviction}`,'ok');
     else toast('✕ SKIPPED','no');
-    delete PENDING[ACTIVE_SIGNAL.direction];
-    ACTIVE_SIGNAL = null;
-    setTimeout(()=>{ $('actions').classList.remove('show'); loadPending(); }, 900);
+    if(card){ card.style.transition='opacity .4s,transform .4s'; card.style.opacity='0'; card.style.transform='scale(.96)'; }
+    if(isActive){
+      delete PENDING[ACTIVE_SIGNAL.direction];
+      ACTIVE_SIGNAL = null;
+      $('actions').classList.remove('show');
+    }
+    setTimeout(()=>{ loadPending(); loadQueue(); }, isActive?900:700);
   }catch(e){
-    toast('network error','err'); ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false);
+    toast('network error','err');
+    if(isActive) ['b-skip','b-take','b-aplus'].forEach(b=>$(b).disabled=false);
+    if(card) card.querySelectorAll('button').forEach(b=>b.disabled=false);
   }
+}
+// sticky action-bar buttons only ever act on the current ACTIVE_SIGNAL.
+function deskDecide(status, conviction){
+  if(!ACTIVE_SIGNAL) return;
+  decide(ACTIVE_SIGNAL.signal_id, status, conviction);
 }
 
 async function loadPending(){
@@ -251,9 +290,265 @@ async function loadPending(){
   }catch(e){ /* non-fatal */ }
 }
 
+// ── queue & decisions (folded in from the old /signals page) ─────────────────
+// Sticky action bar above handles the one most-actionable pending signal;
+// this section is the rest: the full queue for when more than one signal is
+// live, the vetoed/blocked audit trail, and recent decision history.
+
+// same-zone clustering — the hourly scanner re-fires the same context, so
+// group consecutive signals (same direction, entry within 0.5%, ≤6h apart)
+// into one trade idea for display. Nothing is merged in the data — every
+// member keeps its own identity and its own TAKE/SKIP.
+const ZONE_PCT=0.005, ZONE_GAP_MS=6*3600e3;
+function clusterize(list){ // list sorted newest-first
+  const out=[];
+  for(const s of list){
+    const c=out[out.length-1];
+    const prev=c&&c.members[c.members.length-1];
+    if(c && s.direction===c.dir && s.entry_price && c.entry &&
+       Math.abs(s.entry_price-c.entry)/c.entry<ZONE_PCT &&
+       prev && (new Date(prev.received_at)-new Date(s.received_at))<ZONE_GAP_MS){
+      c.members.push(s);
+    } else {
+      out.push({dir:s.direction, entry:s.entry_price, members:[s]});
+    }
+  }
+  return out;
+}
+function zoneLabel(c){
+  const es=c.members.map(m=>m.entry_price).filter(Boolean);
+  if(es.length<2) return '';
+  const lo=Math.min(...es), hi=Math.max(...es);
+  const w=((hi-lo)/lo*100).toFixed(2);
+  return `${money(lo)}–${money(hi)} · ${w}% apart`;
+}
+
+function pendingCard(s){
+  const dir = s.direction;
+  return `<div class="scard active" id="card-${s.signal_id}">
+    <div class="sh">
+      <span class="sid">${s.trigger_type||'?'} <span class="d-${dir}">${ARROW[dir]||''} ${VLAB[dir]||dir}</span></span>
+      <span class="badge pending">pending · ${ago(s.received_at)}</span>
+    </div>
+    <div class="sname">${s.strategy_name||''} ${s.symbol?('· '+s.symbol):''}</div>
+    <div class="tg" style="margin-bottom:12px">
+      <div class="cell"><div class="k">entry</div><div class="v">${money(s.entry_price)}</div></div>
+      <div class="cell"><div class="k">R : R<a class="qh" href="/glossary#rr" target="_blank" rel="noopener">?</a></div><div class="v">${s.expected_rr??'—'}</div></div>
+      <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
+      <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
+    </div>
+    <div class="act-row">
+      <button class="btn skip"  onclick="decide('${s.signal_id}','rejected',null)">SKIP<span class="cap">reject</span></button>
+      <button class="btn take"  onclick="decide('${s.signal_id}','approved',3)">TAKE<span class="cap">conv 3</span></button>
+      <button class="btn aplus" onclick="decide('${s.signal_id}','approved',5)">TAKE A+<span class="cap">conv 5</span></button>
+    </div>
+  </div>`;
+}
+
+// blocked cards — a setup that matched and was vetoed. No buttons: blocked is
+// not actionable, it's evidence for "would taking the vetoed ones have made
+// money?", which the scoreboard above can't answer (it only sees trades).
+function vetoRules(s){
+  const r = s.rejection_reason||'';
+  return r.startsWith('veto:') ? r.slice(5).split(',').filter(Boolean) : [];
+}
+function ledgerLine(rules){
+  const exact = VETO_LEDGER.combos[rules.slice().sort().join(',')];
+  if(exact) return {txt:`this exact veto bucket, realized: <b>${exact.n} trades · €${exact.pnl>0?'+':'−'}${money(Math.abs(exact.pnl))} · ${exact.wr}% WR</b>`, pnl:exact.pnl};
+  const parts = rules.map(r=>{
+    const x = VETO_LEDGER.rules[r];
+    return x ? `${r} ${x.n}t €${x.pnl>0?'+':'−'}${money(Math.abs(x.pnl))}` : null;
+  }).filter(Boolean);
+  if(!parts.length) return {txt:'no realized trades in this bucket yet', pnl:0};
+  return {txt:`no trade hit this exact combination · per rule: <b>${parts.join(' · ')}</b>`,
+          pnl:rules.reduce((a,r)=>a+((VETO_LEDGER.rules[r]||{}).pnl||0),0)};
+}
+function blockedCard(s){
+  const dir = s.direction, rules = vetoRules(s);
+  const led = ledgerLine(rules);
+  const checks = Array.isArray(s.mtf_confluence)?s.mtf_confluence:[];
+  return `<div class="scard" style="opacity:.86">
+    <div class="sh">
+      <span class="sid">${s.trigger_type||'?'} <span class="d-${dir}">${ARROW[dir]||''} ${VLAB[dir]||dir}</span></span>
+      <span class="badge rejected">blocked · ${ago(s.received_at)}</span>
+    </div>
+    <div class="sname">${s.strategy_name||''} ${s.entry_price?('· '+money(s.entry_price)):''}</div>
+    ${checks.length?`<div style="font-size:12px;margin:8px 0 2px"><span class="g">setup ✓</span> <span class="m">${checks.join(' · ')}</span></div>`:''}
+    <div style="font-size:12px;margin:8px 0 2px"><span class="r">blocked ✗</span></div>
+    <ul style="margin:2px 0 0 16px;padding:0;font-size:12px;color:var(--dim)">
+      ${rules.map(r=>`<li>${VETO_LABELS[r]||r}</li>`).join('')}
+    </ul>
+    <div style="font-size:12px;margin-top:10px" class="${led.pnl<0?'g':'a'}">${led.txt}</div>
+  </div>`;
+}
+
+function fmtTs(iso){
+  if(!iso) return '—';
+  const d = new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z');
+  return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function gap(a,b){
+  if(!a||!b) return '';
+  const ta=new Date(a.endsWith('Z')||a.includes('+')?a:a+'Z'), tb=new Date(b.endsWith('Z')||b.includes('+')?b:b+'Z');
+  const m=Math.round((tb-ta)/60000);
+  if(m<1) return '<1m'; if(m<60) return m+'m'; if(m<1440) return Math.round(m/60)+'h'; return Math.round(m/1440)+'d';
+}
+function toggleRow(id){
+  const r=document.getElementById('d-'+id); if(!r) return;
+  r.style.display = r.style.display==='none' ? '' : 'none';
+}
+function togGroup(gi){
+  const rows=document.querySelectorAll(`tr[data-grp="${gi}"]`);
+  const open=rows.length&&rows[0].style.display==='none';
+  rows.forEach(r=>{
+    r.style.display=open?'':'none';
+    if(!open){
+      const oc=r.getAttribute('onclick')||'';
+      const m=oc.match(/toggleRow\('(.+)'\)/);
+      if(m){ const d=document.getElementById('d-'+m[1]); if(d) d.style.display='none'; }
+    }
+  });
+}
+
+// the full order ticket (sizing as the alert + desk compute it) — same numbers
+// you'd punch into Kraken. null when the signal predates ticket math.
+function ticketBlock(t){
+  if(!t) return '';
+  const winBal = t.account + t.reward_usd, loseBal = t.account - t.risk_usd;
+  return `<div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px">`
+    + `full ticket · acct $${money(t.account)} · ${t.leverage}× · fee ${t.fee_rt_pct.toFixed(2)}%`
+    + `<a class="qh" href="/glossary#notional" target="_blank" rel="noopener" title="notional, margin, risk, fees explained">?</a></div>`
+    + `<div class="kv"><span class="k">notional</span><span class="v">$${money(t.notional)}</span></div>`
+    + `<div class="kv"><span class="k">size</span><span class="v">${t.size_btc.toFixed(4)} ₿</span></div>`
+    + `<div class="kv"><span class="k">margin</span><span class="v">$${money(t.margin_usd)} · ${t.cost_btc.toFixed(4)} ₿</span></div>`
+    + `<div class="kv"><span class="k">win balance</span><span class="v g">$${money(winBal)} (+$${money(t.reward_usd)})</span></div>`
+    + `<div class="kv"><span class="k">lose balance</span><span class="v r">$${money(loseBal)} (−$${money(t.risk_usd)})</span></div>`
+    + `<div class="kv"><span class="k">risk</span><span class="v r">$${money(t.risk_usd)} · ${t.loss_pct.toFixed(1)}%</span></div>`
+    + `<div class="kv"><span class="k">hurdle</span><span class="v">$${t.hurdle_usd.toFixed(2)} (${t.fee_rt_pct.toFixed(2)}% rt)</span></div>`
+    + `<div class="kv"><span class="k">breakeven</span><span class="v">${money(t.breakeven)}</span></div>`
+    + `<div class="kv"><span class="k">liquidation</span><span class="v">${money(t.liq)}</span></div>`;
+}
+
+// each decision row expands to the full plan as proposed + decision timing.
+// grp: cluster index — member rows start hidden behind their zone summary row.
+function historyRow(s, grp){
+  const id = s.signal_id;
+  const grpAttr = grp?` data-grp="${grp}" style="display:none"`:'';
+  const conv = s.your_conviction!=null ? s.your_conviction : '—';
+  const g = gap(s.received_at, s.decided_at);
+  const detail = `
+    <div class="tg" style="margin:2px 0 8px">
+      <div class="cell"><div class="k">entry</div><div class="v">${money(s.entry_price)}</div></div>
+      <div class="cell"><div class="k">R : R<a class="qh" href="/glossary#rr" target="_blank" rel="noopener">?</a></div><div class="v">${s.expected_rr??'—'}</div></div>
+      <div class="cell"><div class="k">stop</div><div class="v r">${money(s.stop_price)}</div></div>
+      <div class="cell"><div class="k">target</div><div class="v g">${money(s.target_price)}</div></div>
+    </div>
+    ${ticketBlock(s.ticket)}
+    <div class="kv" style="margin-top:8px"><span class="k">strategy</span><span class="v">${s.strategy_name||'—'}${s.symbol?(' · '+s.symbol):''}</span></div>
+    <div class="kv"><span class="k">proposed</span><span class="v">${fmtTs(s.received_at)}</span></div>
+    <div class="kv"><span class="k">decided</span><span class="v">${fmtTs(s.decided_at)}${g?(' · '+g+' later'):''}</span></div>
+    <div class="kv"><span class="k">conviction</span><span class="v">${conv}</span></div>
+    ${s.rejection_reason?`<div class="kv"><span class="k">reason</span><span class="v">${s.rejection_reason}</span></div>`:''}
+    ${s.linked_trade_id?`<div class="kv"><span class="k">trade</span><span class="v"><a href="/journal?trade=${s.linked_trade_id}" style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation()">#${s.linked_trade_id}${s.pnl_eur!=null?` · ${s.pnl_eur>=0?'+':''}€${s.pnl_eur}`:''} — open in journal →</a></span></div>`:''}`;
+  return `<tr class="hrow"${grpAttr} onclick="toggleRow('${id}')" style="cursor:pointer">
+    <td>${grp?'&nbsp;&nbsp;↳ ':''}${s.trigger_type||'?'}</td>
+    <td class="${s.direction==='long'?'g':'r'}">${VLAB[s.direction]||s.direction||''}</td>
+    <td><span class="badge ${s.status}">${s.status}</span></td>
+    <td class="m">${conv}</td>
+    <td class="m">${ago(s.decided_at||s.received_at)} ▾</td>
+  </tr>
+  <tr id="d-${id}" style="display:none"><td colspan="5" style="background:var(--panel);padding:10px 12px">${detail}</td></tr>`;
+}
+
+function renderQueue(all){
+  const pending = all.filter(s=>s.status==='pending')
+                     .sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''));
+  const isBlocked = s=>(s.rejection_reason||'').startsWith('veto:');
+  const blocked = all.filter(isBlocked)
+                     .sort((a,b)=>(b.received_at||'').localeCompare(a.received_at||''))
+                     .slice(0,20);
+  const decided = all.filter(s=>s.status!=='pending' && !isBlocked(s))
+                     .sort((a,b)=>(b.decided_at||b.received_at||'').localeCompare(a.decided_at||a.received_at||''))
+                     .slice(0,25);
+
+  let html = '';
+  html += `<div class="sect closed" id="h-qhelp" onclick="tog('qhelp')"><span class="caret">▾</span><span class="ttl">❔ queue, filters &amp; history</span><span class="line"></span></div>`
+    + `<div class="sec-body closed" id="s-qhelp"><div class="help-body">`
+    + `<h4>proposed vs decided</h4><b>Proposed</b> = when the hourly scanner spotted the setup. <b>Decided</b> = when a verdict was recorded. Click a row in <b>recent decisions</b> to expand its full ticket + both timestamps.`
+    + `<h4>who decides</h4>Two deciders — the <b>reason</b> field says which acted. <b>1) LENS</b> — the discipline filters auto-reject a signal the instant it's born if it breaks a rule (proposed = decided). <b>2) You</b> — signals that pass sit <b class="a">pending</b> until TAKE/SKIP, here or on the sticky bar above.`
+    + `<h4>the filters (auto-skips)</h4>Mined from the loss fingerprint — each one cost real money historically. A rejected signal is still stored so the dataset stays complete.`
+    + `<ul style="margin:6px 0 0 16px;padding:0">`
+    + `<li><code>filter:saturday</code> — no trading Saturday (UTC). Sat bled €2,606, PF 0.38.</li>`
+    + `<li><code>filter:bleed_hour_02utc</code> / <code>_11utc</code> — skip the two hours that bleed across every year (PF 0.26 / 0.38).</li>`
+    + `<li><code>filter:bad_venue_&lt;x&gt;</code> — Kraken only. Bybit cost €1,874 in 84 trades (PF 0.40), auto-rejected.</li>`
+    + `<li><code>filter:cooldown_&lt;n&gt;min</code> — anti-revenge: &lt;5 min since the last accepted signal on the same symbol.</li>`
+    + `</ul>`
+    + `<h4>blocked</h4>A setup can match and still be stood down by a <b>veto rule</b>. Setup ✓, which rules ✗, and what that veto bucket actually did in your ledger. No alert fires — blocked isn't actionable, it's evidence. A bucket in the red means the veto saved you; a bucket in profit means the rule is costing you.`
+    + `<h4>why skips matter</h4>A skip is recorded too — it trains the veto map. Don't ignore them.`
+    + `</div></div>`;
+
+  html += secHead('pending', `queue · ${pending.length} pending`) + `<div class="sec-body" id="s-pending">`;
+  if(pending.length===0){
+    html += `<div class="panel dim" style="text-align:center;color:var(--dim)">no pending signals — scanner runs hourly at :02</div>`;
+  } else {
+    html += clusterize(pending).map(c=>{
+      if(c.members.length===1) return `<div class="grid-auto">${pendingCard(c.members[0])}</div>`;
+      return `<div style="border:1px solid var(--line2);border-radius:10px;padding:10px;margin-bottom:12px">`
+        + `<div style="font-size:11px;color:var(--dim);margin:0 2px 8px">≋ <b style="color:var(--ink)">${c.members.length} signals · same zone</b>`
+        + ` <span class="mono">${zoneLabel(c)}</span> — one trade idea rescanned hourly; decide each</div>`
+        + `<div class="grid-auto">${c.members.map(pendingCard).join('')}</div></div>`;
+    }).join('');
+  }
+  html += `</div>`;
+
+  html += `<div class="sect closed" id="h-blocked" onclick="tog('blocked')"><span class="caret">▾</span><span class="ttl">⃠ blocked · ${blocked.length}</span><span class="line"></span></div>`
+    + `<div class="sec-body closed" id="s-blocked">`;
+  if(blocked.length===0){
+    html += `<div class="panel dim" style="text-align:center;color:var(--dim)">no blocked setups logged yet — they appear here when a setup matches and a veto rule stands it down</div>`;
+  } else {
+    html += `<div class="grid-auto">${blocked.map(blockedCard).join('')}</div>`;
+  }
+  html += `</div>`;
+
+  let hist='';
+  let gi=0;
+  for(const c of clusterize(decided)){
+    if(c.members.length===1){ hist+=historyRow(c.members[0]); continue; }
+    gi++;
+    const st={}; c.members.forEach(m=>st[m.status]=(st[m.status]||0)+1);
+    const stTxt=Object.entries(st).map(([k,v])=>`<span class="badge ${k}">${v} ${k}</span>`).join(' ');
+    const ty={}; c.members.forEach(m=>{const t=m.trigger_type||'?';ty[t]=(ty[t]||0)+1;});
+    const tyTxt=Object.entries(ty).map(([t,n])=>`${n}× ${t}`).join(' + ');
+    const newest=c.members[0];
+    hist+=`<tr class="hrow" onclick="togGroup(${gi})" style="cursor:pointer">
+      <td>≋ ${tyTxt} <span class="m mono" style="font-size:10px">${zoneLabel(c)}</span></td>
+      <td class="${c.dir==='long'?'g':'r'}">${VLAB[c.dir]||c.dir||''}</td>
+      <td>${stTxt}</td>
+      <td class="m">—</td>
+      <td class="m">${ago(newest.decided_at||newest.received_at)} ▸</td></tr>`;
+    hist+=c.members.map(m=>historyRow(m,gi)).join('');
+  }
+  html += secHead('hist','recent decisions') + `<div class="sec-body" id="s-hist"><div class="sb-wrap"><table class="sb">`
+    + `<tr><th>setup</th><th>dir</th><th>status</th><th>conv</th><th>when</th></tr>`
+    + (decided.length?hist:'<tr><td colspan="5" class="m">no decisions yet</td></tr>')
+    + `</table></div></div>`;
+
+  $('queue').innerHTML = html;
+}
+
+async function loadQueue(){
+  try{
+    const r = await fetch('/api/signals?limit=500');
+    const j = await r.json();
+    renderQueue(j.signals||[]);
+  }catch(e){
+    $('queue').innerHTML = '<div class="skeleton" style="color:var(--amber)">failed to load queue</div>';
+  }
+}
+
 async function load(){
   try{
-    const [stRes] = await Promise.all([fetch('/api/setups/state'), loadPending()]);
+    const [stRes] = await Promise.all([fetch('/api/setups/state'), loadPending(), loadQueue()]);
     STATE = await stRes.json();
     render();
   }catch(e){
@@ -281,5 +576,21 @@ _GEO_JS = (f"const GEO={{sl:{_SL},tp:{_TP},"
            f"fee_t:{FRICTION_PCT / 100:g},"
            f"fee_m:{FRICTION_LADDER['maker both sides'] / 100:g}}};\n")
 
-DESK_HTML = shell("/desk", "Desk", BODY, script=_GEO_JS + SCRIPT, right=RIGHT,
-                  meta="can I enter?")
+
+def render() -> str:
+    # VETO_LABELS + the realized veto ledger feed the queue section's
+    # "blocked" cards (folded in from the old /signals page). Baked in at
+    # render time, same as /signals did — they change only when the book
+    # does, not worth a second round trip.
+    import json
+
+    from .setups import VETO_LABELS, veto_bucket_stats
+
+    try:
+        ledger = veto_bucket_stats()
+    except Exception:
+        ledger = {"rules": {}, "combos": {}}   # a dead stat never blanks the page
+    preamble = (f"const VETO_LABELS={json.dumps(VETO_LABELS)};\n"
+                f"const VETO_LEDGER={json.dumps(ledger)};\n")
+    return shell("/desk", "Desk", BODY, script=_GEO_JS + preamble + SCRIPT,
+                 right=RIGHT, meta="can I enter?")
