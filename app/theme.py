@@ -24,12 +24,16 @@ import re
 # LEGACY_ROUTES in main.py 301s the old bare paths (/goal, /dashboard…) here, so
 # old bookmarks and any href missed by a rename keep working.
 # Order specified by Lucky, 2026-07-25 — his flow, not a derived one:
-# overview → signals → desk → plan → goal → position → journal → analytics →
-# edge. Every entry is a top-bar chip (HEDGE_MAIN below is the full set),
+# overview → desk → plan → goal → position → journal → analytics → edge
+# (signals merged into desk 2026-09-05, see note above). Every entry is a
+# top-bar chip (HEDGE_MAIN below is the full set),
 # because the previous 5-chip bar pushed half the book into a "more"
 # footer: "the nav bar here is too small, it's too little".
 # Calendar dropped 2026-08-28 — merged into Journal (same page now, calendar
 # on top). Two nav entries pointing at the same job was itself the complaint.
+# Signals dropped 2026-09-05 — merged into Desk (same data, same decide
+# endpoint, cockpit-glance vs list-scan was the only difference). /signals
+# 301s to /desk (see LEGACY_ROUTES in main.py).
 # No "hedge-" prefix, unlike prop — 2026-08-29: "I want to keep the hedge
 # completely separate from the prop... I want to remove the prefix of hedge
 # for everything... even if it's using the same engine I feel like the front
@@ -38,7 +42,6 @@ import re
 # marking itself. See LEGACY_ROUTES in main.py for the old /hedge-* 301s.
 NAV_HEDGE = [
     ("/overview", "Overview"),
-    ("/signals", "Signals"),
     ("/desk", "Desk"),
     ("/plan", "Plan"),
     ("/goal", "Goal"),

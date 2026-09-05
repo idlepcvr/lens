@@ -213,7 +213,7 @@ def landing():
     body = f"""
 <div class="strip">
   <a class="sc" href="/journal"><div class="sc-n">{len(trades)}</div><div class="sc-l">Trades → journal</div></a>
-  <a class="sc" href="/signals"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → queue</div></a>
+  <a class="sc" href="/desk"><div class="sc-n">{len(sigs)}</div><div class="sc-l">Signals → desk</div></a>
   <a class="sc {'pend' if pending else ''}" href="/desk"><div class="sc-n">{len(pending)}</div><div class="sc-l">Pending → desk</div></a>
 </div>
 
@@ -1696,14 +1696,9 @@ def expire_stale(older_than_minutes: int = Query(30, ge=1, le=10080)):
     return {"expired": n}
 
 
-# ─── Signals / Conviction page ───────────────────────────────────────────────
-
-@app.get("/signals", response_class=HTMLResponse)
-def signals_page_new():
-    """Responsive signals queue built on the shared design system."""
-    from .signals_page import render
-    return render()
-
+# /signals deleted 2026-09-05 — merged into /desk (see desk_page() below).
+# signals_page.py's queue/blocked/history rendering moved into desk.py's
+# render(); the redirect below keeps any bookmark or stale href working.
 
 
 # ─── Backtest ─────────────────────────────────────────────────────────────────
@@ -2596,10 +2591,15 @@ def api_backtest_strategies():
 LEGACY_ROUTES = {
     "/overview-hedge": "/overview", "/dashboard": "/plan",
     "/hedge-overview": "/overview", "/hedge-plan": "/plan",
-    "/hedge-goal": "/goal", "/hedge-desk": "/desk", "/hedge-signals": "/signals",
+    "/hedge-goal": "/goal", "/hedge-desk": "/desk", "/hedge-signals": "/desk",
     "/hedge-journal": "/journal", "/hedge-analytics": "/analytics",
     "/hedge-position": "/position", "/hedge-edge": "/edge", "/hedge-track": "/track",
     "/calendar": "/journal", "/hedge-calendar": "/journal",
+    # 2026-09-05: /signals merged into /desk — same job (approve/reject a
+    # signal), same decide endpoint, just two presentations. Desk's cockpit
+    # is now the one page; its queue/blocked/history section is what
+    # /signals uniquely had.
+    "/signals": "/desk",
     # Older shims, folded in here from four hand-written handlers. They were
     # identical 301s that each forgot include_in_schema=False, so /sitemap
     # listed them as if they were pages — two of them under "Engines".
@@ -2804,8 +2804,13 @@ def api_stats_trades():
 
 @app.get("/desk", response_class=HTMLResponse)
 def desk_page():
-    from .desk import DESK_HTML
-    return DESK_HTML
+    # 2026-09-05: /signals merged in here — same data (get_signals /
+    # decide_signal), same decide endpoint, same job (approve/reject a
+    # signal), just two presentations (cockpit vs list). The cockpit above
+    # stays primary; the queue/blocked/history section below is what
+    # /signals uniquely had. /signals now 301s here — see LEGACY_ROUTES.
+    from .desk import render
+    return render()
 
 
 @app.get("/assets/lens.css")
