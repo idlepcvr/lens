@@ -1286,6 +1286,16 @@ canvas{width:100%;height:200px;display:block}
 .hm td.hm-cell{width:56px;height:34px;text-align:center;font-size:11px;border:1px solid var(--b1);color:var(--t1)}
 .hm td.hm-base{outline:2px solid var(--t1);outline-offset:-2px}
 .c-n{width:72px;background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--mono);margin-left:4px}
+/* scorecard visuals — same fill/diverging-bar vocabulary as /analytics's
+   vz-track / vz-div, own prefix since this fragment ships standalone CSS. */
+.metric.viz{gap:6px}
+.bt-track{position:relative;height:18px;border-radius:5px;background:var(--bg);border:1px solid var(--b1);overflow:hidden}
+.bt-fill{position:absolute;top:0;bottom:0;left:0;border-radius:4px 0 0 4px}
+.bt-fill-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 7px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--t1)}
+.bt-tick{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--t1);opacity:.6}
+.bt-div{position:relative;height:18px;background:var(--bg);border:1px solid var(--b1);border-radius:5px;overflow:hidden}
+.bt-div .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--b2)}
+.bt-div .seg{position:absolute;top:1px;bottom:1px;border-radius:3px}
 </style>"""
 
     body = f"""
@@ -1771,6 +1781,23 @@ function metricColor(key, val) {{
   if (key === 'net_pct') return val > 0 ? 'good' : 'bad';
   return '';
 }}
+var CLS_COLOR = {{good: 'var(--long)', warn: 'var(--amber)', bad: 'var(--short)', '': 'var(--t2)'}};
+
+// bar(pct, color, label, tick) — a proportion 0..100, same shape as
+// /analytics's fillBar. tick draws a thin reference marker (the goal number).
+function btBar(pct, color, label, tick) {{
+  var t = tick != null ? '<div class="bt-tick" style="left:' + Math.max(0, Math.min(100, tick)) + '%"></div>' : '';
+  pct = Math.max(0, Math.min(100, pct));
+  return '<div class="bt-track"><div class="bt-fill" style="width:' + pct + '%;background:' + color + '"></div>' + t +
+         '<div class="bt-fill-lbl">' + label + '</div></div>';
+}}
+// divBar(val, maxAbs, label) — signed value from a center zero-line.
+function btDiv(val, maxAbs, label, color) {{
+  var w = maxAbs > 0 ? Math.min(50, Math.abs(val) / maxAbs * 50) : 0, pos = val >= 0;
+  var seg = pos ? 'left:50%;width:' + w + '%;background:' + color : 'right:50%;width:' + w + '%;background:' + color;
+  return '<div class="bt-div"><div class="mid"></div><div class="seg" style="' + seg + '"></div></div>' +
+         '<div style="font-size:9px;text-align:' + (pos ? 'right' : 'left') + ';color:' + color + '">' + label + '</div>';
+}}
 
 function renderResults(d) {{
   document.getElementById('strat-name').textContent = d.strategy;
@@ -1786,27 +1813,39 @@ function renderResults(d) {{
                  (+gR).toFixed(2) + '&trades_per_week=' + (m.trades_per_week||1);
     gLink.target = '_blank'; gLink.style.display = '';
   }} else {{ gLink.style.display = 'none'; }}
-  var fields = [
-    ['win_rate',          'Win Rate',        m.win_rate + '%',     '≥48% = goal'],
-    ['profit_factor',     'Profit Factor',   m.profit_factor,      '≥1.5 target'],
-    ['n',                 'Trades',          m.n,                  d.months + 'mo'],
-    ['trades_per_week',   'Trades/wk',       m.trades_per_week,    'target 1–5'],
-    ['avg_r',             'Avg R',           m.avg_r,              'target ≥3.5'],
-    ['sharpe',            'Sharpe',          m.sharpe,             '≥1 = solid'],
-    ['sortino',           'Sortino',         m.sortino,            'downside-only'],
-    ['calmar',            'Calmar',          m.calmar,             'return ÷ maxDD'],
-    ['max_drawdown_pct',  'Max DD',          m.max_drawdown_pct + '%', '<40% safe'],
-    ['max_consec_losses', 'Max Consec Loss', m.max_consec_losses,  'risk of ruin'],
-    ['avg_hours_held',    'Avg Hold (h)',    m.avg_hours_held,     '≥24h = multi-day'],
-    ['net_pct',           'Net Return',      m.net_pct + '%',      d.months + 'mo'],
-    ['final_equity',      'Final €',         '€' + m.final_equity.toLocaleString('en', {{maximumFractionDigits:0}}), 'from €' + m.initial_equity],
+
+  // Scored metrics → a shape (fill bar for a 0..N proportion, diverging bar
+  // for anything that can be win or lose). The number is a caption inside the
+  // shape, never a lone tile — same rule the /analytics rework applied.
+  var wrColor = CLS_COLOR[metricColor('win_rate', m.win_rate)];
+  var pfColor = CLS_COLOR[metricColor('profit_factor', m.profit_factor)];
+  var ddColor = CLS_COLOR[metricColor('max_drawdown_pct', m.max_drawdown_pct)];
+  var viz = [
+    ['Win Rate',   btBar(m.win_rate, wrColor, m.win_rate + '%', 48), 'tick = 48% goal'],
+    ['Profit Factor', btBar(Math.min(m.profit_factor, 3) / 3 * 100, pfColor, m.profit_factor + '×', 1.5 / 3 * 100), 'tick = 1.5× target'],
+    ['Max Drawdown', btBar(Math.min(100, m.max_drawdown_pct / 50 * 100), ddColor, m.max_drawdown_pct + '%', 40 / 50 * 100), 'tick = 40% safe line'],
+    ['Avg R', btDiv(m.avg_r, Math.max(Math.abs(m.avg_r || 0), 3.5, 1), (m.avg_r >= 0 ? '+' : '') + m.avg_r, CLS_COLOR[m.avg_r >= 3.5 ? 'good' : m.avg_r >= 0 ? 'warn' : 'bad']), 'target ≥3.5'],
+    ['Net Return', btDiv(m.net_pct, Math.max(Math.abs(m.net_pct || 0), 50, 1), (m.net_pct >= 0 ? '+' : '') + m.net_pct + '%', CLS_COLOR[metricColor('net_pct', m.net_pct)]), d.months + 'mo'],
+    ['Sharpe', btDiv(m.sharpe, Math.max(Math.abs(m.sharpe || 0), 2, 1), m.sharpe, CLS_COLOR[metricColor('sharpe', m.sharpe)]), '≥1 = solid'],
   ];
   var grid = document.getElementById('metrics-grid');
-  grid.innerHTML = fields.map(function(f) {{
-    var cls = metricColor(f[0], parseFloat(f[2])) + (String(f[2]).length > 8 ? ' big' : '');
-    return '<div class="metric"><div class="lbl">' + f[1] + '</div>' +
-           '<div class="val ' + cls + '">' + f[2] + '</div>' +
-           '<div style="font-size:9px;color:#465064;margin-top:2px">' + f[3] + '</div></div>';
+  grid.innerHTML = viz.map(function(v) {{
+    return '<div class="metric viz"><div class="lbl">' + v[0] + '</div>' + v[1] +
+           '<div style="font-size:9px;color:#465064">' + v[2] + '</div></div>';
+  }}).join('') +
+  // Context numbers — not scored win/lose signals, plain tiles same as before.
+  [
+    ['Trades', m.n, d.months + 'mo'],
+    ['Trades/wk', m.trades_per_week, 'target 1–5'],
+    ['Sortino', m.sortino, 'downside-only'],
+    ['Calmar', m.calmar, 'return ÷ maxDD'],
+    ['Max Consec Loss', m.max_consec_losses, 'risk of ruin'],
+    ['Avg Hold (h)', m.avg_hours_held, '≥24h = multi-day'],
+    ['Final €', '€' + m.final_equity.toLocaleString('en', {{maximumFractionDigits:0}}), 'from €' + m.initial_equity],
+  ].map(function(f) {{
+    return '<div class="metric"><div class="lbl">' + f[0] + '</div>' +
+           '<div class="val">' + f[1] + '</div>' +
+           '<div style="font-size:9px;color:#465064;margin-top:2px">' + f[2] + '</div></div>';
   }}).join('');
 
   // Trades
