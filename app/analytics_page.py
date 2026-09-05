@@ -1,10 +1,19 @@
-"""LENS /analytics — performance dashboard that reads itself.
+"""LENS /analytics — performance dashboard you read in three seconds, not
+one you read at all.
 
-Leads with THE READ: a plain-language interpretation of the trade log + the one
-iterative move the data argues for. Below it, an equity curve (toggleable series)
-and collapsible sections grouped by question: when you trade, how long you hold,
-the scorecard. Data from /api/review/equity (curve + timing) and
-/api/review/analytics (performance + risk + duration).
+2026-09: THE READ (auto-generated prose paragraph + bullet insights) and the
+two labeled-number stat-card grids are gone. The owner is dyslexic/ADHD and
+was explicit: no paragraphs, no jargon labels he has to look up — everything
+communicates through shape, color, size and position, with a number only as
+a small secondary tag inside or beside the shape. The comment above each
+builder function below is the design rationale for that encoding (why a bar
+vs a gauge vs a diverging chart) — not a general changelog.
+
+Equity curve (toggleable series) up top, then collapsible sections: when you
+trade, how long you hold, the scorecard, excursions, cash flow — every one
+now a bar/gauge/heat visual instead of a table of words. Data sources are
+unchanged: /api/review/equity (curve + timing) and /api/review/analytics
+(performance + risk + duration).
 """
 
 from .theme import shell
@@ -25,28 +34,11 @@ details.an-d[open]>summary::before{transform:rotate(90deg)}
 details.an-d>summary .sub{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px}
 details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700}
 .an-d-body{padding:0 13px 13px}
-.an-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:9px}
-.an-card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-.an-card .k{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-.an-card .v{font-size:19px;font-weight:700;font-family:var(--mono)}
-.an-card .s{font-size:9px;color:var(--faint);margin-top:2px}
-.an-tbl{width:100%;border-collapse:collapse;font-size:12px}
-.an-tbl th{text-align:right;color:var(--dim);font-weight:600;padding:5px 9px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:9px}
-.an-tbl th:first-child,.an-tbl td:first-child{text-align:left}
-.an-tbl td{text-align:right;padding:5px 9px;border-bottom:1px solid var(--line);font-family:var(--mono)}
-.an-tbl tr.hot td{background:rgba(31,217,137,.10)}
 .g{color:var(--long)} .r{color:var(--short)}
-/* THE READ */
-.read{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:18px}
-.read h3{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin:0 0 10px}
-.read .lede{font-size:14px;line-height:1.5;color:var(--ink);margin:0 0 10px}
-.read ul{margin:0 0 12px;padding-left:18px}
-.read li{font-size:12.5px;line-height:1.55;color:var(--dim);margin-bottom:3px}
-.read li b{color:var(--ink);font-weight:600}
-.read .move{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:11px 13px}
-.read .move .lbl{font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
-.read .move p{margin:0;font-size:13px;line-height:1.5;color:var(--ink)}
-.read .pos{color:var(--long)} .read .neg{color:var(--short)}
+/* status line — replaces the old "THE READ" prose box for loading/empty/error.
+   A caption, not a paragraph: one line, no styled card. */
+#status{font-size:12px;color:var(--dim);padding:6px 2px 14px}
+#status a{color:var(--accent)}
 /* equity chart */
 .an-chart-wrap{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px 6px}
 #eqchart{height:300px;width:100%}
@@ -69,7 +61,55 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 .cone-bar .badge.plan{color:var(--amber)}
 .cone-bar .sp{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
 
-/* review surfaces (moved off /track) */
+/* ── visual-encoding primitives (replace labeled-number stat cards) ────────
+   Every metric below is a shape: a filled track (proportion / gauge), a
+   diverging bar (signed value either side of a zero line), a dot strip
+   (streaks/counts), or a heat cell (magnitude by color+size). The number
+   is always printed INSIDE or immediately beside the shape — never alone. */
+.vz-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.vz-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.vz-card.sp2{grid-column:span 2}
+.vz-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vz-hero{font-family:var(--mono);font-weight:800;font-size:28px;line-height:1;display:flex;align-items:center;gap:7px}
+.vz-hero .arrow{font-size:19px}
+.vz-cap{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+/* proportional fill: 0→100%, gradient-capable, tick = reference marker */
+.vz-track{position:relative;height:22px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.vz-fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px 0 0 5px;transition:width .2s}
+.vz-fill-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);z-index:2}
+.vz-tick{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);opacity:.6;z-index:3}
+/* diverging: signed value drawn from a center zero-line, color = sign */
+.vz-div{position:relative;height:22px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.vz-div .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2);z-index:1}
+.vz-div .seg{position:absolute;top:1px;bottom:1px;border-radius:3px}
+.vz-pair{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px}
+/* thin diverging row, used for by-hour / by-weekday / duration charts */
+.vz-hrow{display:grid;grid-template-columns:52px 1fr 62px;align-items:center;gap:8px;margin-bottom:3px}
+.vz-hrow .lbl{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right;white-space:nowrap}
+.vz-hrow .trk{position:relative;height:13px;background:var(--bg);border-radius:3px;overflow:hidden}
+.vz-hrow .trk .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.vz-hrow .trk .seg{position:absolute;top:1px;bottom:1px;border-radius:2px}
+.vz-hrow .val{font-family:var(--mono);font-size:10px;text-align:right}
+.vz-hrow.best .lbl,.vz-hrow.worst .lbl{font-weight:700;color:var(--ink)}
+/* dot strip — win/loss streaks, counts */
+.vz-dots{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.vz-dots i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.vz-dots .gap{width:8px}
+/* badge — a verdict word standing in for a paragraph */
+.vz-badge{display:inline-block;font-family:var(--mono);font-weight:800;font-size:11px;letter-spacing:.06em;
+  padding:3px 9px;border-radius:5px;border:1px solid currentColor}
+/* funnel — deposits/withdrawals/fees as one bar with a balance marker */
+.vz-funnel{position:relative;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.vz-funnel .base{position:absolute;inset:0;background:var(--long-d)}
+.vz-funnel .out{position:absolute;top:0;bottom:0;right:0;background:var(--short)}
+.vz-funnel .now{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.vz-funnel .txt{position:absolute;inset:0;display:flex;align-items:center;padding:0 9px;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);z-index:2}
+@media(max-width:560px){ .vz-card.sp2{grid-column:span 1} .vz-hrow{grid-template-columns:44px 1fr 54px} }
+
+/* review surfaces (moved off /track) — untouched by the 2026-09 visual
+   redesign above; these already communicate mostly through bars/dots. */
 .rq-top{display:flex;align-items:center;gap:18px 26px;flex-wrap:wrap;margin-bottom:11px}
 .rq-rate{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
 .rq-rate b{font-family:var(--mono);font-size:34px;font-weight:800;line-height:1;
@@ -127,7 +167,7 @@ details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11p
 """
 
 BODY = """
-<div id="read"></div>
+<div id="status"></div>
 <div class="an-sec">
   <div class="an-h">Equity Curve</div>
   <div id="cone-bar" style="display:none"></div>
@@ -172,13 +212,12 @@ Promise.all([
     const hint=E&&E.era_start
       ?'No closed trades yet in the current era (since '+E.era_start+'). The old book is the baseline, not the scoreboard — <a href="?era=all">lifetime view</a>.'
       :'No closed trades yet.';
-    document.getElementById('read').innerHTML='<div class="read"><p class="lede">'+hint+'</p></div>';return;}
+    document.getElementById('status').innerHTML=hint;return;}
   drawEquity(E);
   drawCone(C);
-  renderRead(E,A);
   renderSections(E,A,X);
 }).catch(e=>{
-  document.getElementById('read').innerHTML='<div class="read"><p class="lede" style="color:var(--short)">Load error: '+e.message+'</p></div>';
+  document.getElementById('status').innerHTML='<span style="color:var(--short)">Load error: '+e.message+'</span>';
 });
 
 // ── projection cone (C3) — bands on the same cum-P&L axis as the equity curve ──
@@ -199,6 +238,8 @@ function drawCone(C){
   document.getElementById('lg-cone').textContent=eur(C.now.p50)+' P50';
   CONE_END=C.points[C.points.length-1].t;
 
+  // AHEAD/BEHIND/OFF-PLAN as a colored word, not a sentence — the badge already
+  // used to carry the meaning; the surrounding numbers are just its receipts.
   const w=C.status, N=C.now;
   box.className='cone-bar'; box.style.display='';
   box.innerHTML=
@@ -212,8 +253,12 @@ function drawCone(C){
 }
 
 // ── equity chart ────────────────────────────────────────────────────────────
+// Baseline series (not a plain area) — it shades green above zero and red
+// below zero on its own, so "ahead" / "behind" reads from the fill color
+// without a caption. This is the single biggest signal on the page.
 function drawEquity(d){
-  const accent=cssv('--accent')||'#1fd989', dim=cssv('--dim')||'#7a8699', line=cssv('--line')||'#1c2430';
+  const accent=cssv('--accent')||'#1fd989', dim=cssv('--dim')||'#7a8699', line=cssv('--line')||'#1c2430',
+        long=cssv('--long')||'#1fd989', short=cssv('--short')||'#ff5468';
   const el=document.getElementById('eqchart');
   const chart=CHART=LightweightCharts.createChart(el,{
     width:el.clientWidth,height:300,
@@ -222,7 +267,10 @@ function drawEquity(d){
     rightPriceScale:{borderColor:line},timeScale:{borderColor:line,timeVisible:false},
     crosshair:{mode:0},
   });
-  cumSeries=chart.addAreaSeries({lineColor:accent,topColor:accent+'44',bottomColor:accent+'05',
+  cumSeries=chart.addBaselineSeries({
+    baseValue:{type:'price',price:0},
+    topLineColor:long,topFillColor1:long+'44',topFillColor2:long+'05',
+    bottomLineColor:short,bottomFillColor1:short+'05',bottomFillColor2:short+'33',
     lineWidth:2,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
   cumSeries.setData(d.equity.map(p=>({time:p.t,value:p.cum})));
   if(d.daily&&d.daily.length){
@@ -249,78 +297,39 @@ function drawEquity(d){
   });
 }
 
-// ── THE READ — interpret the numbers ────────────────────────────────────────
-function renderRead(E,A){
-  const active=x=>x.n>=3;                       // ignore near-empty buckets
-  const hods=E.hod.filter(active), dows=E.dow.filter(x=>x.n);
-  const bestH=hods.slice().sort((a,b)=>b.total-a.total)[0];
-  const worstH=hods.slice().sort((a,b)=>a.total-b.total)[0];
-  const bestD=dows.slice().sort((a,b)=>b.total-a.total)[0];
-  const worstD=dows.slice().sort((a,b)=>a.total-b.total)[0];
-  const hh=h=>String(h).padStart(2,'0')+':00';
-  // duration edge
-  const dur=(A.duration||[]).filter(x=>x.n);
-  const bleed=dur.filter(x=>x.total<0).sort((a,b)=>a.total-b.total);
-  const carry=dur.filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
-  const worstDur=bleed[0], bestDur=carry[0];
-  const bleedSum=bleed.reduce((s,x)=>s+x.total,0);
+// ── visual-primitive builders ───────────────────────────────────────────────
+// card(label, innerHTML, span2?) — the shared frame every metric sits in.
+function vcard(lbl,inner,sp2){ return `<div class="vz-card${sp2?' sp2':''}"><div class="vz-lbl">${lbl}</div>${inner}</div>`; }
 
-  // sober headline
-  const dep=E.net_deposit, bal=E.cur_bal, cum=E.cum_pnl;
-  let head;
-  if(E.prop_cash){
-    // prop book: the only real cash is eval fees. Eval P&L is paper.
-    const P=E.prop_cash, past=P.attempts.filter(a=>a.status!=='live').length;
-    head=`You've paid <b>$${P.fees_total.toFixed(0)}</b> in eval fees across <b>${P.attempts.length}</b> attempt${P.attempts.length===1?'':'s'}`+
-      (past?` — <span class="neg">${past} failed</span>, one live`:'')+
-      `. That fee is the only real cash; eval P&L is paper until a payout. `+
-      (bal!=null?`Current eval equity <b>$${bal.toFixed(0)}</b>. `:'')+
-      `Realised paper P&L across ${A.n} closed prop trades (all attempts) is <span class="${cum>=0?'pos':'neg'}">${eur2(cum)}</span>.`;
-  } else if(dep>0){
-    const gone=Math.max(0,dep-bal), pct=Math.round(gone/dep*100);
-    head=`You've deposited <b>€${E.deposits.toFixed(0)}</b> and withdrawn <b>€${E.withdrawals.toFixed(0)}</b> — `+
-      `net <b>€${dep.toFixed(0)}</b> of real cash into this account. The balance today is <b>€${bal.toFixed(0)}</b> — `+
-      `<span class="neg">~${pct}% of net funding is gone</span>. Realised P&L across ${A.n} closed trades is `+
-      `<span class="neg">${eur2(cum)}</span>. This isn't noise; it's the strategy set not paying.`;
-  } else {
-    head=`Realised P&L across ${A.n} closed trades is <span class="${cum>=0?'pos':'neg'}">${eur2(cum)}</span>.`;
-  }
+// fillBar — a proportion 0..100%. Used for win rate and profit factor. `tick`
+// draws a thin reference marker (e.g. the model's number, or the 1.0×
+// breakeven line) so "good vs. plan" is a bar-vs-marker comparison, not math.
+function fillBar(pct,color,label,tick){
+  const t=tick!=null?`<div class="vz-tick" style="left:${Math.max(0,Math.min(100,tick))}%"></div>`:'';
+  return `<div class="vz-track"><div class="vz-fill" style="width:${Math.max(0,Math.min(100,pct))}%;background:${color}"></div>${t}<div class="vz-fill-lbl">${label}</div></div>`;
+}
 
-  const li=[];
-  if(bestH&&worstH) li.push(`<b>Hours matter most.</b> Your money is made entering around <b>${hh(bestH.hour)}</b> `+
-    `(<span class="pos">${eur(bestH.total)}</span>) and lost around <b>${hh(worstH.hour)}</b> (<span class="neg">${eur(worstH.total)}</span>), Bangkok time.`);
-  if(bestD&&worstD&&bestD.label!==worstD.label) li.push(`<b>${bestD.label}</b> is your best weekday `+
-    `(<span class="pos">${eur(bestD.total)}</span>); <b>${worstD.label}</b> is the worst (<span class="neg">${eur(worstD.total)}</span>).`);
-  if(worstDur&&bestDur) li.push(`<b>Hold time splits you.</b> <b>${worstDur.label}</b> trades bleed `+
-    `(<span class="neg">${eur(worstDur.total)}</span>) while <b>${bestDur.label}</b> holds carry (<span class="pos">${eur(bestDur.total)}</span>).`);
-  if(A.profit_factor!=null) li.push(`Profit factor <b>${A.profit_factor}</b> and expectancy <b class="${A.expectancy>=0?'pos':'neg'}">${eur2(A.expectancy)}/trade</b> — `+
-    `${A.profit_factor>=1?'above':'below'} the line you need to grow.`);
+// divBar — a signed value drawn out from a center zero-line. Used everywhere
+// a number can be win or lose: expectancy, Sharpe, by-hour/day/duration rows.
+function divBar(val,maxAbs,label){
+  const w=maxAbs>0?Math.min(50,Math.abs(val)/maxAbs*50):0, pos=val>=0;
+  const seg=pos?`left:50%;width:${w}%;background:${cssv('--long')}`:`right:50%;width:${w}%;background:${cssv('--short')}`;
+  return `<div class="vz-div"><div class="mid"></div><div class="seg" style="${seg}"></div></div>`+
+    (label!=null?`<div class="vz-cap" style="text-align:${pos?'right':'left'};color:${pc(val)}">${label}</div>`:'');
+}
 
-  // THE MOVE — the single iterative test the data argues for
-  let move;
-  const greenHrs=hods.filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,3).map(x=>hh(x.hour));
-  if(E.prop_cash && A.n<30){
-    move=`n=${A.n} closed prop trades is too small to read a timing edge from — any best-hour/worst-day split here is noise. `+
-      `Execute the basket as designed and revisit once the ledger has 30+; the numbers that matter now are on `+
-      `<a href="/prop-survival#projection" class="ac">the cone</a> (pass odds) and <a href="/prop-ledger" class="ac">the ledger</a> (distance to the walls).`;
-  } else if(bleedSum<-200 && greenHrs.length){
-    move=`For the next 2 weeks, run a <b>subtraction test</b>: only take entries in your green windows `+
-      `(<b>${greenHrs.join(', ')}</b>)`+
-      (worstDur?` and stop closing in the <b>${worstDur.label}</b> band — either scratch faster or let it run past that`:'')+
-      `. Skip <b>${worstD?worstD.label:'your worst day'}</b> entirely. Then reopen this page — if the curve flattens, the bleed was timing, not the market.`;
-  } else {
-    move=`The edge is thin but not negative everywhere. Concentrate size into your best hour (<b>${bestH?hh(bestH.hour):'—'}</b>) `+
-      `and weekday (<b>${bestD?bestD.label:'—'}</b>), and treat everything else as sub-scale until it earns more trades.`;
-  }
+// dots — a streak or small count as a row of colored dots, capped so a long
+// streak reads as "a lot" by row length rather than forcing an exact count.
+function dots(n,color,cap){ cap=cap||14; const k=Math.min(n,cap); let s=''; for(let i=0;i<k;i++) s+=`<i style="background:${color}"></i>`; if(n>cap) s+=`<span class="vz-cap" style="margin-left:3px">+${n-cap}</span>`; return s; }
 
-  const eraTag=E.era_start
-    ?` <span class="sp" style="font-weight:normal">· era since ${E.era_start} — <a href="?era=all">lifetime</a></span>`
-    :` <span class="sp" style="font-weight:normal">· lifetime — <a href="?">current era</a></span>`;
-  document.getElementById('read').innerHTML=
-    `<div class="read"><h3>The Read${eraTag}</h3>`+
-    `<p class="lede">${head}</p>`+
-    `<ul>${li.map(x=>`<li>${x}</li>`).join('')}</ul>`+
-    `<div class="move"><div class="lbl">The move · one iterative test</div><p>${move}</p></div></div>`;
+// hrow — one line of a diverging bar chart (by-hour / by-weekday / duration).
+// Replaces a table row: label, centered bar sized+colored by total P&L, value.
+function hrow(label,total,maxAbs,cls){
+  const w=maxAbs>0?Math.min(50,Math.abs(total)/maxAbs*50):0, pos=total>=0;
+  const seg=pos?`left:50%;width:${w}%;background:${cssv('--long')}`:`right:50%;width:${w}%;background:${cssv('--short')}`;
+  return `<div class="vz-hrow${cls?' '+cls:''}"><span class="lbl">${label}</span>`+
+    `<div class="trk"><div class="mid"></div><div class="seg" style="${seg}"></div></div>`+
+    `<span class="val" style="color:${pc(total)}">${eur(total)}</span></div>`;
 }
 
 // ── collapsible sections ────────────────────────────────────────────────────
@@ -332,139 +341,160 @@ function det(title,sub,tag,tagcol,body,open){
 }
 function renderSections(E,A,X){
   const maxAbs=arr=>Math.max(1,...arr.map(x=>Math.abs(x.total)));
-  const bar=(v,mx)=>`<div style="height:4px;border-radius:2px;width:${Math.min(100,Math.abs(v)/mx*100)}%;background:${pc(v)};opacity:.7"></div>`;
-  const card=(k,v,s,col)=>`<div class="an-card"><div class="k">${k}</div><div class="v" style="color:${col||'var(--ink)'}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
-  // when you trade — scoreboard first: best/worst hour & day (n>=3 so one fluke can't win)
   const hh=h=>String(h).padStart(2,'0')+':00';
+
+  // ── When you trade — a diverging bar per hour and per weekday. Best/worst
+  // get a bold label so the extremes still jump out inside the full chart. ──
   const hodsA=E.hod.filter(x=>x.n>=3), dowsA=E.dow.filter(x=>x.n>=3);
   const bH=hodsA.slice().sort((a,b)=>b.total-a.total)[0], wH=hodsA.slice().sort((a,b)=>a.total-b.total)[0];
   const bD=dowsA.slice().sort((a,b)=>b.total-a.total)[0], wD=dowsA.slice().sort((a,b)=>a.total-b.total)[0];
-  const board=(bH?card('Best hour',hh(bH.hour),eur(bH.total)+' · '+bH.n+' trades','var(--long)'):'')+
-    (wH?card('Worst hour',hh(wH.hour),eur(wH.total)+' · '+wH.n+' trades','var(--short)'):'')+
-    (bD?card('Best day',bD.label,eur(bD.total)+' · '+bD.n+' trades','var(--long)'):'')+
-    (wD?card('Worst day',wD.label,eur(wD.total)+' · '+wD.n+' trades','var(--short)'):'');
   const dmx=maxAbs(E.dow), hmx=maxAbs(E.hod);
-  const dowRows=E.dow.filter(x=>x.n).map(x=>`<tr><td>${x.label}</td><td>${x.n}</td>
-    <td style="color:${pc(x.total)}">${eur(x.total)}</td><td style="color:${pc(x.avg)}">${eur2(x.avg)}</td><td>${bar(x.total,dmx)}</td></tr>`).join('');
-  const hodRows=E.hod.filter(x=>x.n).map(x=>`<tr><td>${String(x.hour).padStart(2,'0')}:00</td><td>${x.n}</td>
-    <td style="color:${pc(x.total)}">${eur(x.total)}</td><td style="color:${pc(x.avg)}">${eur2(x.avg)}</td><td>${bar(x.total,hmx)}</td></tr>`).join('');
-  const P=E.periods, perCard=(lbl,p)=>!p?'':`<div class="an-card"><div class="k">${lbl} · avg</div>`+
-    `<div class="v" style="color:${pc(p.avg)}">${eur2(p.avg)}</div><div class="s">best ${p.best?p.best.k+' '+eur(p.best.v):'—'} · worst ${p.worst?eur(p.worst.v):'—'}</div></div>`;
+  const dowRows=E.dow.filter(x=>x.n).map(x=>hrow(x.label,x.total,dmx,bD&&x===bD?'best':wD&&x===wD?'worst':'')).join('');
+  const hodRows=E.hod.filter(x=>x.n).map(x=>hrow(hh(x.hour),x.total,hmx,bH&&x===bH?'best':wH&&x===wH?'worst':'')).join('');
+  const P=E.periods;
+  const perCard=(lbl,p)=>!p?'':vcard(lbl,`<div class="vz-hero" style="font-size:18px;color:${pc(p.avg)}">${eur2(p.avg)}</div>`+
+    `<div class="vz-cap">best ${p.best?p.best.k+' '+eur(p.best.v):'—'} · worst ${p.worst?eur(p.worst.v):'—'}</div>`);
   const timingBody=
-    `<div class="an-grid" style="margin-bottom:14px">${board}</div>`+
-    `<div class="an-grid" style="margin-bottom:14px">${perCard('Per day',P.day)}${perCard('Per week',P.week)}${perCard('Per month',P.month)}</div>`+
+    `<div class="vz-row">${perCard('Avg / day',P.day)}${perCard('Avg / week',P.week)}${perCard('Avg / month',P.month)}</div>`+
     `<div class="an-h">By weekday <span style="color:var(--faint);text-transform:none;font-weight:400">— entry day, Bangkok</span></div>`+
-    `<table class="an-tbl"><tr><th>Day</th><th>Trades</th><th>Total</th><th>Avg</th><th style="width:30%">·</th></tr>${dowRows}</table>`+
+    dowRows+
     `<div class="an-h" style="margin-top:14px">By hour <span style="color:var(--faint);text-transform:none;font-weight:400">— entry hour, Bangkok</span></div>`+
-    `<table class="an-tbl"><tr><th>Hour</th><th>Trades</th><th>Total</th><th>Avg</th><th style="width:30%">·</th></tr>${hodRows}</table>`;
+    hodRows;
 
-  // how long you hold
+  // ── How long you hold — same diverging chart, one bar per duration bucket.
+  // A thin win/loss dot pair rides beside it so mix-of-outcomes shows without
+  // a W/L column to read. ──
   const dur=A.duration||[];
-  const durRows=dur.map(d=>`<tr class="${d.total>0&&d.n>=8?'hot':''}"><td>${d.label}</td><td>${d.n}</td><td>${d.w}</td><td>${d.l}</td>
-    <td style="color:${pc(d.total)}">${eur2(d.total)}</td><td style="color:${pc(d.avg)}">${eur2(d.avg)}</td></tr>`).join('');
-  const durBody=`<table class="an-tbl"><tr><th>Duration</th><th>Count</th><th>W</th><th>L</th><th>Total P&L</th><th>Avg P&L</th></tr>${durRows}</table>`;
+  const dmax=maxAbs(dur);
+  const durRows=dur.map(d=>{
+    const hot=d.total>0&&d.n>=8;
+    return `<div class="vz-hrow${hot?' best':''}"><span class="lbl">${d.label}</span>`+
+      `<div class="trk"><div class="mid"></div><div class="seg" style="${d.total>=0?`left:50%;width:${dmax>0?Math.min(50,Math.abs(d.total)/dmax*50):0}%;background:var(--long)`:`right:50%;width:${dmax>0?Math.min(50,Math.abs(d.total)/dmax*50):0}%;background:var(--short)`}"></div></div>`+
+      `<span class="val" style="color:${pc(d.total)}">${eur2(d.total)}</span></div>`+
+      `<div class="vz-dots" style="margin:0 0 7px 60px">${dots(d.w,cssv('--long'),20)}<span class="gap"></span>${dots(d.l,cssv('--short'),20)}</div>`;
+  }).join('');
+  const durBody=durRows||'<div class="vz-cap">No closed trades yet.</div>';
 
-  // scorecard
-  const perf=`<div class="an-grid">`+
-    card('Trades',A.n,A.open?A.open+' open':'')+
-    card('Win Rate',A.wr+'%',A.long_wr!=null?`L ${A.long_wr}% · S ${A.short_wr}%`:'')+
-    card('Net P&L',eur2(A.total_pnl),'',pc(A.total_pnl))+
-    card('Expectancy',eur2(A.expectancy),'per trade',pc(A.expectancy))+
-    card('Avg Win',eur2(A.avg_win),'','var(--long)')+
-    card('Avg Loss',eur2(-A.avg_loss),'','var(--short)')+
-    card('Actual R:R',A.rr!=null?A.rr+'×':'—','')+
-    card('Profit Factor',A.profit_factor!=null?A.profit_factor:'—','',A.profit_factor>=1?'var(--long)':'var(--short)')+
-    card('Total Fees',eur2(-A.total_fees),'','var(--short)')+
-    card('Avg Duration',A.avg_dur_h!=null?A.avg_dur_h+'h':'—','')+`</div>`;
-  const dWR=A.wr-(A.model_wr||0), dRR=(A.rr||0)-(A.model_rr||0);
-  const risk=`<div class="an-h" style="margin-top:14px">Risk-adjusted</div><div class="an-grid">`+
-    card('Sharpe',A.sharpe,'per-trade · ann.',A.sharpe>=0?'var(--long)':'var(--short)')+
-    card('Sortino',A.sortino,'',A.sortino>=0?'var(--long)':'var(--short)')+
-    card('Max DD',eur2(-A.max_dd_eur)+(A.max_dd_pct!=null?` · ${A.max_dd_pct}%`:''),'peak→trough','var(--short)')+
-    card('Win Streak',A.win_streak,'','var(--long)')+
-    card('Loss Streak',A.loss_streak,'','var(--short)')+
-    (A.cum_return!=null?card('Cum Return',A.cum_return+'%','',pc(A.cum_return)):card('Cum Return','—','set capital base'))+
-    (A.ann_return!=null?card('Ann Return',A.ann_return+'%','',pc(A.ann_return)):'')+
-    (A.calmar!=null?card('Calmar',A.calmar,''):'')+`</div>`;
-  const avm=`<div class="an-h" style="margin-top:14px">Actual vs Model</div><table class="an-tbl">
-    <tr><th>Metric</th><th>Model</th><th>Actual</th><th>Δ</th></tr>
-    <tr><td>Win Rate</td><td>${A.model_wr!=null?A.model_wr+'%':'—'}</td><td>${A.wr}%</td><td style="color:${pc(dWR)}">${dWR>=0?'+':''}${dWR.toFixed(1)}</td></tr>
-    <tr><td>R:R</td><td>${A.model_rr!=null?A.model_rr+'×':'—'}</td><td>${A.rr!=null?A.rr+'×':'—'}</td><td style="color:${pc(dRR)}">${dRR>=0?'+':''}${dRR.toFixed(2)}</td></tr></table>`;
+  // ── Scorecard — one visual per metric, cut list applied. ──
+  // Trades: context only (n= line), not a card — count alone isn't a signal.
+  // Win Rate: gradient fill bar, tick = model win rate (was "Actual vs Model").
+  // Net P&L: the hero — the one number allowed to be big, color+arrow do the
+  //   telling. Expectancy: a small diverging mini-bar (same shape as by-hour).
+  // Avg Win/Avg Loss/Actual R:R: one diverging bar, win right, loss left —
+  //   the shape IS the R:R, the × is just a caption.
+  // Profit Factor: fill bar capped at 3×, tick at 1.0 (breakeven line).
+  // Fees: a thin bar sized against gross P&L movement — a cost, not a KPI,
+  //   so it gets the smallest shape on the board.
+  // Cut entirely: Avg Duration (the duration chart below already answers
+  //   "how long", per-bucket, which this single average can't), Sortino
+  //   (Sharpe already gives one risk-adjusted read; a second version of the
+  //   same idea is exactly the jargon-pile the owner rejected), Cum Return /
+  //   Ann Return / Calmar (the equity curve already tells the growth story —
+  //   shading above/below zero IS the return; a duplicate % label teaches
+  //   nothing new), and the separate "Actual vs Model" table (folded into
+  //   the Win Rate tick mark instead).
+  const wr=A.wr, wrColor=wr>=50?cssv('--long'):wr>=35?cssv('--amber'):cssv('--short');
+  const winRateCard=vcard('Win Rate',
+    fillBar(wr,wrColor,wr+'%',A.model_wr!=null?A.model_wr:null)+
+    (A.model_wr!=null?`<div class="vz-cap">tick = model ${A.model_wr}%</div>`:''));
+  const pnlCard=vcard('Net P&amp;L',
+    `<div class="vz-hero" style="color:${pc(A.total_pnl)}"><span class="arrow">${A.total_pnl>=0?'▲':'▼'}</span>${eur2(A.total_pnl)}</div>`+
+    `<div class="vz-cap">${A.n} trades${A.open?' · '+A.open+' open':''}</div>`,true);
+  const expMax=Math.max(Math.abs(A.expectancy||0),A.avg_win||0,A.avg_loss||0,1);
+  const expCard=vcard('Expectancy / trade',divBar(A.expectancy,expMax,eur2(A.expectancy)));
+  const rr=A.rr!=null?A.rr+'×':'—';
+  const wlMax=Math.max(A.avg_win||0,A.avg_loss||0,1);
+  const wlCard=vcard('Avg Win vs Avg Loss <span class="vz-cap">'+rr+'</span>',
+    `<div class="vz-div"><div class="mid"></div>`+
+    `<div class="seg" style="right:50%;width:${Math.min(50,(A.avg_loss||0)/wlMax*50)}%;background:${cssv('--short')}"></div>`+
+    `<div class="seg" style="left:50%;width:${Math.min(50,(A.avg_win||0)/wlMax*50)}%;background:${cssv('--long')}"></div></div>`+
+    `<div class="vz-pair"><span style="color:var(--short)">${eur2(-(A.avg_loss||0))}</span><span style="color:var(--long)">${eur2(A.avg_win||0)}</span></div>`,true);
+  const pf=A.profit_factor;
+  const pfCard=pf==null?'':vcard('Profit Factor',
+    fillBar(Math.min(pf,3)/3*100,pf>=1?cssv('--long'):cssv('--short'),pf+'×',1/3*100)+
+    `<div class="vz-cap">tick = 1.0× breakeven</div>`);
+  const grossMove=Math.abs(A.total_pnl||0)+(A.total_fees||0)+1;
+  const feesCard=vcard('Fees',
+    fillBar(Math.min(100,(A.total_fees||0)/grossMove*100),cssv('--short'),eur2(-(A.total_fees||0))));
+  const sharpe=A.sharpe;
+  const shMax=Math.max(Math.abs(sharpe||0),2,1);
+  const shCard=sharpe==null?'':vcard('Sharpe',divBar(sharpe,shMax,sharpe.toFixed(2)));
+  const ddPct=A.max_dd_pct, ddColor=cssv('--short');
+  const ddCard=vcard('Max Drawdown',
+    fillBar(Math.min(100,(ddPct||0)/50*100),ddColor,(ddPct!=null?ddPct+'%':eur2(-(A.max_dd_eur||0))))+
+    `<div class="vz-cap">${eur2(-(A.max_dd_eur||0))} peak→trough</div>`);
+  const streakCard=vcard('Streaks',
+    `<div class="vz-dots">${dots(A.win_streak||0,cssv('--long'))}<span class="gap"></span>${dots(A.loss_streak||0,cssv('--short'))}</div>`+
+    `<div class="vz-pair"><span style="color:var(--long)">W ${A.win_streak||0}</span><span style="color:var(--short)">L ${A.loss_streak||0}</span></div>`);
+  const perf=`<div class="vz-row">${pnlCard}${winRateCard}${pfCard}${wlCard}${expCard}${shCard}${ddCard}${streakCard}${feesCard}</div>`;
 
-  // cash flow — hedge: every EUR deposit/withdrawal. prop: eval fees, the only
-  // real cash (eval P&L is paper; hedge Kraken transfers don't belong here).
+  // ── Cash flow / eval spend — one bar: base = money in, red overlay = money
+  // out, a marker = where the balance sits today. "Am I above or below what
+  // I put in" is a marker-vs-bar-edge read, not four separate stat cards. ──
   let cashBody, cashTitle, cashSub, cashTag;
   if(E.prop_cash){
     const P=E.prop_cash;
-    const aRows=P.attempts.map(a=>`<tr><td>${a.ts||'—'}</td>
-      <td>${a.eval} · $${(a.account||0).toLocaleString()}</td>
-      <td>${a.status==='live'?'<span class="g">live</span>':'<span class="r">failed / archived</span>'}</td>
-      <td style="color:var(--short)">−$${(a.fee||0).toFixed(0)}</td></tr>`).join('');
+    const total=Math.max(P.fees_total,1);
+    const nowPct=E.cur_bal!=null?Math.min(100,Math.max(0,E.cur_bal/total*100)):null;
+    const aRows=P.attempts.map(a=>`<div class="vz-hrow"><span class="lbl">${a.ts||'—'}</span>`+
+      `<div class="trk"><div class="mid"></div><div class="seg" style="right:50%;width:${Math.min(50,(a.fee||0)/total*50)}%;background:${a.status==='live'?'var(--long)':'var(--short)'}"></div></div>`+
+      `<span class="val" style="color:${a.status==='live'?'var(--long)':'var(--short)'}">−$${(a.fee||0).toFixed(0)}</span></div>`).join('');
     cashBody=
-      `<div class="an-grid" style="margin-bottom:14px">`+
-      card('Fees paid','$'+P.fees_total.toFixed(0),P.attempts.length+' attempts','var(--short)')+
-      card('Payouts','$'+P.payouts.toFixed(0),'none yet — eval P&L is paper','var(--dim)')+
-      card('Net real cash','−$'+(P.fees_total-P.payouts).toFixed(0),'fees − payouts','var(--short)')+
-      (E.cur_bal!=null?card('Eval equity now','$'+E.cur_bal.toFixed(0),'paper','var(--ink)'):'')+`</div>`+
-      `<table class="an-tbl"><tr><th>Date</th><th>Eval</th><th>Status</th><th>Fee</th></tr>${aRows}</table>`;
+      `<div class="vz-funnel" style="margin-bottom:11px"><div class="base"></div>`+
+      `<div class="out" style="width:100%;background:var(--short)"></div>`+
+      (nowPct!=null?`<div class="now" style="left:${nowPct}%"></div>`:'')+
+      `<div class="txt">$${P.fees_total.toFixed(0)} in fees${P.payouts?' · $'+P.payouts.toFixed(0)+' paid out':''}${E.cur_bal!=null?' · eval equity now $'+E.cur_bal.toFixed(0):''}</div></div>`+
+      aRows;
     cashTitle='Eval spend'; cashSub='fees — the only real cash';
     cashTag='−$'+P.fees_total.toFixed(0);
   } else {
     const xf=E.transfers||[];
-    const xfRows=xf.map(t=>`<tr><td>${t.ts}</td><td>${t.type}</td>
-      <td style="color:${pc(t.amount)}">${eur2(t.amount)}</td></tr>`).join('');
-    const nDep=xf.filter(t=>t.amount>0).length, nWd=xf.filter(t=>t.amount<0).length;
+    const total=Math.max(E.deposits,1);
+    const outPct=Math.min(100,(E.withdrawals||0)/total*100);
+    const nowPct=E.cur_bal!=null?Math.min(100,Math.max(0,E.cur_bal/total*100)):null;
+    const xfRows=xf.map(t=>{
+      const w=Math.min(50,Math.abs(t.amount)/total*50);
+      return `<div class="vz-hrow"><span class="lbl">${t.ts}</span>`+
+        `<div class="trk"><div class="mid"></div><div class="seg" style="${t.amount>=0?`left:50%;width:${w}%;background:var(--long)`:`right:50%;width:${w}%;background:var(--short)`}"></div></div>`+
+        `<span class="val" style="color:${pc(t.amount)}">${eur2(t.amount)}</span></div>`;
+    }).join('');
     cashBody=
-      `<div class="an-grid" style="margin-bottom:14px">`+
-      card('Deposited',eur(E.deposits),nDep+' deposits','var(--long)')+
-      card('Withdrawn',eur(-E.withdrawals),nWd+' withdrawals','var(--short)')+
-      card('Net funded',eur(E.net_deposit),'deposits − withdrawals',pc(E.net_deposit))+
-      (E.cur_bal!=null?card('Balance now','€'+E.cur_bal.toFixed(0),'','var(--ink)'):'')+`</div>`+
-      `<table class="an-tbl"><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${xfRows}</table>`;
+      `<div class="vz-funnel" style="margin-bottom:11px"><div class="base"></div>`+
+      `<div class="out" style="width:${outPct}%"></div>`+
+      (nowPct!=null?`<div class="now" style="left:${nowPct}%"></div>`:'')+
+      `<div class="txt">€${E.deposits.toFixed(0)} in · €${E.withdrawals.toFixed(0)} out · net ${eur(E.net_deposit)}${E.cur_bal!=null?' · balance now €'+E.cur_bal.toFixed(0):''}</div></div>`+
+      xfRows;
     cashTitle='Cash flow'; cashSub='every EUR deposit &amp; withdrawal';
     cashTag=eur(E.net_deposit)+' in';
   }
 
-  // ── MAE / MFE — exits or selection? ──
-  const pct=v=>v==null?'—':v.toFixed(2)+'%';
+  // ── MAE / MFE — exits or selection? The verdict becomes a badge (like the
+  // cone's AHEAD/BEHIND word) instead of a paragraph explaining terminology;
+  // the reach ceiling becomes a fill bar against the breakeven tick. ──
+  const pct=v=>v==null?'—':v.toFixed(0)+'%';
   let exBody='', exHead='', exCol='';
   if(X&&X.n){
-    const sel=X.verdict.startsWith('SELECTION'), exi=X.verdict.startsWith('EXITS');
-    exHead=X.verdict.split(' — ')[0]; exCol=sel||exi?'var(--short)':'var(--dim)';
-    // A geometry that CANNOT pay outranks "was it exits or selection?" — that is a
-    // question about how you trade the setup, and it is moot if the setup's target
-    // is out of reach. So STARVED takes the closed fold's chip: the verdict has to
-    // be legible without opening anything, or it may as well not be computed.
-    if(X.reach&&X.reach.badge==='STARVED'){
-      exHead='STARVED · ceiling '+(100*X.reach.reach).toFixed(0)+'% < '
-            +(100*X.reach.breakeven_wr).toFixed(0)+'% needed';
-      exCol='var(--short)';
+    exHead=X.verdict.split(' — ')[0];
+    exCol=(exHead.startsWith('SELECTION')||exHead.startsWith('EXITS'))?cssv('--short'):cssv('--dim');
+    let reachBar='';
+    if(X.reach){
+      const starved=X.reach.badge==='STARVED';
+      if(starved){ exHead='STARVED'; exCol=cssv('--short'); }
+      const reachPct=100*X.reach.reach, needPct=100*X.reach.breakeven_wr;
+      reachBar=vcard('Win-rate ceiling <span class="vz-badge" style="color:'+(starved?cssv('--short'):cssv('--long'))+'">'+X.reach.badge+'</span>',
+        fillBar(reachPct,starved?cssv('--short'):cssv('--long'),reachPct.toFixed(0)+'%',needPct)+
+        `<div class="vz-cap">tick = ${needPct.toFixed(0)}% needed to break even at ${X.reach.rr}R</div>`,true);
     }
-    exBody=`<div class="an-grid">`+
-      card('Median MFE',pct(X.median_mfe_pct),'best move offered','var(--long)')+
-      card('Median MAE',pct(X.median_mae_pct),'worst heat taken','var(--short)')+
-      card('Capture on winners',X.median_capture_on_winners!=null?(100*X.median_capture_on_winners).toFixed(0)+'%':'—','of the best move banked','var(--long)')+
-      card('MFE on losers',pct(X.median_mfe_on_losers_pct),'how far losers ran your way','var(--short)')+
-      card('Never reached TP',X.pct_never_reached_tp+'%','of all trades, vs '+X.tp_pct+'% target','var(--short)')+
-      card('Losers that touched TP',X.pct_losers_that_touched_tp+'%','giveback rate','var(--dim)')+
+    const capPct=X.median_capture_on_winners!=null?100*X.median_capture_on_winners:null;
+    exBody=`<div class="vz-row">`+
+      (reachBar||'')+
+      vcard('Median MFE / MAE',divBar(X.median_mfe_pct,Math.max(X.median_mfe_pct||0,Math.abs(X.median_mae_pct||0),1),pct(X.median_mfe_pct))+
+        divBar(-(X.median_mae_pct||0),Math.max(X.median_mfe_pct||0,Math.abs(X.median_mae_pct||0),1),pct(-(X.median_mae_pct||0))))+
+      (capPct!=null?vcard('Capture on winners',fillBar(capPct,cssv('--long'),capPct.toFixed(0)+'%')):'')+
+      vcard('Never reached TP',fillBar(X.pct_never_reached_tp,cssv('--short'),X.pct_never_reached_tp+'%',X.tp_pct))+
+      vcard('Losers that touched TP',fillBar(X.pct_losers_that_touched_tp,cssv('--amber'),X.pct_losers_that_touched_tp+'%'))+
       `</div>`+
-      (X.reach?`<p class="s" style="margin-top:10px;line-height:1.5">`+
-        `<b style="color:${X.reach.badge==='STARVED'?'var(--short)':'var(--long)'}">`+
-        `${X.reach.badge} — win-rate ceiling ${(100*X.reach.reach).toFixed(0)}% `+
-        `vs ${(100*X.reach.breakeven_wr).toFixed(0)}% needed to break even</b><br>`+
-        `<span style="color:var(--dim)">At the live ${X.tp_pct}% TP / ${X.sl_pct}% SL `+
-        `(${X.reach.rr}R), only ${X.reach.hit} of ${X.reach.n} fills ever travelled far `+
-        `enough to win — and that ignores whether the stop was hit first, so the true `+
-        `ceiling is lower. Fees push breakeven to ${(100*X.reach.breakeven_wr).toFixed(0)}%. `+
-        `A ceiling under the breakeven line means no amount of entry skill makes this `+
-        `geometry pay.</span></p>`:'')+
-      `<p class="s" style="margin-top:10px;color:var(--dim);line-height:1.5">`+
-      `<b style="color:${exCol}">${X.verdict}</b><br>`+
-      `Capture is the fraction of the best available move banked on trades that worked; `+
-      `it is meaningless on losers, so it is measured on winners only. Excursions are `+
-      `percent of entry, not R — no trade in the ledger carries a stop, so there is no `+
-      `risk denominator to divide by. ${X.n_5m} of ${X.n} trades measured at 5m resolution, `+
-      `the rest at 1h.</p>`;
+      `<div class="vz-cap">${X.n_5m} of ${X.n} trades at 5m resolution, rest at 1h.</div>`;
   }
 
   document.getElementById('sections').innerHTML=
@@ -474,7 +504,7 @@ function renderSections(E,A,X){
     det('How long you hold','duration breakdown — where the edge lives','',
         '',durBody,false)+
     (exBody?det('Excursions','MAE / MFE — exits or selection?',exHead,exCol,exBody,false):'')+
-    det('Scorecard','performance · risk · vs model',eur(A.total_pnl),pc(A.total_pnl),perf+risk+avm,false)+
+    det('Scorecard','performance · risk',eur(A.total_pnl),pc(A.total_pnl),perf,false)+
     det(cashTitle,cashSub,cashTag,E.prop_cash?'var(--short)':pc(E.net_deposit),cashBody,false);
 }
 """
