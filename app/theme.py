@@ -13,6 +13,7 @@ Components available to any page (class names): .tape .gauge .ticket .tg .sizer
 plus utilities (.mono .dim .g .r .a .big .kv .muted). Responsive at 680px / 1080px.
 """
 
+import hashlib
 import re
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -585,6 +586,11 @@ a{color:var(--accent);text-decoration:none}
   .side-burger{display:none}
 }
 """
+# content-hash cache-buster: the href changes whenever this string changes,
+# so a deploy invalidates every browser's cached copy instead of relying on
+# a hard refresh (bit us 2026-09-05 — max-age=3600 silently served a stale
+# stylesheet for up to an hour after several same-night deploys).
+_LENS_CSS_VER = hashlib.md5(LENS_CSS.encode()).hexdigest()[:8]
 
 
 def nav_html(current_path: str) -> str:
@@ -865,7 +871,7 @@ def shell(current_path: str, page_label: str, body: str, *,
         + FONT_LINKS +
         "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon.svg\">"
         "<link rel=\"apple-touch-icon\" href=\"/assets/favicon.svg\">"
-        "<link rel=\"stylesheet\" href=\"/assets/lens.css\">"
+        "<link rel=\"stylesheet\" href=\"/assets/lens.css?v=" + _LENS_CSS_VER + "\">"
         "<style>"
         "footer.navftr{max-width:1000px;margin:38px auto 0;padding:13px 14px 44px;"
         "border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:7px 15px;align-items:center}"
