@@ -25,6 +25,16 @@ scroll now. /edge 301s here (see main.py LEGACY_ROUTES); #past/#board/
 top of SCRIPT below. Fit ships open by default: it's the one part of the old
 Edge page the owner actually used day to day, everything else here starts
 collapsed like the rest of the page.
+
+2026-09-05: /regime merged in too — market regime (BULL/SIDEWAYS/BEAR) is
+what he checks more than anything else on the site, so it's the FIRST thing
+rendered on this page, above the equity curve and above the book switcher,
+and it is NOT a collapsible `an-d` section like Research — it's always
+visible. regime_section() below builds it from the same regime.py
+detect_regimes()/regime_payload() the old /regime page used (computation
+untouched, only presentation moved), restyled onto this page's vz-card/
+fillBar vocabulary instead of the old page's own `.rg`/`.panel` CSS. /regime
+301s here — see main.py LEGACY_ROUTES.
 """
 
 from .theme import shell
@@ -45,7 +55,12 @@ details.an-d[open]>summary::before{transform:rotate(90deg)}
 details.an-d>summary .sub{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px}
 details.an-d>summary .tag{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700}
 .an-d-body{padding:0 13px 13px}
-.g{color:var(--long)} .r{color:var(--short)}
+.g{color:var(--long)} .r{color:var(--short)} .a{color:var(--amber)}
+/* regime — market BULL/SIDEWAYS/BEAR, relocated from the retired /regime
+   page; the 60-day strip is the one shape that had no vz-* equivalent. */
+.rg-strip{display:flex;gap:2px;flex-wrap:wrap;margin:10px 0 4px}
+.rg-strip span{width:9px;height:20px;border-radius:2px;display:inline-block}
+.rg-now{font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--accent);margin-left:4px}
 /* status line — replaces the old "THE READ" prose box for loading/empty/error.
    A caption, not a paragraph: one line, no styled card. */
 #status{font-size:12px;color:var(--dim);padding:6px 2px 14px}
@@ -745,6 +760,115 @@ def _research_section(book: str, bt_css: str, bt_body: str, bt_script: str):
     return css, body, script
 
 
+def _rg_color(regime: str) -> str:
+    return {"BULL": "var(--long)", "SIDEWAYS": "var(--amber)", "BEAR": "var(--short)"}.get(regime, "var(--dim)")
+
+
+def regime_section() -> str:
+    """Market regime — BULL/SIDEWAYS/BEAR, relocated from the retired /regime
+    page (2026-09-05). Always visible at the TOP of the page, not a
+    collapsible `an-d` section like Research below: this is the one thing
+    the owner checks more than anything else on the site. Pure BTC market
+    read, independent of book — same content on /analytics and
+    /prop-analytics. Computation is regime.py's detect_regimes() via
+    regime_payload(), untouched; this only changes how it's drawn, onto the
+    vz-card/fillBar vocabulary the rest of this page uses instead of the old
+    page's own `.rg`/`.panel` CSS. Never raises: a broken regime read
+    shouldn't blank the page it now leads."""
+    try:
+        from .regime import regime_payload
+        p = regime_payload()
+    except Exception:
+        return ""
+    cur = p.get("current_regime", "UNKNOWN")
+    if cur == "UNKNOWN":
+        return ""
+    cur_col = _rg_color(cur)
+
+    chips = "".join(
+        f'<span style="background:{_rg_color(h["regime"])}" '
+        f'title="{h["date"]} {h["regime"]} {h["ret14_pct"]}%"></span>'
+        for h in p.get("history", [])
+    )
+
+    stats = p.get("regime_stats", {})
+    total_days = sum(s.get("count", 0) for s in stats.values()) or 1
+    stat_cards = ""
+    for r in ("BULL", "SIDEWAYS", "BEAR"):
+        s = stats.get(r, {})
+        pct = 100 * s.get("count", 0) / total_days
+        stat_cards += (
+            f'<div class="vz-card"><div class="vz-lbl">{r}</div>'
+            f'{fillBar_py(pct, _rg_color(r), str(s.get("count", 0)) + "d")}'
+            f'<div class="vz-cap">avg 14d ret {s.get("avg_ret14_pct", 0)}% '
+            f'&middot; vol {s.get("avg_vol14_pct", 0)}%/day</div></div>'
+        )
+
+    tr = p.get("transitions", {})
+    persist_card = ""
+    if tr and tr.get("matrix"):
+        mtx, avg_run = tr["matrix"], tr["avg_run_days"]
+        cur_run, cur_avg = tr.get("current_run_days", 0), avg_run.get(cur)
+
+        def _pct(x):
+            return f"{x * 100:.0f}%" if x is not None else "—"
+
+        run_word, run_col = "", "var(--dim)"
+        if cur_avg and cur_run:
+            ratio = cur_run / cur_avg
+            run_word = "OVERDUE" if ratio >= 1.8 else "ON SCHEDULE"
+            run_col = "var(--amber)" if ratio >= 1.8 else "var(--long)"
+
+        nd = mtx.get(cur, {})
+        next_txt = " &middot; ".join(f'{r} {_pct(nd.get(r))}' for r in ("BULL", "SIDEWAYS", "BEAR"))
+        mrows = ""
+        for frm in ("BULL", "SIDEWAYS", "BEAR"):
+            row = mtx.get(frm, {})
+            mark = ' <span class="rg-now">◀ NOW</span>' if frm == cur else ""
+            cells = "".join(f'<td>{_pct(row.get(to))}</td>' for to in ("BULL", "SIDEWAYS", "BEAR"))
+            mrows += (f'<tr><td style="color:{_rg_color(frm)}">{frm}{mark}</td>{cells}'
+                      f'<td>{avg_run.get(frm) or "—"}d</td></tr>')
+
+        badge = f' <span class="vz-badge" style="color:{run_col}">{run_word}</span>' if run_word else ""
+        persist_card = (
+            f'<div class="vz-card sp2"><div class="vz-lbl">Persistence{badge}</div>'
+            f'<div class="vz-cap">{cur_run}d in <b style="color:{cur_col}">{cur}</b>'
+            + (f' vs a typical {cur_avg}d stretch' if cur_avg else '')
+            + f' &middot; tomorrow: {next_txt}</div>'
+            f'<div class="rq-tw"><table class="rq-tab" style="margin-top:8px">'
+            f'<tr><th>From ↓ / To →</th><th>BULL</th><th>SIDEWAYS</th><th>BEAR</th><th>Avg run</th></tr>'
+            f'{mrows}</table></div></div>'
+        )
+
+    return (
+        '<div class="an-sec">'
+        '<div class="an-h">Market Regime <span style="color:var(--faint);text-transform:none;'
+        'font-weight:400">— BTCUSD daily, K-Means(k=3) on 14d return + vol</span></div>'
+        '<div class="vz-row">'
+        f'<div class="vz-card sp2"><div class="vz-lbl">Now</div>'
+        f'<div class="vz-hero" style="color:{cur_col};font-size:28px">{cur}</div>'
+        f'<div class="vz-cap">14d return <span style="color:{cur_col}">{p.get("current_ret14_pct", 0)}%</span> '
+        f'&middot; 14d vol {p.get("current_vol14_pct", 0)}%/day &middot; {p.get("current_date", "")}</div></div>'
+        f'{persist_card}{stat_cards}'
+        '</div>'
+        f'<div class="rg-strip">{chips}</div>'
+        '<div class="vz-cap" style="margin-top:4px">'
+        '<span class="g">■</span> BULL &nbsp; <span class="a">■</span> SIDEWAYS &nbsp; '
+        '<span class="r">■</span> BEAR &mdash; last 60 days</div>'
+        '</div>'
+    )
+
+
+def fillBar_py(pct: float, color: str, label: str, tick: float | None = None) -> str:
+    """Python twin of SCRIPT's JS `fillBar()` — same `vz-track`/`vz-fill`
+    markup, used here because regime_section() renders server-side rather
+    than via the client-side data fetch the rest of the page uses."""
+    pct = max(0.0, min(100.0, pct))
+    t = f'<div class="vz-tick" style="left:{max(0, min(100, tick))}%"></div>' if tick is not None else ""
+    return (f'<div class="vz-track"><div class="vz-fill" style="width:{pct:.0f}%;background:{color}"></div>'
+            f'{t}<div class="vz-fill-lbl">{label}</div></div>')
+
+
 def review_sections() -> str:
     """Both hedge review surfaces, or nothing if the ledger cannot answer."""
     try:
@@ -774,7 +898,8 @@ def render(book: str = "hedge", bt_css: str = "", bt_body: str = "", bt_script: 
     path = "/prop-analytics" if book == "prop" else "/analytics"
     eval_cone = ('' if book != "prop"
                  else ' · <a href="/prop-survival#projection" class="ac">eval projection cone →</a>')
-    body = (f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
+    body = regime_section() + (
+            f'<div class="sub" style="color:var(--dim);font-size:12px;margin:-8px 0 14px">'
             f'<b>{book}</b> book{" · all eval attempts" if book == "prop" else ""} · '
             f'<a href="{"/analytics" if book == "prop" else "/prop-analytics"}" class="ac">'
             f'switch to {other}</a>{eval_cone}</div>') + BODY

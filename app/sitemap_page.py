@@ -30,7 +30,10 @@ def render(paths: list[str]) -> str:
     hedge = {h for h, _ in NAV_HEDGE}
 
     # Pages with no nav chip on purpose (engine cards, not chips).
-    ENGINES = {"/regime"}
+    # /regime retired 2026-09-05 — merged into /analytics, see LEGACY_ROUTES
+    # in main.py. Kept as an empty set (not deleted) in case a future page
+    # earns this category again.
+    ENGINES: set[str] = set()
 
     groups: dict[str, list[str]] = {
         "Hedge": [], "Engines": [], "Reference": []
