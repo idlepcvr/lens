@@ -82,6 +82,125 @@ NAV_NEUTRAL = [("/evidence", "Evidence"), ("/money", "Money"), ("/manual", "Manu
 
 _PAGE_MODE = {h: "hedge" for h, _ in NAV_HEDGE}
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Sidebar — 2026-09-06. The top nav bar (above) stopped being enough once
+# several pages became small books in themselves (Analytics = Regime+Review+
+# Research, Goal = a stack of fold cards, Evidence = seven merged sections):
+# a flat row of page chips had no room for "and jump to the bit of THIS page
+# I want." PAGE_ANCHORS is the map of (page path -> its in-page sections) that
+# drives the nested sub-list sidebar_html() renders under whichever page is
+# current. Anchor ids must match real ids in that page's markup (a `<details
+# id=…>`, or a `.card.fold` id, or a plain section id) — sidebar_html() does
+# not check, so a renamed section id here silently drops that entry.
+PAGE_ANCHORS: dict[str, list[tuple[str, str]]] = {
+    "/analytics": [
+        ("regime", "Market regime"),
+        ("review", "Review"),
+        ("past", "Past"),
+        ("board", "Board"),
+        ("backtest", "Backtest"),
+        ("fit", "Fit"),
+    ],
+    "/goal": [
+        ("rk-card", "Risk & Kelly"),
+        ("stats-card", "Risk analytics"),
+        ("acct-card", "Account impact / trade"),
+        ("mc-card", "Monte Carlo / BTC"),
+        ("wrs-card", "Win-rate sensitivity"),
+        ("rtgt-card", "R-target scenarios"),
+        ("sladder-card", "Scenario ladder"),
+        ("ladder-card", "Milestone ladder"),
+        ("plan-card", "The plan"),
+    ],
+    "/evidence": [
+        ("review", "This month · review"),
+        ("verdict", "The verdict"),
+        ("luck", "Is it luck?"),
+        ("geometry", "What this configuration earns"),
+        ("target", "What a named target demands"),
+        ("audit", "Audit · superseded"),
+        ("notebook", "The notebook"),
+    ],
+}
+
+
+def sidebar_html(current_path: str) -> str:
+    """The sidebar/drawer: Core (the 7 book pages) + Reference (Evidence and
+    the utility pages), with the current page's in-page anchors (if any)
+    nested directly under its own link. Same `cur` class the old top nav
+    used, so existing current-page styling/tests keep working."""
+    current_path = current_path.split("?")[0]
+
+    def item(href: str, label: str) -> str:
+        cur = href == current_path
+        cls = "side-a cur" if cur else "side-a"
+        html = f'<a href="{href}" class="{cls}">{label}</a>'
+        anchors = PAGE_ANCHORS.get(href) if cur else None
+        if anchors:
+            subs = "".join(
+                f'<a href="#{aid}" class="side-suba">{alabel}</a>'
+                for aid, alabel in anchors
+            )
+            html += f'<div class="side-sub">{subs}</div>'
+        return html
+
+    core = "".join(item(h, l) for h, l in NAV_HEDGE)
+    ref = "".join(item(h, l) for h, l in NAV_NEUTRAL)
+    return (
+        '<aside class="side" id="side">'
+        '<div class="side-hd">'
+        '<a href="/" class="side-logo">LEN<span class="s">S</span></a>'
+        '<button type="button" class="side-x" id="side-close" aria-label="close menu">&#10005;</button>'
+        '</div>'
+        '<nav class="side-nav">'
+        '<div class="side-grp">Core</div>' + core +
+        '<div class="side-grp">Reference</div>' + ref +
+        '</nav>'
+        '</aside>'
+    )
+
+
+_SIDEBAR_JS = r"""
+(function(){
+  var side=document.getElementById('side'), scrim=document.getElementById('side-scrim'),
+      burger=document.getElementById('side-burger'), close=document.getElementById('side-close');
+  function open(){ if(side){side.classList.add('open');} if(scrim){scrim.classList.add('show');} }
+  function shut(){ if(side){side.classList.remove('open');} if(scrim){scrim.classList.remove('show');} }
+  if(burger) burger.addEventListener('click', function(){
+    if(side && side.classList.contains('open')) shut(); else open();
+  });
+  if(close) close.addEventListener('click', shut);
+  if(scrim) scrim.addEventListener('click', shut);
+  if(side) side.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', shut); });
+
+  // Reveal whatever collapsed section a #hash names — both the <details>-based
+  // folds (merged()/evidence, analytics' an-d) and Goal's older .card.fold.col
+  // toggle-by-class pattern, so one sidebar link works against every page's
+  // own collapse mechanism instead of needing three copies of this.
+  function openAnchor(id){
+    if(!id) return;
+    var el=document.getElementById(id);
+    if(!el) return;
+    var n=el;
+    while(n){
+      if(n.tagName==='DETAILS') n.open=true;
+      if(n.classList && n.classList.contains('fold')) n.classList.remove('col');
+      n=n.parentElement;
+    }
+    if(el.querySelectorAll){
+      el.querySelectorAll('details').forEach(function(d){ d.open=true; });
+      el.querySelectorAll('.fold').forEach(function(f){ f.classList.remove('col'); });
+    }
+    if(el.tagName==='DETAILS') el.open=true;
+    if(el.classList && el.classList.contains('fold')) el.classList.remove('col');
+    setTimeout(function(){ el.scrollIntoView({block:'start'}); }, 0);
+  }
+  function fromHash(){ openAnchor((location.hash||'').slice(1)); }
+  if(location.hash) fromHash();
+  window.addEventListener('hashchange', fromHash);
+})();
+"""
+
 
 def page_book(path: str) -> str | None:
     """'hedge' | None — which BOOK a page belongs to, or None if it belongs to
@@ -183,14 +302,23 @@ a{color:var(--accent);text-decoration:none}
 @media (hover:hover){ .qh:hover{color:var(--accent);border-color:var(--accent)} }
 
 /* ── top bar ── */
-.bar{display:flex;align-items:center;justify-content:space-between;
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:16px 2px 12px;position:sticky;top:0;z-index:30;
   background:linear-gradient(var(--bg) 72%,transparent);backdrop-filter:blur(4px)}
-.logo{font-family:var(--hud);font-weight:700;font-size:17px;letter-spacing:.32em;color:#fff}
+.logo{font-family:var(--hud);font-weight:700;font-size:17px;letter-spacing:.32em;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .logo .s{color:var(--accent)}
 .logo .pg{color:var(--dim);font-weight:500;letter-spacing:.22em;font-size:13px;margin-left:2px}
 .live{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+  letter-spacing:.14em;color:var(--dim);text-transform:uppercase;flex:0 0 auto;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw}
+/* the burger takes room the bar didn't need to budget for before — the page
+   label (already shown via the sidebar's own current-page highlight) is the
+   one thing here that can drop without losing information, so it's what
+   goes first rather than letting the logo or live-status text wrap/overlap. */
+@media (max-width:679px){
+  .logo .pg{display:none}
+}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--long);
   box-shadow:0 0 0 0 rgba(31,217,137,.6);animation:pulse 2.4s infinite}
 .dot.stale{background:var(--amber);animation:none;box-shadow:0 0 8px var(--amber)}
@@ -400,6 +528,54 @@ a{color:var(--accent);text-decoration:none}
   .tg{grid-template-columns:repeat(2,1fr)}
 }
 @media (hover:hover){ .nav a:hover{color:var(--ink);border-color:var(--line2)} .sect:hover{color:var(--ink)} }
+
+/* ── sidebar (2026-09-06, replaces the top nav chips) ──
+   Mobile-first: off-canvas drawer by default, slides in over a dimmed scrim.
+   Persistent column from 1080px — that breakpoint already meant "desktop" for
+   the nav bar wrapping, so the sidebar takes the same threshold rather than
+   inventing a new one. */
+.shell{display:flex;min-height:100vh;position:relative;z-index:1}
+.side{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:290px;z-index:100;
+  background:var(--panel);border-right:1px solid var(--line2);overflow-y:auto;
+  transform:translateX(-100%);transition:transform .22s ease;
+  padding:16px 0 24px;-webkit-overflow-scrolling:touch}
+.side.open{transform:translateX(0)}
+.side-scrim{position:fixed;inset:0;z-index:90;background:rgba(3,5,9,.6);
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.side-scrim.show{opacity:1;pointer-events:auto}
+.side-hd{display:flex;align-items:center;justify-content:space-between;padding:2px 18px 16px}
+.side-logo{font-family:var(--hud);font-weight:700;font-size:17px;letter-spacing:.32em;color:#fff}
+.side-logo .s{color:var(--accent)}
+.side-x{background:none;border:none;color:var(--dim);font-size:16px;line-height:1;
+  padding:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.side-nav{display:flex;flex-direction:column;padding:0 10px}
+.side-grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);padding:14px 10px 6px}
+.side-grp:first-child{padding-top:2px}
+.side-a{font-family:var(--hud);font-size:14px;color:var(--dim);text-decoration:none;
+  padding:9px 10px;border-radius:8px;display:block;transition:.15s}
+.side-a.cur{color:var(--bg);background:var(--accent);font-weight:700}
+.side-a:active{transform:scale(.98)}
+.side-sub{display:flex;flex-direction:column;margin:2px 0 6px 14px;
+  border-left:1px solid var(--line2);padding-left:10px}
+.side-suba{font-family:var(--mono);font-size:11.5px;color:var(--dim);text-decoration:none;
+  padding:6px 6px;border-radius:6px}
+.side-suba:active{transform:scale(.98)}
+@media (hover:hover){
+  .side-a:not(.cur):hover{color:var(--ink);background:var(--panel3)}
+  .side-suba:hover{color:var(--accent)}
+}
+.side-burger{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  font-size:16px;line-height:1;border-radius:8px;padding:7px 11px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;flex:0 0 auto}
+.side-burger:active{transform:scale(.94)}
+.shell>.app{flex:1;min-width:0}
+@media (min-width:1080px){
+  .side{position:sticky;top:0;left:auto;height:100vh;width:230px;max-width:230px;
+    transform:none;flex:0 0 230px}
+  .side-scrim{display:none!important}
+  .side-burger{display:none}
+}
 """
 
 
@@ -694,16 +870,28 @@ def shell(current_path: str, page_label: str, body: str, *,
         "@media(max-width:560px){footer.navftr .ftlinks{margin-left:0}}"
         "</style>"
         + head_extra +
-        "</head><body><div class=\"app\">"
+        "</head><body>"
     )
-    if not bare:
+    if bare:
+        head += "<div class=\"app\">"
+        shell_close = "</div>"
+    else:
         head += (
-            "<div class=\"bar\">"
+            "<div class=\"shell\">"
+            + sidebar_html(current_path)
+            + "<div class=\"side-scrim\" id=\"side-scrim\"></div>"
+            + "<div class=\"app\">"
+            + "<div class=\"bar\">"
+            "<button type=\"button\" class=\"side-burger\" id=\"side-burger\" "
+            "aria-label=\"open menu\">&#9776;</button>"
             "<div class=\"logo\">LEN<span class=\"s\">S</span> "
             "<span class=\"pg\">" + _booked(current_path, page_label) + "</span></div>"
             + (right or ("<div class=\"live\"><span class=\"dot\"></span>" + meta + "</div>")) +
             "</div>"
-            + nav_html(current_path)
         )
-    tail = footer_html(current_path) + "</div>" + (("<script>" + script + "</script>") if script else "") + "</body></html>"
+        shell_close = "</div></div>"
+    full_script = (_SIDEBAR_JS if not bare else "") + script
+    tail = (footer_html(current_path) + shell_close +
+            (("<script>" + full_script + "</script>") if full_script else "") +
+            "</body></html>")
     return head + body + tail

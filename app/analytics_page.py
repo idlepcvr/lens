@@ -861,7 +861,7 @@ def regime_section() -> str:
         )
 
     return (
-        '<div class="an-sec">'
+        '<div class="an-sec" id="regime" style="scroll-margin-top:60px">'
         '<div class="an-h">Market Regime <span style="color:var(--faint);text-transform:none;'
         'font-weight:400">— BTCUSD daily, K-Means(k=3) on 14d return + vol</span></div>'
         '<div class="rg-top">'
@@ -906,7 +906,8 @@ def review_sections() -> str:
         out += _last_days(T)
     except Exception:
         pass
-    return f'<div class="an-sec"><div class="an-h">Review</div>{out}</div>' if out else ""
+    return (f'<div class="an-sec" id="review" style="scroll-margin-top:60px">'
+            f'<div class="an-h">Review</div>{out}</div>') if out else ""
 
 
 def render(book: str = "hedge", bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str:
