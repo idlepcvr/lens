@@ -269,7 +269,7 @@ body{
     radial-gradient(900px 500px at 50% -8%, rgba(91,157,255,.10), transparent 60%),
     radial-gradient(700px 600px at 100% 100%, rgba(31,217,137,.05), transparent 55%),
     var(--bg);
-  min-height:100vh;
+  min-height:100vh; min-height:100dvh;
 }
 /* faint cockpit grid */
 body::before{
@@ -539,7 +539,7 @@ a{color:var(--accent);text-decoration:none}
    Persistent column from 1080px — that breakpoint already meant "desktop" for
    the nav bar wrapping, so the sidebar takes the same threshold rather than
    inventing a new one. */
-.shell{display:flex;min-height:100vh;position:relative;z-index:1}
+.shell{display:flex;min-height:100vh;min-height:100dvh;position:relative;z-index:1}
 .side{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:290px;z-index:100;
   background:var(--panel);border-right:1px solid var(--line2);overflow-y:auto;
   transform:translateX(-100%);transition:transform .22s ease;
@@ -552,19 +552,21 @@ a{color:var(--accent);text-decoration:none}
 .side-logo{font-family:var(--hud);font-weight:700;font-size:17px;letter-spacing:.32em;color:#fff}
 .side-logo .s{color:var(--accent)}
 .side-x{background:none;border:none;color:var(--dim);font-size:16px;line-height:1;
-  padding:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  padding:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
 .side-nav{display:flex;flex-direction:column;padding:0 10px}
 .side-grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
   color:var(--faint);padding:14px 10px 6px}
 .side-grp:first-child{padding-top:2px}
 .side-a{font-family:var(--hud);font-size:14px;color:var(--dim);text-decoration:none;
-  padding:9px 10px;border-radius:8px;display:block;transition:.15s}
+  padding:9px 10px;border-radius:8px;display:block;transition:.15s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .side-a.cur{color:var(--bg);background:var(--accent);font-weight:700}
 .side-a:active{transform:scale(.98)}
 .side-sub{display:flex;flex-direction:column;margin:2px 0 6px 14px;
   border-left:1px solid var(--line2);padding-left:10px}
 .side-suba{font-family:var(--mono);font-size:11.5px;color:var(--dim);text-decoration:none;
-  padding:6px 6px;border-radius:6px}
+  padding:6px 6px;border-radius:6px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .side-suba:active{transform:scale(.98)}
 @media (hover:hover){
   .side-a:not(.cur):hover{color:var(--ink);background:var(--panel3)}
@@ -572,11 +574,12 @@ a{color:var(--accent);text-decoration:none}
 }
 .side-burger{background:var(--panel);border:1px solid var(--line);color:var(--ink);
   font-size:16px;line-height:1;border-radius:8px;padding:7px 11px;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;flex:0 0 auto}
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;flex:0 0 auto;
+  min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
 .side-burger:active{transform:scale(.94)}
 .shell>.app{flex:1;min-width:0}
 @media (min-width:1080px){
-  .side{position:sticky;top:0;left:auto;height:100vh;width:230px;max-width:230px;
+  .side{position:sticky;top:0;left:auto;height:100vh;height:100dvh;width:230px;max-width:230px;
     transform:none;flex:0 0 230px}
   .side-scrim{display:none!important}
   .side-burger{display:none}
@@ -846,8 +849,17 @@ def shell(current_path: str, page_label: str, body: str, *,
     head = (
         "<!DOCTYPE html><html lang=\"en\"><head>"
         "<meta charset=\"UTF-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, "
-        "maximum-scale=1.0, user-scalable=no\">"
+        # 2026-09-06: dropped maximum-scale=1.0 + user-scalable=no after direct
+        # phone feedback ("issues with zooming in and out ... not responsive on
+        # mobile"). That combo blocks pinch-zoom outright on most Android/Chrome
+        # builds, and even where the OS overrides it for accessibility (iOS 10+
+        # always allows pinch regardless of the meta tag), a page authored
+        # assuming scale is locked can render fixed-position chrome (the sticky
+        # bar, the drawer, the scrim) misaligned once the OS zooms anyway — the
+        # exact "sidebar doesn't work" symptom. No screen here needs zoom
+        # blocked, and the owner reads better zoomed in sometimes, so let the
+        # browser's native pinch-zoom behave normally.
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
         "<meta name=\"theme-color\" content=\"#06080c\">"
         "<title>LENS // " + _booked(current_path, page_label) + "</title>"
         + FONT_LINKS +
