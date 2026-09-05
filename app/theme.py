@@ -147,10 +147,10 @@ def sidebar_html(current_path: str) -> str:
     core = "".join(item(h, l) for h, l in NAV_HEDGE)
     ref = "".join(item(h, l) for h, l in NAV_NEUTRAL)
     return (
-        '<aside class="side" id="side">'
+        '<aside class="side" id="lens-side">'
         '<div class="side-hd">'
         '<a href="/" class="side-logo">LEN<span class="s">S</span></a>'
-        '<button type="button" class="side-x" id="side-close" aria-label="close menu">&#10005;</button>'
+        '<button type="button" class="side-x" id="lens-side-close" aria-label="close menu">&#10005;</button>'
         '</div>'
         '<nav class="side-nav">'
         '<div class="side-grp">Core</div>' + core +
@@ -162,8 +162,8 @@ def sidebar_html(current_path: str) -> str:
 
 _SIDEBAR_JS = r"""
 (function(){
-  var side=document.getElementById('side'), scrim=document.getElementById('side-scrim'),
-      burger=document.getElementById('side-burger'), close=document.getElementById('side-close');
+  var side=document.getElementById('lens-side'), scrim=document.getElementById('lens-side-scrim'),
+      burger=document.getElementById('lens-side-burger'), close=document.getElementById('lens-side-close');
   function open(){ if(side){side.classList.add('open');} if(scrim){scrim.classList.add('show');} }
   function shut(){ if(side){side.classList.remove('open');} if(scrim){scrim.classList.remove('show');} }
   if(burger) burger.addEventListener('click', function(){
@@ -879,10 +879,10 @@ def shell(current_path: str, page_label: str, body: str, *,
         head += (
             "<div class=\"shell\">"
             + sidebar_html(current_path)
-            + "<div class=\"side-scrim\" id=\"side-scrim\"></div>"
+            + "<div class=\"side-scrim\" id=\"lens-side-scrim\"></div>"
             + "<div class=\"app\">"
             + "<div class=\"bar\">"
-            "<button type=\"button\" class=\"side-burger\" id=\"side-burger\" "
+            "<button type=\"button\" class=\"side-burger\" id=\"lens-side-burger\" "
             "aria-label=\"open menu\">&#9776;</button>"
             "<div class=\"logo\">LEN<span class=\"s\">S</span> "
             "<span class=\"pg\">" + _booked(current_path, page_label) + "</span></div>"
