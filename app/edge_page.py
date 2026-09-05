@@ -32,60 +32,105 @@ _CSS = """
 .ed-tbl tr.main td{font-weight:600}
 .ed-gchip{display:inline-block;font-size:10px;padding:1px 6px;margin:3px 5px 0 0;border:1px solid var(--line2);border-radius:4px;color:var(--dim)}
 .g{color:var(--long)} .r{color:var(--short)} .amb{color:var(--amber)} .dim{color:var(--dim)}
+
+/* ── #past — visual primitives, same vocabulary as /analytics's vz-* set ── */
+.ed-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.ed-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.ed-card.armed{border-color:var(--long)}
+.ed-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-track{position:relative;height:22px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.ed-fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px 0 0 5px}
+.ed-fill-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink)}
+.ed-tick{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);opacity:.6}
+.ed-div{position:relative;height:22px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ed-div .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.ed-div .seg{position:absolute;top:1px;bottom:1px;border-radius:3px}
+.ed-cap{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.ed-badge{display:inline-block;font-family:var(--mono);font-weight:800;font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:5px;border:1px solid currentColor}
+.ed-dead summary{list-style:none;cursor:pointer;padding:9px 12px;font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px;user-select:none}
+.ed-dead summary::-webkit-details-marker{display:none}
+.ed-dead summary::before{content:'▸';color:var(--faint);font-size:10px;transition:transform .15s}
+.ed-dead[open] summary::before{transform:rotate(90deg)}
+.ed-dead{border:1px solid var(--line);border-radius:8px;background:var(--panel2);margin-top:4px}
+.ed-dead-body{padding:0 12px 12px}
+.ed-dead-row{display:grid;grid-template-columns:70px 1fr 90px;align-items:center;gap:8px;margin-bottom:5px;font-size:11px}
+.ed-dead-row .lbl{font-family:var(--mono);color:var(--dim)}
+.ed-dead-row .trk{position:relative;height:12px;background:var(--bg);border-radius:3px;overflow:hidden}
+.ed-dead-row .trk .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.ed-dead-row .trk .seg{position:absolute;top:1px;bottom:1px;border-radius:2px}
+.ed-dead-row .val{font-family:var(--mono);text-align:right;color:var(--dim)}
 </style>
 """
 
 _LIVE = """
 <div class="ed-h" id="past">Past — your live trades</div>
-<div class="ed-hs">Realised edge per setup family · auto-tagged on sync · verdict from expectancy · WR · sample</div>
-<div class="panel" style="overflow-x:auto">
-  <table class="ed-tbl">
-    <thead><tr><th>Setup</th><th>n</th><th>WR</th><th>Avg€</th><th>Total€</th><th>Verdict</th></tr></thead>
-    <tbody id="edge-body"><tr><td colspan="6" class="dim" style="padding:20px">Loading…</td></tr></tbody>
-  </table>
-</div>
+<div class="ed-hs">Realised edge per setup family · auto-tagged on sync · only S1 is armed — S2–S5 are proven losing out-of-sample (see setups.py) and are collapsed below, not weighted equally</div>
+<div id="edge-armed"></div>
+<details class="ed-dead" id="edge-dead-wrap"><summary>Disarmed setups <span id="edge-dead-tag" class="ed-cap" style="margin-left:auto"></span></summary>
+  <div class="ed-dead-body" id="edge-dead"></div>
+</details>
 """
 
 SCRIPT = r"""
+const ARMED_SETUPS=new Set(['S1']);
 function edgeFamily(tag){
   if(!tag) return '(untagged)';
   if(tag.startsWith('VETO:')) return 'VETO';
   if(tag.includes('|VETO:')) return tag.split('|')[0]+' (vetoed)';
   return tag;
 }
+function edgeIsArmed(k){ return ARMED_SETUPS.has(k.split(' ')[0]); }
 function edgeVerdict(n,wr,exp){
   if(n<8)               return ['THIN','var(--dim)'];
   if(exp<=0)            return ['CUT','var(--short)'];
   if(exp>=10&&n>=12&&wr>=45) return ['SIZE-UP','var(--long)'];
   return ['KEEP','var(--amber)'];
 }
+function edgeQuery(k){
+  return k==='(untagged)'?'__none__':k==='VETO'?'VETO:':k.endsWith(' (vetoed)')?k.split(' ')[0]+'|':k;
+}
 function render(trades){
   const g={};
   trades.filter(t=>t.pnl!=null).forEach(t=>{
     const k=edgeFamily(t.setup_tag);
-    if(!g[k]) g[k]={n:0,wins:0,total:0,byGrade:{}};
+    if(!g[k]) g[k]={n:0,wins:0,total:0};
     g[k].n++; if((t.pnl||0)>0)g[k].wins++; g[k].total+=t.pnl||0;
-    const gr=t.grade||'—';
-    if(!g[k].byGrade[gr]) g[k].byGrade[gr]={n:0,wins:0,total:0};
-    g[k].byGrade[gr].n++; if((t.pnl||0)>0)g[k].byGrade[gr].wins++; g[k].byGrade[gr].total+=t.pnl||0;
   });
-  const rows=Object.entries(g).sort((a,b)=>b[1].total-a[1].total);
-  document.getElementById('edge-body').innerHTML=rows.map(([k,d])=>{
+  const rows=Object.entries(g).map(([k,d])=>{
     const exp=d.total/d.n, wr=d.wins/d.n*100;
     const [vl,vc]=edgeVerdict(d.n,wr,exp);
-    const grades=Object.entries(d.byGrade).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-    const sub=grades.length>1?grades.map(([gr,gd])=>
-      `<span class="ed-gchip">${gr}: ${gd.n}·${(gd.wins/gd.n*100).toFixed(0)}%·<span style="color:${gd.total>=0?'var(--long)':'var(--short)'}">${gd.total>=0?'+':''}${gd.total.toFixed(0)}€</span></span>`).join(''):'';
-    const q=k==='(untagged)'?'__none__':k==='VETO'?'VETO:':k.endsWith(' (vetoed)')?k.split(' ')[0]+'|':k;
-    return `<tr class="main"><td><a href="/journal?setup=${encodeURIComponent(q)}" style="color:inherit;text-decoration:none" title="these trades in the journal →">${k} <span style="color:var(--dim);font-size:9px">→</span></a></td><td>${d.n}</td><td>${wr.toFixed(0)}%</td>
-      <td style="color:${exp>=0?'var(--long)':'var(--short)'}">${exp>=0?'+':''}${exp.toFixed(0)}€</td>
-      <td style="color:${d.total>=0?'var(--long)':'var(--short)'}">${d.total>=0?'+':''}${d.total.toFixed(0)}€</td>
-      <td><b style="color:${vc}">${vl}</b></td></tr>`+
-      (sub?`<tr><td colspan="6" style="padding:0 0 6px 10px">${sub}</td></tr>`:'');
-  }).join('');
+    return {k,d,exp,wr,vl,vc};
+  }).sort((a,b)=>b.d.total-a.d.total);
+
+  const armed=rows.filter(r=>edgeIsArmed(r.k));
+  const dead=rows.filter(r=>!edgeIsArmed(r.k));
+
+  document.getElementById('edge-armed').innerHTML=armed.length?('<div class="ed-row">'+armed.map(r=>{
+    const {k,d,exp,wr,vl,vc}=r;
+    const wrColor=wr>=50?'var(--long)':wr>=35?'var(--amber)':'var(--short)';
+    const q=edgeQuery(k);
+    return `<div class="ed-card armed" style="grid-column:span 2">`+
+      `<div class="ed-lbl"><a href="/journal?setup=${encodeURIComponent(q)}" style="color:inherit;text-decoration:none" title="these trades in the journal →">${k} — live, armed</a> <span class="ed-badge" style="color:${vc}">${vl}</span></div>`+
+      `<div class="ed-track"><div class="ed-fill" style="width:${Math.max(0,Math.min(100,wr))}%;background:${wrColor}"></div>`+
+      `<div class="ed-fill-lbl">${wr.toFixed(0)}% WR</div></div>`+
+      `<div class="ed-cap">n=${d.n} · avg ${exp>=0?'+':''}${exp.toFixed(0)}€/trade · total <span style="color:${d.total>=0?'var(--long)':'var(--short)'}">${d.total>=0?'+':''}${d.total.toFixed(0)}€</span></div>`+
+      `</div>`;
+  }).join('')+'</div>'):'<div class="ed-cap" style="margin-bottom:12px">No S1 trades yet.</div>';
+
+  const deadMaxAbs=Math.max(1,...dead.map(r=>Math.abs(r.d.total)));
+  document.getElementById('edge-dead-tag').textContent=dead.length+' family'+(dead.length===1?'':'ies')+' · proven losing / unranked, not worth reading row-by-row';
+  document.getElementById('edge-dead').innerHTML=dead.map(r=>{
+    const {k,d,exp,wr,vl,vc}=r;
+    const w=deadMaxAbs>0?Math.min(50,Math.abs(d.total)/deadMaxAbs*50):0, pos=d.total>=0;
+    const seg=pos?`left:50%;width:${w}%;background:var(--long)`:`right:50%;width:${w}%;background:var(--short)`;
+    const q=edgeQuery(k);
+    return `<div class="ed-dead-row"><a class="lbl" href="/journal?setup=${encodeURIComponent(q)}" style="text-decoration:none" title="these trades in the journal →">${k}</a>`+
+      `<div class="trk"><div class="mid"></div><div class="seg" style="${seg}"></div></div>`+
+      `<span class="val">${wr.toFixed(0)}%WR · n${d.n} · <b style="color:${vc}">${vl}</b></span></div>`;
+  }).join('')||'<div class="ed-cap">Nothing to show.</div>';
 }
 fetch('/api/review/trades').then(r=>r.json()).then(render).catch(e=>{
-  document.getElementById('edge-body').innerHTML='<tr><td colspan="6" class="r" style="padding:20px">Load error: '+e.message+'</td></tr>';});
+  document.getElementById('edge-armed').innerHTML='<div class="r ed-cap">Load error: '+e.message+'</div>';});
 """
 
 
@@ -99,30 +144,54 @@ fetch('/api/review/trades').then(r=>r.json()).then(render).catch(e=>{
 # HEDGE/PROP board toggle stays; it's two strategy families, not two books.
 _BOARD_CSS = r"""<style>
 .pv .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
-.pv table{width:100%;border-collapse:collapse;font-size:13px}
-.pv th,.pv td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
-.pv th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500}
-.pv td{font-family:var(--mono)}
-.pv tr.hl{background:var(--panel2)}
-.pv .green{color:var(--long)} .pv .red{color:var(--short)}
 .pv .prose{color:var(--dim);font-size:13.5px;line-height:1.65}
 .pv .prose strong{color:var(--ink)}
+.pv .green{color:var(--long)} .pv .red{color:var(--short)}
+
+/* one row per strategy: rank + name, a bar sized by score (the "does it pay"
+   read), then a strip of heat cells — one per R level, colored like the
+   backtest SL×TP sweep — so the per-R detail survives without a numbers grid. */
+.pv-row{display:grid;grid-template-columns:26px 1fr 96px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.pv-row:last-child{border-bottom:none}
+.pv-row.top .name{font-weight:700;color:var(--ink)}
+.pv-rank{font-family:var(--mono);font-size:12px;color:var(--dim);text-align:right}
+.pv-row.top .pv-rank{color:var(--long)}
+.pv-main{min-width:0}
+.pv-name{display:flex;align-items:baseline;gap:7px;font-size:12.5px;margin-bottom:5px;flex-wrap:wrap}
+.pv-dir{font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:1px 6px;border-radius:3px;border:1px solid var(--line2);color:var(--dim)}
+.pv-meta{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.pv-bar{position:relative;height:10px;background:var(--bg);border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-bottom:5px}
+.pv-bar>span{display:block;height:100%;border-radius:4px}
+.pv-heat{display:flex;gap:2px}
+.pv-heat i{flex:1 1 0;height:14px;border-radius:2px;min-width:8px}
+.pv-best{font-family:var(--mono);font-size:11px;text-align:right;white-space:nowrap}
 </style>"""
 
 
-def _r_cols(rows, r_levels):
-    """Cells for each R level: net R, green if profitable. The 'let winners run'
-    sweep made visible — you can read straight across which R each one wins at."""
+def _score_bar(score, max_score):
+    """Score as a filled bar, 0..max across the ranked set — length answers
+    'how much does this one pay' at a glance, the number is just the caption."""
+    pct = max(0, min(100, score / max_score * 100)) if max_score > 0 else 0
+    color = "var(--long)" if score > 0 else "var(--short)"
+    return f'<div class="pv-bar"><span style="width:{pct:.1f}%;background:{color}"></span></div>'
+
+
+def _r_heat(rows, r_levels):
+    """One cell per R level, colored like the backtest SL×TP heatmap (green =
+    profitable, red = not, opacity = magnitude) — the per-R breakdown without
+    a row of numbers to read."""
     by_r = {row["r"]: row for row in rows}
+    max_abs = max([abs(r["net"]) for r in rows] + [1])
     out = ""
     for R in r_levels:
         row = by_r.get(R)
         if not row:
-            out += "<td>·</td>"
+            out += '<i style="background:var(--panel2)" title="no data"></i>'
             continue
-        cls = "green" if row["net"] > 0 else "red"
-        out += (f'<td class="{cls}" title="WR {row["wr"]}%">'
-                f'{row["net"]:+.2f}</td>')
+        t = max(-1, min(1, row["net"] / max_abs))
+        hue = 150 if t >= 0 else 5
+        out += (f'<i style="background:hsla({hue},72%,45%,{0.15+0.6*abs(t):.2f})" '
+                f'title="{R:g}R: {row["net"]:+.2f} net · {row["wr"]}% WR"></i>')
     return out
 
 
@@ -130,34 +199,33 @@ def _board(results, mode, r_levels):
     ranked = sorted([o for o in results if o["mode"] == mode and not o["thin"]],
                     key=lambda x: x["rank"])
     thin = [o for o in results if o["mode"] == mode and o["thin"]]
-    rcols_head = "".join(f"<th>{R:g}R</th>" for R in r_levels)
+    max_score = max([o["score"] for o in ranked] + [1])
     body_rows = ""
     for o in ranked:
-        hl = " class=\"hl\"" if o["top3"] else ""
+        top = " top" if o["top3"] else ""
         star = " ★" if o["top3"] else ""
         best = (f'<span class="green">{o["best_net"]:+.2f}R</span> @ {o["best_r"]:g}R'
                 if o["best_net"] and o["best_net"] > 0
                 else f'<span class="red">{o["best_net"]:+.2f}R</span>')
         body_rows += (
-            f"<tr{hl}><td>{o['rank']}{star}</td>"
-            f"<td>{o['name']}</td>"
-            f"<td>{o['dir']}</td>"
-            f"<td>{o['n']}</td>"
-            f"<td>{o['sl']:.2f}%</td>"
-            f"{_r_cols(o['rows'], r_levels)}"
-            f"<td>{best}</td>"
-            f"<td><b>{o['score']:.2f}</b></td></tr>")
+            f'<div class="pv-row{top}">'
+            f'<div class="pv-rank">{o["rank"]}{star}</div>'
+            f'<div class="pv-main">'
+            f'<div class="pv-name"><span>{o["name"]}</span>'
+            f'<span class="pv-dir">{o["dir"]}</span>'
+            f'<span class="pv-meta">n={o["n"]} · stop {o["sl"]:.2f}% · score {o["score"]:.2f}</span></div>'
+            f'{_score_bar(o["score"], max_score)}'
+            f'<div class="pv-heat">{_r_heat(o["rows"], r_levels)}</div>'
+            f'</div>'
+            f'<div class="pv-best">{best}</div>'
+            f'</div>')
     thin_note = ""
     if thin:
         thin_note = ('<div class="prose" style="margin-top:8px">thin (n&lt;40, not ranked): '
                      + ", ".join(f"{o['name']} (n={o['n']})" for o in thin) + "</div>")
     return f"""
   <div class="panel">
-    <div style="overflow-x:auto"><table>
-      <tr><th>#</th><th>strategy</th><th>dir</th><th>n</th><th>stop</th>
-          {rcols_head}<th>best</th><th>score</th></tr>
-      {body_rows}
-    </table></div>
+    {body_rows}
     {thin_note}
   </div>"""
 
