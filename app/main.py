@@ -1278,7 +1278,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}
 th{padding:6px 10px;text-align:left;font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b1)}
 td{padding:6px 10px;border-bottom:1px solid var(--b1)}
 .win{color:var(--long)}.loss{color:var(--short)}
-#status{color:var(--ac);font-size:12px;margin-left:12px}
+#bt-status{color:var(--ac);font-size:12px;margin-left:12px}
 canvas{width:100%;height:200px;display:block}
 .hm{border-collapse:collapse;font-family:var(--mono);width:auto}
 .hm th{padding:5px 8px;font-size:9px;color:var(--t3);text-align:center;border:none}
@@ -1299,8 +1299,7 @@ canvas{width:100%;height:200px;display:block}
 </style>"""
 
     body = f"""
-<h1 id="backtest" style="margin-top:34px">Strategy Backtest — run it yourself</h1>
-<div class="sub">BTC perps · Bybit USDT data (= same price action as Kraken USD, arbitraged tick-for-tick — Kraken's public API only serves ~4mo of candles) · each strategy on its own timeframe · starting balance editable (defaults to your live equity) · 0.15%/side fee</div>
+<div class="ed-hs">BTC perps · Bybit USDT data (= same price action as Kraken USD, arbitraged tick-for-tick — Kraken's public API only serves ~4mo of candles) · each strategy on its own timeframe · starting balance editable (defaults to your live equity) · 0.15%/side fee</div>
 
 <div class="sect closed" id="h-help" onclick="tog('help')"><span class="caret">▾</span><span class="ttl">❔ how to read this backtest</span><span class="line"></span></div>
 <div class="sec-body closed" id="s-help"><div class="help-body">
@@ -1322,7 +1321,7 @@ canvas{width:100%;height:200px;display:block}
          style="width:96px;background:var(--s1);border:1px solid var(--b2);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:12px;font-family:var(--ui)">
   <button class="run" id="run-btn" onclick="runBacktest()">▶ Run</button>
   <button id="sweep-btn" onclick="runSweep()" title="Re-run this strategy across a grid of stop-loss × take-profit to see if the edge is robust or a lucky single point">⊞ Sweep SL×TP</button>
-  <span id="status"></span>
+  <span id="bt-status"></span>
 </div>
 
 <div class="sect closed" id="h-custom" onclick="tog('custom')"><span class="caret">▾</span><span class="ttl">🛠 build your own strategy</span><span class="line"></span></div>
@@ -1427,7 +1426,7 @@ function tog(id){{ document.getElementById('h-'+id).classList.toggle('closed'); 
 function runBacktest() {{
   var name = document.getElementById('strat').value;
   var btn  = document.getElementById('run-btn');
-  var stat = document.getElementById('status');
+  var stat = document.getElementById('bt-status');
   btn.disabled = true;
   btn.textContent = '⏳ Running…';
   stat.textContent = 'Fetching data + running backtest…';
@@ -1452,7 +1451,7 @@ function runBacktest() {{
 
 function runCustom() {{
   var body = customBody();
-  var stat = document.getElementById('status');
+  var stat = document.getElementById('bt-status');
   if (!body.direction || !body.timeframe) {{
     stat.textContent = 'Pick a direction & timeframe to backtest one idea — or hit 🔍 Search blanks to sweep them.';
     return;
@@ -1669,7 +1668,7 @@ function toGoal(wrPct, rr, freq) {{
 
 function runCustomSweep() {{
   var btn = document.getElementById('csweep-btn');
-  var stat = document.getElementById('status');
+  var stat = document.getElementById('bt-status');
   btn.disabled = true; btn.textContent = '⏳ Sweeping…';
   stat.textContent = 'Sweeping ATR-stop × R grid (49 backtests, one data load)…';
   document.getElementById('sweep-wrap').style.display = 'none';
@@ -2144,8 +2143,17 @@ LEGACY_ROUTES = {
     "/hedge-overview": "/overview", "/hedge-plan": "/goal",
     "/hedge-goal": "/goal", "/hedge-desk": "/desk", "/hedge-signals": "/desk",
     "/hedge-journal": "/journal", "/hedge-analytics": "/analytics",
-    "/hedge-position": "/position", "/hedge-edge": "/edge", "/hedge-track": "/track",
+    "/hedge-position": "/position", "/hedge-edge": "/analytics", "/hedge-track": "/track",
     "/calendar": "/journal", "/hedge-calendar": "/journal",
+    # 2026-09-05: /edge merged into /analytics — retrospective ("how did I
+    # actually do") and prospective ("what could I test next") were two pages
+    # answering one question with the same visual language; now one scroll.
+    # No fragment on the target: a bookmark like /edge#fit keeps its #fit
+    # because the browser re-attaches the original fragment to a Location
+    # header that doesn't specify its own (standard redirect behaviour) —
+    # /analytics carries matching section ids (#past #board #backtest #fit)
+    # plus JS that opens+scrolls to whichever one is hit on load.
+    "/edge": "/analytics",
     # 2026-09-05: /signals merged into /desk — same job (approve/reject a
     # signal), same decide endpoint, just two presentations. Desk's cockpit
     # is now the one page; its queue/blocked/history section is what
@@ -2159,8 +2167,8 @@ LEGACY_ROUTES = {
     # Older shims, folded in here from four hand-written handlers. They were
     # identical 301s that each forgot include_in_schema=False, so /sitemap
     # listed them as if they were pages — two of them under "Engines".
-    "/backtest": "/edge#backtest",
-    "/strategy": "/edge#board", "/strategy-hedge": "/edge#board",
+    "/backtest": "/analytics#backtest",
+    "/strategy": "/analytics#board", "/strategy-hedge": "/analytics#board",
     # 2026-08-03 merges. Reading material is one page with tabs; the audit is
     # one July artifact, not two; geometry/target are one calculation run in
     # both directions; short/robustness/research are conclusion, evidence and
@@ -2245,7 +2253,8 @@ def journal_page(book: str = "hedge"):
 @app.get("/analytics", response_class=HTMLResponse)
 def analytics_page(book: str = "hedge"):
     from .analytics_page import render
-    return render(book)
+    css, body, script = _backtest_fragment()
+    return render(book, bt_css=css, bt_body=body, bt_script=script)
 
 
 @app.get("/money", response_class=HTMLResponse)
@@ -2258,13 +2267,6 @@ def money_page():
 def api_money(refresh: bool = Query(False)):
     from .money_page import money_data
     return money_data(refresh=refresh)
-
-
-@app.get("/edge", response_class=HTMLResponse)
-def edge_page(book: str = "hedge"):
-    from .edge_page import render_page
-    css, body, script = _backtest_fragment()
-    return render_page(bt_css=css, bt_body=body, bt_script=script, book=book)
 
 
 # /review + /recap deleted — the Journal is the single trade-history surface.

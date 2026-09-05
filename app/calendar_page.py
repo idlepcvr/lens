@@ -281,7 +281,7 @@ function renderSetupFilter(){
     ? `<div class="cal-setup-pill">setup: ${SETUPFILTER}<button id="cal-setupf-x">✕</button></div>` : '';
   const x=$('cal-setupf-x'); if(x) x.onclick=()=>{SETUPFILTER=null;history.replaceState(null,'',location.pathname);applySetupFilter();};
 }
-// deep-link from /edge's setup scoreboard — exact tag if it exists in the
+// deep-link from /analytics's #past setup scoreboard — exact tag if it exists in the
 // data, else a prefix match (the VETO: family groups by combo, not exact tag)
 function applySetupFilter(){
   TRADES = SETUPFILTER
@@ -445,7 +445,7 @@ function renderSetupStats(t){
       <span>${n} trades</span><span>${wr.toFixed(0)}% WR</span>
       <span style="color:${exp>=0?'var(--long)':'var(--short)'}">${exp>=0?'+':''}${exp.toFixed(0)}€ avg</span>
       <b style="color:${vc}">${vl}</b>
-      <a href="${RBOOK==='prop'?'/prop-edge':'/edge'}#past" style="color:var(--accent);text-decoration:none;font-size:11px">full breakdown →</a>
+      <a href="${RBOOK==='prop'?'/analytics?book=prop':'/analytics'}#past" style="color:var(--accent);text-decoration:none;font-size:11px">full breakdown →</a>
     </div>`;
 }
 function openModal(id){

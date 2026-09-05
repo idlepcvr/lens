@@ -1,14 +1,20 @@
-"""LENS /edge — THE strategy page, one question in three tenses.
+"""LENS /edge — retired 2026-09-05, folded into /analytics as a "Research"
+area (see analytics_page._research_section). /edge itself now just 301s to
+/analytics (main.py LEGACY_ROUTES); render_page() below is no longer wired to
+a route and is dead code kept only because analytics_page.py still imports
+its building blocks (_CSS, _BOARD_CSS, _LIVE, SCRIPT, _MODE_JS, _board) —
+don't call render_page() from a route again without re-reading why it went.
 
 #past     — realised performance per setup family from YOUR live trades
             (auto-tagged on sync, verdict from expectancy · WR · sample).
 #board    — the coded strategies replayed over the full candle history,
-            hedge/prop toggle (was /strategy-hedge + /strategy; both redirect here).
+            hedge/prop toggle (was /strategy-hedge + /strategy; both redirect
+            to /analytics#board now).
 #backtest — the interactive runner + SL×TP sweep + build-your-own
-            (was /backtest; redirects here).
+            (was /backtest; redirects to /analytics#backtest now).
 
 Live results, backtest ranks and the runner are different measurements of the
-same question — "which setups pay?" — so they live on one page.
+same question — "which setups pay?" — so they live on one page (/analytics).
 """
 
 from .theme import shell
@@ -63,8 +69,6 @@ _CSS = """
 """
 
 _LIVE = """
-<div class="ed-h" id="past">Past — your live trades</div>
-<div class="ed-hs">Realised edge per setup family · auto-tagged on sync · only S1 is armed — S2–S5 are proven losing out-of-sample (see setups.py) and are collapsed below, not weighted equally</div>
 <div id="edge-armed"></div>
 <details class="ed-dead" id="edge-dead-wrap"><summary>Disarmed setups <span id="edge-dead-tag" class="ed-cap" style="margin-left:auto"></span></summary>
   <div class="ed-dead-body" id="edge-dead"></div>

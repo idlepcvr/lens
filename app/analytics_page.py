@@ -14,6 +14,17 @@ trade, how long you hold, the scorecard, excursions, cash flow — every one
 now a bar/gauge/heat visual instead of a table of words. Data sources are
 unchanged: /api/review/equity (curve + timing) and /api/review/analytics
 (performance + risk + duration).
+
+2026-09-05: /edge merged in as a "Research" area below the review sections —
+Past (your live setup scorecard), Board (simulated strategy ranks), Backtest
+(the runner + build-your-own) and Fit (the goal-constrained sweep), each a
+collapsible `an-d` section like everything else on this page, not a second
+mode switch. "How did I actually do" and "what could I test next" are one
+scroll now. /edge 301s here (see main.py LEGACY_ROUTES); #past/#board/
+#backtest/#fit keep working as anchors — see the hash-open snippet at the
+top of SCRIPT below. Fit ships open by default: it's the one part of the old
+Edge page the owner actually used day to day, everything else here starts
+collapsed like the rest of the page.
 """
 
 from .theme import shell
@@ -189,6 +200,17 @@ BODY = """
 """
 
 SCRIPT = r"""
+// anchor from a bookmark/link — /edge#fit 301s to /analytics and the browser
+// re-attaches the #fit fragment itself (no fragment on the redirect target),
+// so this just has to open + reveal whichever Research section it names.
+// Runs immediately: Past/Board/Backtest/Fit are static markup in the initial
+// HTML, not injected after a fetch like the sections below.
+(function(){
+  const id=(location.hash||'').slice(1);
+  if(!id) return;
+  const el=document.getElementById(id);
+  if(el && el.tagName==='DETAILS'){ el.open=true; setTimeout(()=>el.scrollIntoView({block:'start'}),0); }
+})();
 const eur=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(0);
 const eur2=v=>v==null?'—':(v>=0?'+':'−')+'€'+Math.abs(v).toFixed(2);
 const pc=v=>v>=0?'var(--long)':'var(--short)';
@@ -641,6 +663,88 @@ def _last_days(T):
 </details>"""
 
 
+def _fold(title, sub, tag, tagcol, body, open_=False, id_=None) -> str:
+    """Server-rendered twin of the JS `det()` builder above — same `an-d`
+    markup, used for the Research sections below because their content is
+    static HTML (client-side data fetches fill it in), not JS-injected like
+    the equity-derived sections."""
+    idattr = f' id="{id_}"' if id_ else ""
+    openattr = " open" if open_ else ""
+    subhtml = f' <span class="sub">{sub}</span>' if sub else ""
+    taghtml = f'<span class="tag" style="color:{tagcol or "var(--dim)"}">{tag}</span>' if tag else ""
+    return (f'<details class="an-d"{idattr}{openattr}><summary>{title}{subhtml}{taghtml}</summary>'
+            f'<div class="an-d-body">{body}</div></details>')
+
+
+def _research_section(book: str, bt_css: str, bt_body: str, bt_script: str):
+    """Ex-/edge — Past / Board / Backtest / Fit — as four `an-d` sections
+    instead of a second page with its own mode switch. Same three tenses of
+    "which setups pay?" (past/board/backtest) plus the goal-constrained sweep
+    (fit), now reachable by scrolling past the review sections rather than a
+    page load. Returns (css, body, script) to fold into render()'s shell()."""
+    from .edge_page import _CSS as ED_CSS, _BOARD_CSS, _LIVE, SCRIPT as ED_SCRIPT, _MODE_JS, _board
+    from .fit_page import fragment as fit_fragment
+    from .strategy_eval import load_cache
+
+    fit_css, fit_body, fit_script = fit_fragment(book)
+    fit_sub = "eval-constrained sweep" if book == "prop" else "goal-constrained sweep — what shape must the strategy be?"
+
+    d = load_cache()
+    if d:
+        rl = d["r_levels"]
+        gen = d["generated_at"][:16].replace("T", " ")
+        ranked_n = len([o for o in d["results"] if not o["thin"]])
+        board_body = (
+            f'<div class="ed-hs">Same question, no you in it: each coded strategy run over the full '
+            f'candle history ({d["span"][0]} → {d["span"][1]}), ranked by net R after {d["fee_pct"]}% '
+            f'round-trip fees · first-touch at R = {rl[0]:g}–{rl[-1]:g} · refreshed {gen}. '
+            f'Same engine and scoring for both books, different candidate sets: '
+            f'<b>hedge</b> = 1h bar-context scalp setups, <b>prop</b> = the 4H/1H Asian-dip family. '
+            f'<b>thin</b> = the pattern fired &lt;40× in the entire history — too few occurrences to '
+            f'rank (samples can\'t be generated, only more history or a looser pattern creates them).</div>'
+            f'<div class="ed-mode">'
+            f'<button data-m="hedge">HEDGE</button><button data-m="prop">PROP</button></div>'
+            f'<div class="pv">'
+            f'<div id="board-hedge">{_board(d["results"], "hedge", rl)}</div>'
+            f'<div id="board-prop" style="display:none">{_board(d["results"], "prop", rl)}</div>'
+            f'<div class="panel"><h2>Read</h2><div class="prose">'
+            f'Each cell is <strong>net R per trade</strong> at that target multiple — green = profitable '
+            f'after fees. <strong>score</strong> sums the profitable cells weighted by R, so a strategy '
+            f'that still pays at 3R outranks one that only pays at 1R. Top 3 are highlighted. '
+            f'Mined in-sample; treat as a shortlist to forward-test, not a guarantee.</div></div>'
+            f'</div>'
+        )
+        board_tag = f'{ranked_n} ranked'
+        mode_script = _MODE_JS
+    else:
+        board_body = ('<div class="ed-hs">No rankings cached yet — run '
+                      '<code>python3 -m app.strategy_eval</code>.</div>')
+        board_tag = ""
+        mode_script = ""
+
+    sections = (
+        _fold("Fit", fit_sub, "", "", fit_body, open_=True, id_="fit") +
+        _fold("Backtest", "run &amp; build your own — locked, mechanical, no discretion", "", "",
+              bt_body, open_=False, id_="backtest") +
+        _fold("Board", "simulated — the coded rules replayed over the full candle history",
+              board_tag, "var(--dim)", board_body, open_=False, id_="board") +
+        _fold("Past", "your live trades — realised edge per setup family", "", "",
+              _LIVE, open_=False, id_="past")
+    )
+    css = ED_CSS + _BOARD_CSS + fit_css + bt_css
+    body = (
+        '<div class="an-sec">'
+        '<div class="an-h">Research — what could I test next?</div>'
+        '<div class="rq-p" style="max-width:none">Live results, backtest ranks and the runner are three '
+        'tenses of the same question — <b>which setups pay?</b> Same visual language as everything above, '
+        'just prospective instead of retrospective.</div>'
+        + sections +
+        '</div>'
+    )
+    script = ED_SCRIPT + mode_script + fit_script + bt_script
+    return css, body, script
+
+
 def review_sections() -> str:
     """Both hedge review surfaces, or nothing if the ledger cannot answer."""
     try:
@@ -660,9 +764,11 @@ def review_sections() -> str:
     return f'<div class="an-sec"><div class="an-h">Review</div>{out}</div>' if out else ""
 
 
-def render(book: str = "hedge") -> str:
+def render(book: str = "hedge", bt_css: str = "", bt_body: str = "", bt_script: str = "") -> str:
     """One page, two books. 'prop' spans every eval attempt (see review.book_filter)
-    — the current eval alone is /prop-ledger."""
+    — the current eval alone is /prop-ledger. bt_* = the backtest-runner fragment
+    (built in main.py, embedded as the Research → Backtest section) — passed in
+    the same way /edge used to take it, main.py's /analytics route builds it."""
     book = "prop" if book == "prop" else "hedge"
     other = "prop" if book == "hedge" else "hedge"
     path = "/prop-analytics" if book == "prop" else "/analytics"
@@ -674,9 +780,11 @@ def render(book: str = "hedge") -> str:
             f'switch to {other}</a>{eval_cone}</div>') + BODY
     if book == "hedge":
         body += review_sections()
+    research_css, research_body, research_script = _research_section(book, bt_css, bt_body, bt_script)
+    body += research_body
     return shell(path, "Analytics", body,
-                 script=f"const BOOK={book!r};\n".replace("'", '"') + SCRIPT,
-                 head_extra=_CSS, meta="how am I doing?")
+                 script=f"const BOOK={book!r};\n".replace("'", '"') + SCRIPT + research_script,
+                 head_extra=_CSS + research_css, meta="how am I doing?")
 
 
 ANALYTICS_HTML = render("hedge")   # back-compat for importers
