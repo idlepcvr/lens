@@ -34,6 +34,10 @@ import re
 # Signals dropped 2026-09-05 — merged into Desk (same data, same decide
 # endpoint, cockpit-glance vs list-scan was the only difference). /signals
 # 301s to /desk (see LEGACY_ROUTES in main.py).
+# Plan dropped 2026-09-05 — /goal was already its explicit rebuild (same
+# calculator, same hero cards, plus the milestone ladder); the two nav
+# entries pointed at the same job, same as the Calendar/Journal merge above.
+# /plan 301s to /goal (see LEGACY_ROUTES in main.py).
 # No "hedge-" prefix, unlike prop — 2026-08-29: "I want to keep the hedge
 # completely separate from the prop... I want to remove the prefix of hedge
 # for everything... even if it's using the same engine I feel like the front
@@ -43,7 +47,6 @@ import re
 NAV_HEDGE = [
     ("/overview", "Overview"),
     ("/desk", "Desk"),
-    ("/plan", "Plan"),
     ("/goal", "Goal"),
     ("/track", "Track"),
     ("/position", "Position"),
