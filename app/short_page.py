@@ -292,8 +292,8 @@ def parts() -> dict:
     )
 
     body = (head + spec + evidence + long_sec + gap_sec + rob + mech + limits +
-            '<p class="foot"><a href="/geometry#target">→ what the target costs</a> · '
-            '<a href="/geometry">→ where the geometry comes from</a><br>'
+            '<p class="foot"><a href="/evidence#target">→ what the target costs</a> · '
+            '<a href="/evidence#geometry">→ where the geometry comes from</a><br>'
             '<span class="m">python3 research/short_edge.py</span> reruns all four '
             'gates.</p>')
 

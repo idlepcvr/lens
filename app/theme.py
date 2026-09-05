@@ -73,7 +73,12 @@ HEDGE_MAIN = {h for h, _ in NAV_HEDGE}
 # glossary, now a tab of /manual. /about joined 2026-08-04 — the page for a
 # reader who can judge the work, as distinct from "/" which is for someone who
 # just wants to know he's okay.
-NAV_NEUTRAL = [("/evidence", "Evidence"), ("/geometry", "Geometry"), ("/review", "Review"), ("/money", "Money"), ("/audit", "Audit"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
+# Geometry/Review/Audit dropped 2026-09-06 — all three merged into /evidence
+# alongside Short/Robustness/Research: geometry+target are the sizing math,
+# review is the live monthly workflow, audit is its own superseded history —
+# four former pages plus the original three, one nav entry. /geometry,
+# /review and /audit 301 to /evidence#<section> (see LEGACY_ROUTES in main.py).
+NAV_NEUTRAL = [("/evidence", "Evidence"), ("/money", "Money"), ("/manual", "Manual"), ("/style", "Style"), ("/sitemap", "Sitemap"), ("/health", "Health")]
 
 _PAGE_MODE = {h: "hedge" for h, _ in NAV_HEDGE}
 
@@ -517,6 +522,46 @@ _MERGE_CSS = """<style>
 </style>"""
 
 
+_FOLD_CSS = """<style>
+details.mfold{margin:14px 0;border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+details.mfold>summary{list-style:none;cursor:pointer;padding:11px 13px;font-size:11px;font-weight:700;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px;user-select:none}
+details.mfold>summary::-webkit-details-marker{display:none}
+details.mfold>summary::before{content:'▸';color:var(--faint);font-size:10px;transition:transform .15s}
+details.mfold[open]>summary::before{transform:rotate(90deg)}
+details.mfold>summary .sub{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10px}
+.mfold-body{padding:4px 13px 13px}
+</style>"""
+
+_FOLD_OPEN_JS = """
+(function(){
+  function openTo(id){
+    if(!id) return;
+    var el = document.getElementById(id);
+    if(!el) return;
+    var d = el.closest ? el.closest('details') : null;
+    while(d){ d.open = true; d = d.parentElement ? d.parentElement.closest('details') : null; }
+    if (el.querySelectorAll) el.querySelectorAll('details').forEach(function(x){ x.open = true; });
+  }
+  if (location.hash) openTo(location.hash.slice(1));
+  window.addEventListener('hashchange', function(){ openTo(location.hash.slice(1)); });
+})();
+"""
+
+
+def fold(title: str, body: str, *, sub: str = "", open_: bool = False, id_: str | None = None) -> str:
+    """A native <details> collapsible, same visual language as analytics_page's
+    `an-d` sections — for wrapping a whole merged-in section (superseded
+    content, a deep appendix) so it doesn't read as equal-weight with the live
+    workflow sections around it. `merged()` always ships the CSS and the
+    hash-opens-ancestor-details script this depends on."""
+    idattr = f' id="{id_}"' if id_ else ""
+    openattr = " open" if open_ else ""
+    subhtml = f' <span class="sub">{sub}</span>' if sub else ""
+    return (f'<details class="mfold"{idattr}{openattr}><summary>{title}{subhtml}</summary>'
+            f'<div class="mfold-body">{body}</div></details>')
+
+
 _AT_UNSCOPED = ("@keyframes", "@-webkit-keyframes", "@font-face", "@import", "@charset")
 _AT_NESTED = ("@media", "@supports", "@container", "@layer")
 
@@ -589,10 +634,10 @@ def merged(current_path: str, page_label: str, sections: list[dict], *,
             "section body — rename the section." % (current_path, sorted(clash)))
 
     nav = "".join('<a href="#%s">%s</a>' % (s["id"], s["label"]) for s in sections)
-    css = _MERGE_CSS + "<style>" + "".join(
+    css = _MERGE_CSS + _FOLD_CSS + "<style>" + "".join(
         scope_css(s["css"], "#" + s["id"]) for s in sections if s.get("css")
     ) + "</style>"
-    script = "".join(
+    script = _FOLD_OPEN_JS + "".join(
         "\n;(function(){\n%s\n})();\n" % s["script"] for s in sections if s.get("script")
     )
     # Sections whose body already opens with its own <h1> pass heading=False,

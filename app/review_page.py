@@ -226,7 +226,10 @@ def _verdict_rows(rows: list[dict]) -> str:
     return "".join(out)
 
 
-def render(month: str | None = None) -> str:
+def parts(month: str | None = None) -> dict:
+    """Body + script, so /evidence can render this as its live monthly-review
+    section. month links round-trip through /evidence?month=…#review rather
+    than the old standalone /review?month= — see LEGACY_ROUTES in main.py."""
     month = month or _default_month()
     d = split(month)
     verdicts = all_verdicts()
@@ -247,9 +250,9 @@ gets recorded here with a date and a reason, the way a plan amendment does.</p>
 </div>
 
 <div class="sb-wrap" style="margin-bottom:12px;display:flex;gap:10px;align-items:center">
-<a class="btn ghost" href="/review?month={prev_m}">&larr; {prev_m}</a>
+<a class="btn ghost" href="/evidence?month={prev_m}#review">&larr; {prev_m}</a>
 <b style="font-family:var(--mono);font-size:15px">{month}</b>
-{'<a class="btn ghost" href="/review?month=' + next_m + '">' + next_m + ' &rarr;</a>' if not is_current else '<span class="m">current in progress</span>'}
+{'<a class="btn ghost" href="/evidence?month=' + next_m + '#review">' + next_m + ' &rarr;</a>' if not is_current else '<span class="m">current in progress</span>'}
 </div>
 
 <div class="sb-wrap" style="margin-bottom:12px">
@@ -333,4 +336,12 @@ async function submitVerdict() {{
   else {{ const e = await r.json(); msg.textContent = e.detail || 'failed'; }}
 }}
 """
-    return shell("/review", "Review", body, script=script, meta="monthly discipline check")
+    return {"body": body, "script": script}
+
+
+def render(month: str | None = None) -> str:
+    """Standalone shell — kept for anything that still wants a bare page;
+    the live route is /evidence#review (see main.py)."""
+    p = parts(month)
+    return shell("/evidence", "Review", p["body"], script=p["script"],
+                 meta="monthly discipline check")

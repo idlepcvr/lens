@@ -53,6 +53,7 @@ def _experiments():
             "mtime": jp.stat().st_mtime,
             "summary": summary,
             "doc": doc,
+            "data": data,
             "json_text": json.dumps(data, indent=2) if data else raw,
         })
     for sp in sorted(RESEARCH.glob("*.py")):
@@ -82,16 +83,46 @@ def _card(c) -> str:
     else:
         json_block = (f'<details><summary>raw result — results/{html.escape(c["name"])}.json</summary>'
                       f'<pre class="rs-json">{html.escape(c["json_text"])}</pre></details>')
-    return (f'<div class="rs-card">'
-            f'<div class="rs-head"><b>{html.escape(c["name"])}</b>{date}</div>'
+    # A one-word verdict badge, same vocabulary as /evidence's other sections
+    # (badge.approved/rejected on /evidence#luck) — decision-useful because it
+    # answers "did this one land?" without opening the JSON, for the one field
+    # that recurs often enough across ad-hoc experiments to be worth a scan:
+    # an explicit survived/passed flag, or common p-value fields.
+    verdict = _verdict_badge(c.get("data") if isinstance(c.get("data"), dict) else None)
+    return (f'<div class="rs-card {verdict["cls"]}">'
+            f'<div class="rs-head"><b>{html.escape(c["name"])}</b>{verdict["badge"]}{date}</div>'
             f'<div class="rs-sum">{html.escape(c["summary"])}</div>'
             f'{doc_block}{json_block}</div>')
 
 
+def _verdict_badge(data: dict | None) -> dict:
+    """Best-effort read of a survived/p-value field, so a card that already
+    states its own verdict shows it as a colored badge instead of requiring a
+    click into raw JSON. Most experiments have no such field — that's the
+    normal case, not a failure, and gets no badge at all rather than a guess."""
+    if not data:
+        return {"cls": "", "badge": ""}
+    for key in ("survived", "passed", "beats_luck"):
+        v = data.get(key)
+        if isinstance(v, bool):
+            return ({"cls": "rs-ok", "badge": ' <span class="badge approved">survived</span>'}
+                    if v else
+                    {"cls": "rs-bad", "badge": ' <span class="badge rejected">did not survive</span>'})
+    for key in ("p", "p_value", "perm_p"):
+        v = data.get(key)
+        if isinstance(v, (int, float)):
+            return ({"cls": "rs-ok", "badge": ' <span class="badge approved">beats luck</span>'}
+                    if v < 0.05 else
+                    {"cls": "rs-bad", "badge": ' <span class="badge rejected">could be luck</span>'})
+    return {"cls": "", "badge": ""}
+
+
 CSS = """
 .rs-intro{color:var(--dim);max-width:72ch;margin-bottom:18px}
-.rs-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
-.rs-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.rs-card{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.rs-card.rs-ok{border-left-color:var(--long)}
+.rs-card.rs-bad{border-left-color:var(--short)}
+.rs-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .rs-date{color:var(--faint);font-size:12px;white-space:nowrap}
 .rs-sum{color:var(--dim);margin:4px 0 6px}
 .rs-card details{margin-top:6px}
