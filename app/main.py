@@ -2184,6 +2184,12 @@ LEGACY_ROUTES = {
     # as "Did the book follow the engine?" — scoped to the hedge book on the way
     # in, which /today never was.
     "/today": "/track",
+    # 2026-09-05: /regime merged into /analytics as the always-visible first
+    # section on the page — it's what he checks more than anything else on
+    # the site, so it moved from its own page to the top of the one he's
+    # already on. See analytics_page.regime_section(). No fragment: the
+    # section is the top of /analytics, not an anchor further down.
+    "/regime": "/analytics",
 }
 def _legacy_redirect(new: str):
     # A factory, not a loop closure: closing over the loop variable would send
@@ -2272,17 +2278,6 @@ def api_money(refresh: bool = Query(False)):
 # /review + /recap deleted — the Journal is the single trade-history surface.
 # /journal deleted the same way, 2026-08-28 — merged into /journal (see
 # journal_page() above). Redirects below keep any bookmark or stale href working.
-
-
-@app.get("/regime", response_class=HTMLResponse)
-def regime_page():
-    """Market regime — BTC classified BULL/SIDEWAYS/BEAR, K-Means(k=3) on 14d
-    rolling return + vol. Was labelled a PROP analytic (it also bucketed the
-    prop hero strategy's win-rate per regime); that bucketing is gone with the
-    prop book, this is the plain market-regime read."""
-    from .regime import regime_payload
-    from .regime_page import render
-    return render(regime_payload())
 
 
 @app.get("/api/review/trades")

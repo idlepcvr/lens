@@ -94,7 +94,7 @@ def render(book: str = "hedge") -> str:
       <div class="grid" id="perf"></div>
     </section>
     <section>
-      <h2>Market<span class="hint">BTC · ATR &asymp; 24h min stop</span><a class="h2go" href="/regime">regime →</a></h2>
+      <h2>Market<span class="hint">BTC · ATR &asymp; 24h min stop</span><a class="h2go" href="/analytics">regime →</a></h2>
       <div class="grid" id="market"></div>
     </section>
   </div>

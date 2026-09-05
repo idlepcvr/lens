@@ -137,8 +137,8 @@ a strategy without panic-quitting.</p>
 <p>LENS sorts every day into one of three moods: <b class="g">BULL</b> (trending up),
 <b class="a">SIDEWAYS</b> (chopping in a range), <b class="r">BEAR</b> (trending down), using
 14-day return + volatility. It matters because your setups <b>don't win equally in all three</b>
-— continuation setups starve in a range and print in a trend. The <code>/regime</code> page
-tells you which mood is live and whether your hero strategy actually wins in it right now.</p>
+— continuation setups starve in a range and print in a trend. The top of
+<code>/analytics</code> tells you which mood is live right now.</p>
 
 <h4 id="transition">Transition matrix &amp; persistence — is the mood about to change?</h4>
 <p>Knowing today's regime isn't enough; you want to know if it's about to flip. The
