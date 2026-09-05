@@ -311,7 +311,12 @@ a{color:var(--accent);text-decoration:none}
 .logo .pg{color:var(--dim);font-weight:500;letter-spacing:.22em;font-size:13px;margin-left:2px}
 .live{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;
   letter-spacing:.14em;color:var(--dim);text-transform:uppercase;flex:0 0 auto;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw}
+  max-width:38vw;min-width:0}
+/* text-overflow on .live itself never engaged — it's a flex container with a
+   dot span + text span, and ellipsis only truncates single inline content.
+   The dot needs to stay fixed-size; only the text should shrink+ellipsize. */
+.live .dot{flex:0 0 auto}
+.live span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 /* the burger takes room the bar didn't need to budget for before — the page
    label (already shown via the sidebar's own current-page highlight) is the
    one thing here that can drop without losing information, so it's what
@@ -886,7 +891,7 @@ def shell(current_path: str, page_label: str, body: str, *,
             "aria-label=\"open menu\">&#9776;</button>"
             "<div class=\"logo\">LEN<span class=\"s\">S</span> "
             "<span class=\"pg\">" + _booked(current_path, page_label) + "</span></div>"
-            + (right or ("<div class=\"live\"><span class=\"dot\"></span>" + meta + "</div>")) +
+            + (right or ("<div class=\"live\"><span class=\"dot\"></span><span>" + meta + "</span></div>")) +
             "</div>"
         )
         shell_close = "</div></div>"
