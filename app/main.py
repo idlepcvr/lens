@@ -468,42 +468,207 @@ def api_research_json(name: str):
     return FileResponse(fp, media_type="application/json")
 
 
-@app.get("/evidence", response_class=HTMLResponse)
-def evidence_page():
-    """What has actually been tested, and what survived.
+def _audit_section() -> dict:
+    """Plain-English home for the 2026-07-02 strategy-audit recommendations,
+    compared LIVE against the current goal config, folded into /evidence as
+    a small collapsed history section rather than a page-equal one.
 
-    Was three routes — /short, /robustness, /research — which is one argument
-    split into three pages with no stated relationship, so none of them said
-    what it was for. Ordered here as the argument actually runs: the claim
-    that survived, then the test that it isn't luck, then every experiment
-    including the ones that failed.
+    2026-08-01: the geometry rows are SUPERSEDED by /evidence#geometry, which
+    derives the stop and target from live σ instead of fitting them to past
+    winners. The goal-model rows below still stand — they were always about
+    the config being consistent with the alerts, and that question survives
+    the geometry change. 2026-09-06: table of rows became a kv-grid of cards
+    (current → recommended, color-coded), the app's shared vocabulary for a
+    config-vs-live comparison — same component as /evidence#geometry's "was
+    vs now" cards — instead of a plain HTML table.
+    """
+    from . import geometry as G
+    from .geometry_page import HOLD_DAYS, RR, WIN_RATE, _sigma
+    from .setups import SL_PCT, TP_PCT
+    from .theme import fold
+    cfg = get_lens_config()
+    rr_live = round(TP_PCT / SL_PCT, 2)
+    rr_cfg = cfg.get("rr_ratio")
+    wr_cfg = cfg.get("win_rate")
+    sigma, _ = _sigma()
+    derived = G.config(sigma, HOLD_DAYS, RR, WIN_RATE)
+    cards = []
+
+    def card(ok, what, current, rec, why):
+        cls = "aud-ok" if ok else "aud-fix"
+        badge = ('<span class="badge approved">aligned</span>' if ok
+                 else '<span class="badge rejected">fix</span>')
+        cards.append(
+            f'<div class="aud-card {cls}"><div class="aud-k">{what}</div>'
+            f'<div class="aud-v"><span class="aud-cur">{current}</span>'
+            f'<span class="aud-arr">→</span><span class="aud-rec">{rec}</span></div>'
+            f'{badge}<div class="aud-why">{why}</div></div>')
+
+    card(abs(SL_PCT - derived["stop_pct"]) / derived["stop_pct"] <= 0.15,
+        "Alert stop", f"{SL_PCT}%", f"{derived['stop_pct']:.2f}%",
+        "Superseded. The old 0.63% came from the MAE of winning trades — a sample "
+        "picked by the outcome it was supposed to predict — and implied a ~5 hour "
+        "hold, over which the 0.30% round trip was half the stop. The figure on the "
+        "right is σ·√(hold/R:R) at live volatility. See Geometry above.")
+    card(abs(TP_PCT - derived["target_pct"]) / derived["target_pct"] <= 0.15,
+        "Alert target", f"{TP_PCT}%", f"{derived['target_pct']:.2f}%",
+        "Superseded. The old 1.5% was the median MFE of winners, which is a "
+        "description of the past, not a target that clears friction. The new one "
+        f"is the stop × R:R {RR:g}, giving a {derived['breakeven_wr']:.1%} breakeven "
+        f"win rate against a {derived['coinflip_wr']:.0%} coin flip.")
+    card(rr_cfg is not None and abs(rr_cfg - rr_live) < 0.2,
+        "Goal-model R:R (Dashboard → Parameters)", f"{rr_cfg}", f"{rr_live}",
+        f"Your projections on /goal and /dashboard are computed with this payoff. "
+        f"The alerts actually deliver {rr_live}R gross (~1.3R net of fees) — set it "
+        f"to {rr_live} so the projections stop assuming a payoff you never take.")
+    card(wr_cfg is not None and derived["breakeven_wr"] <= wr_cfg <= 0.32,
+        "Goal-model win rate", f"{wr_cfg}",
+        f"{derived['breakeven_wr']:.2f}–0.30",
+        f"Must be read against the payoff. At R:R {RR:g} the coin-flip win rate is "
+        f"{derived['coinflip_wr']:.0%} and breakeven is {derived['breakeven_wr']:.1%}, so "
+        f"{wr_cfg} is not conservative here — paired with a 4R payoff it implies an "
+        "enormous edge and the projections inherit it. The old 0.44–0.50 range belonged "
+        "to the 2.4R geometry and does not transfer.")
+    card(False, "Leverage reality", "10x all-in", f"{derived['leverage']:.2f}×",
+        "Superseded, and the old framing was backwards. Leverage multiplies the win "
+        "and the loss by the same factor, so it cannot make a negative system "
+        "positive — it sets the size of the P&L, never its sign. It is a drawdown "
+        f"dial: {derived['leverage']:.2f}× is what caps a 15-loss streak at 25% of "
+        f"the account at a {derived['risk_pct']:.2f}% risk budget. At 10× the toll "
+        "was multiplied by ten alongside everything else.")
+    card(False, "Goal target €" + format(int(cfg.get("target_balance") or 0), ","),
+        "€52,950 by Oct", "keep as north star, don't trust the ETA",
+        "At honest numbers (44–50% WR, ~1.3R net, 2 trades/wk from your balance) the "
+        "math lands near €1,200–1,500 by October — the dashboard only connects to "
+        "€53k through the old 3R assumption. The goal is yours; the timeline isn't data.")
+
+    banner = (
+        '<div class="card" style="background:var(--panel);border:1px solid var(--amber);'
+        'border-radius:10px;padding:16px 18px;margin:14px 0">'
+        '<b>Superseded 2026-08-01 by <a href="#geometry" style="color:var(--accent)">'
+        "Geometry above</a>.</b> This audit set the stop and target from the MAE/MFE of "
+        "<i>winning</i> trades — fitted to a sample selected by the outcome it was "
+        "meant to predict, and never asking how long the resulting trade takes to "
+        "resolve. setups.py already records that the S1–S5 edge those numbers were "
+        "built on did not survive out of sample. The cards below are kept so "
+        "the change is legible, not because they are still the recommendation.</div>"
+        '<div class="card" style="background:var(--panel);border:1px solid var(--line);'
+        'border-radius:10px;padding:16px 18px;margin:14px 0">'
+        "<b>What changed 2026-07-02:</b> every scanner alert now carries the validated "
+        "geometry below, and clean S1–S5 playbook matches alert again (previously only "
+        "the mechanical board top-3 could page you — a clean S3, your best realized "
+        "earner, could never send a notification. That was the desk-says-ENTER-but-"
+        "phone-stays-silent bug.)</div>"
+    )
+    rec_body = (banner + '<div class="aud-grid">' + "".join(cards) + '</div>'
+                + '<p style="margin-top:18px"><a href="#geometry" style="color:var(--accent)">'
+                "→ Where the geometry now comes from</a> · "
+                '<a href="/strategy" style="color:var(--accent)">→ live strategy re-ranks (H12/H13 watch)</a></p>')
+    css = ("<style>"
+           ".aud-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:6px}"
+           ".aud-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;"
+           "padding:13px 15px;border-left:3px solid var(--line)}"
+           ".aud-card.aud-ok{border-left-color:var(--long)}"
+           ".aud-card.aud-fix{border-left-color:var(--short)}"
+           ".aud-k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;"
+           "color:var(--faint);margin-bottom:6px}"
+           ".aud-v{font-family:var(--mono);font-size:15px;font-weight:700;margin-bottom:6px;"
+           "display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}"
+           ".aud-cur{color:var(--faint);text-decoration:line-through;font-weight:400;font-size:13px}"
+           ".aud-arr{color:var(--faint);font-weight:400}"
+           ".aud-rec{color:var(--ink)}"
+           ".aud-why{color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:8px}"
+           "@media(max-width:720px){.aud-grid{grid-template-columns:1fr}}"
+           "</style>")
+
+    # The original report is a standalone document with its own :root and body
+    # rules — inlining it would overwrite the cockpit's. An iframe keeps the
+    # July artifact exactly as written and costs one line.
+    report_body = (
+        '<p style="color:var(--dim);font-size:13px;margin:0 0 10px">'
+        'The original 2026-07-02 report, unedited. Its geometry findings are '
+        'superseded by <a href="#geometry" class="ac">Geometry above</a>; it is kept '
+        'as the record of what was believed at the time. '
+        '<a href="/audit-report-raw" class="ac" target="_blank">open standalone →</a></p>'
+        '<iframe src="/audit-report-raw" title="Strategy Audit 2026-07-02" '
+        'style="width:100%;height:78vh;border:1px solid var(--line);'
+        'border-radius:10px;background:var(--bg)"></iframe>'
+    )
+
+    from .theme import fold as _fold
+    body = (
+        '<p class="lead top" style="color:var(--dim);font-size:13.5px;line-height:1.65;'
+        'max-width:74ch;margin:0 0 14px">On 2 July 2026 the strategy was reviewed end to '
+        'end and a list of changes was written down. Superseded 2026-08-01 by the '
+        'Geometry section above — kept here as a to-do list with a memory, not because '
+        'it is still the recommendation.</p>'
+        + _fold("Recommendations vs live config", rec_body, sub="superseded — click to expand")
+        + _fold("The original report · 2026-07-02", report_body,
+                sub="unedited historical artifact", id_="report")
+    )
+    return {"body": body, "css": css}
+
+
+@app.get("/evidence", response_class=HTMLResponse)
+def evidence_page(month: Optional[str] = None):
+    """What has actually been tested, and what survived — now also where the
+    geometry comes from, the monthly review workflow, and the superseded
+    audit history. Six former routes (/short, /robustness, /research,
+    /geometry, /target, /audit, /review — seven, with /geometry+/target
+    already one calculation) folded into anchored sections of one page
+    rather than seven pages each answering a fragment of "can I trust this,
+    and what do I do about it this month".
+
+    Ordered as the argument actually runs: this month's live workflow first
+    (Review), then the claim that survived and the test that it isn't luck
+    (Verdict, Luck), then the sizing math that claim is quoted at (Geometry,
+    Target), then the two collapsed appendices — the superseded audit
+    history and the full experiment notebook, including the failures.
     """
     from .research_page import parts as notebook
     from .robustness_page import parts as luck
+    from .review_page import parts as review
     from .short_page import parts as verdict
-    from .theme import merged
+    from .geometry_page import parts as geo
+    from .target_page import parts as tgt
+    from .theme import fold, merged
     from .tldr import opener
     intro = opener(
         "What this page is",
         "Every trading idea you've had was tested against the price history to "
         "see whether it makes money for a real reason, or only made money by "
         "coincidence in the sample it was found in. Twelve ideas were tested. "
-        "One survived. That is all the word “evidence” means here.",
-        ["<b>The verdict</b> — the one idea that still made money when tested on "
-         "data it had never seen, and beat a coin-flip entry in the same market. "
-         "Everything else died.",
-         "<b>Is it luck?</b> — the same trades, shuffled into random order a few "
-         "thousand times, to measure how often pure chance produces a result this "
-         "good. Low number = the pattern is probably real.",
-         "<b>The notebook</b> — every test ever run, including the failures. The "
-         "failures are the point: they are why the verdict is only one line long."],
+        "One survived — and this page is also where that survivor's stop and "
+        "target come from, where the month's trades get reviewed against it, "
+        "and where the superseded history that led here is kept.",
+        ["<b>Review</b> — this month's closed trades grouped by what the "
+         "scanner said at entry, with a place to record a keep/tune/retire "
+         "verdict on a veto combination.",
+         "<b>The verdict</b> — the one idea that still made money when tested on "
+         "data it had never seen, and beat a coin-flip entry in the same market.",
+         "<b>Geometry &amp; Target</b> — where the stop and target come from, and "
+         "what a named weekly return actually demands in win rate.",
+         "<b>Audit &amp; the notebook</b> — collapsed by default: the superseded "
+         "July audit, and every experiment ever run, including the failures."],
         "whether that one surviving edge is <b>big enough</b>. It is real, and it "
         "is still far too small — the scoreboard above is the answer to that, and "
         "nothing on this page changes it.")
+    audit = _audit_section()
+    nb = notebook()
     return merged("/evidence", "Evidence", [
+        {"id": "review", "label": "This month · review", **review(month)},
         {"id": "verdict", "label": "The verdict · what survived", **verdict()},
         {"id": "luck", "label": "Is it luck? · permutation test", **luck()},
-        {"id": "notebook", "label": "The notebook · every experiment", **notebook()},
+        {"id": "geometry", "label": "What this configuration earns", **geo()},
+        {"id": "target", "label": "What a named target demands", **tgt()},
+        {"id": "audit", "label": "Audit · superseded", "body": fold(
+            "Audit · superseded 2026-08-01",
+            audit["body"], sub="the July report vs live config — history, not the current call",
+            id_="audit-fold"), "css": audit["css"]},
+        {"id": "notebook", "label": "The notebook · every experiment", "body": fold(
+            "The notebook · every experiment",
+            nb["body"], sub="every test ever run, including the failures",
+            id_="notebook-fold"), "css": nb["css"]},
     ], meta="what survived testing", intro=intro)
 
 
@@ -512,14 +677,6 @@ class ReviewVerdict(BaseModel):
     combo:   str
     verdict: str
     reason:  str
-
-
-@app.get("/review", response_class=HTMLResponse)
-def review_route(month: Optional[str] = None):
-    """NEXT_SESSION.md #1: the month's trades grouped by setup_tag, computed
-    live, plus a place to record a keep/tune/retire verdict on a veto combo."""
-    from .review_page import render
-    return render(month)
 
 
 @app.post("/api/review/verdict")
@@ -548,182 +705,10 @@ def api_review_notify():
     return {"sent": review_page.notify_monthly()}
 
 
-@app.get("/geometry", response_class=HTMLResponse)
-def geometry_page():
-    """One calculation, both directions. /geometry derived what a configuration
-    earns; /target inverted it — name a weekly return, see the edge it demands.
-    target_page.py said so in its own docstring, so they merged 2026-08-03."""
-    from .geometry_page import parts as geo
-    from .target_page import parts as tgt
-    from .theme import merged
-    from .tldr import opener
-    intro = opener(
-        "What this page is",
-        "Where the stop-loss and the take-profit go, and what that choice earns. "
-        "Put the stop too close and normal noise knocks you out; too far and one "
-        "loss costs more than several wins. This page picks the distance from how "
-        "much Bitcoin actually moves in a day, rather than from a round number.",
-        ["<b>What this configuration earns</b> — given the stop and target you're "
-         "using now, the win rate you'd need and the return it produces.",
-         "<b>What a named target demands</b> — the same maths backwards: name a "
-         "weekly return, and see the win rate it would take to get there. This is "
-         "where a target stops being a wish.",
-         "The honest bit: each requirement is priced against a <b>random entry</b>, "
-         "not against zero. Beating a coin flip is the real bar, and it is higher "
-         "than it looks."],
-        "whether the target is reachable. Naming 10%/week does not make it "
-        "available — the win rate the table demands for it is the price, and the "
-        "scoreboard above is what you're actually achieving.")
-    return merged("/geometry", "Geometry", [
-        {"id": "geometry", "label": "What this configuration earns", **geo()},
-        {"id": "target", "label": "What a named target demands", **tgt()},
-    ], meta="where the stop comes from", intro=intro)
-
-
-@app.get("/audit", response_class=HTMLResponse)
-def audit_page():
-    """Plain-English home for the 2026-07-02 strategy-audit recommendations,
-    compared LIVE against the current goal config. The 'where do I see this'
-    page — recommendations were previously only in code comments and git.
-
-    2026-08-01: the geometry rows are SUPERSEDED by /geometry, which derives the
-    stop and target from live σ instead of fitting them to past winners. The
-    goal-model rows below still stand — they were always about the config being
-    consistent with the alerts, and that question survives the geometry change.
-    """
-    from . import geometry as G
-    from .geometry_page import HOLD_DAYS, RR, WIN_RATE, _sigma
-    from .setups import SL_PCT, TP_PCT
-    from .theme import shell
-    cfg = get_lens_config()
-    rr_live = round(TP_PCT / SL_PCT, 2)
-    rr_cfg = cfg.get("rr_ratio")
-    wr_cfg = cfg.get("win_rate")
-    sigma, _ = _sigma()
-    derived = G.config(sigma, HOLD_DAYS, RR, WIN_RATE)
-    rows = []
-
-    def row(ok, what, current, rec, why):
-        badge = ('<span style="color:var(--long)">✓</span>' if ok
-                 else '<span style="color:var(--short)">✗ fix</span>')
-        rows.append(f"<tr><td>{badge}</td><td>{what}</td><td class='m'>{current}</td>"
-                    f"<td class='m'>{rec}</td><td class='why'>{why}</td></tr>")
-
-    row(abs(SL_PCT - derived["stop_pct"]) / derived["stop_pct"] <= 0.15,
-        "Alert stop", f"{SL_PCT}%", f"{derived['stop_pct']:.2f}%",
-        "Superseded. The old 0.63% came from the MAE of winning trades — a sample "
-        "picked by the outcome it was supposed to predict — and implied a ~5 hour "
-        "hold, over which the 0.30% round trip was half the stop. The figure on the "
-        "right is σ·√(hold/R:R) at live volatility. See /geometry.")
-    row(abs(TP_PCT - derived["target_pct"]) / derived["target_pct"] <= 0.15,
-        "Alert target", f"{TP_PCT}%", f"{derived['target_pct']:.2f}%",
-        "Superseded. The old 1.5% was the median MFE of winners, which is a "
-        "description of the past, not a target that clears friction. The new one "
-        f"is the stop × R:R {RR:g}, giving a {derived['breakeven_wr']:.1%} breakeven "
-        f"win rate against a {derived['coinflip_wr']:.0%} coin flip.")
-    row(rr_cfg is not None and abs(rr_cfg - rr_live) < 0.2,
-        "Goal-model R:R (Dashboard → Parameters)", f"{rr_cfg}", f"{rr_live}",
-        f"Your projections on /goal and /dashboard are computed with this payoff. "
-        f"The alerts actually deliver {rr_live}R gross (~1.3R net of fees) — set it "
-        f"to {rr_live} so the projections stop assuming a payoff you never take.")
-    row(wr_cfg is not None and derived["breakeven_wr"] <= wr_cfg <= 0.32,
-        "Goal-model win rate", f"{wr_cfg}",
-        f"{derived['breakeven_wr']:.2f}–0.30",
-        f"Must be read against the payoff. At R:R {RR:g} the coin-flip win rate is "
-        f"{derived['coinflip_wr']:.0%} and breakeven is {derived['breakeven_wr']:.1%}, so "
-        f"{wr_cfg} is not conservative here — paired with a 4R payoff it implies an "
-        "enormous edge and the projections inherit it. The old 0.44–0.50 range belonged "
-        "to the 2.4R geometry and does not transfer.")
-    row(False, "Leverage reality", "10x all-in", f"{derived['leverage']:.2f}×",
-        "Superseded, and the old framing was backwards. Leverage multiplies the win "
-        "and the loss by the same factor, so it cannot make a negative system "
-        "positive — it sets the size of the P&L, never its sign. It is a drawdown "
-        f"dial: {derived['leverage']:.2f}× is what caps a 15-loss streak at 25% of "
-        f"the account at a {derived['risk_pct']:.2f}% risk budget. At 10× the toll "
-        "was multiplied by ten alongside everything else.")
-    row(False, "Goal target €" + format(int(cfg.get("target_balance") or 0), ","),
-        "€52,950 by Oct", "keep as north star, don't trust the ETA",
-        "At honest numbers (44–50% WR, ~1.3R net, 2 trades/wk from your balance) the "
-        "math lands near €1,200–1,500 by October — the dashboard only connects to "
-        "€53k through the old 3R assumption. The goal is yours; the timeline isn't data.")
-
-    body = (
-        '<div class="card" style="background:var(--panel);border:1px solid var(--amber);'
-        'border-radius:10px;padding:16px 18px;margin:14px 0">'
-        '<b>Superseded 2026-08-01 by <a href="/geometry" style="color:var(--accent)">'
-        "/geometry</a>.</b> This audit set the stop and target from the MAE/MFE of "
-        "<i>winning</i> trades — fitted to a sample selected by the outcome it was "
-        "meant to predict, and never asking how long the resulting trade takes to "
-        "resolve. setups.py already records that the S1–S5 edge those numbers were "
-        "built on did not survive out of sample. The geometry rows below are kept so "
-        "the change is legible, not because they are still the recommendation.</div>"
-        '<div class="card" style="background:var(--panel);border:1px solid var(--line);'
-        'border-radius:10px;padding:16px 18px;margin:14px 0">'
-        "<b>What changed 2026-07-02:</b> every scanner alert now carries the validated "
-        "geometry below, and clean S1–S5 playbook matches alert again (previously only "
-        "the mechanical board top-3 could page you — a clean S3, your best realized "
-        "earner, could never send a notification. That was the desk-says-ENTER-but-"
-        "phone-stays-silent bug.)</div>"
-        "<table><tr><th></th><th>Setting</th><th>Current</th><th>Recommended</th>"
-        "<th>Why (plain English)</th></tr>" + "".join(rows) + "</table>"
-        '<p style="margin-top:18px"><a href="/geometry" style="color:var(--accent)">'
-        "→ Where the geometry now comes from</a> · "
-        '<a href="/audit#report" style="color:var(--accent)">'
-        "→ Full audit report (visual, historical)</a> · "
-        '<a href="/strategy" style="color:var(--accent)">→ live strategy re-ranks (H12/H13 watch)</a></p>'
-    )
-    css = ("<style>table{border-collapse:collapse;width:100%;font-size:13.5px}"
-           "th{text-align:left;color:var(--faint);font-family:var(--mono);font-size:10.5px;"
-           "text-transform:uppercase;letter-spacing:.12em;padding:7px 9px;border-bottom:1px solid var(--line)}"
-           "td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top}"
-           "td.m{font-family:var(--mono);font-size:12.5px;white-space:nowrap}"
-           "td.why{color:var(--dim);font-size:12.5px;line-height:1.55}</style>")
-    from .theme import merged
-    # The original report is a standalone document with its own :root and body
-    # rules — inlining it would overwrite the cockpit's. An iframe keeps the
-    # July artifact exactly as written and costs one line.
-    report = (
-        '<div style="max-width:1000px;margin:0 auto;padding:0 14px">'
-        '<p style="color:var(--dim);font-size:13px;margin:0 0 10px">'
-        'The original 2026-07-02 report, unedited. Its geometry findings are '
-        'superseded by <a href="/geometry" class="ac">/geometry</a>; it is kept '
-        'as the record of what was believed at the time. '
-        '<a href="/audit-report-raw" class="ac" target="_blank">open standalone →</a></p>'
-        '<iframe src="/audit-report-raw" title="Strategy Audit 2026-07-02" '
-        'style="width:100%;height:78vh;border:1px solid var(--line);'
-        'border-radius:10px;background:var(--bg)"></iframe></div>'
-    )
-    from .tldr import opener
-    intro = opener(
-        "What this page is",
-        "On 2 July 2026 the strategy was reviewed end to end and a list of changes "
-        "was written down. This page is that list, checked automatically against "
-        "what the system is set to today — so you can see which recommendations "
-        "were actually applied and which were quietly ignored. It is a to-do list "
-        "with a memory, not an analysis.",
-        ["<b>Recommendations vs live config</b> — each July recommendation beside "
-         "the value in use right now, so a drift between what was decided and what "
-         "is running shows up as a mismatched row.",
-         "<b>The original report</b> — the July document itself, unedited, kept as "
-         "the record of what was believed at the time.",
-         "Its stop-and-target findings are <b>out of date on purpose</b>: they were "
-         "fitted to past winning trades, which is circular. "
-         "<a href='/geometry' class='ac'>Geometry</a> replaced that method."],
-        "anything about today. It is a snapshot from July. If a row disagrees with "
-        "the live config, the live config is not automatically wrong — the July "
-        "recommendation may be the stale one.")
-    return merged("/audit", "Audit", [
-        {"id": "recommendations", "label": "Recommendations vs live config",
-         "body": body, "css": css},
-        {"id": "report", "label": "The original report · 2026-07-02",
-         "body": report},
-    ], meta="what to change and why", intro=intro)
-
-
 @app.get("/audit-report-raw", include_in_schema=False)
 def audit_report_raw():
-    """The frozen July report, served as its own document so /audit#report can
-    frame it. Not in the sitemap — it is a section, not a page."""
+    """The frozen July report, served as its own document so /evidence#report
+    can frame it. Not in the sitemap — it is a section, not a page."""
     import os
     from fastapi.responses import FileResponse
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
@@ -2169,16 +2154,26 @@ LEGACY_ROUTES = {
     # listed them as if they were pages — two of them under "Engines".
     "/backtest": "/analytics#backtest",
     "/strategy": "/analytics#board", "/strategy-hedge": "/analytics#board",
-    # 2026-08-03 merges. Reading material is one page with tabs; the audit is
-    # one July artifact, not two; geometry/target are one calculation run in
-    # both directions; short/robustness/research are conclusion, evidence and
-    # appendix of a single argument.
+    # 2026-08-03 merges. Reading material is one page with tabs; geometry/
+    # target were one calculation run in both directions; short/robustness/
+    # research are conclusion, evidence and appendix of a single argument.
     "/glossary": "/manual?doc=glossary",
-    "/audit-report": "/audit#report",
-    "/target": "/geometry#target",
     "/short": "/evidence#verdict",
     "/robustness": "/evidence#luck",
     "/research": "/evidence#notebook",
+    # 2026-09-06: /geometry, /audit and /review folded into /evidence too —
+    # sizing math, superseded history and the live monthly workflow all
+    # answer "can I trust this, and what do I do about it" alongside the
+    # verdict/luck/notebook argument they were already living next to in the
+    # nav. /target followed /geometry in (same calculation, both directions).
+    # Audit's #report anchor is nested inside its collapsed fold now, not a
+    # top-level section — merged()'s hash-open script opens the ancestor
+    # <details> when the fragment lands inside one.
+    "/geometry": "/evidence#geometry",
+    "/target": "/evidence#target",
+    "/audit": "/evidence#audit",
+    "/audit-report": "/evidence#report",
+    "/review": "/evidence#review",
     # 2026-08-21: /today merged into /track. Both opened on the next rung;
     # /today's unique half was the signal-adherence count, which now lives there
     # as "Did the book follow the engine?" — scoped to the hedge book on the way

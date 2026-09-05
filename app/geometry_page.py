@@ -440,7 +440,7 @@ def parts() -> dict:
         f'plus two decisions: hold {HOLD_DAYS} days at R:R {RR:g}. '
         f'Nothing on this page is fitted to past winners.</p>'
         + stale + verdict + law + ladder + conf + base + fric + frag + avail + ledger +
-        '<p class="foot"><a href="/audit">→ what this supersedes</a> · '
+        '<p class="foot"><a href="/evidence#audit">→ what this supersedes</a> · '
         '<a href="/manual?doc=glossary">→ the terms</a> · '
         '<a href="/analytics#board">→ live strategy ranks</a><br>'
         '<span class="m">python3 -m app.geometry</span> runs the same math with its '
