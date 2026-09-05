@@ -213,30 +213,35 @@ BODY = r"""
       <div class="card"><div class="card-title">Required growth to hit goal</div><div class="kv" id="r-growth"></div></div>
       <div class="card"><div class="card-title">Per-trade model</div><div class="kv" id="r-trade"></div></div>
     </div>
-    <div class="rk">
-      <div class="rk-title">Risk &amp; Kelly — the core mismatch<a class="qh" href="/glossary#kelly" target="_blank" rel="noopener" title="Kelly, DD constraint & optimal risk explained">?</a></div>
-      <div class="rk-row" id="rk-row"></div>
-      <div class="explain" id="rk-explain"></div>
+    <div class="rk card fold col" id="rk-card">
+      <div class="rk-title card-title"><span class="pcaret">▾</span> Risk &amp; Kelly — the core mismatch<a class="qh" href="/glossary#kelly" target="_blank" rel="noopener" title="Kelly, DD constraint & optimal risk explained">?</a></div>
+      <div class="fold-body">
+        <div class="rk-row" id="rk-row"></div>
+        <div class="explain" id="rk-explain"></div>
+      </div>
     </div>
     <div class="grid2">
-      <div class="card"><div class="card-title">Risk analytics</div><div class="kv" id="r-stats"></div></div>
-      <div class="card"><div class="card-title">Account impact / trade</div><div class="kv" id="r-acct"></div></div>
+      <div class="card fold col" id="stats-card"><div class="card-title"><span class="pcaret">▾</span> Risk analytics</div><div class="fold-body"><div class="kv" id="r-stats"></div></div></div>
+      <div class="card fold col" id="acct-card"><div class="card-title"><span class="pcaret">▾</span> Account impact / trade</div><div class="fold-body"><div class="kv" id="r-acct"></div></div></div>
     </div>
-    <div id="r-mc"></div>
+    <div class="card fold col" id="mc-card">
+      <div class="card-title"><span class="pcaret">▾</span> Monte Carlo / BTC</div>
+      <div class="fold-body"><div id="r-mc"></div></div>
+    </div>
     <div class="grid2">
-      <div class="card"><div class="card-title">Win-rate sensitivity</div><div class="st" id="r-wrs"></div>
-        <div class="st-note">How EV &amp; ruin move as WR slips/improves around your current rate (R held). Below breakeven WR the edge dies regardless of R.</div></div>
-      <div class="card"><div class="card-title">R-target scenarios</div><div class="st" id="r-rtgt"></div>
-        <div class="st-note">What each reward:risk target yields after fees (WR held). R is the lever you control — exit discipline. ← = your current R:R.</div></div>
+      <div class="card fold col" id="wrs-card"><div class="card-title"><span class="pcaret">▾</span> Win-rate sensitivity</div>
+        <div class="fold-body"><div class="st" id="r-wrs"></div>
+        <div class="st-note">How EV &amp; ruin move as WR slips/improves around your current rate (R held). Below breakeven WR the edge dies regardless of R.</div></div></div>
+      <div class="card fold col" id="rtgt-card"><div class="card-title"><span class="pcaret">▾</span> R-target scenarios</div>
+        <div class="fold-body"><div class="st" id="r-rtgt"></div>
+        <div class="st-note">What each reward:risk target yields after fees (WR held). R is the lever you control — exit discipline. ← = your current R:R.</div></div></div>
     </div>
-    <div class="card">
-      <div class="card-title">Stack projection — when the rungs land</div>
-      <div id="stackproj"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Scenario ladder — win rate × realized R</div>
-      <div class="slwrap"><table class="slad" id="sladder"></table></div>
-      <div class="st-note" id="slad-note"></div>
+    <div class="card fold col" id="sladder-card">
+      <div class="card-title"><span class="pcaret">▾</span> Scenario ladder — win rate × realized R</div>
+      <div class="fold-body">
+        <div class="slwrap"><table class="slad" id="sladder"></table></div>
+        <div class="st-note" id="slad-note"></div>
+      </div>
     </div>
     <div class="card fold col" id="ladder-card">
       <div class="card-title">
@@ -366,10 +371,10 @@ function render(g){
     mc=`<div class="flagcard"><p class="ft">🧪 Monte-Carlo output is non-physical</p>`
       +`<p>P50 projects ${fmtEur(g.mc_p50)} — it compounds the +${fmtPct(g.geometric_drift)}/trade drift but <b>ignores ruin</b>. With losses-to-ruin = ${fmtInt(g.losses_to_ruin)}, that drift is never realised. Treat it as the model over-extrapolating, not a forecast.${g.btc_price_at_goal!=null?" &nbsp;Target AUM: "+fmtNum(g.target_aum_btc)+" BTC @ "+fmtEur(g.btc_price_at_goal)+".":""}</p></div>`;
   } else {
-    mc=`<div class="card"><div class="card-title">Monte Carlo / BTC</div><div class="kv">`
+    mc=`<div class="kv">`
       +row("MC P05",fmtEur(g.mc_p05),"neg")+row("MC P50",fmtEur(g.mc_p50))+row("MC P95",fmtEur(g.mc_p95),"pos")
       +(g.btc_price_at_goal!=null?row("BTC @ goal",fmtEur(g.btc_price_at_goal))+row("Target AUM",fmtNum(g.target_aum_btc)+" BTC"):"")
-      +`</div></div>`;
+      +`</div>`;
   }
   document.getElementById("r-mc").innerHTML=mc;
   LAST_G=g; renderScenarioLadder(g);
@@ -608,41 +613,6 @@ function renderHero(H){
 }
 async function loadHero(){ try{ renderHero(await fetch("/api/goal/hero").then(r=>r.json())); }catch(e){} }
 
-// ── Stack projection — engine → BTC at the three price scenarios ─────────────
-function renderStackProj(S){
-  const box=document.getElementById("stackproj");
-  if(!S||S.stack==null){
-    box.innerHTML=`<div class="st-note">${S&&S.reason?S.reason:"—"}</div>`; return; }
-  const SC=["bear","base","bull"];
-  const cell=d=>d?`<span>${d}</span>`:`<span style="color:var(--re)">never</span>`;
-  const src=k=>k==="measured"
-    ? `<span class="msrc measured">M</span> measured`
-    : `<span class="msrc typed" style="border-color:var(--am);color:var(--am)">P</span> plan`;
-  let body="";
-  ["measured","plan"].forEach(k=>{
-    const R=S.rows[k]; if(!R) return;
-    S.targets.forEach((t,i)=>{
-      // server keys are Python floats ("5.0"); JS String(5.0) is "5"
-      const r=R.rungs[t.toFixed(1)];
-      body+=`<span class="lc">${i===0?src(k):""}</span>`
-        +`<span class="lc" style="color:var(--t1)">${t} ₿</span>`
-        +SC.map(sc=>cell(r[sc])).join("");
-    });
-    body+=`<span class="lc" style="grid-column:1/-1;color:var(--t3);font-size:9.5px;padding-bottom:5px">`
-      +`WR ${(R.win_rate*100).toFixed(1)}% · R ${Number(R.rr).toFixed(2)} · ${R.trades_per_week}/wk · risk ${R.risk_pct}%/trade`
-      +`${k==="measured"?` <span style="color:var(--re)">(n=${R.n})</span>`:" (typed)"}</span>`;
-  });
-  const head=`<span class="sh lc">source</span><span class="sh lc">rung</span>`
-    +SC.map(sc=>`<span class="sh">${sc} ${S.scenarios[sc]>0?"+":""}${S.scenarios[sc]}%</span>`).join("");
-  box.innerHTML=
-     `<div class="st" style="grid-template-columns:1.3fr .6fr 1fr 1fr 1fr">${head}${body}</div>`
-    +`<div class="st-note">Stack <b>${S.stack} ₿</b> @ ${S.stack_date} · BTC ${fmtEur(S.price_eur)} · burn ${fmtEur(S.burn_monthly_eur)}/mo.<br>`
-    +`${S.note}<br>`
-    +`<b>Bear lands first</b> — the rungs are denominated in BTC, so EUR income buys more coin when the price is low. `
-    +`A bull run makes a BTC target <i>harder</i> to reach from fiat earnings, not easier.</div>`;
-}
-async function loadStackProj(){ renderStackProj(await fetch("/api/goal/stack").then(r=>r.json())); }
-loadStackProj();
 document.querySelectorAll(".card.fold>.card-title").forEach(h=>
   h.addEventListener("click",()=>h.parentElement.classList.toggle("col")));
 document.getElementById("amend-toggle").addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation();
